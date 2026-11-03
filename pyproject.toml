@@ -231,6 +231,8 @@ inline-quotes = "double"
 # A local-dev app's Pulumi program is a script directory: an __init__.py there
 # would make it a package named `pulumi`, shadowing the SDK for mypy and isort.
 "local-dev/apps/*/pulumi/**" = ["INP001"]
+# A script the learn-ai program mounts into the model stub's pod, not a package.
+"local-dev/apps/learn-ai/llm-stub/**" = ["INP001"]
 "scripts/**" = [
   "T201",
   "ERA001",
