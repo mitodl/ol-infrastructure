@@ -2099,8 +2099,9 @@ async def _announce_refusals(app, repos, state: ReleaseProgressState) -> bool:
 
 # A closed release issue that Production has not labelled consumed after this
 # long is reported. The gate is checked every 5 minutes, and Production queues
-# behind a running QA job for that app, which has taken up to about 30 minutes,
-# so a shorter wait would report deploys that are only slow.
+# behind a running QA job for that app. QA usually finishes within 30 minutes,
+# so a shorter wait would report deploys that are only slow; one QA run has
+# taken over an hour, which would be reported early.
 _STRANDED_AFTER = timedelta(minutes=45)
 # Only issues closed this recently are considered, which also keeps old
 # releases from before the consumed label existed out of it.
