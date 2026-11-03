@@ -59,7 +59,7 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
 )
 from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
-    read_image_internal_schema,
+    read_image_internal_schema_range,
 )
 from ol_infrastructure.applications.omnigraph.lock_handoff import (
     MIGRATION_ARMED_ANNOTATION,
@@ -494,20 +494,27 @@ def create_data_tier(  # noqa: PLR0913
     # failure instead. A label that cannot be read is NOT a failure — an image
     # predating the label, or a run without ECR access, warns and skips, since
     # refusing those would make a rollback impossible.
+    image_min_internal_schema: int | None
+    image_internal_schema: int | None
     try:
-        image_internal_schema: int | None = read_image_internal_schema(
-            OMNIGRAPH_SERVER_ECR_REPOSITORY, omnigraph_server_image, aws_config.region
+        image_min_internal_schema, image_internal_schema = (
+            read_image_internal_schema_range(
+                OMNIGRAPH_SERVER_ECR_REPOSITORY,
+                omnigraph_server_image,
+                aws_config.region,
+            )
         )
     except ImageSchemaUnavailableError as exc:
         pulumi.log.warn(
             f"skipping the image storage-format check: {exc}",
         )
-        image_internal_schema = None
+        image_min_internal_schema = image_internal_schema = None
     validate_image_internal_schema(
         image_internal_schema,
         internal_schema_version,
         migrate_to_prefix,
         migration_armed=migration_armed,
+        image_min_internal_schema=image_min_internal_schema,
     )
 
     # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,

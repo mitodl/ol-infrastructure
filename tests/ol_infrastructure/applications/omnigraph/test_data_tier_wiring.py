@@ -68,7 +68,9 @@ def _build(
     monkeypatch.setenv("OMNIGRAPH_DOCKER_SHA", "sha256:" + "a" * 64)
     monkeypatch.delenv("OMNIGRAPH_DOCKER_TAG", raising=False)
     monkeypatch.setattr(
-        data_tier, "read_image_internal_schema", lambda *_: image_format
+        data_tier,
+        "read_image_internal_schema_range",
+        lambda *_: (image_format, image_format),
     )
     service_account = kubernetes.core.v1.ServiceAccount("omnigraph-server-sa")
     tier = data_tier.create_data_tier(

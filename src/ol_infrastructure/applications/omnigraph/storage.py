@@ -185,6 +185,7 @@ def validate_image_internal_schema(
     migrate_to_prefix: str,
     *,
     migration_armed: bool,
+    image_min_internal_schema: int | None = None,
 ) -> None:
     """Cross-check the DEPLOYING IMAGE's declared storage format against config.
 
@@ -212,7 +213,12 @@ def validate_image_internal_schema(
       is expected to differ and is not compared.
     * Steady state: the image must read the format the cluster SERVES. This is
       the check that would have refused the deploy on 2026-09-16 instead of
-      letting the cluster-apply Job discover it.
+      letting the cluster-apply Job discover it. "Reads" is a range:
+      ``image_min_internal_schema`` (the image's
+      ``edu.mit.ol.omnigraph.min-internal-schema`` label) up to
+      ``image_internal_schema``. omnigraph 0.14 writes 16 and opens 14 in place,
+      so a 0.14 image is accepted against a fmt14 root with no migration armed.
+      An image without the label serves only the format it writes.
 
     ``migration_armed`` IS PASSED IN RATHER THAN INFERRED FROM
     ``migrate_to_prefix``, so this cannot disagree with the rest of the program
@@ -259,10 +265,20 @@ def validate_image_internal_schema(
         # against — validate_internal_schema_version has already established
         # that this pairing is self-consistent.
         return
-    if image_internal_schema != internal_schema_version:
+    oldest = (
+        image_internal_schema
+        if image_min_internal_schema is None
+        else image_min_internal_schema
+    )
+    if not oldest <= internal_schema_version <= image_internal_schema:
+        served = (
+            f"{image_internal_schema}"
+            if oldest == image_internal_schema
+            else f"{oldest} to {image_internal_schema}"
+        )
         msg = (
             f"the deploying omnigraph image reads storage format "
-            f"{image_internal_schema}, but this cluster serves format "
+            f"{served}, but this cluster serves format "
             f"{internal_schema_version} (omnigraph:internal_schema_version, "
             "fmt<N> in omnigraph:storage_prefix). The server would refuse "
             "every graph. Arm the migration — set omnigraph:migrate_from_image "

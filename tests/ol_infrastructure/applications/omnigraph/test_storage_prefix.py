@@ -188,6 +188,30 @@ def test_image_agreeing_with_the_served_format_passes() -> None:
     validate_image_internal_schema(9, 9, "", migration_armed=False)
 
 
+@pytest.mark.parametrize("served", [14, 15, 16])
+def test_image_serving_the_root_in_place_passes(served: int) -> None:
+    """Omnigraph 0.14 writes 16 and opens 14 in place, so no migration is armed."""
+    validate_image_internal_schema(
+        16, served, "", migration_armed=False, image_min_internal_schema=14
+    )
+
+
+@pytest.mark.parametrize("served", [9, 17])
+def test_image_outside_its_served_range_is_refused(served: int) -> None:
+    with pytest.raises(ValueError, match="reads storage format 14 to 16"):
+        validate_image_internal_schema(
+            16, served, "", migration_armed=False, image_min_internal_schema=14
+        )
+
+
+def test_armed_migration_still_targets_the_written_format() -> None:
+    """The rebuild writes the image's own format; the served range doesn't apply."""
+    with pytest.raises(ValueError, match="targets format 14"):
+        validate_image_internal_schema(
+            16, 14, "fmt14", migration_armed=True, image_min_internal_schema=14
+        )
+
+
 def test_no_committed_schema_leaves_nothing_to_check() -> None:
     """A bucket-root (non-``fmt<N>``) prefix has no number to compare against.
 

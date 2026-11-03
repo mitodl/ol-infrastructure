@@ -15,9 +15,10 @@ import pytest
 
 from ol_infrastructure.applications.omnigraph.image_schema import (
     IMAGE_SCHEMA_LABEL,
+    MIN_IMAGE_SCHEMA_LABEL,
     ImageSchemaUnavailableError,
     _image_id,
-    read_image_internal_schema,
+    read_image_internal_schema_range,
 )
 
 _REPOSITORY = "omnigraph-server"
@@ -133,7 +134,39 @@ def test_reads_the_label_off_a_plain_manifest(patched) -> None:
     """The shape the Concourse build actually pushes today."""
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: "9"}}})
-    assert read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1") == 9
+    assert read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1") == (
+        9,
+        9,
+    )
+
+
+def test_reads_the_oldest_format_served_in_place(patched) -> None:
+    """Omnigraph 0.14 writes 16 and opens a format-14 root without a rebuild."""
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(
+        client,
+        {
+            "config": {
+                "Labels": {IMAGE_SCHEMA_LABEL: "16", MIN_IMAGE_SCHEMA_LABEL: "14"}
+            }
+        },
+    )
+    assert read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1") == (
+        14,
+        16,
+    )
+
+
+def test_a_present_but_unparseable_min_label_fails_the_preview(patched) -> None:
+    """Same rule as the written-format label: an empty value is a broken build."""
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(
+        client,
+        {"config": {"Labels": {IMAGE_SCHEMA_LABEL: "16", MIN_IMAGE_SCHEMA_LABEL: ""}}},
+    )
+    with pytest.raises(ValueError, match="OMNIGRAPH_MIN_INTERNAL_SCHEMA") as caught:
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
+    assert not isinstance(caught.value, ImageSchemaUnavailableError)
 
 
 def test_walks_a_multi_platform_index_to_the_linux_amd64_manifest(patched) -> None:
@@ -155,7 +188,10 @@ def test_walks_a_multi_platform_index_to_the_linux_amd64_manifest(patched) -> No
     }
     client = _FakeEcr({_DIGEST: index, child: _image_manifest()})
     patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: "9"}}})
-    assert read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1") == 9
+    assert read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1") == (
+        9,
+        9,
+    )
     assert client.requested[-1] == {"imageDigest": child}
 
 
@@ -172,7 +208,7 @@ def test_index_without_linux_amd64_is_unavailable_not_fatal(patched) -> None:
     client = _FakeEcr({_DIGEST: index})
     patched(client, {})
     with pytest.raises(ImageSchemaUnavailableError, match="no linux/amd64"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 def test_missing_image_is_unavailable_not_fatal(patched) -> None:
@@ -180,7 +216,7 @@ def test_missing_image_is_unavailable_not_fatal(patched) -> None:
     client = _FakeEcr({})
     patched(client, {})
     with pytest.raises(ImageSchemaUnavailableError, match="no manifest"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 @pytest.mark.parametrize(
@@ -203,7 +239,7 @@ def test_an_image_without_the_label_is_unavailable_not_fatal(
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, config_blob)
     with pytest.raises(ImageSchemaUnavailableError, match="carries no"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 @pytest.mark.parametrize("declared", ["", "nine", "9.0"])
@@ -222,7 +258,7 @@ def test_a_present_but_unparseable_label_fails_the_preview(
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: declared}}})
     with pytest.raises(ValueError, match="not an integer storage-format") as caught:
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
     assert not isinstance(caught.value, ImageSchemaUnavailableError)
 
 
@@ -237,7 +273,7 @@ def test_an_unparseable_manifest_is_unavailable_not_fatal(patched) -> None:
     client = _FakeEcr({_DIGEST: "<html>502 Bad Gateway</html>"})
     patched(client, {})
     with pytest.raises(ImageSchemaUnavailableError, match="unparseable manifest"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 def test_an_index_entry_without_a_digest_is_unavailable_not_fatal(patched) -> None:
@@ -248,7 +284,7 @@ def test_an_index_entry_without_a_digest_is_unavailable_not_fatal(patched) -> No
     client = _FakeEcr({_DIGEST: index})
     patched(client, {})
     with pytest.raises(ImageSchemaUnavailableError, match=r"carries no\s+digest"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 @pytest.mark.parametrize(
@@ -267,7 +303,7 @@ def test_a_config_blob_of_an_unexpected_shape_is_unavailable_not_fatal(
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, config_blob)
     with pytest.raises(ImageSchemaUnavailableError):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 def test_a_non_string_label_value_gets_the_actionable_message(patched) -> None:
@@ -275,7 +311,7 @@ def test_a_non_string_label_value_gets_the_actionable_message(patched) -> None:
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: ["9"]}}})
     with pytest.raises(ValueError, match="not an integer storage-format"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 @pytest.mark.parametrize(
@@ -301,7 +337,7 @@ def test_a_malformed_index_is_unavailable_not_fatal(
     client = _FakeEcr({_DIGEST: index})
     patched(client, {})
     with pytest.raises(ImageSchemaUnavailableError):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 @pytest.mark.parametrize(
@@ -316,7 +352,7 @@ def test_a_manifest_without_a_usable_config_is_unavailable_not_fatal(
     client = _FakeEcr({_DIGEST: manifest})
     patched(client, {})
     with pytest.raises(ImageSchemaUnavailableError, match="image config"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
 @pytest.mark.parametrize("config_blob", [None, "a string", ["a", "list"]])
@@ -328,4 +364,4 @@ def test_a_non_object_config_blob_is_unavailable_not_fatal(
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, config_blob)
     with pytest.raises(ImageSchemaUnavailableError, match="carries no"):
-        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+        read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
