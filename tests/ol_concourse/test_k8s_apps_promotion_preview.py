@@ -491,3 +491,61 @@ def test_classify_fails_closed_without_a_commit_sha(tmp_path):
     assert result.returncode != 0
     assert "not a full commit SHA" in result.stderr
     assert not (out / "title").exists()
+
+
+def _classify_tag_only(
+    tmp_path: Path, *, production: str, state: str
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    """Run classify for a tag-only release: no preview, no ol-infrastructure."""
+    (tmp_path / "version").write_text(VERSION + "\n")
+    (tmp_path / "production_version").write_text(production)
+    (tmp_path / "production_state").write_text(state)
+    checklist = f"## Release {VERSION}\n\n- [ ] a by b\n"
+    (tmp_path / "checklist.md").write_text(checklist)
+    out = tmp_path / "promotion"
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", _CLASSIFY_SCRIPT],
+        env={
+            **os.environ,
+            "APP_NAME": APP,
+            "VERSION_FILE": str(tmp_path / "version"),
+            "PRODUCTION_VERSION_FILE": str(tmp_path / "production_version"),
+            "PRODUCTION_STATE_FILE": str(tmp_path / "production_state"),
+            "CHECKLIST_FILE": str(tmp_path / "checklist.md"),
+            "OUTPUT_DIR": str(out),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, out
+
+
+@pytest.mark.parametrize(("production", "state"), [(LIVE, "known"), ("", "none")])
+def test_classify_tag_only_release_is_the_checklist_alone(tmp_path, production, state):
+    """No preview, so no marker and no infrastructure section."""
+    result, out = _classify_tag_only(tmp_path, production=production, state=state)
+
+    assert result.returncode == 0, result.stderr
+    assert (out / "title").read_text() == f"Release {APP} {VERSION}"
+    assert (out / "body.md").read_text() == f"## Release {VERSION}\n\n- [ ] a by b\n"
+    assert (out / "release_tag").read_text() == VERSION
+    assert not (out / "skip").exists()
+
+
+def test_classify_tag_only_release_already_in_production_posts_nothing(tmp_path):
+    """There is no infrastructure-only issue for a tag-only release."""
+    result, out = _classify_tag_only(tmp_path, production=VERSION, state="known")
+
+    assert result.returncode == 0, result.stderr
+    assert (out / "skip").exists()
+    assert not (out / "body.md").exists()
+    assert (out / "release_tag").read_text() == ""
+
+
+def test_classify_tag_only_still_fails_closed_when_production_is_unknown(tmp_path):
+    result, out = _classify_tag_only(tmp_path, production="", state="unknown")
+
+    assert result.returncode != 0
+    assert "could not tell" in result.stderr
+    assert not (out / "title").exists()

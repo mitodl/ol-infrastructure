@@ -18,6 +18,7 @@ those in.
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,14 @@ class AppRegistration:
         repo with another registered app (``mit-learn-nextjs``) must also set
         it False until the two have separate changelogs, or both flows would
         write the one file.
+    :param release_kind: What a release of this app ships. ``"k8s"`` builds a
+        container image and deploys it with the app's Pulumi stacks. ``"tag"``
+        deploys nothing: its consumers check the repository out at a tag. RC
+        consumers track the newest release tag and Production consumers the
+        newest ``production/<version>`` tag, which closing the gate issue
+        creates (ocw-hugo-themes and ocw-hugo-projects, read by ocw-studio's
+        site pipelines). The two kinds have different pipelines and job names;
+        the release bot reads the names from here.
     """
 
     github_repo: str | None = None
@@ -64,6 +73,7 @@ class AppRegistration:
     slack_channel: str | None = None
     release_resource_workflow: bool = False
     release_changelog: bool = True
+    release_kind: Literal["k8s", "tag"] = "k8s"
 
 
 APPS: dict[str, AppRegistration] = {
@@ -87,6 +97,15 @@ APPS: dict[str, AppRegistration] = {
     ),
     "mitxonline": AppRegistration(
         slack_channel="product-mitx-online", release_resource_workflow=True
+    ),
+    # Tag-only releases, not yet flipped: Doof still releases both until
+    # ocw-studio's site pipelines read tags instead of the release and
+    # release-candidate branches. Doof's channels, which the OCW team reads.
+    "ocw-hugo-projects": AppRegistration(
+        slack_channel="doof-ocw-hugo-projects", release_kind="tag"
+    ),
+    "ocw-hugo-themes": AppRegistration(
+        slack_channel="doof-ocw-hugo-themes", release_kind="tag"
     ),
     "ocw-studio": AppRegistration(
         repo_main_branch="master",
@@ -137,6 +156,35 @@ def release_resource_workflow(app_name: str) -> bool:
     """Return whether the given app runs the modernized release-resource pipeline."""
     entry = APPS.get(app_name)
     return bool(entry and entry.release_resource_workflow)
+
+
+def release_kind(app_name: str) -> Literal["k8s", "tag"]:
+    """Return what a release of the given app ships; see AppRegistration."""
+    entry = APPS.get(app_name)
+    return entry.release_kind if entry else "k8s"
+
+
+#: Production tags of a tag-only release are this prefix plus the version.
+PRODUCTION_TAG_PREFIX = "production/"
+
+
+def release_job_names(app_name: str) -> dict[str, str]:
+    """Return the release jobs the release bot drives, by role.
+
+    ``release`` cuts a release (and a hotfix), ``production`` is the job the
+    release gate triggers, and ``abandon`` tears an in-flight release down.
+    """
+    if release_kind(app_name) == "tag":
+        return {
+            "release": f"cut-{app_name}-release",
+            "production": f"promote-{app_name}-production",
+            "abandon": f"abandon-{app_name}-release",
+        }
+    return {
+        "release": f"build-{app_name}-release-image",
+        "production": f"deploy-ol-application-{app_name}-production",
+        "abandon": f"abandon-{app_name}-release",
+    }
 
 
 def release_changelog(app_name: str) -> bool:

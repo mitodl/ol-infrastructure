@@ -35,6 +35,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import (
     github_deployments_resource,
+    github_issues_resource,
     pulumi_provisioner_resource,
     release_resource_type,
 )
@@ -49,8 +50,11 @@ from ol_concourse.lib.resources import (
 from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
+from bridge.settings.apps import PRODUCTION_TAG_PREFIX
 from bridge.settings.apps import github_repo as app_github_repo
 from bridge.settings.apps import release_changelog as app_release_changelog
+from bridge.settings.apps import release_job_names as app_release_job_names
+from bridge.settings.apps import release_kind as app_release_kind
 from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
@@ -1326,9 +1330,12 @@ def _assert_gate_names_deploy_task(
     github_repo: str,
     release_gate: Resource,
     version_input: Resource,
-    infra_input: Identifier,
+    infra_input: Identifier | None,
 ) -> TaskStep:
     """Fail the job unless the closed gate issue names what it deploys.
+
+    *infra_input* None is a tag-only release, which deploys no
+    ol-infrastructure code: the issue then approves the version alone.
 
     Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
     <version>``, and requires ``<version>`` to equal the contents of
@@ -1356,7 +1363,7 @@ def _assert_gate_names_deploy_task(
             inputs=[
                 Input(name=release_gate.name),
                 Input(name=version_input.name),
-                Input(name=infra_input),
+                *([Input(name=infra_input)] if infra_input else []),
             ],
             # Concourse hands a failed task's outputs to its on_failure hook.
             outputs=[Output(name=Identifier(GATE_REFUSAL_DIR))],
@@ -1365,7 +1372,9 @@ def _assert_gate_names_deploy_task(
                 "REFUSAL_DIR": GATE_REFUSAL_DIR,
                 "GATE_FILE": f"{release_gate.name}/gh_issue.json",
                 "VERSION_FILE": f"{version_input.name}/version",
-                "INFRA_REF_FILE": f"{infra_input}/.git/ref",
+                **(
+                    {"INFRA_REF_FILE": f"{infra_input}/.git/ref"} if infra_input else {}
+                ),
                 "GITHUB_REPOSITORY": github_repo,
                 "GITHUB_APP_ID": GITHUB_APP_ID,
                 "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
@@ -1412,14 +1421,32 @@ def _classify_promotion_task(
     app_name: str,
     release_res: Resource,
     current_release: Identifier,
-    pulumi_resource: Resource,
-    pulumi_code: Resource,
+    pulumi_resource: Resource | None,
+    pulumi_code: Resource | None,
 ) -> TaskStep:
     """Compose the release issue's title and body from the Production preview.
 
     *pulumi_code* is the ol-infrastructure checkout the preview ran from; its
-    commit goes into the body for the Production job to check.
+    commit goes into the body for the Production job to check. Both are None
+    for a tag-only release, which has no preview: the body is the checklist.
     """
+    preview_inputs: list[Input] = []
+    preview_params: dict[str, str] = {}
+    if pulumi_resource is not None and pulumi_code is not None:
+        preview_inputs = [
+            Input(name=pulumi_resource.name),
+            Input(name=pulumi_code.name),
+        ]
+        preview_params = {
+            "PREVIEW_SUMMARY_FILE": (
+                f"{pulumi_resource.name}/{PREVIEW_SUMMARY_FILENAME}"
+            ),
+            "NO_CHANGES_MARKER_FILE": (
+                f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
+            ),
+            "INFRA_REF_FILE": f"{pulumi_code.name}/.git/ref",
+            "INFRA_REPO_URL": pulumi_code.source["uri"],
+        }
     return TaskStep(
         task=Identifier(CLASSIFY_TASK_NAME),
         config=TaskConfig(
@@ -1428,8 +1455,7 @@ def _classify_promotion_task(
             inputs=[
                 Input(name=release_res.name),
                 Input(name=current_release),
-                Input(name=pulumi_resource.name),
-                Input(name=pulumi_code.name),
+                *preview_inputs,
             ],
             outputs=[Output(name=Identifier(PROMOTION_DIR))],
             params={
@@ -1438,14 +1464,7 @@ def _classify_promotion_task(
                 "PRODUCTION_VERSION_FILE": f"{current_release}/production_version",
                 "PRODUCTION_STATE_FILE": f"{current_release}/production_state",
                 "CHECKLIST_FILE": f"{release_res.name}/checklist.md",
-                "PREVIEW_SUMMARY_FILE": (
-                    f"{pulumi_resource.name}/{PREVIEW_SUMMARY_FILENAME}"
-                ),
-                "NO_CHANGES_MARKER_FILE": (
-                    f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
-                ),
-                "INFRA_REF_FILE": f"{pulumi_code.name}/.git/ref",
-                "INFRA_REPO_URL": pulumi_code.source["uri"],
+                **preview_params,
                 "OUTPUT_DIR": PROMOTION_DIR,
             },
             run=Command(path="python3", args=["-c", _CLASSIFY_SCRIPT]),
@@ -1694,6 +1713,7 @@ def _build_abandon_release_job(
     main_repo: Resource,
     release_res: Resource,
     release_issue: Resource,
+    serial_groups: list[str] | None = None,
 ) -> Job:
     """Generate a manually-triggered job that abandons an in-flight release.
 
@@ -1709,10 +1729,14 @@ def _build_abandon_release_job(
     would deploy a version whose branch and tag are gone.  The issue step runs
     only after the release put succeeds, so a refused abandon (a version that
     is not in flight) leaves its issue alone.
+
+    *serial_groups* puts the job in the release's serial group, as the
+    tag-only pipeline does; see _build_tag_release_pipeline.
     """
     return Job(
         name=Identifier(f"abandon-{app_name}-release"),
         build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
         plan=[
             GetStep(get=release_res.name, trigger=False),
             GetStep(get=main_repo.name, trigger=False),
@@ -2192,6 +2216,273 @@ def _build_release_resource_app_pipeline(
     )
 
 
+# ============================================================================
+# Tag-only release pipeline: a release that deploys nothing itself
+# ============================================================================
+# The repository's consumers check it out at a tag (ocw-hugo-themes and
+# ocw-hugo-projects, read by ocw-studio's site pipelines). RC consumers track
+# the newest release tag, which `action: create` pushes; Production consumers
+# track the newest `production/<version>` tag, which only the Production job
+# writes, after the gate issue is closed. Opt in with
+# AppRegistration.release_kind="tag" in bridge.settings.apps.
+
+_PROMOTE_TAG_SCRIPT = (Path(__file__).parent / "scripts" / "promote_tag.py").read_text()
+PROMOTE_TAG_TASK_NAME = "promote-tag"
+CHECK_PROMOTE_TAG_TASK_NAME = "check-promote-tag"
+
+
+def _promote_tag_task(
+    github_repo: str, release_res: Resource, *, check_only: bool = False
+) -> TaskStep:
+    """Create the release's ``production/<version>`` tag at its release tag.
+
+    Retried: re-running finds the tag already at the commit and changes
+    nothing. With *check_only* the task runs the script's checks (the release
+    tag is there, no newer version has a Production tag, and this version's
+    tag is absent or already at the commit) and creates nothing. See the
+    script's docstring.
+    """
+    params = {
+        "VERSION_FILE": f"{release_res.name}/version",
+        "TAG_PREFIX": PRODUCTION_TAG_PREFIX,
+        "GITHUB_REPOSITORY": github_repo,
+        "GITHUB_APP_ID": GITHUB_APP_ID,
+        "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+        "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+    }
+    if check_only:
+        params["CHECK_ONLY"] = "true"
+    return TaskStep(
+        task=Identifier(
+            CHECK_PROMOTE_TAG_TASK_NAME if check_only else PROMOTE_TAG_TASK_NAME
+        ),
+        attempts=3,
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=release_res.name)],
+            params=params,
+            run=Command(path="python3", args=["-c", _PROMOTE_TAG_SCRIPT]),
+        ),
+    )
+
+
+def _build_tag_release_pipeline(app_name: str) -> Pipeline:
+    """Generate the release pipeline for a tag-only app.
+
+    Four jobs, with the names ``bridge.settings.apps.release_job_names`` gives
+    the release bot:
+
+    - ``cut-<app>-release`` bumps the version and cuts the release, which
+      pushes the release tag. Like ``build-<app>-release-image``, nothing
+      schedules it: the bot checks the release resource and triggers it, a
+      hotfix included (see ``_build_release_image_job``).
+    - ``deploy-<app>-rc`` records the RC GitHub Deployment and opens the
+      checklist gate issue. RC consumers pick the tag up themselves.
+    - ``promote-<app>-production`` runs when the gate issue is closed, checks
+      the issue names the version and was opened by the release App, creates
+      the ``production/<version>`` tag, records the Production Deployment, and
+      merges the release branch back.
+    - ``abandon-<app>-release`` is the k8s apps' abandon job.
+
+    All four jobs share a serial group. A promotion never finishes a release
+    while the RC job is reading what Production runs, and a cut (which
+    supersedes the in-flight release) or an abandon never deletes the release
+    tag between promote-tag reading it and creating the Production tag. Those
+    two keep a release's tag only once its Production Deployment has
+    succeeded, and that is recorded after the tag is created.
+
+    The Production job refuses a version older than the newest Production
+    tag before it starts the Production Deployment, so re-running an old
+    build cannot report that version as live while consumers run the newer
+    tag.
+
+    Before the first release the repository needs what the k8s apps have: a
+    ``[tool.bumpversion]`` table in ``pyproject.toml`` (bump_version_task reads
+    that file, even in an npm repository) naming the files to bump, such as a
+    ``VERSION`` file. Without it the cut job fails at bump-version and nothing
+    is tagged.
+    """
+    jobs = app_release_job_names(app_name)
+    github_repo = app_github_repo(app_name)
+    repo_main_branch = app_repo_main_branch(app_name)
+    main_repo = git_repo(
+        name=Identifier(f"{app_name}-{repo_main_branch}"),
+        uri=f"https://github.com/{github_repo}",
+        branch=repo_main_branch,
+    )
+    (
+        release_res,
+        release_gate,
+        release_issue,
+        deployment_rc,
+        deployment_prod,
+    ) = _define_release_resources(
+        app_name=app_name,
+        github_repo=github_repo,
+        repo_main_branch=repo_main_branch,
+        generated_changelog=app_release_changelog(app_name),
+    )
+    cut_job_name = jobs["release"]
+    rc_job_name = f"deploy-{app_name}-rc"
+    serial_groups = [f"{app_name}-release"]
+    release_current = Identifier(f"{app_name}-release-current")
+    version_var = LoadVarStep(
+        load_var="version", file=f"{release_res.name}/version", reveal=True
+    )
+
+    cut_job = Job(
+        name=Identifier(cut_job_name),
+        build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
+        plan=[
+            # Not `trigger: true`, for the reasons in _build_release_image_job.
+            GetStep(get=release_res.name, trigger=False),
+            GetStep(get=main_repo.name, trigger=False),
+            LoadVarStep(
+                load_var="hotfix", file=f"{release_res.name}/hotfix", reveal=True
+            ),
+            bump_version_task(
+                version_file=f"{release_res.name}/version",
+                repository=str(main_repo.name),
+            ),
+            PutStep(
+                put=release_res.name,
+                params={
+                    "action": "create",
+                    "repo_dir": str(main_repo.name),
+                    "version_file": f"{release_res.name}/version",
+                    "commit_hash": "((.:hotfix))",
+                },
+            ),
+        ],
+    )
+    rc_job = Job(
+        name=Identifier(rc_job_name),
+        build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
+        plan=[
+            GetStep(get=release_res.name, trigger=True, passed=[cut_job_name]),
+            version_var,
+            # The implicit get after this put makes deployment.json available
+            # to the finish put; see _build_release_resource_app_pipeline.
+            PutStep(
+                put=deployment_rc.name,
+                params={"action": "start", "ref": "((.:version))"},
+            ),
+            # What Production runs has to be current; see _cache_bust_task and
+            # the release_current get in _build_release_resource_app_pipeline.
+            _cache_bust_task(),
+            LoadVarStep(
+                load_var="cache_bust", file=f"{CACHE_BUST_DIR}/value", reveal=True
+            ),
+            GetStep(
+                get=release_current,
+                resource=release_res.name,
+                passed=[cut_job_name],
+                params={"cache_bust": "((.:cache_bust))"},
+            ),
+            _classify_promotion_task(
+                app_name, release_res, release_current, None, None
+            ),
+            LoadVarStep(
+                load_var="promotion_title",
+                file=f"{PROMOTION_DIR}/title",
+                reveal=True,
+            ),
+            LoadVarStep(
+                load_var="release_tag",
+                file=f"{PROMOTION_DIR}/release_tag",
+                reveal=True,
+            ),
+            PutStep(
+                put=release_issue.name,
+                params={
+                    "body_file": f"{PROMOTION_DIR}/body.md",
+                    "labels": [RELEASE_LABEL],
+                    "title_template": "((.:promotion_title))",
+                    "skip_if_file": f"{PROMOTION_DIR}/skip",
+                    "skip_if_tag_missing": "((.:release_tag))",
+                    "carry_checks_unless_labeled": ABANDONED_LABELS,
+                },
+            ),
+            PutStep(
+                put=deployment_rc.name,
+                params={
+                    "action": "finish",
+                    "deployment_file": f"{deployment_rc.name}/deployment.json",
+                    "state": "success",
+                },
+            ),
+            _supersede_gate_issues_task(app_name, github_repo, release_issue),
+        ],
+    )
+    production_job = Job(
+        name=Identifier(jobs["production"]),
+        build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
+        plan=[
+            GetStep(get=release_res.name, trigger=False, passed=[rc_job_name]),
+            version_var,
+            GetStep(get=release_gate.name, trigger=True, version="every"),
+            _assert_gate_names_deploy_task(
+                app_name, github_repo, release_gate, release_res, None
+            ),
+            # main_repo is needed by the action=finish put.
+            GetStep(get=main_repo.name, trigger=False, passed=[cut_job_name]),
+            # Before the Deployment starts, so a refused version records none.
+            _promote_tag_task(github_repo, release_res, check_only=True),
+            PutStep(
+                put=deployment_prod.name,
+                params={"action": "start", "ref": "((.:version))"},
+            ),
+            _promote_tag_task(github_repo, release_res),
+            PutStep(
+                put=deployment_prod.name,
+                params={
+                    "action": "finish",
+                    "deployment_file": f"{deployment_prod.name}/deployment.json",
+                    "state": "success",
+                    "comment_on_issue_file": f"{release_gate.name}/gh_issue.json",
+                },
+            ),
+            # Not in a `try`; see the finish put in
+            # _build_release_resource_app_pipeline.
+            PutStep(
+                put=release_res.name,
+                params={
+                    "action": "finish",
+                    "repo_dir": str(main_repo.name),
+                    "version_file": f"{release_res.name}/version",
+                },
+            ),
+        ],
+    )
+    abandon_job = _build_abandon_release_job(
+        app_name=app_name,
+        main_repo=main_repo,
+        release_res=release_res,
+        release_issue=release_issue,
+        serial_groups=serial_groups,
+    )
+    return Pipeline(
+        resource_types=[
+            release_resource_type(),
+            github_deployments_resource(),
+            github_issues_resource(),
+        ],
+        resources=[
+            main_repo,
+            release_res,
+            release_gate,
+            release_issue,
+            deployment_rc,
+            deployment_prod,
+        ],
+        jobs=[cut_job, rc_job, production_job, abandon_job],
+    )
+
+
 def build_app_pipeline(app_name: str) -> Pipeline:
     """Generate the full Concourse pipeline for a given application.
 
@@ -2203,6 +2494,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     a per-app flag duplicated across the two would let a pipeline be migrated
     while the bot still refuses to drive it.
     """
+    if app_release_kind(app_name) == "tag":
+        return _build_tag_release_pipeline(app_name)
     pipeline_parameters = pipeline_params.get(app_name) or AppPipelineParams(
         app_name=app_name
     )
