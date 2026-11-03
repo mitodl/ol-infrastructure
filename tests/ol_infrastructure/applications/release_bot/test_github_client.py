@@ -2,7 +2,7 @@
 selection, and PyGithub-backed API wrappers.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import github_client as github
 import pytest
@@ -266,11 +266,12 @@ class _FakeRepo:
         self._issues = {issue.number: issue for issue in issues}
         self.label_queries: list[str] = []
 
-    def get_deployments(self, environment=None, **_kwargs):
+    def get_deployments(self, environment=None, ref=None, **_kwargs):
         return [
             deployment
             for deployment in self._deployments
             if environment in (None, deployment.environment)
+            and ref in (None, deployment.ref)
         ]
 
     def get_tags(self):
@@ -1291,6 +1292,79 @@ def test_refused_release_issues_reads_every_issue_in_the_window(fake_repo):
         "mitodl/thing", datetime(2026, 10, 29, tzinfo=UTC)
     )
     assert len(found) == 40
+
+
+def test_closed_release_issues_reads_both_label_names_once_each(fake_repo):
+    """An issue under both the ops: and legacy names is returned once."""
+    both = _FakeIssue(9, "Release app 2026.9.2.1", "", ["ops:release", "release"])
+    legacy = _FakeIssue(8, "Release app 2026.9.1.1", "", ["release"])
+    still_open = _FakeIssue(10, "Release app 2026.9.3.1", "", ["ops:release"])
+    pull = _FakeIssue(11, "Release app 2026.9.4.1", "", ["ops:release"])
+    for issue in (both, legacy, pull):
+        issue.edit(state="closed")
+    pull.pull_request = object()
+    repo = fake_repo(_FakeRepo(issues=[both, legacy, still_open, pull]))
+
+    issues = github._closed_release_issues_sync(
+        "mitodl/thing", datetime(2026, 10, 29, tzinfo=UTC)
+    )
+
+    assert [issue["number"] for issue in issues] == [9, 8]
+    assert issues[0]["closed_at"] == datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
+    assert issues[0]["labels"] == ["ops:release", "release"]
+    assert sorted(repo.label_queries) == ["ops:release", "release"]
+
+
+def _deployment_at(deployment_id, ref, created_at, state="success"):
+    deployment = _FakeDeployment(
+        deployment_id, ref, "Production", [_FakeDeploymentStatus(state)]
+    )
+    deployment.created_at = created_at
+    return deployment
+
+
+_CLOSED = datetime(2026, 11, 3, 13, 44, 52, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("deployments", "expected"),
+    [
+        # Newest first, as the API lists them.
+        ([_deployment_at(2, "2026.9.5.1", _CLOSED + timedelta(minutes=5))], True),
+        # Still running counts: Production took the issue.
+        (
+            [
+                _deployment_at(
+                    2, "2026.9.5.1", _CLOSED + timedelta(minutes=5), "in_progress"
+                )
+            ],
+            True,
+        ),
+        # Began before the close, even if it finished after: not this approval.
+        ([_deployment_at(1, "2026.9.5.1", _CLOSED - timedelta(minutes=5))], False),
+        # A newer release deployed after the close does not hide or stand in
+        # for this version's Deployment.
+        ([_deployment_at(3, "2026.9.6.1", _CLOSED + timedelta(minutes=9))], False),
+        (
+            [
+                _deployment_at(3, "2026.9.6.1", _CLOSED + timedelta(minutes=9)),
+                _deployment_at(2, "2026.9.5.1", _CLOSED + timedelta(minutes=5)),
+            ],
+            True,
+        ),
+        ([], False),
+    ],
+)
+def test_deployment_created_since_matches_version_and_start_time(
+    fake_repo, deployments, expected
+):
+    fake_repo(_FakeRepo(deployments=deployments))
+    assert (
+        github._deployment_created_since_sync(
+            "mitodl/thing", "Production", "2026.9.5.1", _CLOSED
+        )
+        is expected
+    )
 
 
 @pytest.mark.parametrize(

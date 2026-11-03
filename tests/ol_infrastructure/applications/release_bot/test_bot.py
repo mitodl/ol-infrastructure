@@ -3054,6 +3054,240 @@ async def test_a_failed_refusal_lookup_is_reported_not_raised(repos, refusals):
     assert not await bot._announce_refusals(app, repos, bot.ReleaseProgressState())
 
 
+# ---------------------------------------------------------------------------
+# closed release issues Production never took
+# ---------------------------------------------------------------------------
+
+
+def _closed_issue(
+    number=7,
+    title="Release my-app 2026.9.5.1",
+    labels=None,
+    closed_ago=timedelta(minutes=50),
+):
+    return {
+        "number": number,
+        "title": title,
+        "url": f"https://github.com/mitodl/my-app/issues/{number}",
+        "labels": labels if labels is not None else ["ops:release"],
+        "closed_at": datetime.now(tz=UTC) - closed_ago,
+    }
+
+
+@pytest.fixture
+def stranded(monkeypatch):
+    """Stub the closed-issue and deployment lookups and capture what is posted."""
+    lookup = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot.github, "closed_release_issues", lookup)
+    report = AsyncMock(return_value=False)
+    monkeypatch.setattr(bot.github, "deployment_created_since", report)
+    monkeypatch.setattr(
+        bot.slack_channels, "resolve", AsyncMock(side_effect=lambda _c, ch: ch)
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+    return lookup, report, app
+
+
+async def _seeded(app, repos, lookup):
+    """Return state past the first poll, which seeds and posts nothing old."""
+    state = bot.ReleaseProgressState()
+    assert await bot._announce_stranded_approvals(app, repos, state)
+    lookup.return_value = []
+    return state
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Release my-app 2026.9.5.1",
+        "Release my-app infrastructure @ 2026.9.5.1",
+    ],
+)
+async def test_an_unconsumed_closed_issue_is_announced_once(repos, stranded, title):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(title=title)]
+
+    assert await bot._announce_stranded_approvals(app, repos, state)
+    assert await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+    text = app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "|#7>" in text
+    assert "was closed 50 minutes ago" in text
+    assert "/jobs/deploy-ol-application-my-app-qa" in text
+    assert "/jobs/deploy-ol-application-my-app-production" in text
+
+
+async def test_a_recently_closed_issue_is_not_announced_yet(repos, stranded):
+    """The gate check and a queued QA job can take most of the wait."""
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(closed_ago=timedelta(minutes=20))]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        ["ops:release", "ops:consumed"],
+        ["ops:release", "ops:consumed", "ops:refused"],
+        ["ops:release", "ops:abandoned"],
+        ["release", "abandoned"],
+    ],
+)
+async def test_a_taken_or_retired_issue_is_not_announced(repos, stranded, labels):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(labels=labels)]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_production_deployment_after_the_close_counts_as_taken(repos, stranded):
+    """The consumed label is best-effort; the Deployment says Production ran."""
+    lookup, deployment_created_since, app = stranded
+    state = await _seeded(app, repos, lookup)
+    deployment_created_since.return_value = True
+    issue = _closed_issue()
+    lookup.return_value = [issue]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+    deployment_created_since.assert_awaited_once_with(
+        "mitodl/my-app", "Production", "2026.9.5.1", issue["closed_at"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("title", "version"),
+    [
+        ("Release my-app 2026.9.5.1", "2026.9.5.1"),
+        ("Release my-app infrastructure @ 2026.9.5.1", "2026.9.5.1"),
+    ],
+)
+async def test_the_deployment_lookup_uses_the_issues_version(
+    repos, stranded, title, version
+):
+    lookup, deployment_created_since, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(title=title)]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    assert deployment_created_since.await_args.args[2] == version
+    app.client.chat_postMessage.assert_awaited_once()
+
+
+async def test_a_shared_repo_relies_on_the_label_alone(repos, stranded):
+    """Two apps in one repository record Deployments under the same versions."""
+    lookup, deployment_created_since, app = stranded
+    shared = dict(
+        repos,
+        **{
+            "my-app-nextjs": bot_config.AppConfig(
+                pipeline="my-app-nextjs-pipeline",
+                repo="mitodl/my-app",
+                branch="main",
+                channel="C123",
+                release_workflow=True,
+            )
+        },
+    )
+    state = await _seeded(app, shared, lookup)
+    deployment_created_since.return_value = True
+    lookup.return_value = [_closed_issue()]
+
+    await bot._announce_stranded_approvals(app, shared, state)
+
+    deployment_created_since.assert_not_awaited()
+    app.client.chat_postMessage.assert_awaited_once()
+    assert "`my-app`" in app.client.chat_postMessage.call_args.kwargs["text"]
+
+
+async def test_an_issue_already_due_at_startup_is_not_announced(
+    repos, stranded, monkeypatch
+):
+    lookup, _report, app = stranded
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    lookup.return_value = [_closed_issue(closed_ago=timedelta(hours=3))]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_stranded_approvals(app, repos, state)
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_an_issue_that_fell_due_during_a_restart_is_announced(
+    repos, stranded, monkeypatch
+):
+    lookup, _report, app = stranded
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    lookup.return_value = [_closed_issue(closed_ago=timedelta(minutes=50))]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "issue",
+    [
+        _closed_issue(title="Release my-app-nextjs 2026.9.5.1"),
+        _closed_issue(title="[CONSUMED #22]Release my-app"),
+        _closed_issue(closed_ago=timedelta(days=2)),
+        dict(_closed_issue(), closed_at=None),
+    ],
+)
+async def test_issues_that_are_not_live_approvals_are_ignored(repos, stranded, issue):
+    """Another app's issue, a title-consumed one, one too old, or not closed."""
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [issue]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_failed_unconsumed_post_is_retried(repos, stranded):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue()]
+    app.client.chat_postMessage.side_effect = [RuntimeError("Slack is down"), None]
+
+    assert not await bot._announce_stranded_approvals(app, repos, state)
+    assert await bot._announce_stranded_approvals(app, repos, state)
+
+    assert app.client.chat_postMessage.await_count == 2
+
+
+@pytest.mark.parametrize(
+    "failing", ["closed_release_issues", "deployment_created_since"]
+)
+async def test_a_failed_lookup_is_reported_not_raised(
+    repos, stranded, monkeypatch, failing
+):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue()]
+    monkeypatch.setattr(
+        bot.github, failing, AsyncMock(side_effect=RuntimeError("GitHub is down"))
+    )
+
+    assert not await bot._announce_stranded_approvals(app, repos, state)
+    app.client.chat_postMessage.assert_not_awaited()
+
+
 @pytest.mark.parametrize(
     ("labels", "shown", "hidden"),
     [
@@ -3612,6 +3846,9 @@ async def test_poll_loops_record_a_heartbeat_even_when_an_iteration_fails(
     )
     monkeypatch.setattr(bot, "_announce_deployments", AsyncMock(return_value=True))
     monkeypatch.setattr(bot, "_announce_refusals", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        bot, "_announce_stranded_approvals", AsyncMock(return_value=True)
+    )
     monkeypatch.setattr(bot, "_nag_stuck_releases", AsyncMock(return_value=True))
 
     async def _stop(_seconds):
