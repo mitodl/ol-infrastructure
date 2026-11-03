@@ -12,7 +12,7 @@ added with their backends.
 from dataclasses import dataclass
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Output, Resource, ResourceOptions, StackReference
+from pulumi import Input, Output, Resource, ResourceOptions, StackReference
 from pulumi_aws import ec2
 
 from bridge.lib.magic_numbers import (
@@ -25,7 +25,10 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.traefik import OLTraefikMiddleware
-from ol_infrastructure.lib.aws.eks_helper import ecr_dockerhub_registry
+from ol_infrastructure.lib.aws.eks_helper import (
+    GATEWAY_CLASS_LABEL,
+    ecr_dockerhub_registry,
+)
 from ol_infrastructure.lib.ol_types import (
     AlertTier,
     AWSBase,
@@ -38,7 +41,6 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 RELEASE_NAME = "telemetry-archive-ingress"
 GATEWAY_CLASS_NAME = "telemetry-archive"
-GATEWAY_CONTROLLER_LABEL = "ol.mit.edu/gateway-controller"
 GATEWAY_NAME = "telemetry-archive"
 LISTENER_NAME = "websecure"
 TLS_SECRET_NAME = "telemetry-archive-tls"  # noqa: S105  # pragma: allowlist secret
@@ -75,7 +77,7 @@ def build(  # noqa: PLR0913
     node_selector: dict[str, str],
     tolerations: list[dict[str, str]],
     push_auth_secret_name: str,
-    depends_on: list[Resource],
+    depends_on: Input[list[Resource]],
 ) -> ArchiveIngress:
     """Build the NLB-fronted Traefik, its Gateway, TLS, auth middleware and /ready."""
     env = stack_info.env_suffix
@@ -155,7 +157,7 @@ def build(  # noqa: PLR0913
                 "gatewayClass": {
                     "enabled": True,
                     "name": GATEWAY_CLASS_NAME,
-                    "labels": {GATEWAY_CONTROLLER_LABEL: GATEWAY_CLASS_NAME},
+                    "labels": {GATEWAY_CLASS_LABEL: GATEWAY_CLASS_NAME},
                 },
                 # The Gateway is declared below so its listener can carry the
                 # TLS certificate reference.
@@ -171,7 +173,7 @@ def build(  # noqa: PLR0913
                         # not isolation by itself: the shared public Traefik
                         # would also load this Gateway onto its NLB. Both
                         # controllers select their own class by this label.
-                        "labelSelector": f"{GATEWAY_CONTROLLER_LABEL}={GATEWAY_CLASS_NAME}",
+                        "labelSelector": f"{GATEWAY_CLASS_LABEL}={GATEWAY_CLASS_NAME}",
                         # The DNS record comes from the Service annotation
                         # below. Copying the NLB hostname onto the Gateway
                         # status would make external-dns's gateway source

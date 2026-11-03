@@ -84,6 +84,30 @@ ARCHIVE_TOLERATIONS = [
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
+
+def require_shared_traefik_selector(selector: str | None) -> str:
+    """Refuse to deploy before the shared Traefik filters GatewayClasses.
+
+    The archive runs its own Traefik on the same Gateway API controller name as
+    the cluster's public one. Until the EKS stack has deployed the shared Traefik
+    with its GatewayClass label selector, that public controller would also
+    serve the archive Gateway on its internet-facing NLB. The ingress depends on
+    this check, so nothing it creates can exist before the check has passed.
+    """
+    if not selector:
+        msg = (
+            "The operations EKS stack does not export traefik_gateway_class_selector. "
+            "Apply infrastructure/aws/eks first so the shared Traefik stops serving "
+            "other GatewayClasses, then deploy this stack."
+        )
+        raise RuntimeError(msg)
+    return selector
+
+
+shared_gateway_class_selector = cluster_stack.get_output(
+    "traefik_gateway_class_selector"
+).apply(require_shared_traefik_selector)
+
 ##################################
 #   Vault: push credentials      #
 ##################################
@@ -179,7 +203,7 @@ archive_ingress = ingress.build(
     node_selector=ARCHIVE_NODE_SELECTOR,
     tolerations=ARCHIVE_TOLERATIONS,
     push_auth_secret_name=PUSH_AUTH_SECRET_NAME,
-    depends_on=[push_auth_secret],
+    depends_on=shared_gateway_class_selector.apply(lambda _: [push_auth_secret]),
 )
 
 ##################################

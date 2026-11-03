@@ -50,7 +50,10 @@ from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integra
 from ol_infrastructure.infrastructure.aws.eks.cert_manager import setup_cert_manager
 from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
 from ol_infrastructure.infrastructure.aws.eks.external_dns import setup_external_dns
-from ol_infrastructure.infrastructure.aws.eks.traefik import setup_traefik
+from ol_infrastructure.infrastructure.aws.eks.traefik import (
+    SHARED_GATEWAY_CLASS_SELECTOR,
+    setup_traefik,
+)
 from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
     setup_vault_secrets_operator,
 )
@@ -1327,6 +1330,7 @@ gateway_api_crds = setup_traefik(
     vpa_release=vpa_release,
     stack_info=stack_info,
 )
+export("traefik_gateway_class_selector", SHARED_GATEWAY_CLASS_SELECTOR)
 
 setup_apisix(
     cluster_name=cluster_name,
