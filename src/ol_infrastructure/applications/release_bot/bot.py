@@ -2107,13 +2107,44 @@ _STRANDED_AFTER = timedelta(minutes=45)
 _STRANDED_LOOKBACK = timedelta(days=1)
 
 
-async def _production_started_since(repo_slug: str, since: datetime) -> bool:
-    """Return whether a Production Deployment was recorded at or after *since*."""
+async def _production_started_since(
+    repo_slug: str, version: str, since: datetime
+) -> bool:
+    """Return whether Production recorded a *version* Deployment at or after *since*.
+
+    The version has to match because every app records its Deployments in the
+    same `Production` environment, so in a repository with another app (or
+    after a newer release) any Deployment would otherwise count.
+    """
     report = await github.deployment_report(repo_slug, github.PRODUCTION_ENVIRONMENT)
     success, newer = report["success"], report["newer"]
-    return (success is not None and success["deployed_at"] >= since) or (
-        newer is not None and newer["created_at"] >= since
+    return (
+        success is not None
+        and success["version"] == version
+        and success["deployed_at"] >= since
+    ) or (
+        newer is not None
+        and newer["version"] == version
+        and newer["created_at"] >= since
     )
+
+
+def _gate_version(title: str) -> str | None:
+    """Return the version a gate issue title names, or None for the bare title."""
+    words = title.split()
+    # "Release <app> <version>" or "Release <app> infrastructure @ <version>".
+    return words[-1] if len(words) > 2 else None  # noqa: PLR2004
+
+
+async def _deployed_since_close(cfg, repos, issue: dict[str, Any]) -> bool:
+    """Return whether Production deployed *issue*'s version after it closed."""
+    version = _gate_version(issue["title"])
+    # A repository two apps share holds both apps' Deployments under the same
+    # version numbers, so there only the label is evidence.
+    shares_repo = sum(c.repo == cfg.repo for c in repos.values()) > 1
+    if version is None or shares_repo:
+        return False
+    return await _production_started_since(cfg.repo, version, issue["closed_at"])
 
 
 def _qa_job_url(app_name: str, cfg) -> str:
@@ -2164,8 +2195,8 @@ async def _announce_stranded_approvals(app, repos, state: ReleaseProgressState) 
 
     A refused or abandoned issue is handled elsewhere or nobody is waiting on
     it, so only issues still in the release or promote-ready state count. The
-    consumed label is best-effort, so a Production Deployment started after the
-    close also counts as taken.
+    consumed label is best-effort, so a Production Deployment of the issue's
+    version started after the close also counts as taken.
     """
     ok = True
     now = _now()
@@ -2191,12 +2222,13 @@ async def _announce_stranded_approvals(app, repos, state: ReleaseProgressState) 
             closed_at = issue["closed_at"]
             due = closed_at + _STRANDED_AFTER
             if seeding and due < _started_at - _REFUSAL_STARTUP_GRACE:
-                # Already reportable before this process started, so assumed
-                # reported; as with refusals, a restart does not repeat it.
+                # Reportable well before this process started, so assumed
+                # reported. As with refusals, one that fell due just before a
+                # restart may be reported twice.
                 state.stranded_announced.add(key)
                 continue
             try:
-                taken = await _production_started_since(cfg.repo, closed_at)
+                taken = await _deployed_since_close(cfg, repos, issue)
             except Exception:
                 ok = False
                 log.exception("Failed to read Production deployments for %s", app_name)

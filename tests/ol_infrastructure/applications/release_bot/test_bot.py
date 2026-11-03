@@ -3153,10 +3153,17 @@ async def test_a_taken_or_retired_issue_is_not_announced(repos, stranded, labels
 @pytest.mark.parametrize(
     "report",
     [
-        {"success": {"deployed_at": datetime.now(tz=UTC)}, "newer": None},
+        {
+            "success": {"version": "2026.9.5.1", "deployed_at": datetime.now(tz=UTC)},
+            "newer": None,
+        },
         {
             "success": None,
-            "newer": {"created_at": datetime.now(tz=UTC), "state": "in_progress"},
+            "newer": {
+                "version": "2026.9.5.1",
+                "created_at": datetime.now(tz=UTC),
+                "state": "in_progress",
+            },
         },
     ],
 )
@@ -3178,7 +3185,10 @@ async def test_a_production_deployment_before_the_close_does_not_count(repos, st
     lookup, deployment_report, app = stranded
     state = await _seeded(app, repos, lookup)
     deployment_report.return_value = {
-        "success": {"deployed_at": datetime.now(tz=UTC) - timedelta(days=2)},
+        "success": {
+            "version": "2026.9.5.1",
+            "deployed_at": datetime.now(tz=UTC) - timedelta(days=2),
+        },
         "newer": None,
     }
     lookup.return_value = [_closed_issue()]
@@ -3186,6 +3196,51 @@ async def test_a_production_deployment_before_the_close_does_not_count(repos, st
     await bot._announce_stranded_approvals(app, repos, state)
 
     app.client.chat_postMessage.assert_awaited_once()
+
+
+async def test_a_production_deployment_of_another_version_does_not_count(
+    repos, stranded
+):
+    lookup, deployment_report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    deployment_report.return_value = {
+        "success": {"version": "2026.9.6.1", "deployed_at": datetime.now(tz=UTC)},
+        "newer": None,
+    }
+    lookup.return_value = [_closed_issue()]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+
+
+async def test_a_shared_repo_relies_on_the_label_alone(repos, stranded):
+    """Two apps in one repository record Deployments under the same versions."""
+    lookup, deployment_report, app = stranded
+    shared = dict(
+        repos,
+        **{
+            "my-app-nextjs": bot_config.AppConfig(
+                pipeline="my-app-nextjs-pipeline",
+                repo="mitodl/my-app",
+                branch="main",
+                channel="C123",
+                release_workflow=True,
+            )
+        },
+    )
+    state = await _seeded(app, shared, lookup)
+    deployment_report.return_value = {
+        "success": {"version": "2026.9.5.1", "deployed_at": datetime.now(tz=UTC)},
+        "newer": None,
+    }
+    lookup.return_value = [_closed_issue()]
+
+    await bot._announce_stranded_approvals(app, shared, state)
+
+    deployment_report.assert_not_awaited()
+    app.client.chat_postMessage.assert_awaited_once()
+    assert "`my-app`" in app.client.chat_postMessage.call_args.kwargs["text"]
 
 
 async def test_an_issue_already_due_at_startup_is_not_announced(
