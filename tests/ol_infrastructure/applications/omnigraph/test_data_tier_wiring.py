@@ -63,6 +63,7 @@ def _build(  # noqa: PLR0913
     image_min_format: int | None = None,
     migration_armed: bool = False,
     boot_budget_seconds: int | None = None,
+    deployed_marks: dict[str, float] | None = None,
 ) -> tuple[_Mocks, data_tier.OmnigraphDataTier]:
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
@@ -97,6 +98,8 @@ def _build(  # noqa: PLR0913
         suspend_maintenance=migration_armed,
         migration_armed=migration_armed,
         boot_budget_seconds=boot_budget_seconds,
+        deployed_written_internal_schema=deployed_marks,
+        storage_restored_to_format=None,
     )
     return mocks, tier
 
@@ -170,9 +173,25 @@ def test_an_image_opening_the_root_in_place_deploys_without_a_migration(monkeypa
     (oldest, written) order would make the range empty and refuse this.
     """
     _, tier = _build(
-        monkeypatch, served_format=14, image_format=16, image_min_format=14
+        monkeypatch,
+        served_format=14,
+        image_format=16,
+        image_min_format=14,
+        deployed_marks={"": 14.0},
     )
+    assert tier.written_internal_schema == {"": 16}
     return tier.deployment.urn
+
+
+def test_a_rollback_below_the_roots_written_format_is_refused(monkeypatch):
+    """The stack's last export reaches the guard: a 0.13 image after 0.14."""
+    with pytest.raises(ValueError, match="already been deployed onto this root"):
+        _build(
+            monkeypatch,
+            served_format=14,
+            image_format=14,
+            deployed_marks={"": 16.0},
+        )
 
 
 @pulumi.runtime.test

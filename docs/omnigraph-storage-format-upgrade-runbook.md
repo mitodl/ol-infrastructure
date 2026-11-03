@@ -19,9 +19,11 @@ in a pod against S3.
 
 ## When this applies
 
-omnigraph storage is strict-single-version: a binary reads exactly one
-internal-schema (storage-format) version, and the version gate is enforced in
-both directions — including read-only opens. `omnigraph upgrade` converts a
+Before 0.14, omnigraph storage is strict-single-version: a binary reads exactly
+one internal-schema (storage-format) version, and the version gate is enforced
+in both directions — including read-only opens. (0.14 opens older formats in
+place; see [In-place upgrades](#in-place-upgrades-omnigraph-014-and-later).)
+`omnigraph upgrade` converts a
 standalone store in place, but it refuses a cluster-managed root, which is what
 every deployed graph is, so there is no in-place migration here. A
 mixed fleet where an old binary still writes a graph a newer binary has stamped
@@ -42,6 +44,39 @@ way until you either roll back or run the offline rebuild below.
 > This is the "offline export/rebuild" path referenced from `data_tier.py`'s
 > `strategy=Recreate` comment and from
 > [ADR-0009](adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md).
+
+### In-place upgrades (omnigraph 0.14 and later)
+
+Not every format change is a rebuild. omnigraph 0.14 writes format 16 but
+opens a format-14 root in place (`omnigraph version`: `internal-schema 16
+(serves v14 to v16)`), and stamps each branch 16 on its first write. agent-kit
+labels both images with the range they serve
+(`edu.mit.ol.omnigraph.min-internal-schema` and
+`edu.mit.ol.omnigraph.internal-schema`), and preview accepts an image whose
+range covers `omnigraph:internal_schema_version` with no migration armed. Such
+an upgrade is an ordinary image deploy: `storage_prefix` and
+`internal_schema_version` stay as they are, and nothing below applies.
+
+It is still one-way. A 0.13 binary refuses a branch 0.14 has stamped, and a
+0.14 server rewrites the S3 lock in a form 0.13 refuses on its first start. So
+the stack exports `written_internal_schema`, the highest format any image it
+deployed onto each root writes, and preview refuses a later image that writes
+less ("an image writing format 16 has already been deployed onto this root").
+There is no rollback by image alone. To go back:
+
+1. Restore the root from the backup taken before the upgrade, `__cluster/`
+   included.
+2. Deploy the old image with `omnigraph:storage_restored_to_format` set to the
+   format it writes. That lowers the root's mark, and preview accepts the old
+   image on that one deploy.
+3. Remove `storage_restored_to_format` in the next change. Preview refuses it
+   on any deploy that isn't a rollback, so a leftover can't permit a later
+   rollback that has no restore behind it.
+
+An aborted *rebuild* migration is different. Disarming it onto the old root with
+a new image whose range covers that root is now accepted, and that new image
+then upgrades the old root in place. To abort a rebuild without touching the
+old root, disarm with the old image's digest.
 
 ## First: is this actually a format bump?
 

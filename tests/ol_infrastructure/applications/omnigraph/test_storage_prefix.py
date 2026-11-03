@@ -356,70 +356,78 @@ def test_mistyped_rollback_override_says_what_to_set_it_to() -> None:
 # config still says 14.
 
 
-def _next(  # noqa: PLR0913
-    deployed_written: int | None,
+def _next(
+    marks: dict[str, float] | None,
     image: int | None,
     *,
-    deployed_prefix: str | None = "fmt14",
     prefix: str = "fmt14",
     armed: bool = False,
     restored_to: int | None = None,
-) -> int | None:
+) -> dict[str, int]:
     return next_written_internal_schema(
-        deployed_prefix,
-        deployed_written,
-        prefix,
-        image,
-        migration_armed=armed,
-        restored_to=restored_to,
+        marks, prefix, image, migration_armed=armed, restored_to=restored_to
     )
 
 
 def test_first_deploy_records_what_the_image_writes() -> None:
-    assert _next(None, 14, deployed_prefix=None) == 14
+    assert _next(None, 14) == {"fmt14": 14}
 
 
 def test_an_upgrade_raises_the_mark() -> None:
-    assert _next(14, 16) == 16
+    assert _next({"fmt14": 14}, 16) == {"fmt14": 16}
+
+
+def test_marks_read_back_as_floats_are_ints_again() -> None:
+    """A numeric stack output comes back through a StackReference as a float."""
+    assert _next({"fmt14": 16.0}, 16) == {"fmt14": 16}
 
 
 def test_an_image_writing_less_than_the_mark_is_refused() -> None:
     """The 0.13 rollback after a 0.14 deploy, without a restore."""
     with pytest.raises(ValueError, match="storage_restored_to_format set to 14"):
-        _next(16, 14)
+        _next({"fmt14": 16}, 14)
 
 
 def test_an_unreadable_label_keeps_the_mark() -> None:
-    assert _next(16, None) == 16
+    assert _next({"fmt14": 16}, None) == {"fmt14": 16}
 
 
-def test_a_different_root_starts_over() -> None:
-    """A rebuild cutover's rollback moves to the old root, which only its own
-    format ever wrote.
+def test_a_root_never_served_starts_over_and_others_are_kept() -> None:
+    assert _next({"fmt9": 9}, 14) == {"fmt9": 9, "fmt14": 14}
+
+
+def test_a_rollback_onto_a_root_upgraded_in_place_keeps_its_mark() -> None:
+    """fmt14 was upgraded in place to 16, then rebuilt into fmt18. Rolling back
+    to fmt14 with a 0.13 image must still be refused.
     """
-    assert _next(14, 9, deployed_prefix="fmt14", prefix="fmt9") == 9
+    with pytest.raises(ValueError, match="fmt14"):
+        _next({"fmt14": 16, "fmt18": 18}, 14)
+
+
+def test_the_bucket_root_is_a_root_too() -> None:
+    assert _next({"": 6}, 9, prefix="") == {"": 9}
 
 
 def test_an_armed_migration_does_not_move_the_mark() -> None:
     """Disarming must be able to put the old image back."""
-    assert _next(9, 14, deployed_prefix="fmt9", prefix="fmt9", armed=True) == 9
+    assert _next({"fmt9": 9}, 14, prefix="fmt9", armed=True) == {"fmt9": 9}
 
 
 def test_a_restore_lowers_the_mark_on_its_own_deploy() -> None:
-    assert _next(16, 14, restored_to=14) == 14
+    assert _next({"fmt14": 16}, 14, restored_to=14) == {"fmt14": 14}
 
 
 @pytest.mark.parametrize(
-    ("deployed_written", "image", "restored_to"),
+    ("marks", "image", "restored_to"),
     [
-        (14, 14, 14),  # left set after the rollback deployed
-        (16, 16, 14),  # set ahead of time, image not rolled back
-        (16, 14, 13),  # names a format the image doesn't write
+        ({"fmt14": 14}, 14, 14),  # left set after the rollback deployed
+        ({"fmt14": 16}, 16, 14),  # set ahead of time, image not rolled back
+        ({"fmt14": 16}, 14, 13),  # names a format the image doesn't write
         (None, 14, 14),  # nothing to roll back from
     ],
 )
 def test_a_restore_override_outside_its_deploy_is_refused(
-    deployed_written: int | None, image: int, restored_to: int
+    marks: dict[str, float] | None, image: int, restored_to: int
 ) -> None:
     with pytest.raises(ValueError, match="accepted only on the deploy"):
-        _next(deployed_written, image, restored_to=restored_to)
+        _next(marks, image, restored_to=restored_to)

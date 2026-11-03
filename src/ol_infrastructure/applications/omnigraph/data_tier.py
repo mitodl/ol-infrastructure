@@ -44,6 +44,7 @@ pulumi-provisioner's ``env_vars_from_files``).
 
 import hashlib
 import json
+from collections.abc import Mapping
 from typing import NamedTuple
 
 import pulumi
@@ -344,8 +345,8 @@ class OmnigraphDataTier(NamedTuple):
     # cannot drift onto a different one.
     server_image: str | Output[str]
     # The highest storage format an image deployed onto this root writes, for
-    # the stack to export. See next_written_internal_schema.
-    written_internal_schema: int | None
+    # the stack to export, by root. See next_written_internal_schema.
+    written_internal_schema: dict[str, int]
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -373,9 +374,8 @@ def create_data_tier(  # noqa: PLR0913
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
-    deployed_storage_prefix: str | None = None,
-    deployed_written_internal_schema: int | None = None,
-    storage_restored_to_format: int | None = None,
+    deployed_written_internal_schema: Mapping[str, float] | None,
+    storage_restored_to_format: int | None,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
 
@@ -524,7 +524,6 @@ def create_data_tier(  # noqa: PLR0913
         image_min_internal_schema=image_min_internal_schema,
     )
     written_internal_schema = next_written_internal_schema(
-        deployed_storage_prefix,
         deployed_written_internal_schema,
         storage_prefix,
         image_internal_schema,

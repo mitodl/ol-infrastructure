@@ -9,6 +9,7 @@ test can import them without credentials.
 """
 
 import re
+from collections.abc import Mapping
 
 # One path segment, starting alphanumeric. Everything else is rejected — see
 # validate_storage_prefix for why this is stricter than S3 requires.
@@ -389,15 +390,14 @@ def validate_storage_prefix_progression(
     raise ValueError(msg)
 
 
-def next_written_internal_schema(  # noqa: PLR0913
-    deployed_prefix: str | None,
-    deployed_written: int | None,
+def next_written_internal_schema(
+    deployed_marks: Mapping[str, float] | None,
     storage_prefix: str,
     image_internal_schema: int | None,
     *,
     migration_armed: bool,
     restored_to: int | None,
-) -> int | None:
+) -> dict[str, int]:
     """Refuse an image that cannot open what has been written, and track it.
 
     An in-place format upgrade (omnigraph 0.14 opens a format-14 root and
@@ -405,17 +405,18 @@ def next_written_internal_schema(  # noqa: PLR0913
     without changing ``storage_prefix`` or ``internal_schema_version``. From
     then on an image that writes only 14 refuses the root, and
     ``validate_image_internal_schema`` can't see that, because the config
-    still says 14. So the stack exports the highest format any image it
-    deployed onto this root writes (``written_internal_schema``), and the next
-    deploy is refused if its image writes less. Deploying an image is taken as
-    writing: a 0.14 server rewrites its S3 lock in a form 0.13 refuses on its
-    first start, before any graph write.
+    still says 14. So the stack exports, per root, the highest format any
+    image it deployed onto that root writes (``written_internal_schema``), and
+    a deploy is refused if its image writes less than the served root's mark.
+    Deploying an image is taken as writing: a 0.14 server rewrites its S3 lock
+    in a form 0.13 refuses on its first start, before any graph write.
 
-    The mark belongs to one root. A deploy onto a different ``storage_prefix``
-    (a rebuild cutover, or its rollback) starts over, because that root was
-    written only by its own migration. While a migration is armed the mark
-    doesn't move: the served root isn't being written by the new image, and
-    disarming must be able to put the old image back.
+    Keyed by root because a root the stack has left keeps what was written to
+    it. A rollback from a rebuild cutover onto a root that had earlier been
+    upgraded in place is checked against that root's own mark, and a root the
+    stack has never served starts with none. While a migration is armed the
+    mark doesn't move: the served root isn't being written by the new image,
+    and disarming must be able to put the old image back.
 
     ``restored_to`` (``omnigraph:storage_restored_to_format``) is the one way
     down, after restoring the root from a backup taken before the upgrade. It
@@ -423,20 +424,22 @@ def next_written_internal_schema(  # noqa: PLR0913
     and it must be below the mark. Left set afterwards it is refused, so it
     can't quietly permit a later rollback that has no restore behind it.
 
-    :param deployed_prefix: The ``storage_prefix`` this stack last exported.
-    :param deployed_written: The ``written_internal_schema`` it last exported.
+    :param deployed_marks: The ``written_internal_schema`` map this stack last
+        exported, root (``storage_prefix``, ``""`` for the bucket root) to
+        format. Numbers come back from a stack output as floats.
     :param storage_prefix: The normalized ``storage_prefix`` being deployed.
     :param image_internal_schema: The deploying image's written format, or
         ``None`` when its label couldn't be read.
     :param migration_armed: Whether a storage-format migration is armed.
     :param restored_to: ``omnigraph:storage_restored_to_format``, or ``None``.
-    :returns: The ``written_internal_schema`` to export, or ``None`` when
-        nothing is known.
-    :rtype: int | None
+    :returns: The map to export.
+    :rtype: dict[str, int]
     :raises ValueError: on an image that writes less than the mark, or a
         ``restored_to`` outside the deploy it is for.
     """
-    prior = deployed_written if deployed_prefix == storage_prefix else None
+    marks = {root: int(mark) for root, mark in (deployed_marks or {}).items()}
+    prior = marks.get(storage_prefix)
+    root = storage_prefix or "bucket root"
     if restored_to is not None:
         if (
             prior is None
@@ -447,25 +450,40 @@ def next_written_internal_schema(  # noqa: PLR0913
                 f"omnigraph:storage_restored_to_format is {restored_to}, but "
                 "it is accepted only on the deploy that rolls this root back "
                 "after a restore: the image must write exactly that format "
-                "and the root must have been written at a newer one (last "
-                f"exported: {prior}; this image writes {image_internal_schema}). "
-                "If the rollback has already deployed, remove the setting."
+                f"and the root must have been written at a newer one ({root} "
+                f"was last at {prior}; this image writes "
+                f"{image_internal_schema}). If the rollback has already "
+                "deployed, remove the setting."
             )
             raise ValueError(msg)
-        return restored_to
-    if image_internal_schema is None:
-        return prior
-    if prior is not None and image_internal_schema < prior:
-        msg = (
-            f"the deploying omnigraph image writes storage format "
-            f"{image_internal_schema}, but an image writing format {prior} has "
-            f"already been deployed onto this root ({storage_prefix or 'bucket root'}"
-            "), so it may hold branches this image refuses. An in-place "
-            "upgrade has no rollback by image alone. Restore the root from the "
-            "backup taken before the upgrade, then deploy this image with "
-            f"omnigraph:storage_restored_to_format set to {image_internal_schema}."
-        )
-        raise ValueError(msg)
-    if migration_armed:
-        return prior
-    return image_internal_schema if prior is None else max(prior, image_internal_schema)
+        return {**marks, storage_prefix: restored_to}
+    if image_internal_schema is None or migration_armed:
+        if prior is not None and image_internal_schema is not None:
+            _refuse_below_mark(image_internal_schema, prior, root)
+        return marks
+    if prior is not None:
+        _refuse_below_mark(image_internal_schema, prior, root)
+    return {**marks, storage_prefix: max(prior or 0, image_internal_schema)}
+
+
+def _refuse_below_mark(image_internal_schema: int, prior: int, root: str) -> None:
+    """Raise when the image writes an older format than ``root`` has been at.
+
+    :param image_internal_schema: The deploying image's written format.
+    :param prior: The root's mark.
+    :param root: The root, for the message.
+    :raises ValueError: when ``image_internal_schema`` is below ``prior``.
+    """
+    if image_internal_schema >= prior:
+        return
+    msg = (
+        f"the deploying omnigraph image writes storage format "
+        f"{image_internal_schema}, but an image writing format {prior} has "
+        f"already been deployed onto this root ({root}), so it may hold "
+        "branches this image refuses. An in-place upgrade has no rollback by "
+        "image alone. Restore the root from the backup taken before the "
+        "upgrade, then deploy this image with "
+        f"omnigraph:storage_restored_to_format set to {image_internal_schema}. "
+        "See docs/omnigraph-storage-format-upgrade-runbook.md."
+    )
+    raise ValueError(msg)

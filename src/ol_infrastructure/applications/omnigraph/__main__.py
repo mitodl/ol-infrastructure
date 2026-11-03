@@ -295,10 +295,10 @@ validate_storage_prefix_progression(
 # ── Nor may it be handed to an image that can't open what was written to it.
 # An in-place upgrade (0.13 -> 0.14) raises the format a root holds without
 # touching storage_prefix or internal_schema_version, so this stack tracks the
-# highest format it has deployed onto the root itself. See
+# highest format it has deployed onto each root itself. See
 # next_written_internal_schema; it runs in create_data_tier once the image's
 # label has been read.
-DEPLOYED_WRITTEN_INTERNAL_SCHEMA: int | None = optional_stack_output_value(
+DEPLOYED_WRITTEN_INTERNAL_SCHEMA: dict[str, float] | None = optional_stack_output_value(
     _this_stack, "written_internal_schema"
 )
 STORAGE_RESTORED_TO_FORMAT: int | None = omnigraph_config.get_int(
@@ -1125,7 +1125,6 @@ data_tier = create_data_tier(
     # resolved the image reference. See validate_image_internal_schema.
     internal_schema_version=INTERNAL_SCHEMA_VERSION,
     migrate_to_prefix=MIGRATE_TO_PREFIX,
-    deployed_storage_prefix=DEPLOYED_STORAGE_PREFIX,
     deployed_written_internal_schema=DEPLOYED_WRITTEN_INTERNAL_SCHEMA,
     storage_restored_to_format=STORAGE_RESTORED_TO_FORMAT,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
