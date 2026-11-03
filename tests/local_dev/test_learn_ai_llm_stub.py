@@ -29,7 +29,13 @@ def stub_url():
     spec.loader.exec_module(server_module)
     server_module.WORD_DELAY_SECONDS = 0
     server = server_module.ThreadingHTTPServer(("127.0.0.1", 0), server_module.Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    # shutdown() returns only at serve_forever's next poll, so the 0.5s default
+    # poll interval added half a second to every test's teardown.
+    threading.Thread(
+        target=server.serve_forever,
+        kwargs={"poll_interval": 0.01},
+        daemon=True,
+    ).start()
     yield f"http://127.0.0.1:{server.server_address[1]}/v1"
     server.shutdown()
     server.server_close()

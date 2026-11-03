@@ -153,7 +153,13 @@ class _StubHandler(BaseHTTPRequestHandler):
 @pytest.fixture
 def stub_server():
     server = HTTPServer(("127.0.0.1", 0), _StubHandler)
-    thread = Thread(target=server.serve_forever, daemon=True)
+    # shutdown() returns only at serve_forever's next poll, so the 0.5s default
+    # poll interval added half a second to every test's teardown.
+    thread = Thread(
+        target=server.serve_forever,
+        kwargs={"poll_interval": 0.01},
+        daemon=True,
+    )
     thread.start()
     yield server, f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
