@@ -1276,9 +1276,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UKM",
                 idp_display_name="Universiti Kebangsaan Malaysia",
                 org_saml_metadata_url="https://sso.ukm.my/saml2/idp/metadata.php",
-                # The Wayback Machine's capture of 2025-07-29, saved while the
-                # endpoint was down from 2026-10-21. Its SSO/SLO URLs and signing
-                # cert match what metadata.php served again on 2026-10-23.
+                # Copied from metadata.php on 2026-11-03, after UKM rotated its
+                # signing cert (the new one is valid from 2026-10-24). The copy
+                # before that was a Wayback Machine capture from 2025-07-29.
                 org_saml_metadata_xml=_saved_idp_metadata("ukm_metadata.xml"),
                 # UKM gave one value per field for "attribute name and friendly
                 # name", so the plain name (SimpleSAMLphp's basic format) is
