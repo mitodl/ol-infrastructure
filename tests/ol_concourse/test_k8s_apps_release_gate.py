@@ -177,7 +177,13 @@ def fake_github():
     _FakeGitHub.last_edited_at = "2026-10-15T19:33:53Z"
     _FakeGitHub.calls = []
     server = HTTPServer(("127.0.0.1", 0), _FakeGitHub)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    # shutdown() returns only at serve_forever's next poll, so the 0.5s default
+    # poll interval added half a second to every test's teardown.
+    thread = threading.Thread(
+        target=server.serve_forever,
+        kwargs={"poll_interval": 0.01},
+        daemon=True,
+    )
     thread.start()
     yield server
     server.shutdown()
@@ -651,7 +657,13 @@ def fake_label_github():
     _FakeLabelGitHub.strip_after_add = set()
     _FakeLabelGitHub.calls = []
     server = HTTPServer(("127.0.0.1", 0), _FakeLabelGitHub)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    # shutdown() returns only at serve_forever's next poll, so the 0.5s default
+    # poll interval added half a second to every test's teardown.
+    thread = threading.Thread(
+        target=server.serve_forever,
+        kwargs={"poll_interval": 0.01},
+        daemon=True,
+    )
     thread.start()
     yield server
     server.shutdown()
