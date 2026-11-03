@@ -5,8 +5,10 @@ condition that matches more than the marked clients fails the next deploy of the
 others.
 """
 
+import ast
 import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 import pulumi
@@ -18,6 +20,7 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
+from ol_infrastructure.substructure.keycloak import client_policies
 from ol_infrastructure.substructure.keycloak.client_policies import (
     MANAGED_CLIENT_ARGS,
     MANAGED_MARKER_ATTRIBUTE,
@@ -102,6 +105,41 @@ def test_a_managed_client_always_has_both_grants_off(client_args):
     assert client_args["extra_config"][MANAGED_MARKER_ATTRIBUTE] == MANAGED_MARKER_VALUE
     assert client_args["implicit_flow_enabled"] is False
     assert client_args["direct_access_grants_enabled"] is False
+
+
+KEYCLOAK_PACKAGE = Path(client_policies.__file__).parent
+# The master realm has no client policies, so its clients carry no marker.
+UNMARKED_CLIENT_MODULES = {"scim.py"}
+CLIENT_ARG_SPREADS = {"MANAGED_CLIENT_ARGS", "PKCE_REQUIRED_CLIENT_ARGS"}
+
+
+def _client_calls_without_spread() -> list[str]:
+    missing = []
+    for module in sorted(KEYCLOAK_PACKAGE.glob("*.py")):
+        if module.name in UNMARKED_CLIENT_MODULES:
+            continue
+        for node in ast.walk(ast.parse(module.read_text())):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "Client"
+                and isinstance(node.func.value, ast.Attribute)
+                and node.func.value.attr == "openid"
+            ):
+                continue
+            spreads = {
+                keyword.value.id
+                for keyword in node.keywords
+                if keyword.arg is None and isinstance(keyword.value, ast.Name)
+            }
+            if not spreads & CLIENT_ARG_SPREADS:
+                missing.append(f"{module.name}:{node.lineno}")
+    return missing
+
+
+def test_every_realm_client_carries_a_marker():
+    """A client declared without a spread escapes both policies silently."""
+    assert _client_calls_without_spread() == []
 
 
 def test_a_pkce_client_always_carries_s256():

@@ -48,6 +48,15 @@ def _marker_condition(
     public clients, or on every client, also matches the built-in ``account`` and
     ``admin-cli`` clients and the SAML clients, which do not conform, and the next
     update of any of them would be rejected.
+
+    Keycloak evaluates the condition against the stored client and abstains on
+    creation, so the update that first adds the marker is not checked. Every update
+    after it is.
+
+    :param attribute: Client attribute name.
+    :param value: Value the attribute must have.
+    :returns: The condition.
+    :rtype: keycloak.RealmClientPolicyProfilePolicyConditionArgs
     """
     return keycloak.RealmClientPolicyProfilePolicyConditionArgs(
         name="client-attributes",
@@ -109,13 +118,17 @@ def create_managed_client_policy(
     name_prefix: str,
     opts: pulumi.ResourceOptions | None = None,
 ) -> keycloak.RealmClientPolicyProfilePolicy:
-    """Reject the implicit and password grants for every client carrying the managed
-    marker attribute.
+    """Reject the implicit and password grants for clients with the managed marker.
 
-    On an Admin API write of a marked client, Keycloak rejects the client if either
+    On an Admin API update of a marked client, Keycloak rejects the client if either
     flag is on. On authorization and token requests, it rejects implicit, hybrid and
     password grants whatever the client's flags say. The flags are already off on
-    every marked client, so only the write check changes anything today.
+    every marked client, so only the update check changes anything today.
+
+    A partial update that omits ``implicitFlowEnabled`` (e.g. python-keycloak's
+    ``update_client`` with only ``attributes``) fails with a server error on a marked
+    client, because 26.7's ``reject-implicit-grant`` does not handle a missing value.
+    Pulumi and the admin console always send it.
 
     ``auto-configure`` is off, for the same reason as the PKCE profile.
 
@@ -161,9 +174,21 @@ def create_client_policies(
 ) -> None:
     """Create the PKCE and managed-client policies for a realm.
 
+    The managed profile and policy wait for the PKCE ones. The provider writes a
+    realm's whole policy list (and profile list) with GET, modify, PUT, under a
+    mutex that differs between create, update and delete. Two operations on the
+    same list in one deploy, e.g. creating one policy while updating the other,
+    would otherwise race and the last PUT would drop the other's change.
+
     :param realm_id: The realm the policies belong to.
     :param name_prefix: Prefix for the Pulumi resource names, e.g. ``ol-data-platform``.
     :param opts: Resource options applied to every profile and policy.
     """
-    create_pkce_client_policy(realm_id, name_prefix, opts)
-    create_managed_client_policy(realm_id, name_prefix, opts)
+    pkce_policy = create_pkce_client_policy(realm_id, name_prefix, opts)
+    create_managed_client_policy(
+        realm_id,
+        name_prefix,
+        (opts or pulumi.ResourceOptions()).merge(
+            pulumi.ResourceOptions(depends_on=[pkce_policy])
+        ),
+    )
