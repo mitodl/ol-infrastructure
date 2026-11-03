@@ -339,13 +339,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     DEFAULT_SCOPES = [
         "acr",
-        # "basic" carries the "sub" and "auth_time" mappers. ClientDefaultScopes
-        # replaces a client's default scopes rather than adding to them, so
-        # leaving it out drops "sub" from the access token -- which
-        # social-auth-core 6 requires as the Keycloak ID_KEY (it was "username"
-        # through 5.x). Deployed clients keep Keycloak's stock defaults and so
-        # already have it.
-        "basic",
         "email",
         "profile",
         "roles",
@@ -827,7 +820,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             "olapps-ocw-studio-default-scopes",
             realm_id=realm.realm,
             client_id=ocw_studio_client.id,
-            default_scopes=DEFAULT_SCOPES,
+            # "basic" carries the "sub" and "auth_time" mappers. ClientDefaultScopes
+            # replaces a client's default scopes rather than adding to them, so
+            # DEFAULT_SCOPES alone drops "sub" from the access token -- which
+            # social-auth-core 6 needs as the Keycloak ID_KEY (it was "username"
+            # through 5.x). ocw-studio is the only local app on social-auth-core
+            # 6 so far; the deployed ol-mit client sets no scope override and so
+            # keeps Keycloak's stock default, which includes "basic".
+            default_scopes=[*DEFAULT_SCOPES, "basic"],
             opts=kc_opts,
         )
         # social-core's KeycloakOAuth2 decodes the access token with
