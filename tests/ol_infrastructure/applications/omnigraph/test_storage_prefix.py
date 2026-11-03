@@ -13,6 +13,7 @@ See ``docs/omnigraph-storage-format-upgrade-runbook.md``.
 import pytest
 
 from ol_infrastructure.applications.omnigraph.storage import (
+    next_written_internal_schema,
     storage_uri_for,
     validate_image_internal_schema,
     validate_internal_schema_version,
@@ -347,3 +348,78 @@ def test_mistyped_rollback_override_says_what_to_set_it_to() -> None:
     """A typo on a real rollback must not read as "delete the override"."""
     with pytest.raises(ValueError, match="storage_rollback_from to 'fmt9'"):
         validate_storage_prefix_progression("fmt9", "fmt6", "fmt8")
+
+
+# ── next_written_internal_schema ─────────────────────────────────────────────
+# The in-place upgrade's rollback guard: a root a 0.14 image has been deployed
+# onto may hold format-16 branches, which a 0.13 image refuses, while the stack
+# config still says 14.
+
+
+def _next(  # noqa: PLR0913
+    deployed_written: int | None,
+    image: int | None,
+    *,
+    deployed_prefix: str | None = "fmt14",
+    prefix: str = "fmt14",
+    armed: bool = False,
+    restored_to: int | None = None,
+) -> int | None:
+    return next_written_internal_schema(
+        deployed_prefix,
+        deployed_written,
+        prefix,
+        image,
+        migration_armed=armed,
+        restored_to=restored_to,
+    )
+
+
+def test_first_deploy_records_what_the_image_writes() -> None:
+    assert _next(None, 14, deployed_prefix=None) == 14
+
+
+def test_an_upgrade_raises_the_mark() -> None:
+    assert _next(14, 16) == 16
+
+
+def test_an_image_writing_less_than_the_mark_is_refused() -> None:
+    """The 0.13 rollback after a 0.14 deploy, without a restore."""
+    with pytest.raises(ValueError, match="storage_restored_to_format set to 14"):
+        _next(16, 14)
+
+
+def test_an_unreadable_label_keeps_the_mark() -> None:
+    assert _next(16, None) == 16
+
+
+def test_a_different_root_starts_over() -> None:
+    """A rebuild cutover's rollback moves to the old root, which only its own
+    format ever wrote.
+    """
+    assert _next(14, 9, deployed_prefix="fmt14", prefix="fmt9") == 9
+
+
+def test_an_armed_migration_does_not_move_the_mark() -> None:
+    """Disarming must be able to put the old image back."""
+    assert _next(9, 14, deployed_prefix="fmt9", prefix="fmt9", armed=True) == 9
+
+
+def test_a_restore_lowers_the_mark_on_its_own_deploy() -> None:
+    assert _next(16, 14, restored_to=14) == 14
+
+
+@pytest.mark.parametrize(
+    ("deployed_written", "image", "restored_to"),
+    [
+        (14, 14, 14),  # left set after the rollback deployed
+        (16, 16, 14),  # set ahead of time, image not rolled back
+        (16, 14, 13),  # names a format the image doesn't write
+        (None, 14, 14),  # nothing to roll back from
+    ],
+)
+def test_a_restore_override_outside_its_deploy_is_refused(
+    deployed_written: int | None, image: int, restored_to: int
+) -> None:
+    with pytest.raises(ValueError, match="accepted only on the deploy"):
+        _next(deployed_written, image, restored_to=restored_to)

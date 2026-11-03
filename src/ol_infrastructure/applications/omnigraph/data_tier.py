@@ -76,6 +76,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     create_maintenance_window,
 )
 from ol_infrastructure.applications.omnigraph.storage import (
+    next_written_internal_schema,
     storage_uri_for,
     validate_image_internal_schema,
 )
@@ -342,6 +343,9 @@ class OmnigraphDataTier(NamedTuple):
     # binary as the server — the storage-format migration Job loads with it —
     # cannot drift onto a different one.
     server_image: str | Output[str]
+    # The highest storage format an image deployed onto this root writes, for
+    # the stack to export. See next_written_internal_schema.
+    written_internal_schema: int | None
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -369,6 +373,9 @@ def create_data_tier(  # noqa: PLR0913
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
+    deployed_storage_prefix: str | None = None,
+    deployed_written_internal_schema: int | None = None,
+    storage_restored_to_format: int | None = None,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
 
@@ -515,6 +522,14 @@ def create_data_tier(  # noqa: PLR0913
         migrate_to_prefix,
         migration_armed=migration_armed,
         image_min_internal_schema=image_min_internal_schema,
+    )
+    written_internal_schema = next_written_internal_schema(
+        deployed_storage_prefix,
+        deployed_written_internal_schema,
+        storage_prefix,
+        image_internal_schema,
+        migration_armed=migration_armed,
+        restored_to=storage_restored_to_format,
     )
 
     # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,
@@ -1275,4 +1290,5 @@ def create_data_tier(  # noqa: PLR0913
         maintenance=omnigraph_maintenance,
         storage_uri=storage_uri,
         server_image=omnigraph_server_image,
+        written_internal_schema=written_internal_schema,
     )
