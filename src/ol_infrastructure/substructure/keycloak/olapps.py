@@ -814,9 +814,9 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     # MITXONLINE B2B [START]
     # This client is used by MITx Online for B2B provisioning via the Keycloak
     # Admin API: organizations, the identity providers they are linked to, and
-    # the drift reconciler. Adding a user to an organization on an enrollment
-    # request uses mitxonline-b2b-membership-client below instead, so these
-    # roles are not on the per-request path.
+    # the drift reconciler. mitxonline-b2b-membership-client below is for adding
+    # a user to an organization on an enrollment request, so that these roles
+    # can come off the per-request path once mitxonline reads it.
     olapps_mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
@@ -922,7 +922,7 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=[],
-        opts=resource_options,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     for role in ("manage-organizations", "manage-users"):
         keycloak.openid.ClientServiceAccountRole(
@@ -938,6 +938,9 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         "olapps-mitxonline-b2b-membership-client-vault-credentials",
         path="secret-mitxonline/keycloak-admin-b2b-membership",
         data_json=Output.all(
+            url=olapps_mitxonline_b2b_membership_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
             client_id=olapps_mitxonline_b2b_membership_client.client_id,
             client_secret=olapps_mitxonline_b2b_membership_client.client_secret,
         ).apply(json.dumps),
