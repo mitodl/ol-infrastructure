@@ -950,6 +950,50 @@ REFUSED_LABEL = "ops:refused"
 ABANDONED_LABEL = "ops:abandoned"
 ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 
+# The custom resource types the release flow keeps version history in, pinned
+# to the ol-concourse commit each image was built from. Concourse keys a
+# resource's history on its type's source and image, so while these tracked
+# `latest`, every image publish gave each app's release resource an empty
+# history on its next check. QA builds from before then no longer offer
+# Production a matching set of inputs, so a release issue closed afterward
+# deployed nothing until the next QA build, and Production then refused it
+# when that build carried something newer
+# (https://github.com/mitodl/mitxpro/issues/4172, 2026-11-03).
+#
+# Bumping a tag resets the same histories, once, on each pipeline's next check
+# after k8s-apps-meta regenerates them, even when the image itself is
+# unchanged: the type's source is what changed. Introducing these pins was
+# such a bump. So bump deliberately, and afterwards re-run the QA job of every
+# app with an open release issue. The release bot reports an approved issue
+# that Production has not taken.
+RELEASE_RESOURCE_TYPE_TAGS = {
+    "release": "eaa392681a2c2be5ea93abe1f3144844f0e65415",  # pragma: allowlist secret
+    "github-issues": "a91cc95e592b3327b3d270e79286c56db2c78235",  # pragma: allowlist secret
+    "github-deployments": "0bc607fd2912156998d379155a2acc8f8249d00a",  # pragma: allowlist secret
+}
+
+
+def _pin_release_resource_types(pipeline: Pipeline) -> Pipeline:
+    """Set each RELEASE_RESOURCE_TYPE_TAGS type in *pipeline* to its pinned tag.
+
+    Applied to the finished pipeline rather than to each fragment because the
+    github-issues type arrives through the library's pulumi_jobs_chain, and
+    fragment merging keeps whichever definition of a name comes first.
+    """
+    for resource_type in pipeline.resource_types or []:
+        tag = RELEASE_RESOURCE_TYPE_TAGS.get(resource_type.name)
+        if tag is None:
+            continue
+        source = resource_type.source
+        if isinstance(source, RegistryImage):
+            source.tag = tag
+        elif isinstance(source, dict):
+            source["tag"] = tag
+        else:
+            msg = f"resource type {resource_type.name!r} has no source to pin"
+            raise TypeError(msg)
+    return pipeline
+
 
 def _define_release_resources(
     app_name: str,
@@ -2138,7 +2182,9 @@ def _build_release_resource_app_pipeline(
                 production_job_name=f"deploy-{project_name}-production",
             )
         )
-    return PipelineFragment.combine_fragments(*fragments).to_pipeline()
+    return _pin_release_resource_types(
+        PipelineFragment.combine_fragments(*fragments).to_pipeline()
+    )
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
