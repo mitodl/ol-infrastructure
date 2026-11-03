@@ -48,6 +48,12 @@ from ol_infrastructure.lib.pulumi_helper import (
     require_stack_output_value,
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.substructure.starrocks.resource_groups import (
+    Classifier,
+    QueryQueueSettings,
+    ResourceGroup,
+    ResourceGroupLimits,
+)
 
 _vault_provider = setup_vault_provider()
 stack_info = parse_stack()
@@ -96,6 +102,20 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT readonly TO USER '{{name}}'@'%';",
             "ALTER USER '{{name}}'@'%' DEFAULT ROLE readonly;",
+        ],
+        "revoke": ["DROP USER '{{name}}'@'%';"],
+        "renew": [],
+        "rollback": [],
+    },
+    # readonly's privileges under a role of its own, so the batch resource group
+    # below can tell batch readers (OpenMetadata, the mit-learn warehouse pull)
+    # from Superset. A classifier can only see the session's active role, and a
+    # Vault username is random past its prefix.
+    "batch_readonly": {
+        "create": [
+            "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
+            "GRANT batch_readonly TO USER '{{name}}'@'%';",
+            "ALTER USER '{{name}}'@'%' DEFAULT ROLE batch_readonly;",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -467,6 +487,10 @@ _base_roles_sql = """\
 CREATE ROLE IF NOT EXISTS readonly;
 CREATE ROLE IF NOT EXISTS app;
 CREATE ROLE IF NOT EXISTS admin;
+-- batch_readonly inherits every readonly grant, the Iceberg catalog grants
+-- included. It exists only to classify its users into the batch resource group.
+CREATE ROLE IF NOT EXISTS batch_readonly;
+GRANT readonly TO ROLE batch_readonly;
 
 -- Governance roles for OIDC-authenticated human users.  Names match the
 -- Keycloak ol-starrocks-client roles exactly for 1:1 claim-to-role mapping.
@@ -656,6 +680,109 @@ command.local.Command(
         depends_on=[roles_setup_cmd],
     ),
 )
+
+# --- Resource groups and query queue (ADR 0012 decision 3) -----------------
+# One cluster per environment serves both interactive and batch traffic, so
+# isolation comes from resource groups: OSS 4.1 stubs multi-warehouse and CN
+# groups. Classification is by the session's active role, because that is the
+# only identity that separates the consumers. The user classifier is an exact
+# match, and a Vault-issued username ends in random characters.
+#
+# Who holds which active role today:
+#   readonly        Superset; OpenMetadata and the mit-learn warehouse pull until
+#                   they move to batch_readonly
+#   app             ol-analytics-api; `ol-dbt starrocks` from a laptop defaults
+#                   to it too
+#   admin           Dagster: the lakehouse dbt build. Its REFRESH MATERIALIZED
+#                   VIEW does not land here: an MV task run sets its session
+#                   resource_group to the MV's property, else default_mv_wg.
+#   batch_readonly  nothing yet
+#   governance      OIDC-authenticated people, from the file group provider
+#
+# Interactive takes only SELECTs, so a write from any of those principals falls
+# through to the type-only INSERT classifier and lands in batch. That relies on
+# the FE choosing the satisfied classifier with the highest weight: role plus
+# query_type (2.1) beats query_type alone (1.1), which beats role alone (1.0).
+# root and anything else unclassified stays in default_wg.
+#
+# exclusive_cpu_cores is the FE's own cap check against the smallest CN's
+# reported cores, which on these pods is the CPU limit (cgroup quota), not the
+# request. The values in stack config are sized from the request instead, so the
+# dedicated executor threads have CPU the pod is actually guaranteed.
+#
+# Unverified: that a CN enforces workgroups the same way a BE does. Reading
+# be/src on branch-4.1, the workgroup and executor code has no CN branch (only
+# the heartbeat checks is_cn()), but this needs a concurrent-load test on QA.
+query_queue = QueryQueueSettings.model_validate(
+    starrocks_config.require_object("query_queue")
+)
+query_queue_cmd = command.local.Command(
+    f"starrocks-{stack_info.env_suffix}-query-queue-setup",
+    create=_exec_sql,
+    update=_exec_sql,
+    delete=_exec_delete_sql,
+    environment={
+        **_mysql_env,
+        "STARROCKS_SQL": query_queue.set_sql(),
+        "STARROCKS_DELETE_SQL": QueryQueueSettings.reset_sql(),
+    },
+    # No triggers. A trigger change replaces a Command even when it has an
+    # update step, which here would run the delete (back to the FE defaults)
+    # before the create. A change to STARROCKS_SQL alone runs update in place.
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[starrocks_db_connection],
+    ),
+)
+
+_INTERACTIVE_ROLES = ("readonly", "app", *GOVERNANCE_ROLES)
+_resource_group_limits = starrocks_config.require_object("resource_groups")
+resource_groups = (
+    ResourceGroup(
+        name="interactive",
+        classifiers=tuple(
+            Classifier(role=role, query_types=("select",))
+            for role in _INTERACTIVE_ROLES
+        ),
+        limits=ResourceGroupLimits.model_validate(
+            _resource_group_limits["interactive"]
+        ),
+    ),
+    ResourceGroup(
+        name="batch",
+        classifiers=(
+            Classifier(role="admin"),
+            Classifier(role="batch_readonly"),
+            Classifier(query_types=("insert",)),
+        ),
+        limits=ResourceGroupLimits.model_validate(_resource_group_limits["batch"]),
+    ),
+)
+for _resource_group in resource_groups:
+    command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-resource-group-{_resource_group.name}",
+        create=_exec_sql,
+        update=_exec_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _resource_group.create_sql(),
+            "STARROCKS_DELETE_SQL": _resource_group.drop_sql(),
+        },
+        # No triggers, for the reason on query_queue_cmd: an update runs the
+        # CREATE ... OR REPLACE, which swaps the group under one FE write lock
+        # instead of dropping it as a separate step first.
+        opts=ResourceOptions(
+            # A create-before-delete replacement would run the old resource's
+            # DROP after the new one's CREATE and leave no group.
+            delete_before_replace=True,
+            # query_queue_cmd: concurrency_limit means something different
+            # depending on enable_group_level_query_queue (see QueryQueueSettings).
+            # roles_setup_cmd: batch_readonly has to exist for its classifier to
+            # match anyone.
+            depends_on=[query_queue_cmd, roles_setup_cmd],
+        ),
+    )
 
 # --- OIDC / OAuth2 authentication via Keycloak ------------------------------
 # StarRocks v3.5+ uses a "security integration" (SQL object) to hold OAuth2
