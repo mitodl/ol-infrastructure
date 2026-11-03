@@ -37,6 +37,7 @@ from ol_infrastructure.lib.opik import (
 )
 from ol_infrastructure.lib.pulumi_helper import make_stack_reference
 from ol_infrastructure.lib.vault import get_vault_provider
+from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
 
 REALM_NAME = "ol-platform-engineering"
 # The client the Opik gateway's OIDC plugin is configured with; its bearer route
@@ -67,8 +68,7 @@ def _opik_sdk_client(
         access_type="CONFIDENTIAL",
         service_accounts_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         opts=ResourceOptions(provider=keycloak_provider, delete_before_replace=True),
     )
     # Every client in the realm signs with the same key, so the gateway's audience

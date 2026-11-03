@@ -7,8 +7,9 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
-    create_pkce_client_policy,
+    create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_staff_organizations,
@@ -274,7 +275,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
-    create_pkce_client_policy(
+    create_client_policies(
         ol_data_platform_realm.id, "ol-data-platform", resource_options
     )
 
@@ -289,9 +290,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ),
         enabled=True,
         access_type="CONFIDENTIAL",
-        direct_access_grants_enabled=False,
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-data-platform-superset-redirect-uris"
@@ -386,8 +386,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",  # Public client - no secret required
         standard_flow_enabled=True,  # Authorization code flow
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         # superset-sup listens on this fixed port. A loopback redirect has to
@@ -485,7 +483,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-data-platform-openmetadata-redirect-uris"
@@ -580,9 +578,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         # Standard flow for browser-based auth, service accounts for API access
-        direct_access_grants_enabled=False,
         standard_flow_enabled=bool(ol_data_platform_starrocks_redirect_uris),
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=ol_data_platform_starrocks_redirect_uris,
         access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
@@ -871,8 +868,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         # bin/starrocks-auth in ol-data-platform listens on this fixed port.
@@ -943,9 +938,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
-        direct_access_grants_enabled=False,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
@@ -962,9 +956,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
-        direct_access_grants_enabled=False,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     for resource_name, role in [
@@ -1034,9 +1027,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
-        direct_access_grants_enabled=False,
         valid_redirect_uris=[
             "https://nb.data.ol.mit.edu/hub/oauth_callback",
             "https://nb-qa.data.ol.mit.edu/hub/oauth_callback",
@@ -1096,9 +1088,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
-        direct_access_grants_enabled=False,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
