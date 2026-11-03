@@ -3079,8 +3079,8 @@ def stranded(monkeypatch):
     """Stub the closed-issue and deployment lookups and capture what is posted."""
     lookup = AsyncMock(return_value=[])
     monkeypatch.setattr(bot.github, "closed_release_issues", lookup)
-    report = AsyncMock(return_value={"success": None, "newer": None})
-    monkeypatch.setattr(bot.github, "deployment_report", report)
+    report = AsyncMock(return_value=False)
+    monkeypatch.setattr(bot.github, "deployment_created_since", report)
     monkeypatch.setattr(
         bot.slack_channels, "resolve", AsyncMock(side_effect=lambda _c, ch: ch)
     )
@@ -3150,73 +3150,45 @@ async def test_a_taken_or_retired_issue_is_not_announced(repos, stranded, labels
     app.client.chat_postMessage.assert_not_awaited()
 
 
-@pytest.mark.parametrize(
-    "report",
-    [
-        {
-            "success": {"version": "2026.9.5.1", "deployed_at": datetime.now(tz=UTC)},
-            "newer": None,
-        },
-        {
-            "success": None,
-            "newer": {
-                "version": "2026.9.5.1",
-                "created_at": datetime.now(tz=UTC),
-                "state": "in_progress",
-            },
-        },
-    ],
-)
-async def test_a_production_deployment_after_the_close_counts_as_taken(
-    repos, stranded, report
-):
+async def test_a_production_deployment_after_the_close_counts_as_taken(repos, stranded):
     """The consumed label is best-effort; the Deployment says Production ran."""
-    lookup, deployment_report, app = stranded
+    lookup, deployment_created_since, app = stranded
     state = await _seeded(app, repos, lookup)
-    deployment_report.return_value = report
-    lookup.return_value = [_closed_issue()]
+    deployment_created_since.return_value = True
+    issue = _closed_issue()
+    lookup.return_value = [issue]
 
     await bot._announce_stranded_approvals(app, repos, state)
 
     app.client.chat_postMessage.assert_not_awaited()
+    deployment_created_since.assert_awaited_once_with(
+        "mitodl/my-app", "Production", "2026.9.5.1", issue["closed_at"]
+    )
 
 
-async def test_a_production_deployment_before_the_close_does_not_count(repos, stranded):
-    lookup, deployment_report, app = stranded
-    state = await _seeded(app, repos, lookup)
-    deployment_report.return_value = {
-        "success": {
-            "version": "2026.9.5.1",
-            "deployed_at": datetime.now(tz=UTC) - timedelta(days=2),
-        },
-        "newer": None,
-    }
-    lookup.return_value = [_closed_issue()]
-
-    await bot._announce_stranded_approvals(app, repos, state)
-
-    app.client.chat_postMessage.assert_awaited_once()
-
-
-async def test_a_production_deployment_of_another_version_does_not_count(
-    repos, stranded
+@pytest.mark.parametrize(
+    ("title", "version"),
+    [
+        ("Release my-app 2026.9.5.1", "2026.9.5.1"),
+        ("Release my-app infrastructure @ 2026.9.5.1", "2026.9.5.1"),
+    ],
+)
+async def test_the_deployment_lookup_uses_the_issues_version(
+    repos, stranded, title, version
 ):
-    lookup, deployment_report, app = stranded
+    lookup, deployment_created_since, app = stranded
     state = await _seeded(app, repos, lookup)
-    deployment_report.return_value = {
-        "success": {"version": "2026.9.6.1", "deployed_at": datetime.now(tz=UTC)},
-        "newer": None,
-    }
-    lookup.return_value = [_closed_issue()]
+    lookup.return_value = [_closed_issue(title=title)]
 
     await bot._announce_stranded_approvals(app, repos, state)
 
+    assert deployment_created_since.await_args.args[2] == version
     app.client.chat_postMessage.assert_awaited_once()
 
 
 async def test_a_shared_repo_relies_on_the_label_alone(repos, stranded):
     """Two apps in one repository record Deployments under the same versions."""
-    lookup, deployment_report, app = stranded
+    lookup, deployment_created_since, app = stranded
     shared = dict(
         repos,
         **{
@@ -3230,15 +3202,12 @@ async def test_a_shared_repo_relies_on_the_label_alone(repos, stranded):
         },
     )
     state = await _seeded(app, shared, lookup)
-    deployment_report.return_value = {
-        "success": {"version": "2026.9.5.1", "deployed_at": datetime.now(tz=UTC)},
-        "newer": None,
-    }
+    deployment_created_since.return_value = True
     lookup.return_value = [_closed_issue()]
 
     await bot._announce_stranded_approvals(app, shared, state)
 
-    deployment_report.assert_not_awaited()
+    deployment_created_since.assert_not_awaited()
     app.client.chat_postMessage.assert_awaited_once()
     assert "`my-app`" in app.client.chat_postMessage.call_args.kwargs["text"]
 
@@ -3302,7 +3271,9 @@ async def test_a_failed_unconsumed_post_is_retried(repos, stranded):
     assert app.client.chat_postMessage.await_count == 2
 
 
-@pytest.mark.parametrize("failing", ["closed_release_issues", "deployment_report"])
+@pytest.mark.parametrize(
+    "failing", ["closed_release_issues", "deployment_created_since"]
+)
 async def test_a_failed_lookup_is_reported_not_raised(
     repos, stranded, monkeypatch, failing
 ):

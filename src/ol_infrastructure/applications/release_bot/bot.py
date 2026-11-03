@@ -2108,28 +2108,6 @@ _STRANDED_AFTER = timedelta(minutes=45)
 _STRANDED_LOOKBACK = timedelta(days=1)
 
 
-async def _production_started_since(
-    repo_slug: str, version: str, since: datetime
-) -> bool:
-    """Return whether Production recorded a *version* Deployment at or after *since*.
-
-    The version has to match because every app records its Deployments in the
-    same `Production` environment, so in a repository with another app (or
-    after a newer release) any Deployment would otherwise count.
-    """
-    report = await github.deployment_report(repo_slug, github.PRODUCTION_ENVIRONMENT)
-    success, newer = report["success"], report["newer"]
-    return (
-        success is not None
-        and success["version"] == version
-        and success["deployed_at"] >= since
-    ) or (
-        newer is not None
-        and newer["version"] == version
-        and newer["created_at"] >= since
-    )
-
-
 def _gate_version(title: str) -> str | None:
     """Return the version a gate issue title names, or None for the bare title."""
     words = title.split()
@@ -2138,14 +2116,19 @@ def _gate_version(title: str) -> str | None:
 
 
 async def _deployed_since_close(cfg, repos, issue: dict[str, Any]) -> bool:
-    """Return whether Production deployed *issue*'s version after it closed."""
+    """Return whether a Production deploy of *issue*'s version began after it closed."""
     version = _gate_version(issue["title"])
     # A repository two apps share holds both apps' Deployments under the same
     # version numbers, so there only the label is evidence.
     shares_repo = sum(c.repo == cfg.repo for c in repos.values()) > 1
     if version is None or shares_repo:
         return False
-    return await _production_started_since(cfg.repo, version, issue["closed_at"])
+    # Matched on the version because every app records its Deployments in
+    # the same Production environment, and on when the Deployment was created,
+    # not finished, so a deploy already under way at the close does not count.
+    return await github.deployment_created_since(
+        cfg.repo, github.PRODUCTION_ENVIRONMENT, version, issue["closed_at"]
+    )
 
 
 def _qa_job_url(app_name: str, cfg) -> str:

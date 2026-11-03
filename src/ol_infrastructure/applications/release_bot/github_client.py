@@ -591,6 +591,31 @@ async def closed_release_issues(
     return await asyncio.to_thread(_closed_release_issues_sync, repo_slug, since)
 
 
+def _deployment_created_since_sync(
+    repo_slug: str, environment: str, version: str, since: datetime
+) -> bool:
+    repo = _get_client().get_repo(repo_slug)
+    # The API lists a ref's deployments newest first, so the first one created
+    # before *since* ends the search.
+    for deployment in repo.get_deployments(ref=version, environment=environment):
+        return deployment.created_at >= since
+    return False
+
+
+async def deployment_created_since(
+    repo_slug: str, environment: str, version: str, since: datetime
+) -> bool:
+    """Return whether a *version* Deployment to *environment* began at or after *since*.
+
+    Any status counts, and the time is when the Deployment was created, which
+    the pipeline does as the deploy starts: a deploy that began before *since*
+    and finished after it does not count.
+    """
+    return await asyncio.to_thread(
+        _deployment_created_since_sync, repo_slug, environment, version, since
+    )
+
+
 # Environments the release pipeline creates GitHub Deployments for (see
 # _define_release_resources in
 # src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py). Each
