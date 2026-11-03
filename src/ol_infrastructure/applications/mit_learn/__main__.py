@@ -2022,9 +2022,7 @@ mitlearn_celery_beat_config = OLApplicationK8sCeleryBeatConfig(
 # stack's `mitlearn:vars` is what makes mit-learn register the warehouse-pull
 # beat entries (it requires STARROCKS_HOST and STARROCKS_USER together), so
 # minting credentials for a stack that has no host would rotate a StarRocks
-# user on every refresh for nothing. Only CI lacks a StarRocks cluster
-# entirely; QA has one but is held back for the reason recorded in
-# Pulumi.QA.yaml.
+# user on every refresh for nothing. Only CI sets no host.
 starrocks_vault_mount_path = (
     "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
 )
