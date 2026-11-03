@@ -952,12 +952,13 @@ ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 
 # The custom resource types the release flow keeps version history in, pinned
 # to the ol-concourse commit each image was built from. Concourse keys a
-# resource's history on its type's image, so while these tracked `latest`,
-# every image publish gave each app's release resource an empty history on its
-# next check. QA builds from before then no longer offer Production a matching
-# set of inputs, so a release issue closed afterward deployed nothing until the
-# next QA build, and Production then refused it when that build carried
-# something newer (https://github.com/mitodl/mitxpro/issues/4172, 2026-11-03).
+# resource's history on its type's source and image, so while these tracked
+# `latest`, every image publish gave each app's release resource an empty
+# history on its next check. QA builds from before then no longer offer
+# Production a matching set of inputs, so a release issue closed afterward
+# deployed nothing until the next QA build, and Production then refused it
+# when that build carried something newer
+# (https://github.com/mitodl/mitxpro/issues/4172, 2026-11-03).
 #
 # Bumping a tag resets the same histories, once, on each pipeline's next check
 # after k8s-apps-meta regenerates them, even when the image itself is
