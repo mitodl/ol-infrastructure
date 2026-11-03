@@ -55,11 +55,12 @@ class _Mocks(pulumi.runtime.Mocks):
         }
 
 
-def _build(
+def _build(  # noqa: PLR0913
     monkeypatch: pytest.MonkeyPatch,
     *,
     served_format: int,
     image_format: int,
+    image_min_format: int | None = None,
     migration_armed: bool = False,
     boot_budget_seconds: int | None = None,
 ) -> tuple[_Mocks, data_tier.OmnigraphDataTier]:
@@ -70,7 +71,10 @@ def _build(
     monkeypatch.setattr(
         data_tier,
         "read_image_internal_schema_range",
-        lambda *_: (image_format, image_format),
+        lambda *_: (
+            image_format if image_min_format is None else image_min_format,
+            image_format,
+        ),
     )
     service_account = kubernetes.core.v1.ServiceAccount("omnigraph-server-sa")
     tier = data_tier.create_data_tier(
@@ -158,6 +162,17 @@ def test_format_14_has_the_plan_gate_and_one_stop_window(monkeypatch):
         tier.plan_gate_job.urn,
         *(cj.urn for cj in tier.maintenance.cron_jobs),
     ).apply(check)
+
+
+@pulumi.runtime.test
+def test_an_image_opening_the_root_in_place_deploys_without_a_migration(monkeypatch):
+    """A 0.14 image (opens 14 to 16) on a fmt14 root. Swapping the reader's
+    (oldest, written) order would make the range empty and refuse this.
+    """
+    _, tier = _build(
+        monkeypatch, served_format=14, image_format=16, image_min_format=14
+    )
+    return tier.deployment.urn
 
 
 @pulumi.runtime.test
