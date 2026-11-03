@@ -62,6 +62,11 @@ RUN apt-get update && \
       ca-certificates \
       curl \
       git \
+      # less registers the /usr/bin/pager alternative, which Debian's psql runs
+      # when PAGER is unset. DHI's util-linux ships `more` but doesn't register
+      # it, so without this any psql result long enough to page (e.g. in
+      # `manage.py dbshell`) fails with "sh: pager: command not found".
+      less \
       libffi-dev \
       libjpeg-dev \
       libpq-dev \
