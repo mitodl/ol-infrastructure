@@ -13,13 +13,13 @@ The Simple Pulumi-Only pattern is for applications/services that:
 ## Managed Applications
 
 `production_app_names` in `meta.py` is the source of truth for what this meta
-pipeline manages on odl-prod. It currently holds 37 applications, each rendered
+pipeline manages on odl-prod. It currently holds 38 applications, each rendered
 as a `pulumi-{app_name}` pipeline on the `infrastructure` team:
 
 `airbyte`, `aws-ecr`, `aws-sftp`, `b2b-partners-storage`, `celery-monitoring`,
 `clickhouse`, `data_warehouse`, `digital-credentials`, `fastly-redirector`,
 `github-organization`, `github-repositories`, `grafana-alerting`,
-`jupyterhub-data`, `mailgun`, `marimo-data`, `mongodb-atlas`, `monitoring`,
+`jupyterhub-data`, `mailgun`, `marimo-data`, `mongodb-atlas`, `monitoring`, `observability-archive`,
 `ocw-site`, `open-discussions`, `open-metadata`, `open-metadata-substructure`,
 `opensearch`, `opik`, `qdrant-cloud`, `release-bot`, `rootly`, `sentry`,
 `starrocks`, `starrocks-substructure`, `starburst`, `tika`, `toolhive-apps`,

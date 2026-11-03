@@ -1,0 +1,7 @@
+---
+name: ol-application-observability-archive
+runtime: python
+description: Self-hosted Loki and Mimir telemetry archive on the operations EKS cluster
+  (ADR-0014)
+backend:
+  url: s3://mitol-pulumi-state/

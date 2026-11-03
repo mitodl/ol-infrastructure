@@ -635,7 +635,32 @@ if not USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE:
         if ng_name != "io-optimized"
     }
 
+
+def pod_subnet_ids_in_zone(zone: str | None) -> Output[list[str]]:
+    """Return the pod subnets a node group may use, narrowed to one zone when asked.
+
+    A single-zone node group is for workloads that replicate nothing across
+    nodes (the telemetry archive at replication factor 1), where spreading a
+    ring over three zones buys cross-AZ transfer charges and no durability.
+    """
+    if not zone:
+        return target_vpc["k8s_pod_subnet_ids"]
+    return Output.all(
+        subnet_ids=target_vpc["k8s_pod_subnet_ids"],
+        subnet_zones=target_vpc["k8s_pod_subnet_zones"],
+    ).apply(
+        lambda subnets: [
+            subnet_id
+            for subnet_id, subnet_zone in zip(
+                subnets["subnet_ids"], subnets["subnet_zones"], strict=True
+            )
+            if subnet_zone == zone
+        ]
+    )
+
+
 for ng_name, ng_config in configured_node_groups.items():
+    node_group_subnet_ids = pod_subnet_ids_in_zone(ng_config.get("availability_zone"))
     taint_list = {}
     for taint_name, taint_config in ng_config["taints"].items() or {}:
         taint_list[taint_name] = eks.TaintArgs(
@@ -666,7 +691,7 @@ for ng_name, ng_config in configured_node_groups.items():
                     node_associate_public_ip_address=False,
                 ),
                 provider=k8s_provider,
-                subnet_ids=target_vpc["k8s_pod_subnet_ids"],
+                subnet_ids=node_group_subnet_ids,
                 vpc_id=target_vpc["id"],
             ),
             launch_template_tag_specifications=[

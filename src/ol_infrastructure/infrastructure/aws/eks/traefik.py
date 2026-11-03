@@ -180,6 +180,7 @@ def setup_traefik(
                 },
                 "gatewayClass": {
                     "enabled": True,
+                    "labels": {"ol.mit.edu/gateway-controller": "shared"},
                 },
                 "providers": {
                     # Not supporting legacy ingress resources
@@ -188,6 +189,12 @@ def setup_traefik(
                     },
                     "kubernetesGateway": {
                         "enabled": True,
+                        # Only serve Gateways of our own GatewayClass. Other
+                        # Traefik instances on the cluster (the telemetry
+                        # archive's internal one) share the controller name,
+                        # and without this filter their Gateways would be
+                        # exposed on this public NLB as well.
+                        "labelSelector": "ol.mit.edu/gateway-controller=shared",
                     },
                 },
                 # These are important for external-dns to actually work

@@ -123,6 +123,12 @@ MARIMO_OPERATOR_VERSION = "v0.3.0"
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.6.0"
+# renovate: datasource=helm depName=loki packageName=loki registryUrl=https://grafana.github.io/helm-charts
+LOKI_CHART_VERSION = "7.5.0"
+# renovate: datasource=helm depName=mimir-distributed packageName=mimir-distributed registryUrl=https://grafana.github.io/helm-charts
+MIMIR_DISTRIBUTED_CHART_VERSION = "6.2.2"
+# renovate: datasource=docker depName=pdc-agent packageName=grafana/pdc-agent
+PDC_AGENT_VERSION = "0.0.67"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.4"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
