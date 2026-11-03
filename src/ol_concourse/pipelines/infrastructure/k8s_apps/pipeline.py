@@ -960,9 +960,11 @@ ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 # something newer (https://github.com/mitodl/mitxpro/issues/4172, 2026-11-03).
 #
 # Bumping a tag resets the same histories, once, on each pipeline's next check
-# after k8s-apps-meta regenerates them. So bump deliberately, and afterwards
-# re-run the QA job of every app with an open release issue. The release bot
-# reports an approved issue that Production has not taken.
+# after k8s-apps-meta regenerates them, even when the image itself is
+# unchanged: the type's source is what changed. Introducing these pins was
+# such a bump. So bump deliberately, and afterwards re-run the QA job of every
+# app with an open release issue. The release bot reports an approved issue
+# that Production has not taken.
 RELEASE_RESOURCE_TYPE_TAGS = {
     "release": "eaa392681a2c2be5ea93abe1f3144844f0e65415",  # pragma: allowlist secret
     "github-issues": "a91cc95e592b3327b3d270e79286c56db2c78235",  # pragma: allowlist secret
