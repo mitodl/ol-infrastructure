@@ -602,9 +602,14 @@ opik_bearer_oidc_plugin["config"]["bearer_only"] = True
 # SDK request would 401 even with a freshly-issued valid token.
 opik_bearer_oidc_plugin["config"]["use_jwks"] = True
 # Every client in the realm signs with the same key, so without an audience
-# check a client-credentials token from any of them is admitted. The audience
-# mapper on ol-opik-client puts its own client id in aud. The issuer is pinned
-# here rather than taken from the discovery document at request time.
+# check a client-credentials token from any of them is admitted. Tokens pass
+# only with ol-opik-client in aud: the per-app SDK clients (opik-<app>-<env>,
+# ol-data-platform-evaluation-opik; keycloak/opik_sdk.py) each carry an audience
+# mapper that adds it, and ol-opik-client's own mapper adds it to every access
+# token that client issues, UI users' included (the claim_schema below rejects
+# those).
+# The issuer is pinned here rather than taken from the discovery document at
+# request time.
 opik_bearer_oidc_plugin["config"]["claim_validator"] = {
     "issuer": {"valid_issuers": [KEYCLOAK_ISSUER]},
     "audience": {"required": True, "match_with_client_id": True},
