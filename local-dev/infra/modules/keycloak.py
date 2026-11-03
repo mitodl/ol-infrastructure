@@ -339,6 +339,13 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     DEFAULT_SCOPES = [
         "acr",
+        # "basic" carries the "sub" and "auth_time" mappers. ClientDefaultScopes
+        # replaces a client's default scopes rather than adding to them, so
+        # leaving it out drops "sub" from the access token -- which
+        # social-auth-core 6 requires as the Keycloak ID_KEY (it was "username"
+        # through 5.x). Deployed clients keep Keycloak's stock defaults and so
+        # already have it.
+        "basic",
         "email",
         "profile",
         "roles",
