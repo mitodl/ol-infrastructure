@@ -1600,8 +1600,10 @@ def _build_release_image_job(
         #            the commit a re-cut would tag is now the merge commit
         #            ("Tag X already exists at <sha>, which does not match the
         #            commit being released")
-        #   abandon  deletes the branch and the tag, so the re-cut finds no tag,
-        #            succeeds, and resurrects the abandoned release
+        #   abandon  deletes the branch and the version tag but leaves an
+        #            ``abandoned/<version>`` tombstone, which ``create``
+        #            refuses, so the re-cut fails instead of resurrecting the
+        #            abandoned release
         #
         # Nothing is lost by dropping the trigger. Concourse checks the
         # resource on its own only to repair a fresh version history (see
@@ -1696,8 +1698,9 @@ def _build_abandon_release_job(
     """Generate a manually-triggered job that abandons an in-flight release.
 
     Running this job deletes the ``releases/{version}`` branch and version tag
-    from the remote so that the next ``check`` sees no in-flight release and
-    recomputes the next version normally.  Use it when a release was cut but
+    from the remote and leaves an ``abandoned/<version>`` tombstone, so the
+    next ``check`` sees no in-flight release and skips the abandoned number
+    when it computes the next version.  Use it when a release was cut but
     must be cancelled before it reaches production.
 
     It then labels the release's gate issue ``ops:abandoned`` and closes it. That
@@ -2051,11 +2054,13 @@ def _build_release_resource_app_pipeline(
             LoadVarStep(
                 load_var="image_tag", file=f"{release_res.name}/version", reveal=True
             ),
-            # Deploy by digest, not by the calver tag. Abandoning a release
-            # deletes its git tag, so a same-day re-cut computes the same
-            # version and overwrites the same image tag. A tag-pinned pod spec
-            # would then be unchanged: nothing rolls out, and RC keeps serving
-            # the abandoned build while every job reports success. The image
+            # Deploy by digest, not by the calver tag. A tag is mutable: an
+            # image re-pushed under the same tag leaves a tag-pinned pod spec
+            # unchanged, so nothing rolls out and RC keeps serving the old
+            # build while every job reports success. (A re-cut after an
+            # abandon no longer reuses the version, because the abandoned/
+            # tombstone makes the release resource skip it, but the digest
+            # also survives a stale node image cache.) The image
             # get above is chained `passed:` QA in the Production job, so
             # Production deploys the digest QA ran. skip_download still writes
             # the digest file.
