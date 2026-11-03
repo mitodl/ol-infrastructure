@@ -14,6 +14,13 @@ Tags are immutable here: a re-run that finds the Production tag already at
 that commit changes nothing, and one that finds it anywhere else fails rather
 than moving it.
 
+A version older than the newest Production tag is refused, even when its own
+Production tag is already in place. Consumers run the newest tag, so
+re-running an old Production build changes nothing they run, but its
+Production Deployment would report the old version as live. The Production
+job runs this with ``CHECK_ONLY`` set before it starts that Deployment, so
+such a re-run fails before it records anything.
+
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the
 release GitHub App the same way ``label_gate_issue.py`` does, signing the app
@@ -26,6 +33,7 @@ Environment:
     GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY: the
         release GitHub App's credentials.
     GITHUB_API_URL: optional, defaults to ``https://api.github.com``.
+    CHECK_ONLY: optional; when non-empty, run every check but create nothing.
 """
 
 import base64
@@ -126,13 +134,48 @@ def tag_commit(github: GitHub, repo: str, tag: str) -> str | None:
     return str(target["sha"])
 
 
-def promote(github: GitHub, repo: str, version: str, prefix: str) -> str:
+def _version_key(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("."))
+
+
+def newest_production_version(github: GitHub, repo: str, prefix: str) -> str | None:
+    """Return the newest version with a ``<prefix><version>`` tag, if any.
+
+    The matching-refs endpoint is not paginated; it returns every match.
+    """
+    refs = github.request(
+        "GET",
+        f"/repos/{repo}/git/matching-refs/tags/{urllib.parse.quote(prefix)}",
+    )
+    versions = [
+        name
+        for ref in refs or []
+        if _VERSION.fullmatch(
+            name := str(ref["ref"]).removeprefix(f"refs/tags/{prefix}")
+        )
+    ]
+    return max(versions, key=_version_key, default=None)
+
+
+def promote(
+    github: GitHub, repo: str, version: str, prefix: str, *, check_only: bool = False
+) -> str:
     """Create ``<prefix><version>`` at the commit tagged *version*; return a report.
 
-    Raises RuntimeError when the release tag is gone or the Production tag
-    already names another commit.
+    With *check_only*, stop after the checks and create nothing.
+
+    Raises RuntimeError when the release tag is gone, a newer version already
+    has a Production tag, or the Production tag already names another commit.
     """
     production_tag = f"{prefix}{version}"
+    newest = newest_production_version(github, repo, prefix)
+    if newest is not None and _version_key(newest) > _version_key(version):
+        msg = (
+            f"{prefix}{newest} is newer, and consumers run the newest Production "
+            f"tag, so {version} cannot be put back in Production. Is this a "
+            "re-run of an old build?"
+        )
+        raise RuntimeError(msg)
     commit = tag_commit(github, repo, version)
     if commit is None:
         msg = (
@@ -150,6 +193,8 @@ def promote(github: GitHub, repo: str, version: str, prefix: str) -> str:
                 f"tag's {commit[:8]}. Production tags are never moved."
             )
             raise RuntimeError(msg)
+        if check_only:
+            return f"{production_tag} can be created at {commit[:8]}."
         try:
             github.request(
                 "POST",
@@ -183,7 +228,14 @@ def main() -> None:
         os.environ["GITHUB_APP_PRIVATE_KEY"],
     )
     try:
-        print(promote(GitHub(api_url, token), repo, version, prefix))  # noqa: T201
+        report = promote(
+            GitHub(api_url, token),
+            repo,
+            version,
+            prefix,
+            check_only=bool(os.environ.get("CHECK_ONLY")),
+        )
+        print(report)  # noqa: T201
     except RuntimeError as error:
         sys.exit(f"Not promoting {repo} {version}: {error}.")
 

@@ -28,6 +28,7 @@ from bridge.settings.apps import (
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _PROMOTE_TAG_SCRIPT,
     ASSERT_GATE_TASK_NAME,
+    CHECK_PROMOTE_TAG_TASK_NAME,
     CLASSIFY_TASK_NAME,
     PROMOTE_TAG_TASK_NAME,
     SUPERSEDE_TASK_NAME,
@@ -129,13 +130,16 @@ def test_production_checks_the_gate_before_it_promotes():
     assert plan[gate]["version"] == "every"
     check = _index(plan, "task", ASSERT_GATE_TASK_NAME)
     assert "INFRA_REF_FILE" not in plan[check]["config"]["params"]
+    check_tag = _index(plan, "task", CHECK_PROMOTE_TAG_TASK_NAME)
     start = _index(plan, "put", f"{APP}-deployment-production")
     promote = _index(plan, "task", PROMOTE_TAG_TASK_NAME)
     finish = _index(plan, "put", f"{APP}-deployment-production", nth=1)
-    assert gate < check < start < promote < finish
+    assert gate < check < check_tag < start < promote < finish
     params = plan[promote]["config"]["params"]
     assert params["TAG_PREFIX"] == PRODUCTION_TAG_PREFIX
     assert params["GITHUB_REPOSITORY"] == f"mitodl/{APP}"
+    assert "CHECK_ONLY" not in params
+    assert plan[check_tag]["config"]["params"] == {**params, "CHECK_ONLY": "true"}
     assert plan[-1]["put"] == f"{APP}-release"
     assert plan[-1]["params"]["action"] == "finish"
 
@@ -147,10 +151,20 @@ def test_production_takes_the_release_rc_ran():
     assert not release.get("trigger")
 
 
-def test_rc_and_production_share_a_serial_group():
-    rc = _job(f"deploy-{APP}-rc")
-    production = _job(f"promote-{APP}-production")
-    assert rc["serial_groups"] == production["serial_groups"] == [f"{APP}-release"]
+def test_every_job_shares_one_serial_group():
+    """A cut or abandon cannot delete the release tag mid-promotion."""
+    assert {tuple(job["serial_groups"]) for job in _pipeline()["jobs"]} == {
+        (f"{APP}-release",)
+    }
+
+
+def test_k8s_abandon_jobs_stay_out_of_a_serial_group():
+    (abandon,) = [
+        job
+        for job in json.loads(build_app_pipeline("xpro").model_dump_json())["jobs"]
+        if job["name"] == "abandon-xpro-release"
+    ]
+    assert not abandon.get("serial_groups")
 
 
 class _FakeGitHub(BaseHTTPRequestHandler):
@@ -165,7 +179,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         pass
 
     def _reply(self, status: int, body: Any = None) -> None:
-        payload = json.dumps(body or {}).encode()
+        payload = json.dumps({} if body is None else body).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
@@ -179,6 +193,16 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         if rest.startswith("ref/tags/"):
             ref = self.refs.get(rest.removeprefix("ref/tags/"))
             self._reply(200, {"object": ref}) if ref else self._reply(404)
+        elif rest.startswith("matching-refs/tags/"):
+            match = rest.removeprefix("matching-refs/tags/")
+            self._reply(
+                200,
+                [
+                    {"ref": f"refs/tags/{tag}", "object": ref}
+                    for tag, ref in self.refs.items()
+                    if tag.startswith(match)
+                ],
+            )
         elif rest.startswith("tags/"):
             self._reply(200, {"object": self.tags[rest.removeprefix("tags/")]})
         else:
@@ -226,18 +250,23 @@ def private_key(tmp_path_factory) -> str:
     return key.read_text()
 
 
-def _promote(
+def _promote(  # noqa: PLR0913
     tmp_path: Path,
     server: HTTPServer,
     private_key: str,
     version: str = VERSION,
     prefix: str = PRODUCTION_TAG_PREFIX,
+    *,
+    check_only: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     (tmp_path / "version").write_text(version + "\n")
+    env = {k: v for k, v in os.environ.items() if k != "CHECK_ONLY"}
+    if check_only:
+        env["CHECK_ONLY"] = "true"
     return subprocess.run(  # noqa: S603
         [sys.executable, "-c", _PROMOTE_TAG_SCRIPT],
         env={
-            **os.environ,
+            **env,
             "VERSION_FILE": str(tmp_path / "version"),
             "TAG_PREFIX": prefix,
             "GITHUB_REPOSITORY": f"mitodl/{APP}",
@@ -292,6 +321,49 @@ def test_a_concurrent_create_of_the_same_tag_succeeds(
 
     assert result.returncode == 0, result.stderr
     assert "nothing to do" in result.stdout
+
+
+@pytest.mark.parametrize("own_tag", [False, True])
+def test_a_version_older_than_production_is_refused(
+    tmp_path, fake_github, private_key, own_tag
+):
+    """Re-running an old build must not report the old version as live."""
+    _FakeGitHub.refs["production/2026.11.10.1"] = {"type": "commit", "sha": OTHER}
+    # Not a release version; ignored rather than compared.
+    _FakeGitHub.refs["production/latest"] = {"type": "commit", "sha": OTHER}
+    if own_tag:
+        _FakeGitHub.refs[f"production/{VERSION}"] = {"type": "commit", "sha": COMMIT}
+
+    result = _promote(tmp_path, fake_github, private_key, check_only=True)
+
+    assert result.returncode != 0
+    assert "production/2026.11.10.1 is newer" in result.stderr
+    assert _FakeGitHub.created == []
+
+
+def test_an_older_production_tag_does_not_block_a_newer_version(
+    tmp_path, fake_github, private_key
+):
+    # 2026.11.10.1 sorts before 2026.11.2.1 as a string but not as a version.
+    _FakeGitHub.refs[VERSION.replace("2.1", "10.1")] = {"type": "commit", "sha": COMMIT}
+    _FakeGitHub.refs[f"production/{VERSION}"] = {"type": "commit", "sha": OTHER}
+
+    result = _promote(
+        tmp_path, fake_github, private_key, version=VERSION.replace("2.1", "10.1")
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert _FakeGitHub.created == [
+        {"ref": "refs/tags/production/2026.11.10.1", "sha": COMMIT}
+    ]
+
+
+def test_check_only_creates_nothing(tmp_path, fake_github, private_key):
+    result = _promote(tmp_path, fake_github, private_key, check_only=True)
+
+    assert result.returncode == 0, result.stderr
+    assert "can be created" in result.stdout
+    assert _FakeGitHub.created == []
 
 
 def test_a_production_tag_is_never_moved(tmp_path, fake_github, private_key):

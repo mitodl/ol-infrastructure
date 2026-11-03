@@ -1667,6 +1667,7 @@ def _build_abandon_release_job(
     main_repo: Resource,
     release_res: Resource,
     release_issue: Resource,
+    serial_groups: list[str] | None = None,
 ) -> Job:
     """Generate a manually-triggered job that abandons an in-flight release.
 
@@ -1681,10 +1682,14 @@ def _build_abandon_release_job(
     would deploy a version whose branch and tag are gone.  The issue step runs
     only after the release put succeeds, so a refused abandon (a version that
     is not in flight) leaves its issue alone.
+
+    *serial_groups* puts the job in the release's serial group, as the
+    tag-only pipeline does; see _build_tag_release_pipeline.
     """
     return Job(
         name=Identifier(f"abandon-{app_name}-release"),
         build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
         plan=[
             GetStep(get=release_res.name, trigger=False),
             GetStep(get=main_repo.name, trigger=False),
@@ -2172,29 +2177,40 @@ def _build_release_resource_app_pipeline(
 
 _PROMOTE_TAG_SCRIPT = (Path(__file__).parent / "scripts" / "promote_tag.py").read_text()
 PROMOTE_TAG_TASK_NAME = "promote-tag"
+CHECK_PROMOTE_TAG_TASK_NAME = "check-promote-tag"
 
 
-def _promote_tag_task(github_repo: str, release_res: Resource) -> TaskStep:
+def _promote_tag_task(
+    github_repo: str, release_res: Resource, *, check_only: bool = False
+) -> TaskStep:
     """Create the release's ``production/<version>`` tag at its release tag.
 
     Retried: re-running finds the tag already at the commit and changes
-    nothing. See the script's docstring.
+    nothing. With *check_only* the task runs the script's checks (the release
+    tag is there, no newer version has a Production tag, and this version's
+    tag is absent or already at the commit) and creates nothing. See the
+    script's docstring.
     """
+    params = {
+        "VERSION_FILE": f"{release_res.name}/version",
+        "TAG_PREFIX": PRODUCTION_TAG_PREFIX,
+        "GITHUB_REPOSITORY": github_repo,
+        "GITHUB_APP_ID": GITHUB_APP_ID,
+        "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+        "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+    }
+    if check_only:
+        params["CHECK_ONLY"] = "true"
     return TaskStep(
-        task=Identifier(PROMOTE_TAG_TASK_NAME),
+        task=Identifier(
+            CHECK_PROMOTE_TAG_TASK_NAME if check_only else PROMOTE_TAG_TASK_NAME
+        ),
         attempts=3,
         config=TaskConfig(
             platform=Platform.linux,
             image_resource=TASK_IMAGE,
             inputs=[Input(name=release_res.name)],
-            params={
-                "VERSION_FILE": f"{release_res.name}/version",
-                "TAG_PREFIX": PRODUCTION_TAG_PREFIX,
-                "GITHUB_REPOSITORY": github_repo,
-                "GITHUB_APP_ID": GITHUB_APP_ID,
-                "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
-                "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
-            },
+            params=params,
             run=Command(path="python3", args=["-c", _PROMOTE_TAG_SCRIPT]),
         ),
     )
@@ -2218,8 +2234,17 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
       merges the release branch back.
     - ``abandon-<app>-release`` is the k8s apps' abandon job.
 
-    The RC and Production jobs share a serial group, so a promotion never
-    finishes a release while the RC job is reading what Production runs.
+    All four jobs share a serial group. A promotion never finishes a release
+    while the RC job is reading what Production runs, and a cut (which
+    supersedes the in-flight release) or an abandon never deletes the release
+    tag between promote-tag reading it and creating the Production tag. Those
+    two keep a release's tag only once its Production Deployment has
+    succeeded, and that is recorded after the tag is created.
+
+    The Production job refuses a version older than the newest Production
+    tag before it starts the Production Deployment, so re-running an old
+    build cannot report that version as live while consumers run the newer
+    tag.
 
     Before the first release the repository needs what the k8s apps have: a
     ``[tool.bumpversion]`` table in ``pyproject.toml`` (bump_version_task reads
@@ -2258,6 +2283,7 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
     cut_job = Job(
         name=Identifier(cut_job_name),
         build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
         plan=[
             # Not `trigger: true`, for the reasons in _build_release_image_job.
             GetStep(get=release_res.name, trigger=False),
@@ -2353,6 +2379,8 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
             ),
             # main_repo is needed by the action=finish put.
             GetStep(get=main_repo.name, trigger=False, passed=[cut_job_name]),
+            # Before the Deployment starts, so a refused version records none.
+            _promote_tag_task(github_repo, release_res, check_only=True),
             PutStep(
                 put=deployment_prod.name,
                 params={"action": "start", "ref": "((.:version))"},
@@ -2384,6 +2412,7 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
         main_repo=main_repo,
         release_res=release_res,
         release_issue=release_issue,
+        serial_groups=serial_groups,
     )
     return Pipeline(
         resource_types=[
