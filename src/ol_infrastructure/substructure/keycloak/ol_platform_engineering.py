@@ -7,8 +7,9 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
-    create_pkce_client_policy,
+    create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_staff_organizations,
@@ -147,7 +148,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         opts=resource_options,
     )
 
-    create_pkce_client_policy(
+    create_client_policies(
         ol_platform_engineering_realm.id, "ol-platform-engineering", resource_options
     )
 
@@ -163,7 +164,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -212,9 +212,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=True,
-        direct_access_grants_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-opik-redirect-uris"
@@ -353,8 +351,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         # Public client with no secret — PKCE is the ONLY proof-of-possession
         # this flow has, so it must be server-enforced, not just assumed because
@@ -437,8 +433,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         access_type="CONFIDENTIAL",
         service_accounts_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
@@ -522,8 +517,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         access_type="PUBLIC",
         oauth2_device_authorization_grant_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
@@ -598,8 +591,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         # Same PKCE reasoning as `toolhive-swe-cli` and
         # `ol-platform-engineering-grafana-client`: a PUBLIC client has no
@@ -666,8 +657,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=[f"{witan_ui_origin}/ui/"],
@@ -701,7 +690,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-jupyterhub-redirect-uris"
@@ -742,7 +731,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -784,7 +772,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -840,7 +827,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -893,7 +879,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            implicit_flow_enabled=False,
             service_accounts_enabled=False,
             **PKCE_REQUIRED_CLIENT_ARGS,
             valid_redirect_uris=keycloak_realm_config.get_object(
@@ -979,7 +964,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -1022,8 +1006,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(

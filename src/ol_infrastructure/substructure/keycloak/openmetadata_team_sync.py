@@ -15,6 +15,8 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
+
 REALM_NAME = "ol-data-platform"
 
 
@@ -49,8 +51,7 @@ def create_openmetadata_team_sync_resources(
         access_type="CONFIDENTIAL",
         service_accounts_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 

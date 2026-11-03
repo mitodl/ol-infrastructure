@@ -8,8 +8,9 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
-    create_pkce_client_policy,
+    create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.learner_records import (
     create_learner_records_clients,
@@ -210,7 +211,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         opts=resource_options,
     )
 
-    create_pkce_client_policy(ol_apps_realm.id, "olapps", resource_options)
+    create_client_policies(ol_apps_realm.id, "olapps", resource_options)
 
     keycloak.RealmUserProfile(
         "olapps-user-profile",
@@ -434,7 +435,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         standard_token_exchange_enabled=ol_memory_enabled or None,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -535,7 +536,6 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            implicit_flow_enabled=False,
             service_accounts_enabled=False,
             **PKCE_REQUIRED_CLIENT_ARGS,
             valid_redirect_uris=keycloak_realm_config.get_object(
@@ -600,7 +600,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            implicit_flow_enabled=False,
+            **MANAGED_CLIENT_ARGS,
             service_accounts_enabled=False,
             # Not PKCE_REQUIRED_CLIENT_ARGS yet. mit-learn's AccountActionStartView
             # sends its own authorization request with this client (change email
@@ -685,8 +685,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=False,
-            implicit_flow_enabled=False,
-            direct_access_grants_enabled=False,
+            **MANAGED_CLIENT_ARGS,
             service_accounts_enabled=True,
             valid_redirect_uris=[],
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
@@ -743,7 +742,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "olapps-open-discussions-client-redirect-uris"
@@ -782,7 +781,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.require_object(
             "olapps-mitxonline-client-redirect-uris"
@@ -825,8 +824,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=[],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),

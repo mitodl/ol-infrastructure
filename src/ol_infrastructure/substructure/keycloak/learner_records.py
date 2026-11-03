@@ -37,6 +37,8 @@ import pulumi_vault as vault
 from pulumi import Input, Output, ResourceOptions
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
 
+from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
+
 LEARNER_RECORDS_READ_SCOPE = "learner-records:read"
 # ol-analytics-api tenants/b2b_learner_records/auth.py reads this claim and
 # grants nothing unless it is a JSON array of UUID strings.
@@ -170,8 +172,7 @@ def create_learner_records_clients(  # noqa: PLR0913
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=False,
-            implicit_flow_enabled=False,
-            direct_access_grants_enabled=False,
+            **MANAGED_CLIENT_ARGS,
             service_accounts_enabled=True,
             valid_redirect_uris=[],
             access_token_lifespan=str(ACCESS_TOKEN_LIFESPAN_SECONDS),
