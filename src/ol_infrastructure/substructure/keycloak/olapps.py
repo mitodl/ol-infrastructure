@@ -48,7 +48,7 @@ def _saved_idp_metadata(filename: str) -> str:
     return SAVED_IDP_METADATA_DIR.joinpath(filename).read_text()
 
 
-def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
+def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -812,10 +812,11 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # MITXONLINE SCIM [END]
 
     # MITXONLINE B2B [START]
-    # This client is used by MITx Online for B2B operations via the Keycloak
-    # Admin API. It requires service account roles to view realms, users, and
-    # organizations, to manage organization membership, and to manage the
-    # identity providers organizations are linked to.
+    # This client is used by MITx Online for B2B provisioning via the Keycloak
+    # Admin API: organizations, the identity providers they are linked to, and
+    # the drift reconciler. Adding a user to an organization on an enrollment
+    # request uses mitxonline-b2b-membership-client below instead, so these
+    # roles are not on the per-request path.
     olapps_mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
@@ -900,6 +901,45 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             client_secret=olapps_mitxonline_b2b_client.client_secret,
             realm_id=olapps_mitxonline_b2b_client.realm_id,
             realm_name="olapps",
+        ).apply(json.dumps),
+    )
+
+    # MITx Online adds a user to an organization while handling an enrollment
+    # code, through OrganizationMemberResource.addMember(). That calls
+    # auth.orgs().requireManage(organization), which manage-organizations
+    # satisfies, and auth.users().requireManage(user), which only manage-users
+    # does. The user is not a member yet, so FGAP v2 cannot narrow the second
+    # check to the organization. GET /admin/realms (the client's realm check)
+    # lists any realm the caller holds a realm-management role in.
+    olapps_mitxonline_b2b_membership_client = keycloak.openid.Client(
+        "olapps-mitxonline-b2b-membership-client",
+        name="mitxonline-b2b-membership-client",
+        realm_id=ol_apps_realm.id,
+        client_id="mitxonline-b2b-membership-client",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
+        service_accounts_enabled=True,
+        valid_redirect_uris=[],
+        opts=resource_options,
+    )
+    for role in ("manage-organizations", "manage-users"):
+        keycloak.openid.ClientServiceAccountRole(
+            f"olapps-mitxonline-b2b-membership-client-{role}-role",
+            realm_id=ol_apps_realm.id,
+            service_account_user_id=olapps_mitxonline_b2b_membership_client.service_account_user_id,
+            client_id=realm_management_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    vault.generic.Secret(
+        "olapps-mitxonline-b2b-membership-client-vault-credentials",
+        path="secret-mitxonline/keycloak-admin-b2b-membership",
+        data_json=Output.all(
+            client_id=olapps_mitxonline_b2b_membership_client.client_id,
+            client_secret=olapps_mitxonline_b2b_membership_client.client_secret,
         ).apply(json.dumps),
     )
 
