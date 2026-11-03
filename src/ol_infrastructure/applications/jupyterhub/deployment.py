@@ -257,6 +257,14 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             ),
             oidc_session_idling_timeout=0,
             oidc_session_rolling_timeout=0,
+            # The tmp and shared-password authenticators read no gateway
+            # headers, so the session keeps only access_token (with its
+            # refresh token) for renewal and enc_id_token, which gateway
+            # logout sends as id_token_hint.  Leaving out user and id_token
+            # keeps them, and X-Userinfo/X-ID-Token, out of sessions created
+            # after this change.  An authenticator that reads X-Userinfo
+            # would need "user" back.
+            oidc_session_contents={"access_token": True, "enc_id_token": True},
             oidc_use_session_secret=True,
             oidc_scope="openid email",
             credentials=OLApisixOIDCVaultCredentials(
