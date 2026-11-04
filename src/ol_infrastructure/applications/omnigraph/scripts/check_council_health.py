@@ -124,15 +124,26 @@ PROBE_QUERIES: tuple[tuple[str, str], ...] = (
 
 HTTP_TIMEOUT_SECONDS = 15
 
-#: The HTTP contract omnigraph-server 0.13 requires on every protected route:
-#: without exactly this header and value it answers 400
-#: ``api_contract_mismatch`` before it looks at the graph or the query. A 0.11
-#: server ignores it, so sending it is safe on both sides of the cutover. Same
-#: value as ``witan_core.omnigraph_http.HTTP_API_CONTRACT``; this script cannot
-#: import it (see WHY A RAW HTTP CALL above), so the two move together by hand.
+#: The HTTP contract header omnigraph-server 0.12 and later require on every
+#: protected route: without exactly one, carrying exactly the server's
+#: contract, it answers 400 ``api_contract_mismatch`` before it looks at the
+#: graph or the query. The server also stamps its contract on every response.
 HTTP_API_CONTRACT_HEADER = "Omnigraph-Http-Api"
-HTTP_API_CONTRACT = "0.13"
 API_CONTRACT_MISMATCH = "api_contract_mismatch"
+
+#: The contracts this probe speaks: the ones
+#: ``witan_core.omnigraph_http.SUPPORTED_HTTP_API_CONTRACTS`` speaks, which
+#: this script cannot import (see WHY A RAW HTTP CALL above). The probe sends
+#: whichever of these the server announces on ``/healthz``, so it follows the
+#: deployed server across a contract bump instead of pinning one: the ConfigMap
+#: carrying this script swaps before the server pod rolls, so a pinned value
+#: would be wrong for part of every cutover.
+SUPPORTED_HTTP_API_CONTRACTS = ("0.14", "0.13")
+
+#: Public, unauthenticated, and stamped with the server's contract on 0.13.0
+#: and 0.14.0 alike. omnigraph's own CLI asks it before every data request for
+#: the same reason.
+HEALTHZ_PATH = "/healthz"
 
 #: Budget for everything in a run that is not an HTTP call: pod scheduling,
 #: image pull, interpreter start. Generous on purpose — the deadline below is
@@ -147,9 +158,11 @@ PROBE_STARTUP_BUDGET_SECONDS = 30
 #: halved the startup headroom instead of widening the deadline. Adding a
 #: third probe to PROBE_QUERIES now moves this on its own.
 #:
-#: Currently 2 * 15 + 30 = 60, the value it has always had.
+#: One HTTP call per query plus the contract discovery before them:
+#: currently (1 + 2) * 15 + 30 = 75.
+PROBE_HTTP_CALLS = 1 + len(PROBE_QUERIES)
 PROBE_ACTIVE_DEADLINE_SECONDS = (
-    len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
+    PROBE_HTTP_CALLS * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
 )
 
 
@@ -170,8 +183,50 @@ def _error_code(body: str) -> str | None:
     return parsed.get("code") if isinstance(parsed, dict) else None
 
 
+def discover_contract(server_addr: str) -> str:
+    """Return the HTTP contract the server announces on ``HEAD /healthz``.
+
+    :param server_addr: The omnigraph-server base URL.
+    :returns: The server's contract, one of :data:`SUPPORTED_HTTP_API_CONTRACTS`.
+    :rtype: str
+    :raises ProbeError: when the server can't be reached, or announces no
+        single contract this probe speaks.
+    """
+    url = f"{server_addr.rstrip('/')}{HEALTHZ_PATH}"
+    request = urllib.request.Request(url, method="HEAD")  # noqa: S310 - server_addr is our own config
+    try:
+        with urllib.request.urlopen(  # noqa: S310 - server_addr is our own config
+            request, timeout=HTTP_TIMEOUT_SECONDS
+        ) as response:
+            stamped = response.headers.get_all(HTTP_API_CONTRACT_HEADER) or []
+    except urllib.error.HTTPError as exc:
+        msg = f"HEAD {url} failed: HTTP {exc.code}"
+        raise ProbeError(msg) from exc
+    except urllib.error.URLError as exc:
+        msg = f"HEAD {url} failed: {exc.reason}"
+        raise ProbeError(msg) from exc
+    except TimeoutError as exc:
+        msg = f"HEAD {url} timed out after {HTTP_TIMEOUT_SECONDS}s"
+        raise ProbeError(msg) from exc
+    if len(stamped) != 1 or stamped[0] not in SUPPORTED_HTTP_API_CONTRACTS:
+        found = ", ".join(stamped) if stamped else "none"
+        msg = (
+            f"HEAD {url} announced {HTTP_API_CONTRACT_HEADER}: {found}; this probe "
+            f"speaks exactly one of {', '.join(SUPPORTED_HTTP_API_CONTRACTS)}. "
+            "Add the server's contract to SUPPORTED_HTTP_API_CONTRACTS in "
+            "check_council_health.py once witan-core speaks it."
+        )
+        raise ProbeError(msg)
+    return stamped[0]
+
+
 def run_probe(
-    server_addr: str, graph_id: str, token: str, query: str = PROBE_QUERY
+    server_addr: str,
+    graph_id: str,
+    token: str,
+    query: str = PROBE_QUERY,
+    *,
+    contract: str,
 ) -> dict[str, Any]:
     """POST a probe query and return the decoded JSON body on success.
 
@@ -190,7 +245,7 @@ def run_probe(
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
-            HTTP_API_CONTRACT_HEADER: HTTP_API_CONTRACT,
+            HTTP_API_CONTRACT_HEADER: contract,
         },
     )
     try:
@@ -205,13 +260,16 @@ def run_probe(
         detail = error_body[:500]
         if _error_code(error_body) == API_CONTRACT_MISMATCH:
             # Named apart from every other refusal because the remedy is
-            # different: the graph and this probe's credentials may be fine,
-            # and the server is on another omnigraph version than this script.
+            # different: the graph and this probe's credentials may be fine.
+            # /healthz announced this contract, so the server changed
+            # contract between the two calls, mid-rollout, and the next run
+            # discovers the new one.
             msg = (
-                f"POST {url} failed: the server does not speak "
-                f"{HTTP_API_CONTRACT_HEADER}: {HTTP_API_CONTRACT} "
-                f"(HTTP {exc.code} {detail}). Update HTTP_API_CONTRACT in "
-                "check_council_health.py to the deployed omnigraph's contract."
+                f"POST {url} failed: the server refused "
+                f"{HTTP_API_CONTRACT_HEADER}: {contract}, which its "
+                f"{HEALTHZ_PATH} announced moments earlier (HTTP {exc.code} "
+                f"{detail}). It changed contract mid-run; the next run "
+                "follows it."
             )
             raise ProbeError(msg) from exc
         msg = f"POST {url} failed: HTTP {exc.code} {detail}"
@@ -223,15 +281,15 @@ def run_probe(
         msg = f"POST {url} timed out after {HTTP_TIMEOUT_SECONDS}s"
         raise ProbeError(msg) from exc
 
-    # A 0.13 server stamps its contract on every response. One that names
-    # another contract is a different server than this probe was written for,
-    # whatever the body looks like. An absent stamp is not refused here: a
-    # 0.11 server sends none, and this script runs on both sides of the cutover.
-    if stamped and stamped != [HTTP_API_CONTRACT]:
+    # The server stamps its contract on every response. A response stamped
+    # with anything else, or with nothing, came from something other than the
+    # server that answered /healthz (a proxy answering in its place), whatever
+    # the body looks like.
+    if stamped != [contract]:
+        found = ", ".join(stamped) if stamped else "none"
         msg = (
             f"POST {url} returned HTTP {status} stamped "
-            f"{HTTP_API_CONTRACT_HEADER}: {', '.join(stamped)}, not "
-            f"{HTTP_API_CONTRACT}"
+            f"{HTTP_API_CONTRACT_HEADER}: {found}, not {contract}"
         )
         raise ProbeError(msg)
 
@@ -281,10 +339,15 @@ def main() -> int:
         # cast rather than assert since this is not a runtime invariant worth
         # enforcing twice, just a fact the type checker cannot see through
         # the comprehension above.
+        contract = discover_contract(cast(str, server_addr))
         counts = {
             label: _row_count(
                 run_probe(
-                    cast(str, server_addr), graph_id, cast(str, token), query=query
+                    cast(str, server_addr),
+                    graph_id,
+                    cast(str, token),
+                    query=query,
+                    contract=contract,
                 )
             )
             for label, query in PROBE_QUERIES
@@ -297,8 +360,9 @@ def main() -> int:
         return 1
 
     LOG.info(
-        "council-health probe OK: graph=%s %s",
+        "council-health probe OK: graph=%s contract=%s %s",
         graph_id,
+        contract,
         " ".join(f"{label}_row_count={count}" for label, count in counts.items()),
     )
     return 0

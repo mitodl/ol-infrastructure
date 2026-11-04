@@ -17,10 +17,12 @@ import pytest
 from ol_infrastructure.applications.omnigraph.scripts.check_council_health import (
     HTTP_TIMEOUT_SECONDS,
     PROBE_ACTIVE_DEADLINE_SECONDS,
+    PROBE_HTTP_CALLS,
     PROBE_QUERIES,
     PROBE_STARTUP_BUDGET_SECONDS,
     SEARCH_PROBE_QUERY,
     ProbeError,
+    discover_contract,
     main,
     run_probe,
 )
@@ -33,15 +35,30 @@ class _StubHandler(BaseHTTPRequestHandler):
     #: Every request this handler has served, for tests that assert on how the
     #: probe called out rather than only on what came back.
     requests: ClassVar[list[dict[str, Any]]] = []
-    #: The ``Omnigraph-Http-Api`` value stamped on every response, as a 0.13
-    #: server does. ``None`` is a 0.11 server, which sends none.
-    stamp: ClassVar[str | None] = None
+    #: The ``Omnigraph-Http-Api`` value stamped on every response, as 0.13 and
+    #: 0.14 servers do. ``None`` sends none (a proxy answering in the server's
+    #: place), and a list repeats the header.
+    stamp: ClassVar[str | list[str] | None] = None
+
+    def _send_stamp(self):
+        stamps = [self.stamp] if isinstance(self.stamp, str) else self.stamp or []
+        for value in stamps:
+            self.send_header("Omnigraph-Http-Api", value)
+
+    def do_HEAD(self):
+        self.__class__.requests.append({"method": "HEAD", "path": self.path})
+        status, _ = self.routes.get(self.path, (200, {}))
+        self.send_response(status)
+        self._send_stamp()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         raw_body = self.rfile.read(length) if length else b""
         self.__class__.requests.append(
             {
+                "method": "POST",
                 "path": self.path,
                 "authorization": self.headers.get("Authorization"),
                 "http_api": self.headers.get_all("Omnigraph-Http-Api"),
@@ -51,8 +68,7 @@ class _StubHandler(BaseHTTPRequestHandler):
         status, body = self.routes.get(self.path, (404, {"error": "not found"}))
         payload = body.encode() if isinstance(body, str) else json.dumps(body).encode()
         self.send_response(status)
-        if self.stamp is not None:
-            self.send_header("Omnigraph-Http-Api", self.stamp)
+        self._send_stamp()
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
@@ -75,7 +91,7 @@ def stub_server():
     thread.start()
     _StubHandler.routes = {}
     _StubHandler.requests = []
-    _StubHandler.stamp = None
+    _StubHandler.stamp = "0.14"
     yield server, f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
 
@@ -86,7 +102,9 @@ def test_run_probe_sends_the_bearer_token_and_query_path(stub_server):
         "/graphs/council/query": (200, {"rows": [{"m.slug": "x"}], "row_count": 1})
     }
 
-    result = run_probe(base, "council", "t")  # pragma: allowlist secret
+    result = run_probe(
+        base, "council", "t", contract="0.14"
+    )  # pragma: allowlist secret
 
     assert result["row_count"] == 1
     [seen] = _StubHandler.requests
@@ -96,22 +114,55 @@ def test_run_probe_sends_the_bearer_token_and_query_path(stub_server):
     assert "match" in seen["body"]["query"]
 
 
-def test_run_probe_sends_the_http_api_contract_header(stub_server):
-    """omnigraph-server 0.13 answers 400 to a protected request without it."""
+def test_run_probe_sends_the_contract_it_is_given(stub_server):
+    """omnigraph-server answers 400 to a protected request without it."""
     _, base = stub_server
     _StubHandler.stamp = "0.13"
     _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
 
-    run_probe(base, "council", "t")  # pragma: allowlist secret
+    run_probe(base, "council", "t", contract="0.13")  # pragma: allowlist secret
 
     [seen] = _StubHandler.requests
     assert seen["http_api"] == ["0.13"]
 
 
+@pytest.mark.parametrize("contract", ["0.13", "0.14"])
+def test_the_contract_is_discovered_from_healthz(stub_server, contract):
+    _, base = stub_server
+    _StubHandler.stamp = contract
+
+    assert discover_contract(base) == contract
+    [seen] = _StubHandler.requests
+    assert (seen["method"], seen["path"]) == ("HEAD", "/healthz")
+
+
+@pytest.mark.parametrize(
+    ("stamp", "found"),
+    [(None, "none"), ("0.15", "0.15"), (["0.14", "0.14"], "0.14, 0.14")],
+    ids=["unstamped", "unsupported", "repeated"],
+)
+def test_healthz_without_one_supported_contract_fails_the_probe(
+    stub_server, stamp, found
+):
+    """A server on a contract this probe doesn't speak, or something
+    answering in the server's place, is named rather than queried.
+    """
+    _, base = stub_server
+    _StubHandler.stamp = stamp
+
+    with pytest.raises(ProbeError, match=rf"announced Omnigraph-Http-Api: {found};"):
+        discover_contract(base)
+
+
+def test_an_unreachable_healthz_fails_the_probe():
+    with pytest.raises(ProbeError, match=r"HEAD .*/healthz failed"):
+        discover_contract("http://127.0.0.1:1")  # nothing listens on port 1
+
+
 def test_a_contract_mismatch_is_reported_apart_from_an_auth_failure(stub_server):
     """Both are refusals of a healthy graph, with different remedies: one is a
-    version skew between this script and the server, the other a credential.
-    The body is the 0.13.0 server's own.
+    server that changed contract since /healthz answered, the other a
+    credential. The body is the 0.14.0 server's own.
     """
     _, base = stub_server
     _StubHandler.stamp = "0.14"
@@ -127,8 +178,8 @@ def test_a_contract_mismatch_is_reported_apart_from_an_auth_failure(stub_server)
         )
     }
 
-    with pytest.raises(ProbeError, match=r"does not speak Omnigraph-Http-Api: 0\.13"):
-        run_probe(base, "council", "t")  # pragma: allowlist secret
+    with pytest.raises(ProbeError, match=r"refused Omnigraph-Http-Api: 0\.13"):
+        run_probe(base, "council", "t", contract="0.13")  # pragma: allowlist secret
 
     _StubHandler.routes = {
         "/graphs/council/query": (
@@ -137,8 +188,8 @@ def test_a_contract_mismatch_is_reported_apart_from_an_auth_failure(stub_server)
         )
     }
     with pytest.raises(ProbeError, match="HTTP 401") as excinfo:
-        run_probe(base, "council", "t")  # pragma: allowlist secret
-    assert "does not speak" not in str(excinfo.value)
+        run_probe(base, "council", "t", contract="0.14")  # pragma: allowlist secret
+    assert "refused Omnigraph-Http-Api" not in str(excinfo.value)
 
 
 def test_a_success_stamped_with_another_contract_is_a_failure(stub_server):
@@ -146,15 +197,22 @@ def test_a_success_stamped_with_another_contract_is_a_failure(stub_server):
     _StubHandler.stamp = "0.14"
     _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
 
-    with pytest.raises(ProbeError, match=r"stamped Omnigraph-Http-Api: 0\.14"):
-        run_probe(base, "council", "t")  # pragma: allowlist secret
+    with pytest.raises(
+        ProbeError, match=r"stamped Omnigraph-Http-Api: 0\.14, not 0\.13"
+    ):
+        run_probe(base, "council", "t", contract="0.13")  # pragma: allowlist secret
 
 
-def test_an_unstamped_success_is_accepted_from_a_0_11_server(stub_server):
+def test_an_unstamped_success_is_a_failure(stub_server):
+    """Both supported servers stamp every response, so a 2xx without one came
+    from something answering in the server's place.
+    """
     _, base = stub_server
+    _StubHandler.stamp = None
     _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
 
-    assert run_probe(base, "council", "t")["rows"] == []  # pragma: allowlist secret
+    with pytest.raises(ProbeError, match=r"stamped Omnigraph-Http-Api: none"):
+        run_probe(base, "council", "t", contract="0.14")  # pragma: allowlist secret
 
 
 def test_a_blocked_graph_fails_the_probe(stub_server):
@@ -171,7 +229,7 @@ def test_a_blocked_graph_fails_the_probe(stub_server):
     }
 
     with pytest.raises(ProbeError, match=r"HTTP 503.*graph_unavailable"):
-        run_probe(base, "council", "t")  # pragma: allowlist secret
+        run_probe(base, "council", "t", contract="0.14")  # pragma: allowlist secret
 
 
 def test_run_probe_targets_the_graph_id_it_is_given(stub_server):
@@ -182,7 +240,9 @@ def test_run_probe_targets_the_graph_id_it_is_given(stub_server):
     _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
 
     with pytest.raises(ProbeError, match="HTTP 404"):
-        run_probe(base, "does-not-exist", "t")  # pragma: allowlist secret
+        run_probe(
+            base, "does-not-exist", "t", contract="0.14"
+        )  # pragma: allowlist secret
 
 
 def test_run_probe_raises_on_a_server_error(stub_server):
@@ -195,7 +255,7 @@ def test_run_probe_raises_on_a_server_error(stub_server):
     }
 
     with pytest.raises(ProbeError, match="policy denied action"):
-        run_probe(base, "council", "t")  # pragma: allowlist secret
+        run_probe(base, "council", "t", contract="0.14")  # pragma: allowlist secret
 
 
 def test_run_probe_rejects_a_non_json_2xx_body(stub_server):
@@ -206,7 +266,7 @@ def test_run_probe_rejects_a_non_json_2xx_body(stub_server):
     _StubHandler.routes = {"/graphs/council/query": (200, "<html>not json</html>")}
 
     with pytest.raises(ProbeError, match="non-JSON body"):
-        run_probe(base, "council", "t")  # pragma: allowlist secret
+        run_probe(base, "council", "t", contract="0.14")  # pragma: allowlist secret
 
 
 def test_run_probe_rejects_a_2xx_body_missing_rows(stub_server):
@@ -217,7 +277,7 @@ def test_run_probe_rejects_a_2xx_body_missing_rows(stub_server):
     _StubHandler.routes = {"/graphs/council/query": (200, {"ok": True})}
 
     with pytest.raises(ProbeError, match="unexpected body shape"):
-        run_probe(base, "council", "t")  # pragma: allowlist secret
+        run_probe(base, "council", "t", contract="0.14")  # pragma: allowlist secret
 
 
 @pytest.mark.parametrize(
@@ -237,7 +297,7 @@ def test_run_probe_rejects_rows_that_is_not_a_list(stub_server, malformed_rows):
     }
 
     with pytest.raises(ProbeError, match="unexpected body shape"):
-        run_probe(base, "council", "t")  # pragma: allowlist secret
+        run_probe(base, "council", "t", contract="0.14")  # pragma: allowlist secret
 
 
 def test_run_probe_raises_when_the_server_is_unreachable():
@@ -246,6 +306,7 @@ def test_run_probe_raises_when_the_server_is_unreachable():
             "http://127.0.0.1:1",  # nothing listens on port 1
             "council",
             "t",  # pragma: allowlist secret
+            contract="0.14",
         )
 
 
@@ -266,13 +327,44 @@ def test_main_succeeds_end_to_end(stub_server, monkeypatch):
     monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
 
     assert main() == 0
-    # TWO calls, not one: the ordinary read and the full-text read are
-    # separate failure modes and the probe has to exercise both.
-    ordinary, search = _StubHandler.requests
+    # The contract first, then TWO queries, not one: the ordinary read and the
+    # full-text read are separate failure modes and the probe has to exercise
+    # both.
+    healthz, ordinary, search = _StubHandler.requests
+    assert (healthz["method"], healthz["path"]) == ("HEAD", "/healthz")
     assert ordinary["path"] == "/graphs/council/query"
     assert search["path"] == "/graphs/council/query"
     assert "search(" not in ordinary["body"]["query"]
     assert search["body"]["query"] == SEARCH_PROBE_QUERY
+
+
+@pytest.mark.parametrize("contract", ["0.13", "0.14"])
+def test_main_follows_the_servers_contract(stub_server, monkeypatch, contract):
+    """The same probe passes against a 0.13 and a 0.14 server, so the
+    ConfigMap swapping before the server pod rolls costs no failed runs.
+    """
+    _, base = stub_server
+    _StubHandler.stamp = contract
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+    monkeypatch.setenv("OMNIGRAPH_SERVER_ADDR", base)
+    monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
+    monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
+
+    assert main() == 0
+    queries = [r for r in _StubHandler.requests if r["method"] == "POST"]
+    assert [r["http_api"] for r in queries] == [[contract], [contract]]
+
+
+def test_main_fails_when_healthz_names_an_unsupported_contract(
+    stub_server, monkeypatch
+):
+    _, base = stub_server
+    _StubHandler.stamp = "0.15"
+    monkeypatch.setenv("OMNIGRAPH_SERVER_ADDR", base)
+    monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
+
+    assert main() == 1
+    assert [r["method"] for r in _StubHandler.requests] == ["HEAD"]
 
 
 def test_main_fails_when_the_full_text_index_needs_a_rebuild(stub_server, monkeypatch):
@@ -344,15 +436,17 @@ def test_active_deadline_is_derived_from_the_probe_query_list():
     doubled worst-case client time (15s -> 30s) against a hardcoded
     `activeDeadlineSeconds = 60`, silently halving the headroom left for pod
     scheduling and interpreter start. Deriving it means a third probe widens
-    the deadline instead of eating that headroom.
+    the deadline instead of eating that headroom. The contract discovery
+    before the queries is one more call.
     """
+    assert len(PROBE_QUERIES) + 1 == PROBE_HTTP_CALLS
     assert (
-        len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
+        PROBE_HTTP_CALLS * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
     ) == PROBE_ACTIVE_DEADLINE_SECONDS
     # The startup budget has to survive the worst case, or the backstop fires
     # on a slow node instead of on a wedged run.
     assert PROBE_STARTUP_BUDGET_SECONDS > 0
-    assert len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS < PROBE_ACTIVE_DEADLINE_SECONDS
+    assert PROBE_HTTP_CALLS * HTTP_TIMEOUT_SECONDS < PROBE_ACTIVE_DEADLINE_SECONDS
 
 
 def test_probe_queries_covers_both_read_paths():
