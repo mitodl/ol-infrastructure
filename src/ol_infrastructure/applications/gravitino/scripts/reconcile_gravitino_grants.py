@@ -670,6 +670,9 @@ class KeycloakToken:
             except urllib.error.HTTPError as err:
                 msg = f"Keycloak token request failed: {err.code} {err.read().decode()}"
                 raise ReconcileError(msg) from err
+            except OSError as err:
+                msg = f"Keycloak token request to {self._issuer} failed: {err}"
+                raise ReconcileError(msg) from err
             self._token = payload["access_token"]
             self._refresh_at = (
                 time.monotonic() + payload["expires_in"] - TOKEN_REFRESH_MARGIN_SECONDS
@@ -689,6 +692,9 @@ def keycloak_get(url: str, token: KeycloakToken) -> Any:
             return json.load(response)
     except urllib.error.HTTPError as err:
         msg = f"Keycloak GET {url} returned {err.code}: {err.read().decode()}"
+        raise ReconcileError(msg) from err
+    except OSError as err:
+        msg = f"Keycloak GET {url} failed: {err}"
         raise ReconcileError(msg) from err
 
 
@@ -781,6 +787,10 @@ def gravitino_transport(
                 return err.code, json.loads(raw)
             except json.JSONDecodeError:
                 return err.code, {"type": "non-JSON response", "message": raw[:500]}
+        # Refused, reset or timed out: Gravitino is down or restarting.
+        except OSError as err:
+            msg = f"{method} {base_uri}{path} failed: {err}"
+            raise ReconcileError(msg) from err
 
     return send
 

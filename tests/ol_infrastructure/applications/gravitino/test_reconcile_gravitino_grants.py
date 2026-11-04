@@ -14,6 +14,8 @@ state and unusable principals are refused.
 
 import copy
 import re
+import socket
+import ssl
 from typing import Any
 
 import pytest
@@ -21,8 +23,11 @@ import pytest
 from ol_infrastructure.applications.gravitino.reconcile import render_desired_state
 from ol_infrastructure.applications.gravitino.scripts.reconcile_gravitino_grants import (  # noqa: E501
     Gravitino,
+    KeycloakToken,
     ReconcileError,
     governance_role_holders,
+    gravitino_transport,
+    keycloak_get,
     reconcile,
     usable_principal,
     validate_desired_roles,
@@ -701,3 +706,41 @@ def test_schema_iceberg_cannot_name_is_skipped_without_a_request(
     assert not any("your" in path for path in requested)
     assert "is not a name Iceberg can load" in capsys.readouterr().err
     assert server.owners[MART] == {"name": "ol_data_engineer", "type": "group"}
+
+
+@pytest.fixture
+def closed_port() -> int:
+    """Return a localhost port with nothing listening, as when Gravitino is down."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+class _FreshToken(KeycloakToken):
+    def __init__(self) -> None:
+        super().__init__("https://sso.example.com/realms/r", "client", "secret")
+
+    def get(self) -> str:
+        return "token"
+
+
+def test_refused_management_api_is_a_fail_line_not_a_traceback(closed_port):
+    send = gravitino_transport(
+        f"https://127.0.0.1:{closed_port}/api",
+        ssl.create_default_context(),
+        _FreshToken(),
+    )
+
+    with pytest.raises(
+        ReconcileError, match=r"GET https://127\.0\.0\.1:\d+/api/metalakes/m failed"
+    ):
+        send("GET", "/metalakes/m", None)
+
+
+def test_unreachable_keycloak_is_a_fail_line_not_a_traceback(closed_port):
+    issuer = f"http://127.0.0.1:{closed_port}/realms/r"
+
+    with pytest.raises(ReconcileError, match=r"Keycloak token request to .* failed"):
+        KeycloakToken(issuer, "client", "secret").get()
+    with pytest.raises(ReconcileError, match=r"Keycloak GET .* failed"):
+        keycloak_get(f"{issuer}/users", _FreshToken())
