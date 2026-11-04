@@ -3097,6 +3097,22 @@ async def _seeded(app, repos, lookup):
     return state
 
 
+async def test_a_stranded_tag_release_links_the_jobs_its_pipeline_defines(
+    tag_repos, stranded
+):
+    """A tag-only pipeline has deploy-<app>-rc and promote-<app>-production."""
+    lookup, _report, app = stranded
+    state = await _seeded(app, tag_repos, lookup)
+    lookup.return_value = [_closed_issue(title="Release my-theme 2026.9.5.1")]
+
+    assert await bot._announce_stranded_approvals(app, tag_repos, state)
+
+    text = app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "/jobs/deploy-my-theme-rc" in text
+    assert "/jobs/promote-my-theme-production" in text
+    assert "deploy-ol-application" not in text
+
+
 @pytest.mark.parametrize(
     "title",
     [
@@ -4009,6 +4025,7 @@ def tag_repos():
             channel="C789",
             release_workflow=True,
             release_job="cut-my-theme-release",
+            qa_job="deploy-my-theme-rc",
             production_job="promote-my-theme-production",
             abandon_job="abandon-my-theme-release",
         )
@@ -4019,6 +4036,9 @@ def test_job_names_default_to_the_k8s_pipeline(repos):
     cfg = repos["my-app"]
     assert bot_config.job_name("my-app", cfg, "release_job") == (
         "build-my-app-release-image"
+    )
+    assert bot_config.job_name("my-app", cfg, "qa_job") == (
+        "deploy-ol-application-my-app-qa"
     )
     assert bot_config.job_name("my-app", cfg, "production_job") == (
         "deploy-ol-application-my-app-production"

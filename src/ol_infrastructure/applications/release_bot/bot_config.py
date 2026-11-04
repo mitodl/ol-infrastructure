@@ -26,12 +26,14 @@ class AppConfig:
     # bridge.settings.apps.release_job_names. Unset means the k8s app names,
     # so a hand-written repos_config override that predates them still works.
     release_job: str | None = None
+    qa_job: str | None = None
     production_job: str | None = None
     abandon_job: str | None = None
 
 
 _K8S_JOB_NAMES = {
     "release_job": "build-{app}-release-image",
+    "qa_job": "deploy-ol-application-{app}-qa",
     "production_job": "deploy-ol-application-{app}-production",
     "abandon_job": "abandon-{app}-release",
 }

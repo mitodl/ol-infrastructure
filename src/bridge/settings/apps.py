@@ -98,14 +98,18 @@ APPS: dict[str, AppRegistration] = {
     "mitxonline": AppRegistration(
         slack_channel="product-mitx-online", release_resource_workflow=True
     ),
-    # Tag-only releases, not yet flipped: Doof still releases both until
-    # ocw-studio's site pipelines read tags instead of the release and
-    # release-candidate branches. Doof's channels, which the OCW team reads.
+    # Tag-only releases (release_kind="tag"): ocw-studio's site pipelines read
+    # the release tags, so nothing advances the release and release-candidate
+    # branches any more. Doof's channels, which the OCW team reads.
     "ocw-hugo-projects": AppRegistration(
-        slack_channel="doof-ocw-hugo-projects", release_kind="tag"
+        slack_channel="doof-ocw-hugo-projects",
+        release_resource_workflow=True,
+        release_kind="tag",
     ),
     "ocw-hugo-themes": AppRegistration(
-        slack_channel="doof-ocw-hugo-themes", release_kind="tag"
+        slack_channel="doof-ocw-hugo-themes",
+        release_resource_workflow=True,
+        release_kind="tag",
     ),
     "ocw-studio": AppRegistration(
         repo_main_branch="master",
@@ -171,17 +175,21 @@ PRODUCTION_TAG_PREFIX = "production/"
 def release_job_names(app_name: str) -> dict[str, str]:
     """Return the release jobs the release bot drives, by role.
 
-    ``release`` cuts a release (and a hotfix), ``production`` is the job the
-    release gate triggers, and ``abandon`` tears an in-flight release down.
+    ``release`` cuts a release (and a hotfix), ``qa`` is the job that makes it
+    deployable to Production (QA for a k8s app, the RC job for a tag-only one),
+    ``production`` is the job the release gate triggers, and ``abandon`` tears
+    an in-flight release down.
     """
     if release_kind(app_name) == "tag":
         return {
             "release": f"cut-{app_name}-release",
+            "qa": f"deploy-{app_name}-rc",
             "production": f"promote-{app_name}-production",
             "abandon": f"abandon-{app_name}-release",
         }
     return {
         "release": f"build-{app_name}-release-image",
+        "qa": f"deploy-ol-application-{app_name}-qa",
         "production": f"deploy-ol-application-{app_name}-production",
         "abandon": f"abandon-{app_name}-release",
     }

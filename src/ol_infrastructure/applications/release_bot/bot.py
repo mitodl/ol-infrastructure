@@ -2126,8 +2126,9 @@ async def _deployed_since_close(cfg, repos, issue: dict[str, Any]) -> bool:
 
 
 def _qa_job_url(app_name: str, cfg) -> str:
-    # The QA job of the same Pulumi project as _production_job_url.
-    return concourse.job_url(cfg.pipeline, f"deploy-ol-application-{app_name}-qa")
+    # The job whose success makes the release deployable to Production: QA for
+    # a k8s app, the RC job for a tag-only one.
+    return concourse.job_url(cfg.pipeline, config.job_name(app_name, cfg, "qa_job"))
 
 
 def _overdue_approval(app_name: str, issue: dict[str, Any], now: datetime) -> bool:

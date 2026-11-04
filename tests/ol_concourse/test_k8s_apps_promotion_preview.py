@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from bridge.settings.apps import APPS, release_resource_workflow
+from bridge.settings.apps import APPS, release_kind, release_resource_workflow
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _CLASSIFY_SCRIPT,
     CACHE_BUST_TASK_NAME,
@@ -34,7 +34,9 @@ DOCKER_TAG_ENV = "OL_ANALYTICS_API_DOCKER_TAG"
 DOCKER_SHA_ENV = "OL_ANALYTICS_API_DOCKER_SHA"
 RELEASE_VERSION_ENV = "OL_ANALYTICS_API_RELEASE_VERSION"
 RELEASE_IMAGE = f"{APP}-app-release-ecr-image"
-RELEASE_APPS = [app for app in APPS if release_resource_workflow(app)]
+RELEASE_APPS = [
+    app for app in APPS if release_resource_workflow(app) and release_kind(app) == "k8s"
+]
 VERSION = "2026.10.2.1"
 LIVE = "2026.10.1.1"
 SHA = "c" * 40

@@ -2324,7 +2324,7 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
         generated_changelog=app_release_changelog(app_name),
     )
     cut_job_name = jobs["release"]
-    rc_job_name = f"deploy-{app_name}-rc"
+    rc_job_name = jobs["qa"]
     serial_groups = [f"{app_name}-release"]
     release_current = Identifier(f"{app_name}-release-current")
     version_var = LoadVarStep(
@@ -2465,21 +2465,23 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
         release_issue=release_issue,
         serial_groups=serial_groups,
     )
-    return Pipeline(
-        resource_types=[
-            release_resource_type(),
-            github_deployments_resource(),
-            github_issues_resource(),
-        ],
-        resources=[
-            main_repo,
-            release_res,
-            release_gate,
-            release_issue,
-            deployment_rc,
-            deployment_prod,
-        ],
-        jobs=[cut_job, rc_job, production_job, abandon_job],
+    return _pin_release_resource_types(
+        Pipeline(
+            resource_types=[
+                release_resource_type(),
+                github_deployments_resource(),
+                github_issues_resource(),
+            ],
+            resources=[
+                main_repo,
+                release_res,
+                release_gate,
+                release_issue,
+                deployment_rc,
+                deployment_prod,
+            ],
+            jobs=[cut_job, rc_job, production_job, abandon_job],
+        )
     )
 
 
