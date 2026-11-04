@@ -62,6 +62,7 @@ def test_ec2_sink_file_is_a_bounded_loki_sink() -> None:
     assert sink["type"] == "loki"
     assert sink["endpoint"] == "https://telemetry-archive-qa.ol.mit.edu"
     assert sink["buffer"]["when_full"] == "drop_newest"
+    assert sink["healthcheck"] is False
     assert sink["request"]["retry_attempts"] == ta.VECTOR_SINK_RETRY_ATTEMPTS
     assert sink["auth"]["user"] == "${ARCHIVE_LOKI_USER}"
 

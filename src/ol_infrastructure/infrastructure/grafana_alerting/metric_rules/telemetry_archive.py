@@ -73,10 +73,12 @@ _RETENTION_STALE_EXPR = (
     f'{{namespace="{_NAMESPACE}"}}) > 0'
 )
 # Two agents is the floor for a rolling restart not breaking queries (plan D8).
+# `bool` because rd()'s threshold stage fires on value > 0: a plain `< 2`
+# returns the replica count itself, which is 0 when both agents are down.
 _PDC_AGENTS_EXPR = (
     "min by (cluster, namespace, deployment) ("
     "kube_deployment_status_replicas_available"
-    f'{{namespace="{_NAMESPACE}", deployment="pdc-agent"}}) < 2'
+    f'{{namespace="{_NAMESPACE}", deployment="pdc-agent"}}) < bool 2'
 )
 
 

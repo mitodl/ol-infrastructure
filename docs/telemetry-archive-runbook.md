@@ -42,10 +42,14 @@ Consul or Vault stack **and** an instance roll. The image ships a discarding
 ## Erasure: deleting log lines from the archive
 
 Retention is enforced by Loki's compactor, which also serves the delete API.
-Deletes are asynchronous: the compactor marks the request, rewrites the
-affected chunks without the matching lines on its next retention pass, and
-removes the originals after `retention_delete_delay` (2 h). Expect a request to
-take **2 to 3 hours** to be fully applied.
+Deletes are asynchronous and deliberately slow. A request sits in a
+cancellation window first (`delete_request_cancel_period`, Loki's default of
+24 h, not overridden here); only once it is older than that does the compactor
+rewrite the affected chunks without the matching lines on its next retention
+pass, and the originals are removed `retention_delete_delay` (2 h) after that.
+Expect **at least 26 hours** from submission until the data is gone from S3.
+Query results exclude the lines from the moment the request is received, so
+the data is unreadable long before it is physically deleted.
 
 ### 1. Reach the compactor
 
@@ -99,8 +103,9 @@ curl -s -H "X-Scope-OrgID: $LOKI_TENANT" \
   'http://localhost:3100/loki/api/v1/delete' | jq .
 ```
 
-Status moves `received` → `processed`. A request can be cancelled while it is
-still `received`:
+Status moves `received` → `processed` once the 24 h cancellation window has
+passed and the compactor has run. A request can be cancelled while it is still
+`received`:
 
 ```sh
 curl -s -X DELETE -H "X-Scope-OrgID: $LOKI_TENANT" \
@@ -115,7 +120,7 @@ request is received, so a re-run of step 2 should already return nothing.
 Delete requests are stored under `index/delete_requests/` in the Loki bucket,
 and the rewritten chunks replace the originals under `fake/` (the tenant
 prefix). After the request is `processed` and `retention_delete_delay` has
-passed, the compactor's `loki_compactor_deleted_chunks_total` (or the
+passed (so no sooner than about 26 h after submission), the compactor's `loki_compactor_deleted_chunks_total` (or the
 `loki_compactor_apply_retention_*` family) should have moved and the chunk
 count for the affected day should have changed:
 

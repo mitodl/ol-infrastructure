@@ -157,6 +157,9 @@ def vector_loki_sink(
             "password": f"${{{password_env}}}",
         },
         "encoding": {"codec": "json"},
+        # The EC2 unit's ExecStartPre `vector validate` runs sink healthchecks;
+        # an unreachable archive must not keep Vector from starting.
+        "healthcheck": False,
         "labels": labels,
         "out_of_order_action": "rewrite_timestamp",
         "buffer": {
