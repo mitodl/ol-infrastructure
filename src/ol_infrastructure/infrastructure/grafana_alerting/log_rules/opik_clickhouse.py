@@ -81,8 +81,8 @@ _LIMITS_LOCATION = (
 )
 
 _QUOTA_SUMMARY = (
-    "Opik in {{ $labels.cluster }} had {{ $value }} queries refused by its"
-    " ClickHouse quota in 10 minutes"
+    "Opik in {{ $labels.cluster }} logged {{ $values.B.Value }} ClickHouse"
+    " quota refusal lines in 10 minutes"
 )
 
 _QUOTA_DESCRIPTION = (
@@ -97,8 +97,8 @@ _QUOTA_DESCRIPTION = (
 )
 
 _CONCURRENCY_SUMMARY = (
-    "Opik in {{ $labels.cluster }} had {{ $value }} queries refused by"
-    " ClickHouse's concurrency limit in 10 minutes"
+    "Opik in {{ $labels.cluster }} logged {{ $values.B.Value }} ClickHouse"
+    " concurrency refusal lines in 10 minutes"
 )
 
 _CONCURRENCY_DESCRIPTION = (
