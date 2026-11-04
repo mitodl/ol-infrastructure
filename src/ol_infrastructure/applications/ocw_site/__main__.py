@@ -18,6 +18,7 @@ from bridge.lib.magic_numbers import (
     HTTP_STATUS_OK,
     SECONDS_IN_ONE_DAY,
 )
+from ol_infrastructure.applications.ocw_site.theme_404 import themes_404_url
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.fastly import (
     OLFastlyDNSRecordConfig,
@@ -885,7 +886,7 @@ fastly_image_optimization_enabled = (
 website_storage_bucket_fqdn = "ocw-website-storage.s3.us-east-1.amazonaws.com"
 project_dir = Path(__file__).resolve().parent
 snippets_dir = project_dir.joinpath("snippets")
-url_themes_404 = "https://raw.githubusercontent.com/mitodl/ocw-hugo-themes/release/www/layouts/404.html"
+url_themes_404 = themes_404_url()
 fastly_distributions: dict[str, fastly.ServiceVcl] = {}
 for purpose in ("draft", "live", "test"):
     if stack_info.env_suffix == "production" and purpose == "live":
