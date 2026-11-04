@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
+import yaml
 from pulumi import Config, ResourceOptions, export
 from pulumi_aws import get_caller_identity
 
@@ -33,6 +34,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
 )
+from ol_infrastructure.lib.telemetry_archive import push_target, vector_loki_sink
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
@@ -57,6 +59,11 @@ application_name = "vector-log-proxy"
 # Ports for the proxy services (internal)
 HEROKU_LOG_PROXY_PORT = 9000
 FASTLY_LOG_PROXY_PORT = 9443
+VECTOR_METRICS_PORT = 9598
+
+# The self-hosted telemetry archive (ADR-0014) gets a copy of every stream the
+# Grafana Cloud sinks receive. None in CI.
+archive = push_target(stack_info.env_suffix)
 
 aws_config = AWSBase(
     tags={
@@ -114,6 +121,14 @@ grafana_credentials = read_yaml_secrets(
 
 heroku_proxy_credentials = proxy_credentials["heroku"]
 fastly_proxy_credentials = proxy_credentials["fastly"]
+archive_credentials = (
+    {
+        "archive_loki_username": archive.username,
+        "archive_loki_password": archive.password,
+    }
+    if archive
+    else {}
+)
 
 # Store proxy and Grafana credentials in Vault
 vault.generic.Secret(
@@ -134,6 +149,7 @@ vault.generic.Secret(
             "grafana_api_key": grafana_credentials["api_key"],
             "grafana_prometheus_user_id": grafana_credentials["prometheus_user_id"],
             "grafana_loki_user_id": grafana_credentials["loki_user_id"],
+            **archive_credentials,
         }
     ),
 )
@@ -185,6 +201,7 @@ vector_log_proxy_credentials_secret = OLVaultK8SSecret(
             "grafana_api_key": "{{ .Secrets.grafana_api_key }}",
             "grafana_prometheus_user_id": ("{{ .Secrets.grafana_prometheus_user_id }}"),
             "grafana_loki_user_id": "{{ .Secrets.grafana_loki_user_id }}",
+            **{key: f"{{{{ .Secrets.{key} }}}}" for key in archive_credentials},
         },
         refresh_after="1h",
         vaultauth=vector_auth_binding.vault_k8s_resources.auth_name,
@@ -257,6 +274,12 @@ api:
   enabled: false
 
 sources:
+  # Vector's own counters, for the archive drop-rate alert
+  # (grafana_alerting/metric_rules/telemetry_archive.py) and sink health.
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 15
+
   fastly_log_proxy:
     type: http_server
     address: 0.0.0.0:9443
@@ -322,6 +345,12 @@ transforms:
       }
 
 sinks:
+  prometheus_exporter:
+    inputs:
+    - 'internal_metrics'
+    type: prometheus_exporter
+    address: "0.0.0.0:9598"
+
   ship_fastly_logs_to_grafana_cloud:
     inputs:
     - 'fastly_drop_unwanted_logs'
@@ -357,6 +386,39 @@ sinks:
     out_of_order_action: rewrite_timestamp
 """
 
+# The archive sinks in a file of their own: Vector merges every file in
+# VECTOR_CONFIG_DIR, and a second top-level `sinks` key cannot share a YAML
+# document with the first. Same inputs and labels as the Cloud sinks, so both
+# backends hold the same streams; bounded buffer and retries so a stalled
+# archive drops its own copy instead of holding up Cloud delivery.
+vector_config_files = {"vector.yaml": vector_config_template}
+if archive:
+    vector_config_files["archive.yaml"] = yaml.safe_dump(
+        {
+            "sinks": {
+                "archive_fastly_logs": vector_loki_sink(
+                    inputs=["fastly_drop_unwanted_logs"],
+                    labels={
+                        "environment": "{{ environment }}",
+                        "application": "{{ application }}",
+                        "service": "fastly",
+                    },
+                    target=archive,
+                ),
+                "archive_heroku_logs": vector_loki_sink(
+                    inputs=["heroku_drop_unwanted_logs"],
+                    labels={
+                        "environment": "{{ environment }}",
+                        "application": "{{ app_name }}",
+                        "service": "{{ service }}",
+                    },
+                    target=archive,
+                ),
+            }
+        },
+        sort_keys=False,
+    )
+
 vector_config_map = kubernetes.core.v1.ConfigMap(
     "vector-log-proxy-config",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -364,9 +426,7 @@ vector_config_map = kubernetes.core.v1.ConfigMap(
         name="vector-log-proxy-config",
         labels=k8s_global_labels,
     ),
-    data={
-        "vector.yaml": vector_config_template,
-    },
+    data=vector_config_files,
     opts=ResourceOptions(delete_before_replace=True),
 )
 
@@ -438,7 +498,10 @@ vector_deployment = kubernetes.apps.v1.Deployment(
                 # when it changes.
                 annotations={
                     "checksum/vector-config": hashlib.sha256(
-                        vector_config_template.encode()
+                        "".join(
+                            vector_config_files[name]
+                            for name in sorted(vector_config_files)
+                        ).encode()
                     ).hexdigest(),
                 },
             ),
@@ -457,6 +520,10 @@ vector_deployment = kubernetes.apps.v1.Deployment(
                             ),
                             kubernetes.core.v1.ContainerPortArgs(
                                 name="fastly", container_port=FASTLY_LOG_PROXY_PORT
+                            ),
+                            kubernetes.core.v1.ContainerPortArgs(
+                                name="vector-metrics",
+                                container_port=VECTOR_METRICS_PORT,
                             ),
                         ],
                         env=[
@@ -516,6 +583,22 @@ vector_deployment = kubernetes.apps.v1.Deployment(
                                     ),
                                 ),
                             ),
+                            *[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name=env_name,
+                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                            name="vector-log-proxy-credentials",
+                                            key=secret_key,
+                                        ),
+                                    ),
+                                )
+                                for env_name, secret_key in (
+                                    ("ARCHIVE_LOKI_USER", "archive_loki_username"),
+                                    ("ARCHIVE_LOKI_PASSWORD", "archive_loki_password"),
+                                )
+                                if archive
+                            ],
                             # Proxy credentials from Vault secrets
                             kubernetes.core.v1.EnvVarArgs(
                                 name="HEROKU_PROXY_PASSWORD",
@@ -720,6 +803,38 @@ vector_service = kubernetes.core.v1.Service(
             ),
         ],
     ),
+)
+
+# Scraped by the cluster's prometheusOperatorObjects feature into Grafana
+# Cloud. Counters only: the histogram buckets have no reader.
+kubernetes.apiextensions.CustomResource(
+    "vector-log-proxy-pod-monitor",
+    api_version="monitoring.coreos.com/v1",
+    kind="PodMonitor",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=application_name,
+        namespace=namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "selector": {"matchLabels": k8s_global_labels},
+        "namespaceSelector": {"matchNames": [namespace]},
+        "podMetricsEndpoints": [
+            {
+                "port": "vector-metrics",
+                "path": "/metrics",
+                "interval": "60s",
+                "metricRelabelings": [
+                    {
+                        "sourceLabels": ["__name__"],
+                        "action": "drop",
+                        "regex": "vector_.*_bucket",
+                    }
+                ],
+            }
+        ],
+    },
+    opts=ResourceOptions(depends_on=[vector_deployment]),
 )
 
 ##################################
