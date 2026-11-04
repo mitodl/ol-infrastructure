@@ -975,7 +975,7 @@ ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 RELEASE_RESOURCE_TYPE_TAGS = {
     "release": "eaa392681a2c2be5ea93abe1f3144844f0e65415",  # pragma: allowlist secret
     "github-issues": "9ab0f9739aa61b39071be0022dcaec1bc8f0688c",  # pragma: allowlist secret
-    "github-deployments": "0bc607fd2912156998d379155a2acc8f8249d00a",  # pragma: allowlist secret
+    "github-deployments": "efb28bc297f104f4bc8d63e33d07b114f710e2b3",  # pragma: allowlist secret
 }
 
 
