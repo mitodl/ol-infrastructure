@@ -197,7 +197,6 @@ cluster_stack.require_output("namespaces").apply(
 )
 
 # Configuration values
-hot_data_days = int(clickhouse_config.get("hot_data_days") or "7")
 hot_storage_size = clickhouse_config.get("hot_storage_size") or "100Gi"
 storage_class = stateful_workload_storage["storage_class"]
 data_storage_class = (
@@ -2120,7 +2119,7 @@ export(
         Keeper TLS: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{KEEPER_TLS_PORT}
 
         Tenants: opik_db
-        Hot/cold cutoff: {hot_data_days} days (table TTL MOVE expressions)
+        Hot/cold cutoff: per-table TTL MOVE expressions
         Cold storage: s3://{cold_bucket_name}/data/
     """),
 )
