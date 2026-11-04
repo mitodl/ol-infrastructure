@@ -759,6 +759,33 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             opts=kc_opts,
         )
 
+    # The service account MITx Online adds organization members with on
+    # enrollment requests; same grants as the deployed
+    # mitxonline-b2b-membership-client in substructure/keycloak/olapps.py.
+    mitxonline_b2b_membership_client = keycloak.openid.Client(
+        "olapps-mitxonline-b2b-membership-client",
+        name="mitxonline-b2b-membership-client",
+        realm_id=realm.realm,
+        client_id="mitxonline-b2b-membership-client",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=True,
+        valid_redirect_uris=[],
+        opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    for role in ("manage-organizations", "manage-users"):
+        keycloak.openid.ClientServiceAccountRole(
+            f"olapps-mitxonline-b2b-membership-{role}",
+            realm_id=realm.realm,
+            service_account_user_id=mitxonline_b2b_membership_client.service_account_user_id,
+            client_id=realm_management_client.id,
+            role=role,
+            opts=kc_opts,
+        )
+
     # MITx Online's admin API settings, under the names the deployed
     # keycloak-admin-b2b template writes (applications/mitxonline/k8s_secrets.py);
     # the local mitxonline program loads this Secret into its workloads. The
@@ -769,12 +796,16 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         string_data=Output.all(
             client_id=mitxonline_b2b_client.client_id,
             client_secret=mitxonline_b2b_client.client_secret,
+            membership_client_id=mitxonline_b2b_membership_client.client_id,
+            membership_client_secret=mitxonline_b2b_membership_client.client_secret,
         ).apply(
             lambda args: {
                 "KEYCLOAK_ADMIN_CLIENT_ID": args["client_id"],
                 "KEYCLOAK_ADMIN_CLIENT_SECRET": args["client_secret"],
                 "KEYCLOAK_ADMIN_CLIENT_SCOPES": "openid profile email",
                 "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL": "False",
+                "KEYCLOAK_MEMBERSHIP_CLIENT_ID": args["membership_client_id"],
+                "KEYCLOAK_MEMBERSHIP_CLIENT_SECRET": args["membership_client_secret"],
             }
         ),
         opts=k8s_opts,
