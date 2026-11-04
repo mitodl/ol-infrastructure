@@ -14,17 +14,32 @@ Required environment variables:
 The ol-starrocks-client service account holds view-realm and view-users on the
 realm-management client (see substructure/keycloak/ol_data_platform.py), so
 its client credentials are sufficient to enumerate role memberships.
+
+Two ways to write the ConfigMap:
+  default        kubectl apply, from the Pulumi runner (the bootstrap run).
+  --in-cluster   GET and PATCH through the Kubernetes API with the pod's
+                 ServiceAccount token, from the starrocks-group-sync CronJob.
+                 The ConfigMap must already exist (the applications stack
+                 creates it). With --changed-file, the file is created only
+                 when the content changed, so the next step knows whether to
+                 wait for kubelet to project the new file into the FE pods.
+
+Writing the ConfigMap does not change what StarRocks resolves: the FE reads the
+file only when the group provider is created or altered. The CronJob follows
+this script with ALTER GROUP PROVIDER (see group_sync_job.py).
 """
 
 import argparse
 import json
 import os
 import re
+import ssl
 import subprocess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 _GOVERNANCE_ROLES: tuple[str, ...] = (
@@ -41,16 +56,20 @@ _PAGE_SIZE = 100
 # groups.txt is "role:user1,user2" per line, so a principal carrying ":", "," or
 # a newline would corrupt the file or smuggle in a group entry.
 _PRINCIPAL_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
+_GROUP_FILE_KEY = "groups.txt"
+_SERVICE_ACCOUNT_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
 
 
 def _api_get(url: str, headers: dict[str, str]) -> Any:
-    """GET url and return the parsed JSON body; exit on HTTP error."""
+    """GET url and return the parsed JSON body; exit on HTTP or connection error."""
     req = urllib.request.Request(url, headers=headers)  # noqa: S310
     try:
         with urllib.request.urlopen(req) as resp:  # noqa: S310
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         sys.exit(f"Keycloak API error {exc.code} for {url}: {exc.read().decode()}")
+    except urllib.error.URLError as exc:
+        sys.exit(f"Keycloak API unreachable at {url}: {exc.reason}")
 
 
 def _api_get_all(url: str, headers: dict[str, str]) -> list[Any]:
@@ -147,6 +166,104 @@ def effective_role_members(
     return members
 
 
+def render_group_file(members: dict[str, set[str]]) -> str:
+    """Render groups.txt from the role membership map.
+
+    :param members: Governance role name to the saml_uid values holding it.
+    :returns: One "role:uid1,uid2" line per role with at least one holder.
+    :rtype: str
+    """
+    return "\n".join(
+        f"{role}:{','.join(sorted(members[role]))}"
+        for role in _GOVERNANCE_ROLES
+        if members[role]
+    )
+
+
+def _kubectl_apply(namespace: str, configmap: str, group_file: str) -> None:
+    manifest = {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {"name": configmap, "namespace": namespace},
+        "data": {_GROUP_FILE_KEY: group_file},
+    }
+    result = subprocess.run(
+        ["kubectl", "apply", "--validate=false", "-f", "-"],  # noqa: S607
+        input=json.dumps(manifest).encode(),
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        sys.exit(
+            f"kubectl apply failed (exit {result.returncode}):\n"
+            f"{result.stderr.decode()}"
+        )
+    sys.stdout.write(result.stdout.decode().strip() + "\n")
+
+
+def _k8s_request(
+    method: str, path: str, body: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Call the in-cluster Kubernetes API with the pod's ServiceAccount token.
+
+    :param method: HTTP method.
+    :param path: API path, starting with /api.
+    :param body: JSON merge patch to send, for PATCH.
+    :returns: The parsed response body.
+    :rtype: dict[str, Any]
+    """
+    host = os.environ["KUBERNETES_SERVICE_HOST"]
+    port = os.environ["KUBERNETES_SERVICE_PORT"]
+    url = f"https://{host}:{port}{path}"
+    token = (_SERVICE_ACCOUNT_DIR / "token").read_text().strip()
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    data = None
+    if body is not None:
+        headers["Content-Type"] = "application/merge-patch+json"
+        data = json.dumps(body).encode()
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    context = ssl.create_default_context(cafile=str(_SERVICE_ACCOUNT_DIR / "ca.crt"))
+    try:
+        with urllib.request.urlopen(req, context=context) as resp:  # noqa: S310
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        sys.exit(
+            f"Kubernetes API error {exc.code} for {method} {path}: "
+            f"{exc.read().decode()}"
+        )
+    except urllib.error.URLError as exc:
+        sys.exit(f"Kubernetes API unreachable at {url}: {exc.reason}")
+
+
+def write_configmap_in_cluster(namespace: str, configmap: str, group_file: str) -> bool:
+    """Patch the group file into an existing ConfigMap if its content differs.
+
+    :param namespace: Namespace of the ConfigMap.
+    :param configmap: ConfigMap name.
+    :param group_file: The rendered groups.txt.
+    :returns: Whether the ConfigMap was changed.
+    :rtype: bool
+    """
+    path = f"/api/v1/namespaces/{namespace}/configmaps/{configmap}"
+    current = (_k8s_request("GET", path).get("data") or {}).get(_GROUP_FILE_KEY, "")
+    if current == group_file:
+        sys.stdout.write(f"ConfigMap {namespace}/{configmap} is already current\n")
+        return False
+    # The reload that follows makes an empty file live within one run, and an empty
+    # file refuses every OIDC login. Keycloak returning no role mappings looks the
+    # same as nobody holding a role, so fail and alert rather than guess. To empty
+    # the file on purpose, clear the ConfigMap's data by hand.
+    if current and not group_file:
+        sys.exit(
+            f"Refusing to replace the non-empty {_GROUP_FILE_KEY} in "
+            f"{namespace}/{configmap} with an empty one: Keycloak returned no "
+            "governance role holders"
+        )
+    _k8s_request("PATCH", path, {"data": {_GROUP_FILE_KEY: group_file}})
+    sys.stdout.write(f"Updated ConfigMap {namespace}/{configmap}\n")
+    return True
+
+
 def main() -> None:
     """Fetch Keycloak role memberships and apply them to a Kubernetes ConfigMap."""
     parser = argparse.ArgumentParser(
@@ -154,7 +271,19 @@ def main() -> None:
     )
     parser.add_argument("--namespace", default="starrocks")
     parser.add_argument("--configmap", required=True, help="ConfigMap name to write")
+    parser.add_argument(
+        "--in-cluster",
+        action="store_true",
+        help="Write through the Kubernetes API with the pod's ServiceAccount token",
+    )
+    parser.add_argument(
+        "--changed-file",
+        type=Path,
+        help="With --in-cluster, create this file when the ConfigMap changed",
+    )
     args = parser.parse_args()
+    if args.changed_file and not args.in_cluster:
+        parser.error("--changed-file requires --in-cluster")
 
     issuer = os.environ["KEYCLOAK_ISSUER_URL"].rstrip("/")
     client_id = os.environ["KEYCLOAK_CLIENT_ID"]
@@ -182,6 +311,8 @@ def main() -> None:
             access_token = json.loads(resp.read())["access_token"]
     except urllib.error.HTTPError as exc:
         sys.exit(f"Token request failed: {exc.code} {exc.read().decode()}")
+    except urllib.error.URLError as exc:
+        sys.exit(f"Keycloak token endpoint unreachable at {issuer}: {exc.reason}")
 
     headers = {"Authorization": f"Bearer {access_token}"}
 
@@ -190,31 +321,16 @@ def main() -> None:
         sys.exit("ol-starrocks-client not found in Keycloak realm")
     client_uuid = clients[0]["id"]
 
-    members = effective_role_members(admin_base, client_uuid, headers)
-    lines = [
-        f"{role}:{','.join(sorted(members[role]))}"
-        for role in _GOVERNANCE_ROLES
-        if members[role]
-    ]
-
-    manifest = {
-        "apiVersion": "v1",
-        "kind": "ConfigMap",
-        "metadata": {"name": args.configmap, "namespace": args.namespace},
-        "data": {"groups.txt": "\n".join(lines)},
-    }
-    result = subprocess.run(
-        ["kubectl", "apply", "--validate=false", "-f", "-"],  # noqa: S607
-        input=json.dumps(manifest).encode(),
-        capture_output=True,
-        check=False,
+    group_file = render_group_file(
+        effective_role_members(admin_base, client_uuid, headers)
     )
-    if result.returncode != 0:
-        sys.exit(
-            f"kubectl apply failed (exit {result.returncode}):\n"
-            f"{result.stderr.decode()}"
-        )
-    sys.stdout.write(result.stdout.decode().strip() + "\n")
+
+    if not args.in_cluster:
+        _kubectl_apply(args.namespace, args.configmap, group_file)
+        return
+    changed = write_configmap_in_cluster(args.namespace, args.configmap, group_file)
+    if changed and args.changed_file:
+        args.changed_file.touch()
 
 
 if __name__ == "__main__":
