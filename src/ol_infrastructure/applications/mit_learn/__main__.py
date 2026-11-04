@@ -2494,5 +2494,11 @@ export(
             mitlearn_vault_iam_role.backend, mitlearn_vault_iam_role.name
         ).apply(lambda role: f"{role[0]}/roles/{role[1]}"),
         "app_security_group_id": mitlearn_app_security_group.id,
+        "rds_host": mitlearn_db.db_instance.address,
+        **(
+            {"rds_replica_host": mitlearn_db.db_replica.address}
+            if mitlearn_db_config.read_replica
+            else {}
+        ),
     },
 )

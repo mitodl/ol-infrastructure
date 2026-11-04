@@ -1061,6 +1061,11 @@ export(
     "learn_ai",
     {
         "rds_host": learn_ai_db.app_db.db_instance.address,
+        **(
+            {"rds_replica_host": learn_ai_db.app_db.db_replica.address}
+            if learn_ai_db.app_db_config.read_replica
+            else {}
+        ),
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
     },

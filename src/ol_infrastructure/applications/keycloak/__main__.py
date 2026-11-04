@@ -691,5 +691,10 @@ export(
     "keycloak",
     {
         "rds_host": db_address,
+        **(
+            {"rds_replica_host": keycloak_db.db_replica.address}
+            if keycloak_db_config.read_replica
+            else {}
+        ),
     },
 )

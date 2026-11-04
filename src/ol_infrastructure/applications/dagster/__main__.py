@@ -24,6 +24,7 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
+    StackReference,
     export,
 )
 from pulumi.config import get_config
@@ -153,6 +154,29 @@ xpro_stack = (
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
+
+
+def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[str]:
+    """Pick the database host a data_loading dlt source reads.
+
+    Production reads the application's read replica so bulk extracts never load
+    the primary. The replica only exists where stack_defaults gives one
+    (production), so other environments read the primary. A production app stack
+    that stops exporting ``rds_replica_host`` fails this lookup rather than
+    silently sending the loader back to the primary.
+
+    :param app_stack: The application's stack reference.
+    :param output_name: The application stack's export holding its RDS hosts.
+
+    :returns: The host for the matching ``<NAME>_DB_HOST`` variable.
+    :rtype: Output[str]
+    """
+    host_key = (
+        "rds_replica_host" if stack_info.env_suffix == "production" else "rds_host"
+    )
+    return app_stack.require_output(output_name)[host_key]
+
+
 # The ml code location traces its LLM calls to the Production Opik from every
 # environment dagster-ml has an Opik client in (lib/opik.py); on the Dev stack
 # OPIK_URL_OVERRIDE stays unset and the ml code's tracing is a no-op.
@@ -2989,7 +3013,7 @@ for location in code_locations:
         deployment["env"].append(
             {
                 "name": "KEYCLOAK_DB_HOST",
-                "value": keycloak_stack.require_output("keycloak")["rds_host"],
+                "value": data_loading_db_host(keycloak_stack, "keycloak"),
             }
         )
 
@@ -2997,7 +3021,7 @@ for location in code_locations:
         deployment["env"].append(
             {
                 "name": "MITXONLINE_APP_DB_HOST",
-                "value": mitxonline_stack.require_output("mitxonline")["rds_host"],
+                "value": data_loading_db_host(mitxonline_stack, "mitxonline"),
             }
         )
 
@@ -3005,7 +3029,7 @@ for location in code_locations:
         deployment["env"].append(
             {
                 "name": "XPRO_APP_DB_HOST",
-                "value": xpro_stack.require_output("xpro")["rds_host"],
+                "value": data_loading_db_host(xpro_stack, "xpro"),
             }
         )
 
