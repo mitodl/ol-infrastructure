@@ -297,7 +297,8 @@ validate_storage_prefix_progression(
 # touching storage_prefix or internal_schema_version, so this stack tracks the
 # highest format it has deployed onto each root itself. See
 # next_written_internal_schema; it runs in create_data_tier once the image's
-# label has been read.
+# label has been read, and create_data_tier exports the result
+# (written_internal_schema) before it registers the server Deployment.
 DEPLOYED_WRITTEN_INTERNAL_SCHEMA: dict[str, float] | None = optional_stack_output_value(
     _this_stack, "written_internal_schema"
 )
@@ -1309,8 +1310,6 @@ export("managed_repos", MANAGED_REPOS)
 # goes out alongside it because that is the value they would set or clear.
 export("storage_uri", data_tier.storage_uri)
 export("storage_prefix", STORAGE_PREFIX)
-# Read back by the next deploy as DEPLOYED_WRITTEN_INTERNAL_SCHEMA.
-export("written_internal_schema", data_tier.written_internal_schema)
 # Whether every direct writer of the graphs should be held still. This stack
 # suspends its own two sweeps off the same switch; the witan stack reads this
 # to suspend witan-ci-indexer and witan-view-reaper, which it owns.

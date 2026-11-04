@@ -530,6 +530,13 @@ def create_data_tier(  # noqa: PLR0913
         migration_armed=migration_armed,
         restored_to=storage_restored_to_format,
     )
+    # Exported here, before any resource that runs the image is registered,
+    # and not at the end of __main__. A failed update still writes the
+    # outputs registered so far, but a program exception between the
+    # Deployment and a later export would roll the new image with the old
+    # mark, letting an older image back onto a root the new one has written.
+    # Read back by the next deploy as deployed_written_internal_schema.
+    pulumi.export("written_internal_schema", written_internal_schema)
 
     # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,
     # organization-wide, plus the `code-bridge` graph and one `code-<repo>`

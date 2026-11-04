@@ -183,6 +183,45 @@ def test_an_image_opening_the_root_in_place_deploys_without_a_migration(monkeypa
     return tier.deployment.urn
 
 
+def test_the_mark_is_exported_before_the_server_deployment(monkeypatch):
+    """A failed update keeps the outputs registered so far, but a program
+    exception after the Deployment and before a later export would roll the
+    new image with the old mark. Stopping the program at the export shows
+    nothing running the image was registered ahead of it.
+    """
+
+    class _ExportedError(Exception):
+        pass
+
+    exported: dict[str, object] = {}
+
+    def export(name: str, value: object) -> None:
+        exported[name] = value
+        raise _ExportedError
+
+    deployments: list[str] = []
+    real_deployment = data_tier.kubernetes.apps.v1.Deployment
+
+    def deployment(name: str, *args: object, **kwargs: object) -> object:
+        deployments.append(name)
+        return real_deployment(name, *args, **kwargs)
+
+    monkeypatch.setattr(data_tier.pulumi, "export", export)
+    monkeypatch.setattr(data_tier.kubernetes.apps.v1, "Deployment", deployment)
+
+    with pytest.raises(_ExportedError):
+        _build(
+            monkeypatch,
+            served_format=14,
+            image_format=16,
+            image_min_format=14,
+            deployed_marks={"": 14.0},
+        )
+
+    assert exported == {"written_internal_schema": {"": 16}}
+    assert deployments == []
+
+
 def test_a_rollback_below_the_roots_written_format_is_refused(monkeypatch):
     """The stack's last export reaches the guard: a 0.13 image after 0.14."""
     with pytest.raises(ValueError, match="already been deployed onto this root"):
