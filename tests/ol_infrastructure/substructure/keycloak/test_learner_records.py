@@ -236,3 +236,13 @@ def test_vault_secret_carries_what_the_partner_needs(mocks):
     )
     assert data["scope"] == LEARNER_RECORDS_READ_SCOPE
     assert data["organizations"] == [ORG_A]
+    assert data["access_end_date"] is None
+
+
+def test_vault_secret_carries_the_access_end_date(mocks):
+    """The partner is told the same date the API enforces."""
+    _create(parse_learner_records_clients([_entry(access_end_date="2027-06-30")]))
+
+    (secret,) = mocks.of_type("vault:generic/secret:Secret")
+    data = json.loads(secret.inputs["dataJson"]["value"])
+    assert data["access_end_date"] == "2027-06-30"
