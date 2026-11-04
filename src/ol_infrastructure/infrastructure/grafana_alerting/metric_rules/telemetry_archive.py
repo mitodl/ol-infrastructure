@@ -39,13 +39,15 @@ _NAMESPACE = "observability-archive"
 _ONE_DAY_SECONDS = 24 * 60 * 60
 
 # Every k8s Alloy pod's metrics reach Mimir twice (see alloy_pipeline.py);
-# collector_id="" keeps the cluster scrape, which names the cluster.
+# collector_id="" keeps the cluster scrape, which names the cluster. The two
+# counters are selected together rather than added: each exists only after
+# its own kind of failure, and send_failed carries labels enqueue_failed
+# lacks, so `a + b` would be empty whenever only one side is failing.
 _ALLOY_DROPS_EXPR = (
     "sum by (cluster, namespace, pod, exporter) ("
-    "rate(otelcol_exporter_send_failed_log_records_total"
-    '{exporter=~".*archive.*", collector_id=""}[10m])'
-    " + rate(otelcol_exporter_enqueue_failed_log_records_total"
-    '{exporter=~".*archive.*", collector_id=""}[10m])'
+    "rate({__name__=~"
+    '"otelcol_exporter_(send|enqueue)_failed_log_records_total",'
+    ' exporter=~".*archive.*", collector_id=""}[10m])'
     ") > 0"
 )
 _VECTOR_DROPS_EXPR = (

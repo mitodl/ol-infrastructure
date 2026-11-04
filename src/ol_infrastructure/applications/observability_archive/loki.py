@@ -201,6 +201,9 @@ def build(  # noqa: PLR0913
                 "per_stream_rate_limit_burst": "32MB",
                 "max_global_streams_per_user": sizing.max_global_streams_per_user,
                 "max_query_series": 5000,
+                # Loki's default is 721h; anything longer is a 400 before the
+                # query is split, which would make the retention unreachable.
+                "max_query_length": f"{retention_days + 1}d",
                 "query_timeout": "300s",
                 "split_queries_by_interval": "15m",
             },
