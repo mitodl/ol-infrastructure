@@ -15,9 +15,12 @@ config:
   # the operator does not shrink an existing claim, and EBS cannot shrink in
   # place. Getting it to 100Gi means deleting replica 0's PVC and copying the
   # schema back from replica 1 (the schema-copy steps in the runbook's "Replica
-  # pod Pending on its data volume", with replica 1 as the source). Left as is
-  # until a recreated replica no longer serves Opik queries before its schema
-  # exists. Replica 1 was recreated on 2026-10-20 and has 100Gi.
+  # pod Pending on its data volume", with replica 1 as the source). That loop
+  # also copies Opik's Liquibase ledger: in QA default.DATABASECHANGELOG* are
+  # ReplicatedMergeTree on both replicas (180 rows each on 2026-11-04), unlike
+  # production, where only replica 0 holds the rows. Left as is until a
+  # recreated replica no longer serves Opik queries before its schema exists.
+  # Replica 1 was recreated on 2026-10-20 and has 100Gi.
   clickhouse:hot_storage_size: 100Gi
   # QA is the upgrade canary (docs/clickhouse-llmops-runbook.md), so it runs
   # replicated like production: 2 replicas exercise replication and the
