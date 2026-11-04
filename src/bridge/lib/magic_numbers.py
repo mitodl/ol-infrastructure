@@ -9,6 +9,13 @@ AWS_LOAD_BALANCER_NAME_MAX_LENGTH = 32
 AWS_TARGET_GROUP_NAME_MAX_LENGTH = 32
 AWS_RDS_DEFAULT_DATABASE_CAPACITY = 334  # For optimal performance on gp2 storage
 AWS_EVENT_TARGET_GROUP_NAME_MAX_LENGTH = 64
+# terminationGracePeriodSeconds for the LLMOps ClickHouse server pods
+# (applications/clickhouse). On SIGTERM the server waits for a running BACKUP,
+# and the production daily backup took 333s for 42.35 GiB on 2026-11-04, up
+# from 278s for 33.86 GiB on 2026-10-22 (about 8s per GiB). 1800s covers a
+# backup of roughly 200 GiB. ClickHouseBackupNearGracePeriod in
+# grafana_alerting/metric_rules/clickhouse.py warns well before that.
+CLICKHOUSE_TERMINATION_GRACE_SECONDS = 1800
 CONCOURSE_PROMETHEUS_EXPORTER_DEFAULT_PORT = 9391
 CONCOURSE_WEB_HOST_COMMUNICATION_PORT = 2222
 CONCOURSE_WORKER_HEALTHCHECK_PORT = 8888
