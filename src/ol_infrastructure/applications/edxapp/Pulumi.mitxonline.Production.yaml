@@ -210,6 +210,11 @@ config:
         cpu_request: "250m"
         memory_request: "4Gi"
         memory_limit: "6Gi"
+      # Sized for --concurrency=2; see the GIT_CONFIG_* env in k8s_resources.py.
+      cms_export:
+        cpu_request: "250m"
+        memory_request: "4Gi"
+        memory_limit: "6Gi"
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
   redis:instance_type: cache.r7g.large
   vault:address: https://vault-production.odl.mit.edu

@@ -2413,6 +2413,22 @@ def create_k8s_resources(  # noqa: C901
                                         name="OTEL_SERVICE_NAME",
                                         value=f"{env_name}-edxapp-cms-export-celery",
                                     ),
+                                    # git push of a course's assets: one delta thread
+                                    # per node CPU and delta search on files up to
+                                    # 512m OOM-killed the worker. Measured on a 1.4 GB
+                                    # push: 2.2 GiB/295s default, 98 MiB/37s with these.
+                                    # Big assets are mostly compressed already
+                                    # (tar.gz, PDF), so skipping delta costs little.
+                                    *[
+                                        kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+                                        for k, v in {
+                                            "GIT_CONFIG_COUNT": "2",
+                                            "GIT_CONFIG_KEY_0": "pack.threads",
+                                            "GIT_CONFIG_VALUE_0": "1",
+                                            "GIT_CONFIG_KEY_1": "core.bigFileThreshold",
+                                            "GIT_CONFIG_VALUE_1": "50m",
+                                        }.items()
+                                    ],
                                     *[
                                         kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                         for k, v in _OTEL_SDK_ENV.items()
