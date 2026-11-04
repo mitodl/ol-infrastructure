@@ -30,7 +30,7 @@ rule may read from it.
 | Writer | Archive leg | Drop signal |
 |---|---|---|
 | k8s-monitoring collectors (every cluster) | `archive-otlp` destination in `substructure/aws/eks/grafana.py` | `otelcol_exporter_send_failed_log_records_total`, `otelcol_exporter_enqueue_failed_log_records_total` with `exporter=~".*archive.*"` |
-| vector-log-proxy (Fastly, Heroku) | `archive.yaml` in its ConfigMap | `vector_component_discarded_events_total{component_id=~"archive_.*"}` |
+| vector-log-proxy (Fastly, Heroku) | `archive.yaml` in its ConfigMap | `vector_buffer_discarded_events_total` (buffer full) and `vector_component_discarded_events_total` (retries exhausted) with `component_id=~"archive_.*"` |
 | EC2 Vector (Concourse, Consul, Vault) | `/etc/vector/archive_logs.yaml`, written by cloud-init | journald on the host only |
 | EC2 Alloy (Concourse web) | `/etc/alloy/archive.alloy`, written by cloud-init | journald on the host only |
 

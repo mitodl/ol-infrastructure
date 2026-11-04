@@ -206,7 +206,7 @@ processing, and `Loki (archive, 13mo)` works in Explore and Logs Drilldown.
 
 ### Phase 1 as built (2026-11-04)
 
-Branch `md/202611_telemetry_archive_phase0`, on top of Phase 0. Where the build departs from
+Branch `md/202611_telemetry_archive_phase1`, on top of Phase 0. Where the build departs from
 the text above:
 
 - **One source of truth for writers.** `lib/telemetry_archive.py` holds the archive hostnames,

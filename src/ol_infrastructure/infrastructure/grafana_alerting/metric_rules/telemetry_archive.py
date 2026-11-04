@@ -50,10 +50,15 @@ _ALLOY_DROPS_EXPR = (
     ' exporter=~".*archive.*", collector_id=""}[10m])'
     ") > 0"
 )
+# Vector counts a drop by its non-blocking buffer (`when_full: drop_newest`)
+# under buffer_discarded_events_total and a drop by the sink itself (retries
+# exhausted) under component_discarded_events_total; a slow archive shows only
+# in the first, a refused write only in the second.
 _VECTOR_DROPS_EXPR = (
     "sum by (cluster, namespace, pod, component_id) ("
-    "rate(vector_component_discarded_events_total"
-    '{component_id=~"archive_.*"}[10m])'
+    "rate({__name__=~"
+    '"vector_(buffer|component)_discarded_events_total",'
+    ' component_id=~"archive_.*"}[10m])'
     ") > 0"
 )
 # A compactor that has started but not applied retention for a day. The

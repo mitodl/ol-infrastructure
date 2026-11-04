@@ -10,6 +10,7 @@ builds rules or dashboards.
 from pathlib import Path
 
 from ol_infrastructure.infrastructure import grafana_alerting
+from ol_infrastructure.lib import telemetry_archive
 from ol_infrastructure.lib.telemetry_archive import (
     ARCHIVE_LOKI_DATASOURCE_UID,
     ARCHIVE_MIMIR_DATASOURCE_UID,
@@ -17,6 +18,16 @@ from ol_infrastructure.lib.telemetry_archive import (
 
 PACKAGE_DIR = Path(grafana_alerting.__file__).parent
 SCANNED_PACKAGES = ("metric_rules", "log_rules", "dashboards")
+# The UIDs themselves, the constants that hold them, and the module that
+# exports them: importing the constant is the one-line way around a scan for
+# the literal.
+FORBIDDEN = (
+    ARCHIVE_LOKI_DATASOURCE_UID,
+    ARCHIVE_MIMIR_DATASOURCE_UID,
+    "ARCHIVE_LOKI_DATASOURCE_UID",
+    "ARCHIVE_MIMIR_DATASOURCE_UID",
+    telemetry_archive.__name__,
+)
 
 
 def _sources() -> list[Path]:
@@ -33,11 +44,11 @@ def test_scans_every_rule_and_dashboard_package() -> None:
 
 
 def test_no_rule_or_dashboard_references_an_archive_datasource() -> None:
-    """Plan D13: the archive UIDs appear in no rule or dashboard module."""
+    """Plan D13: no rule or dashboard module names an archive UID or imports them."""
     offenders = [
         f"{path.relative_to(PACKAGE_DIR)}: {uid}"
         for path in _sources()
-        for uid in (ARCHIVE_LOKI_DATASOURCE_UID, ARCHIVE_MIMIR_DATASOURCE_UID)
+        for uid in FORBIDDEN
         if uid in path.read_text()
     ]
     assert offenders == [], (
