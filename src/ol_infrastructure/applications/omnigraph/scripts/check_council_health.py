@@ -110,10 +110,10 @@ query council_search_probe() {
 #: Every query one run makes, in order — the ordinary read first, then the
 #: full-text read.
 #:
-#: This tuple, not a hand-kept number, is what says how many HTTP calls a run
-#: costs: ``council_probe.py`` derives the CronJob's
-#: ``activeDeadlineSeconds`` from ``len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS``
-#: plus a startup budget. Adding a third probe here therefore widens that
+#: This tuple, not a hand-kept number, is what says how many queries a run
+#: makes: ``council_probe.py`` takes the CronJob's ``activeDeadlineSeconds``
+#: from :data:`PROBE_ACTIVE_DEADLINE_SECONDS`, which counts one HTTP call per
+#: query plus the contract discovery. Adding a third probe here therefore widens that
 #: deadline automatically instead of quietly eating into the headroom the pod
 #: needs to be scheduled and start an interpreter — which is exactly what
 #: adding the second one did, when the deadline was a literal 60.
@@ -183,6 +183,20 @@ def _error_code(body: str) -> str | None:
     return parsed.get("code") if isinstance(parsed, dict) else None
 
 
+def _unreachable(
+    method: str, url: str, exc: urllib.error.URLError | TimeoutError
+) -> str:
+    """Describe a request that got no HTTP answer at all."""
+    if isinstance(exc, TimeoutError):
+        return f"{method} {url} timed out after {HTTP_TIMEOUT_SECONDS}s"
+    return f"{method} {url} failed: {exc.reason}"
+
+
+def _stamps(stamped: list[str]) -> str:
+    """Show a response's contract stamps the way a message names them."""
+    return ", ".join(stamped) if stamped else "none"
+
+
 def discover_contract(server_addr: str) -> str:
     """Return the HTTP contract the server announces on ``HEAD /healthz``.
 
@@ -202,16 +216,12 @@ def discover_contract(server_addr: str) -> str:
     except urllib.error.HTTPError as exc:
         msg = f"HEAD {url} failed: HTTP {exc.code}"
         raise ProbeError(msg) from exc
-    except urllib.error.URLError as exc:
-        msg = f"HEAD {url} failed: {exc.reason}"
-        raise ProbeError(msg) from exc
-    except TimeoutError as exc:
-        msg = f"HEAD {url} timed out after {HTTP_TIMEOUT_SECONDS}s"
-        raise ProbeError(msg) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise ProbeError(_unreachable(request.get_method(), url, exc)) from exc
     if len(stamped) != 1 or stamped[0] not in SUPPORTED_HTTP_API_CONTRACTS:
-        found = ", ".join(stamped) if stamped else "none"
         msg = (
-            f"HEAD {url} announced {HTTP_API_CONTRACT_HEADER}: {found}; this probe "
+            f"HEAD {url} announced {HTTP_API_CONTRACT_HEADER}: "
+            f"{_stamps(stamped)}; this probe "
             f"speaks exactly one of {', '.join(SUPPORTED_HTTP_API_CONTRACTS)}. "
             "Add the server's contract to SUPPORTED_HTTP_API_CONTRACTS in "
             "check_council_health.py once witan-core speaks it."
@@ -261,35 +271,31 @@ def run_probe(
         if _error_code(error_body) == API_CONTRACT_MISMATCH:
             # Named apart from every other refusal because the remedy is
             # different: the graph and this probe's credentials may be fine.
-            # /healthz announced this contract, so the server changed
-            # contract between the two calls, mid-rollout, and the next run
-            # discovers the new one.
+            # The server announced this contract on /healthz moments earlier,
+            # so either it changed contract between the two calls or something
+            # between the two rewrote the header.
             msg = (
                 f"POST {url} failed: the server refused "
                 f"{HTTP_API_CONTRACT_HEADER}: {contract}, which its "
                 f"{HEALTHZ_PATH} announced moments earlier (HTTP {exc.code} "
-                f"{detail}). It changed contract mid-run; the next run "
-                "follows it."
+                f"{detail}). A server that changed contract mid-run clears on "
+                "the next run; one that keeps refusing the contract it "
+                "announces needs looking at."
             )
             raise ProbeError(msg) from exc
         msg = f"POST {url} failed: HTTP {exc.code} {detail}"
         raise ProbeError(msg) from exc
-    except urllib.error.URLError as exc:
-        msg = f"POST {url} failed: {exc.reason}"
-        raise ProbeError(msg) from exc
-    except TimeoutError as exc:
-        msg = f"POST {url} timed out after {HTTP_TIMEOUT_SECONDS}s"
-        raise ProbeError(msg) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise ProbeError(_unreachable(request.get_method(), url, exc)) from exc
 
     # The server stamps its contract on every response. A response stamped
     # with anything else, or with nothing, came from something other than the
     # server that answered /healthz (a proxy answering in its place), whatever
     # the body looks like.
     if stamped != [contract]:
-        found = ", ".join(stamped) if stamped else "none"
         msg = (
             f"POST {url} returned HTTP {status} stamped "
-            f"{HTTP_API_CONTRACT_HEADER}: {found}, not {contract}"
+            f"{HTTP_API_CONTRACT_HEADER}: {_stamps(stamped)}, not {contract}"
         )
         raise ProbeError(msg)
 

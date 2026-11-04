@@ -154,6 +154,14 @@ def test_healthz_without_one_supported_contract_fails_the_probe(
         discover_contract(base)
 
 
+def test_a_healthz_refusing_head_fails_the_probe_with_its_status(stub_server):
+    _, base = stub_server
+    _StubHandler.routes = {"/healthz": (405, {})}
+
+    with pytest.raises(ProbeError, match=r"HEAD .*/healthz failed: HTTP 405"):
+        discover_contract(base)
+
+
 def test_an_unreachable_healthz_fails_the_probe():
     with pytest.raises(ProbeError, match=r"HEAD .*/healthz failed"):
         discover_contract("http://127.0.0.1:1")  # nothing listens on port 1
