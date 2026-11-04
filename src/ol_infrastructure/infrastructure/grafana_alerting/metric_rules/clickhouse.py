@@ -458,7 +458,7 @@ def create(
                 "ClickHouseBackupNearGracePeriod",
                 _backup_near_grace_period(),
                 "5m",
-                f"A clickhouse-backup Job in cluster {{{{ $labels.cluster }}}} ran for {{{{ $value | humanizeDuration }}}}, past 80% of the server pods' {CLICKHOUSE_TERMINATION_GRACE_SECONDS}s grace period. A replica restarted during the backup would be killed before it finishes. Raise CLICKHOUSE_TERMINATION_GRACE_SECONDS in bridge/lib/magic_numbers.py.",
+                f"A clickhouse-backup Job in cluster {{{{ $labels.cluster }}}} ran for {{{{ $values.B.Value | humanizeDuration }}}}, past 80% of the server pods' {CLICKHOUSE_TERMINATION_GRACE_SECONDS}s grace period. A replica restarted during the backup would be killed before it finishes. Raise CLICKHOUSE_TERMINATION_GRACE_SECONDS in bridge/lib/magic_numbers.py.",
                 rd,
             ),
         ],

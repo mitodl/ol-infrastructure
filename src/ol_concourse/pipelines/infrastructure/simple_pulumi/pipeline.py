@@ -384,6 +384,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+        # CLICKHOUSE_TERMINATION_GRACE_SECONDS, shared with grafana-alerting.
+        additional_watched_paths=["src/bridge/lib/magic_numbers.py"],
     ),
     "data_warehouse": SimplePulumiParams(
         app_name="data_warehouse",
@@ -474,6 +476,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+        # CLICKHOUSE_TERMINATION_GRACE_SECONDS sets a ClickHouse alert threshold.
+        additional_watched_paths=["src/bridge/lib/magic_numbers.py"],
     ),
     "gravitino": SimplePulumiParams(
         app_name="gravitino",
