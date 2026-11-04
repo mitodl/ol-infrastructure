@@ -392,9 +392,11 @@ def create_ol_mit_realm(  # noqa: PLR0913
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # Grant the service account realm-management roles for user and group management.
-    # These are consumed by the moira-to-keycloak migration management commands via
-    # the Keycloak admin API (client_credentials grant against /realms/master).
+    # OVS looks up users by email and reads groups, a user's groups, group members
+    # and group attributes, which view-users covers (it is a composite of
+    # query-users and query-groups).
+    # manage-users is for the assign_group_users management command, which adds
+    # existing users to a group.
     realm_management_client = keycloak.openid.get_client(
         realm_id=ol_mit_realm.id,
         client_id="realm-management",
@@ -403,8 +405,6 @@ def create_ol_mit_realm(  # noqa: PLR0913
     for resource_name, role in [
         ("ol-mit-ovs-sa-manage-users", "manage-users"),
         ("ol-mit-ovs-sa-view-users", "view-users"),
-        ("ol-mit-ovs-sa-query-users", "query-users"),
-        ("ol-mit-ovs-sa-query-groups", "query-groups"),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
