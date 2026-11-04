@@ -226,6 +226,7 @@ loki_release = loki.build(
     aws_config=aws_config,
     k8s_global_labels=k8s_global_labels,
     namespace=NAMESPACE,
+    cluster_name=cluster_stack.require_output("cluster_name"),
     bucket_name=loki_storage.bucket_name,
     irsa_role_arn=loki_storage.irsa_role.role.arn,
     service_account=loki_storage.service_account,

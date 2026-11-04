@@ -110,6 +110,7 @@ def build(  # noqa: PLR0913
     aws_config: AWSBase,
     k8s_global_labels: dict[str, str],
     namespace: str,
+    cluster_name: Output[str],
     bucket_name: str,
     irsa_role_arn: Output[str],
     service_account: str,
@@ -156,6 +157,9 @@ def build(  # noqa: PLR0913
 
     values: dict[str, object] = {
         "deploymentMode": "Distributed",
+        # The chart's ServiceMonitor relabels `cluster` to the release name,
+        # which would hide Loki's own series from every cluster-scoped query.
+        "clusterLabelOverride": cluster_name,
         "global": {"imageRegistry": registry},
         "loki": {
             # Writers and the PDC read path bypass any gateway, so nothing
