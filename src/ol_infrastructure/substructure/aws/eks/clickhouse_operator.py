@@ -13,6 +13,7 @@ import pulumi_kubernetes as kubernetes
 import yaml as pyyaml
 from pulumi import Config, ResourceOptions, StackReference
 
+from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import CLICKHOUSE_OPERATOR_VERSION
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
 
@@ -25,6 +26,19 @@ CLICKHOUSE_OPERATOR_NAMESPACE = "clickhouse-operator"
 # metrics Service. The bundle hardcodes kube-system; nothing is deployed into
 # CLICKHOUSE_OPERATOR_NAMESPACE, which is only checked for existence.
 CLICKHOUSE_OPERATOR_BUNDLE_NAMESPACE = "kube-system"
+# reconcile.statefulSet.update.timeout bounds every wait on a StatefulSet,
+# including the wait for a pod to go away when the operator recreates one.
+# From 0.27.4 a pod that outlasts it is force-deleted (grace 0), so the bundle
+# default of 300s would SIGKILL a ClickHouse server still finishing the daily
+# backup inside its grace period. Only the operator-wide value counts: the
+# operator builds its pollers from chop.Config(), not from the CHI. It applies
+# to Keeper and every ClickHouse install too, so a genuinely failed update
+# holds that reconcile this long before giving up. The CRD caps it at 3600.
+OPERATOR_STATEFULSET_UPDATE_TIMEOUT_SECONDS = CLICKHOUSE_TERMINATION_GRACE_SECONDS + 600
+# Objects the operator reads at startup, applied before its Deployment rolls.
+_OPERATOR_PREREQUISITE_KINDS = frozenset(
+    {"CustomResourceDefinition", "ConfigMap", "ClickHouseOperatorConfiguration"}
+)
 
 
 def _fetch_operator_manifests() -> list[dict[str, Any]]:
@@ -41,6 +55,79 @@ def _fetch_operator_manifests() -> list[dict[str, Any]]:
     with urllib.request.urlopen(CLICKHOUSE_OPERATOR_MANIFEST_URL) as response:  # noqa: S310
         content = response.read().decode("utf-8")
     return [doc for doc in pyyaml.safe_load_all(content) if doc is not None]
+
+
+def _operator_configuration() -> dict[str, Any]:
+    """Build the ClickHouseOperatorConfiguration merged over the bundle's config.yaml.
+
+    The operator lists every ClickHouseOperatorConfiguration in its own
+    namespace at startup and merges them, in name order, over the file config.
+
+    :returns: The ClickHouseOperatorConfiguration manifest.
+    :rtype: dict[str, Any]
+    """
+    return {
+        "apiVersion": "clickhouse.altinity.com/v1",
+        "kind": "ClickHouseOperatorConfiguration",
+        "metadata": {
+            "name": "ol-overrides",
+            "namespace": CLICKHOUSE_OPERATOR_BUNDLE_NAMESPACE,
+        },
+        "spec": {
+            "reconcile": {
+                "statefulSet": {
+                    "update": {"timeout": OPERATOR_STATEFULSET_UPDATE_TIMEOUT_SECONDS}
+                }
+            }
+        },
+    }
+
+
+def _resource_ref(obj: dict[str, Any]) -> str:
+    """Format a manifest as a ``config.kubernetes.io/depends-on`` reference.
+
+    :param obj: A Kubernetes manifest.
+    :returns: ``<group>/namespaces/<ns>/<kind>/<name>``, or
+        ``<group>/<kind>/<name>`` for a cluster-scoped object. The core group is
+        the empty string.
+    :rtype: str
+    """
+    group = obj["apiVersion"].rpartition("/")[0]
+    metadata = obj["metadata"]
+    scope = f"namespaces/{metadata['namespace']}/" if "namespace" in metadata else ""
+    return f"{group}/{scope}{obj['kind']}/{metadata['name']}"
+
+
+def _prepare_operator_deployment(objs: list[dict[str, Any]]) -> None:
+    """Make the operator Deployment roll last, and alone.
+
+    The CRDs, the config ConfigMaps and the ClickHouseOperatorConfiguration go
+    in first, so a new operator never starts against old CRDs or config. The
+    ConfigGroup's own heuristics only order CRDs before custom resources, not
+    before a Deployment. A rolling update with no surge stops the old operator
+    before the new one starts, so the two never reconcile side by side (the
+    operator has no leader election). It stays type RollingUpdate because a
+    server-side apply cannot drop the defaulted rollingUpdate block that type
+    Recreate forbids.
+
+    The CRDs stay in this ConfigGroup: a child's URN is
+    ``<group name>:<namespace>/<name>``, so moving them to another group would
+    delete and recreate them, and deleting a CRD deletes every CHI and CHK.
+
+    :param objs: The bundle manifests, modified in place.
+    """
+    deployment = next(obj for obj in objs if obj["kind"] == "Deployment")
+    deployment["metadata"].setdefault("annotations", {})[
+        "config.kubernetes.io/depends-on"
+    ] = ",".join(
+        _resource_ref(obj)
+        for obj in objs
+        if obj["kind"] in _OPERATOR_PREREQUISITE_KINDS
+    )
+    deployment["spec"]["strategy"] = {
+        "type": "RollingUpdate",
+        "rollingUpdate": {"maxSurge": 0, "maxUnavailable": 1},
+    }
 
 
 def setup_clickhouse_operator(
@@ -74,9 +161,11 @@ def setup_clickhouse_operator(
         lambda ns: check_cluster_namespace(CLICKHOUSE_OPERATOR_NAMESPACE, ns)
     )
 
+    objs = [*_fetch_operator_manifests(), _operator_configuration()]
+    _prepare_operator_deployment(objs)
     operator = kubernetes.yaml.v2.ConfigGroup(
         f"{cluster_name}-clickhouse-operator",
-        objs=_fetch_operator_manifests(),
+        objs=objs,
         opts=ResourceOptions(
             provider=k8s_provider,
             delete_before_replace=True,

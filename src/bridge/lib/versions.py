@@ -92,7 +92,7 @@ VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
 VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf325f88138c0a111955"  # pragma: allowlist secret
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
-CLICKHOUSE_OPERATOR_VERSION = "release-0.26.0"
+CLICKHOUSE_OPERATOR_VERSION = "release-0.27.4"
 # 24.8 -> 26.3 goes through 25.8: upstream supports a rolling upgrade only
 # between versions less than a year or two LTS lines apart. Stacks still on the
 # previous line pin clickhouse:version and set clickhouse:compatibility.

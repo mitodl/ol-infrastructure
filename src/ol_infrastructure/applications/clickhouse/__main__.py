@@ -1208,14 +1208,16 @@ interserver_credentials_enabled = clickhouse_config.require_bool(
 # so apply this stack before it after flipping.
 tls_listeners_enabled = clickhouse_config.require_bool("tls_listeners_enabled")
 # Points the servers at Keeper's TLS port. Flip it per stack only after Keeper
-# is serving 9281 there. Operator 0.26 restarts a host for any zookeeper change
-# (isZookeeperChangeRequiresReboot is !a.Equals(b); the zookeeper/* "no" restart
-# rule is never consulted), so this rolls every replica in turn. A replica that
-# cannot complete the TLS handshake comes back with no Keeper session, its
-# replicated tables read-only, and the operator, which only waits for /ping,
-# moves on to the next one. Check system.zookeeper_connection (no row, or a
+# is serving 9281 there. Operator 0.26 restarted a host for any zookeeper
+# change. 0.27.4 consults the zookeeper/* "no" entry of
+# configurationRestartPolicy (isZookeeperChangeRequiresReboot), so the new port
+# reaches each replica as a host ConfigMap rewrite that the server hot-reloads,
+# with no restart. A replica that cannot complete the TLS handshake loses its
+# Keeper session and its replicated tables go read-only, and nothing in the
+# operator's reconcile notices. Check system.zookeeper_connection (no row, or a
 # port other than 9281, both mean stop) and system.replicas.is_readonly on the
-# first restarted replica.
+# first replica whose chi-clickhouse-deploy-confd-default-0-N ConfigMap shows
+# 9281.
 #
 # The operator does not abort an in-flight reconcile when the CHI changes. To
 # stop the roll: scale kube-system/clickhouse-operator to 0, set this back to

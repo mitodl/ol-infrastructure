@@ -478,7 +478,19 @@ upgrade goes to QA first.
      LTS lines newer needs an intermediate version first.
    - Operator: `CLICKHOUSE_OPERATOR_VERSION` in `bridge/lib/versions.py`,
      applied with the `data.QA` stack of `substructure/aws/eks`, which installs the
-     operator.
+     operator. The constant is shared, so CI applies it on merge and QA and
+     Production wait at their gates. The apply updates the CRDs, the config
+     ConfigMaps and the `ol-overrides` ClickHouseOperatorConfiguration before
+     it replaces the operator pod (a `config.kubernetes.io/depends-on`
+     annotation on the Deployment, whose rolling update has no surge, so the
+     old operator stops before the new one starts). Never
+     delete the CRDs, or move them to another ConfigGroup: deleting a CRD
+     deletes every CHI and CHK of that kind. Read the release notes for changes
+     to the Keeper defaults, which roll every Keeper pod, and for changes to
+     the generated StatefulSets, which roll every ClickHouse replica. Check the
+     new operator's startup log for the merged `reconcile.statefulSet.update.timeout`
+     (`OPERATOR_STATEFULSET_UPDATE_TIMEOUT_SECONDS`), then watch the CHI and
+     CHK reach `Completed`.
    - Keeper: `CLICKHOUSE_KEEPER_VERSION` in `bridge/lib/versions.py`, applied
      with the `applications/clickhouse` QA stack. It is a floating tag
      (`26.8-alpine`) shared by every environment and bumped by Renovate, so a
