@@ -388,8 +388,21 @@ def test_an_image_writing_less_than_the_mark_is_refused() -> None:
         _next({"fmt14": 16}, 14)
 
 
-def test_an_unreadable_label_keeps_the_mark() -> None:
-    assert _next({"fmt14": 16}, None) == {"fmt14": 16}
+@pytest.mark.parametrize("armed", [False, True])
+def test_an_unreadable_label_onto_a_root_with_a_mark_is_refused(*, armed: bool) -> None:
+    """A format-16 image deployed while ECR can't be read would leave the mark
+    at 14, and a later 0.13 image would then pass with no restore behind it.
+    """
+    with pytest.raises(ValueError, match="label could not be read"):
+        _next({"fmt14": 14}, None, armed=armed)
+
+
+def test_an_unreadable_label_onto_a_root_without_a_mark_is_skipped() -> None:
+    """The warn-and-skip data_tier applies to an unreadable label still holds
+    where there is nothing to protect yet.
+    """
+    assert _next({"fmt9": 9}, None) == {"fmt9": 9}
+    assert _next(None, None) == {}
 
 
 def test_a_root_never_served_starts_over_and_others_are_kept() -> None:
@@ -418,16 +431,19 @@ def test_a_restore_lowers_the_mark_on_its_own_deploy() -> None:
 
 
 @pytest.mark.parametrize(
-    ("marks", "image", "restored_to"),
+    ("marks", "image", "restored_to", "armed"),
     [
-        ({"fmt14": 14}, 14, 14),  # left set after the rollback deployed
-        ({"fmt14": 16}, 16, 14),  # set ahead of time, image not rolled back
-        ({"fmt14": 16}, 14, 13),  # names a format the image doesn't write
-        (None, 14, 14),  # nothing to roll back from
+        ({"fmt14": 14}, 14, 14, False),  # left set after the rollback deployed
+        ({"fmt14": 16}, 16, 14, False),  # set ahead of time, image not rolled back
+        ({"fmt14": 16}, 14, 13, False),  # names a format the image doesn't write
+        (None, 14, 14, False),  # nothing to roll back from
+        # Armed leaves the server at zero replicas, so this deploy doesn't
+        # serve the restored root and must not use up the acknowledgment.
+        ({"fmt14": 16}, 14, 14, True),
     ],
 )
 def test_a_restore_override_outside_its_deploy_is_refused(
-    marks: dict[str, float] | None, image: int, restored_to: int
+    marks: dict[str, float] | None, image: int, restored_to: int, *, armed: bool
 ) -> None:
     with pytest.raises(ValueError, match="accepted only on the deploy"):
-        _next(marks, image, restored_to=restored_to)
+        _next(marks, image, restored_to=restored_to, armed=armed)

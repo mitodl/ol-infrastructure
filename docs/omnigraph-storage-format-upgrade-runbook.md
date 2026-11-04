@@ -54,22 +54,40 @@ labels both images with the range they serve
 (`edu.mit.ol.omnigraph.min-internal-schema` and
 `edu.mit.ol.omnigraph.internal-schema`), and preview accepts an image whose
 range covers `omnigraph:internal_schema_version` with no migration armed. Such
-an upgrade is an ordinary image deploy: `storage_prefix` and
-`internal_schema_version` stay as they are, and nothing below applies.
+an upgrade is an image deploy: `storage_prefix` and `internal_schema_version`
+stay as they are, and the rebuild procedure below doesn't apply.
 
 It is still one-way. A 0.13 binary refuses a branch 0.14 has stamped, and a
 0.14 server rewrites the S3 lock in a form 0.13 refuses on its first start. So
 the stack exports `written_internal_schema`, the highest format any image it
 deployed onto each root writes, and preview refuses a later image that writes
 less ("an image writing format 16 has already been deployed onto this root").
-There is no rollback by image alone. To go back:
+There is no rollback by image alone, and an image deploy takes no backup (only
+the rebuild migration Job does). So before the first deploy of an image that
+writes a newer format onto a root:
 
-1. Restore the root from the backup taken before the upgrade, `__cluster/`
-   included.
-2. Deploy the old image with `omnigraph:storage_restored_to_format` set to the
-   format it writes. That lowers the root's mark, and preview accepts the old
-   image on that one deploy.
-3. Remove `storage_restored_to_format` in the next change. Preview refuses it
+1. Stop every writer: suspend the maintenance CronJob, `witan-ci-indexer` and
+   the view reaper, let any Job they started finish, and scale
+   `omnigraph-server` to zero.
+2. Take a whole-root backup, `__cluster/` included, and verify it (object
+   count and bytes against the source prefix).
+3. Deploy the image, then scale `omnigraph-server` back to one replica if it
+   is still at zero (Pulumi doesn't put `replicas` back after something else
+   changed it), and resume the CronJobs.
+
+To go back:
+
+1. Pause the omnigraph pipeline's automatic deploys, then stop every writer as
+   above. Nothing may write the root while it is restored: a running 0.14
+   server or maintenance Job would overwrite restored objects or stamp them
+   16 again.
+2. Restore the root from the backup, `__cluster/` included.
+3. Deploy the old image with `omnigraph:storage_restored_to_format` set to the
+   format it writes and no migration armed. That lowers the root's mark, and
+   preview accepts the old image on that one deploy.
+4. Scale `omnigraph-server` back to one replica if it is still at zero, then
+   resume the CronJobs once they run the old image, then the pipeline.
+5. Remove `storage_restored_to_format` in the next change. Preview refuses it
    on any deploy that isn't a rollback, so a leftover can't permit a later
    rollback that has no restore behind it.
 

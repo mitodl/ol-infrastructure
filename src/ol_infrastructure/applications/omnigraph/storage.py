@@ -420,9 +420,17 @@ def next_written_internal_schema(
 
     ``restored_to`` (``omnigraph:storage_restored_to_format``) is the one way
     down, after restoring the root from a backup taken before the upgrade. It
-    is accepted only on that deploy: the image must write exactly that format
-    and it must be below the mark. Left set afterwards it is refused, so it
-    can't quietly permit a later rollback that has no restore behind it.
+    is accepted only on that deploy: no migration armed (an armed deploy
+    leaves the server at zero replicas, so it isn't the deploy that serves the
+    restored root), the image must write exactly that format, and it must be
+    below the mark. Left set afterwards it is refused, so it can't quietly
+    permit a later rollback that has no restore behind it.
+
+    An image whose label can't be read is refused on a root that has a mark:
+    neither guard could tell whether it can open the root, and recording
+    nothing would let a later, older image past the mark if this one wrote a
+    newer format. A root without a mark keeps the warn-and-skip that
+    ``data_tier`` applies to an unreadable label.
 
     :param deployed_marks: The ``written_internal_schema`` map this stack last
         exported, root (``storage_prefix``, ``""`` for the bucket root) to
@@ -434,7 +442,8 @@ def next_written_internal_schema(
     :param restored_to: ``omnigraph:storage_restored_to_format``, or ``None``.
     :returns: The map to export.
     :rtype: dict[str, int]
-    :raises ValueError: on an image that writes less than the mark, or a
+    :raises ValueError: on an image that writes less than the mark, an image
+        whose label can't be read onto a root with a mark, or a
         ``restored_to`` outside the deploy it is for.
     """
     marks = {root: int(mark) for root, mark in (deployed_marks or {}).items()}
@@ -442,23 +451,38 @@ def next_written_internal_schema(
     root = storage_prefix or "bucket root"
     if restored_to is not None:
         if (
-            prior is None
+            migration_armed
+            or prior is None
             or image_internal_schema is None
             or not image_internal_schema == restored_to < prior
         ):
             msg = (
                 f"omnigraph:storage_restored_to_format is {restored_to}, but "
                 "it is accepted only on the deploy that rolls this root back "
-                "after a restore: the image must write exactly that format "
-                f"and the root must have been written at a newer one ({root} "
-                f"was last at {prior}; this image writes "
-                f"{image_internal_schema}). If the rollback has already "
-                "deployed, remove the setting."
+                "into service after a restore: no migration armed, the image "
+                "must write exactly that format, and the root must have been "
+                f"written at a newer one ({root} was last at {prior}; this "
+                f"image writes {image_internal_schema}; migration armed: "
+                f"{migration_armed}). If the rollback has already deployed, "
+                "remove the setting."
             )
             raise ValueError(msg)
         return {**marks, storage_prefix: restored_to}
-    if image_internal_schema is None or migration_armed:
-        if prior is not None and image_internal_schema is not None:
+    if image_internal_schema is None:
+        if prior is not None:
+            msg = (
+                "the deploying omnigraph image's storage-format label could "
+                f"not be read, and {root} has been written at format {prior} "
+                "by an image this stack deployed. Without the label, preview "
+                "can't tell whether this image opens that root, or record what "
+                "it writes for the next deploy to check against. Re-run once "
+                "the image's labels can be read from ECR (the warning above "
+                "says why they couldn't)."
+            )
+            raise ValueError(msg)
+        return marks
+    if migration_armed:
+        if prior is not None:
             _refuse_below_mark(image_internal_schema, prior, root)
         return marks
     if prior is not None:
