@@ -16,7 +16,11 @@ Each client is one entry in the keycloak stack's
         description: Contoso LMS integration for Contoso Manufacturing
         organizations:
           - 8f14e45f-ceea-467a-9c1b-2f4b9c0a3d21
-        contract_end_date: "2027-06-30"
+        access_end_date: "2027-06-30"
+
+``access_end_date`` is the last day the partner may read learner records. It is
+the contract's end date unless the contract keeps its data available after
+enrollment closes, in which case it is the later date.
 
 Bumping an entry's ``secret_version`` makes Keycloak issue the client a new
 secret on the next apply and invalidates the old one at once, so the partner's
@@ -46,8 +50,8 @@ ORGANIZATIONS_CLAIM = "learner_records_organizations"
 # ol-analytics-api tenants/b2b_learner_records/token.py refuses the client's
 # tokens once this date has passed, inclusive, end of day Anywhere on Earth
 # (mitodl/ol-analytics-api#73). That is a backstop; the client should still
-# be removed at contract end.
-CONTRACT_END_DATE_CLAIM = "learner_records_contract_end_date"
+# be removed when its access ends.
+ACCESS_END_DATE_CLAIM = "learner_records_access_end_date"
 # A token issued before its client is removed stays valid until it expires, so
 # this is the revocation window. Pinned on each client rather than inherited
 # from the realm so a realm-wide change can't widen it unnoticed.
@@ -71,7 +75,7 @@ class LearnerRecordsClient(BaseModel):
     ]
     description: Annotated[str, StringConstraints(min_length=1)]
     organizations: Annotated[list[UUID], Field(min_length=1)]
-    contract_end_date: date | None = None
+    access_end_date: date | None = None
     secret_version: Annotated[int, Field(ge=1)] = 1
 
     @property
@@ -214,14 +218,14 @@ def create_learner_records_clients(  # noqa: PLR0913
             add_to_userinfo=False,
             opts=opts,
         )
-        if contract.contract_end_date is not None:
+        if contract.access_end_date is not None:
             keycloak.openid.HardcodedClaimProtocolMapper(
-                f"olapps-{contract.client_id}-contract-end-date-mapper",
+                f"olapps-{contract.client_id}-access-end-date-mapper",
                 realm_id=realm_id,
                 client_id=client.id,
-                name="learner-records-contract-end-date",
-                claim_name=CONTRACT_END_DATE_CLAIM,
-                claim_value=contract.contract_end_date.isoformat(),
+                name="learner-records-access-end-date",
+                claim_name=ACCESS_END_DATE_CLAIM,
+                claim_value=contract.access_end_date.isoformat(),
                 claim_value_type="String",
                 add_to_access_token=True,
                 add_to_id_token=False,
@@ -243,9 +247,9 @@ def create_learner_records_clients(  # noqa: PLR0913
                         "token_url": f"{issuer_url}/protocol/openid-connect/token",
                         "scope": LEARNER_RECORDS_READ_SCOPE,
                         "organizations": contract.sorted_organizations,
-                        "contract_end_date": (
-                            contract.contract_end_date.isoformat()
-                            if contract.contract_end_date
+                        "access_end_date": (
+                            contract.access_end_date.isoformat()
+                            if contract.access_end_date
                             else None
                         ),
                     },

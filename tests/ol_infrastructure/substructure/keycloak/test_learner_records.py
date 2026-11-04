@@ -20,7 +20,7 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 from ol_infrastructure.substructure.keycloak.learner_records import (
-    CONTRACT_END_DATE_CLAIM,
+    ACCESS_END_DATE_CLAIM,
     LEARNER_RECORDS_READ_SCOPE,
     ORGANIZATIONS_CLAIM,
     LearnerRecordsClient,
@@ -69,7 +69,7 @@ class TestParseLearnerRecordsClients:
             {"description": ""},
             {"organizations": []},
             {"organizations": ["contoso"]},
-            {"contract_end_date": "next year"},
+            {"access_end_date": "next year"},
             {"secret_version": 0},
             {"read_pii": True},
         ],
@@ -165,13 +165,13 @@ def test_organizations_claim_is_json_typed_and_access_token_only(mocks):
     assert mapper.inputs["addToUserinfo"] is False
 
 
-def test_contract_end_date_claim_only_when_set(mocks):
+def test_access_end_date_claim_only_when_set(mocks):
     """The end date is optional per contract."""
     _create(
         parse_learner_records_clients(
             [
                 _entry(),
-                _entry(name="fabrikam-lms", contract_end_date="2027-06-30"),
+                _entry(name="fabrikam-lms", access_end_date="2027-06-30"),
             ]
         )
     )
@@ -180,7 +180,7 @@ def test_contract_end_date_claim_only_when_set(mocks):
         "keycloak:openid/hardcodedClaimProtocolMapper:HardcodedClaimProtocolMapper"
     )
     end_dates = [
-        m.inputs for m in mappers if m.inputs["claimName"] == CONTRACT_END_DATE_CLAIM
+        m.inputs for m in mappers if m.inputs["claimName"] == ACCESS_END_DATE_CLAIM
     ]
     assert len(end_dates) == 1
     assert end_dates[0]["claimValue"] == "2027-06-30"
