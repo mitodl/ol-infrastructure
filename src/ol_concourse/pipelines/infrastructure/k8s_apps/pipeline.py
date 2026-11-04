@@ -967,9 +967,11 @@ ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 # Bumping a tag resets the same histories, once, on each pipeline's next check
 # after k8s-apps-meta regenerates them, even when the image itself is
 # unchanged: the type's source is what changed. Introducing these pins was
-# such a bump. So bump deliberately, and afterwards re-run the QA job of every
-# app with an open release issue. The release bot reports an approved issue
-# that Production has not taken.
+# such a bump. So bump deliberately, and afterwards check that each app with an
+# open release issue still lists its release resource as an input of its latest
+# QA build; where it does not, start a new QA build (fly rerun-build reuses the
+# old input versions, which may no longer exist). The release bot reports an
+# approved issue that Production has not taken.
 RELEASE_RESOURCE_TYPE_TAGS = {
     "release": "eaa392681a2c2be5ea93abe1f3144844f0e65415",  # pragma: allowlist secret
     "github-issues": "9ab0f9739aa61b39071be0022dcaec1bc8f0688c",  # pragma: allowlist secret

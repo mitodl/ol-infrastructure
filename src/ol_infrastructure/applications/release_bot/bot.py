@@ -2154,8 +2154,9 @@ def _stranded_text(app_name: str, cfg, issue: dict[str, Any], age: timedelta) ->
         f"{minutes} minutes ago, but Production has not taken it, so nothing "
         "has deployed. If the Production job has no pending build, Concourse "
         "has no QA run it can deploy (this happens after the release resource "
-        "types are updated): re-run the QA job, then approve the release issue "
-        f"it posts. QA: {_qa_job_url(app_name, cfg)} "
+        "types are updated): start a new QA build (not a re-run of an old one, "
+        "which reuses the old inputs), then approve the release issue it posts. "
+        f"QA: {_qa_job_url(app_name, cfg)} "
         f"Production: {_production_job_url(app_name, cfg)}"
     )
 
