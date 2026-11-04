@@ -175,17 +175,21 @@ PRODUCTION_TAG_PREFIX = "production/"
 def release_job_names(app_name: str) -> dict[str, str]:
     """Return the release jobs the release bot drives, by role.
 
-    ``release`` cuts a release (and a hotfix), ``production`` is the job the
-    release gate triggers, and ``abandon`` tears an in-flight release down.
+    ``release`` cuts a release (and a hotfix), ``qa`` is the job that makes it
+    deployable to Production (QA for a k8s app, the RC job for a tag-only one),
+    ``production`` is the job the release gate triggers, and ``abandon`` tears
+    an in-flight release down.
     """
     if release_kind(app_name) == "tag":
         return {
             "release": f"cut-{app_name}-release",
+            "qa": f"deploy-{app_name}-rc",
             "production": f"promote-{app_name}-production",
             "abandon": f"abandon-{app_name}-release",
         }
     return {
         "release": f"build-{app_name}-release-image",
+        "qa": f"deploy-ol-application-{app_name}-qa",
         "production": f"deploy-ol-application-{app_name}-production",
         "abandon": f"abandon-{app_name}-release",
     }

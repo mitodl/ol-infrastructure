@@ -2324,7 +2324,7 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
         generated_changelog=app_release_changelog(app_name),
     )
     cut_job_name = jobs["release"]
-    rc_job_name = f"deploy-{app_name}-rc"
+    rc_job_name = jobs["qa"]
     serial_groups = [f"{app_name}-release"]
     release_current = Identifier(f"{app_name}-release-current")
     version_var = LoadVarStep(
