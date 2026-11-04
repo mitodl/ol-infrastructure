@@ -28,6 +28,7 @@ import pulumi_tls as tls
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
+from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import (
     CLICKHOUSE_KEEPER_VERSION,
     CLICKHOUSE_OPERATOR_VERSION,  # noqa: F401 — for traceability
@@ -223,10 +224,9 @@ keeper_resources = clickhouse_config.get_object("keeper_resources") or {
     "limits": {"memory": "512Mi"},
 }
 # Server waits on SIGTERM for running queries (shutdown_wait_unfinished_queries)
-# and, by default, for a running BACKUP (shutdown_wait_backups_and_restores).
-# The daily backup took 274s on production replica 0 on 2026-10-21, so the
-# kubelet's default 30s would SIGKILL a replica restarted during it.
-CLICKHOUSE_TERMINATION_GRACE_SECONDS = 300
+# and, by default, for a running BACKUP (shutdown_wait_backups_and_restores), so
+# the pod's grace period (CLICKHOUSE_TERMINATION_GRACE_SECONDS) has to outlast
+# the daily backup or a replica restarted during it is SIGKILLed.
 CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS = 60
 
 
