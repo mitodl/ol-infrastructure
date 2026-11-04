@@ -25,6 +25,7 @@ from ol_infrastructure.applications.gravitino.scripts.reconcile_gravitino_grants
     Gravitino,
     KeycloakToken,
     ReconcileError,
+    UnreachableError,
     governance_role_holders,
     gravitino_transport,
     keycloak_get,
@@ -626,6 +627,28 @@ def test_one_unloadable_schema_does_not_stop_the_owner_pass(server):
         reconcile(Gravitino(flaky, METALAKE), _desired(), list, ADMIN)
 
     assert server.owners[MART] == {"name": "ol_data_engineer", "type": "group"}
+
+
+def test_unreachable_server_stops_at_the_first_schema_request(server):
+    """The owner pass collects per-schema failures, but not this one.
+
+    A hung server would cost one timeout per remaining schema and could run the
+    Job past its deadline before any FAIL line printed.
+    """
+    server.backend_schemas.add("ol_warehouse_qa_aaa_first")
+    owner_calls = []
+
+    def down_after_listing(method, path, body):
+        if "/schemas/ol_warehouse_qa_" in path or "/owners/" in path:
+            owner_calls.append(path)
+            msg = f"{method} {path} failed: TimeoutError()"
+            raise UnreachableError(msg)
+        return server(method, path, body)
+
+    with pytest.raises(UnreachableError):
+        reconcile(Gravitino(down_after_listing, METALAKE), _desired(), list, ADMIN)
+
+    assert len(owner_calls) == 1
 
 
 def test_two_users_resolving_to_one_principal_are_both_refused(server, capsys):
