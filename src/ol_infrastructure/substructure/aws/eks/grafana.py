@@ -2,7 +2,7 @@
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ResourceOptions
+from pulumi import Output, ResourceOptions
 
 from bridge.lib.versions import GRAFANA_K8S_MONITORING_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
@@ -682,7 +682,9 @@ def setup_grafana(
                                 "auth": {
                                     "type": "basic",
                                     "username": archive.username,
-                                    "password": archive.password,
+                                    # Marked secret so the value is masked in
+                                    # previews and encrypted in state.
+                                    "password": Output.secret(archive.password),
                                 },
                                 "metrics": {"enabled": False},
                                 "logs": {"enabled": True},
