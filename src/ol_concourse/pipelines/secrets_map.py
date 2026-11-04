@@ -108,6 +108,10 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/mailgun/": [],
     "applications/marimo_data/": [],
     "applications/micromasters/": ["fastly.yaml", "vector/"],
+    "applications/observability_archive/": [
+        "grafana_cloud/",
+        "observability_archive/",
+    ],
     "applications/mit_learn/": [
         "fastly.yaml",
         "mitlearn/",

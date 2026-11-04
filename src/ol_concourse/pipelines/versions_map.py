@@ -83,6 +83,10 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/mit_learn/": ["NGINX_VERSION"],
     "applications/mit_learn_nextjs/": [],
     "applications/mitxonline/": ["NGINX_VERSION"],
+    "applications/observability_archive/": [
+        "PDC_AGENT_VERSION",
+        "TRAEFIK_CHART_VERSION",
+    ],
     "applications/ocw_site/": [],
     "applications/ocw_studio/": ["NGINX_VERSION"],
     "applications/odl_video_service/": ["NGINX_VERSION"],

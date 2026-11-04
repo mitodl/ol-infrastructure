@@ -147,6 +147,7 @@ class Services(StrEnum):
     open_metadata = "open-metadata"
     openedx = "openedx"
     starrocks = "starrocks"
+    telemetry_archive = "telemetry-archive"
     tika = "tika"
     toolhive = "toolhive"
     omnigraph = "omnigraph"

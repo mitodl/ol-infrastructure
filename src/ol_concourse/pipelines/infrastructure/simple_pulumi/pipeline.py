@@ -804,6 +804,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
+    "observability-archive": SimplePulumiParams(
+        app_name="observability-archive",
+        pulumi_project_path="applications/observability_archive/",
+        pulumi_project_name="ol-application-observability-archive",
+        description=(
+            "Deploys the self-hosted Loki/Mimir telemetry archive (ADR-0014) on the "
+            "operations EKS cluster via Pulumi."
+        ),
+        category="core-platform",
+        topology="preview-gated",
+        stages=["QA", "Production"],
+    ),
     "aws-ecr": SimplePulumiParams(
         app_name="aws-ecr",
         pulumi_project_path="infrastructure/aws/ecr/",

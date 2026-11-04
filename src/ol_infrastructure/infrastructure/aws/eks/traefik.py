@@ -5,7 +5,10 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
-from ol_infrastructure.lib.aws.eks_helper import ecr_dockerhub_registry
+from ol_infrastructure.lib.aws.eks_helper import (
+    GATEWAY_CLASS_LABEL,
+    ecr_dockerhub_registry,
+)
 from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import (
     AlertTier,
@@ -16,6 +19,10 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.toolhive_telemetry import ships_telemetry
+
+# Exported by the EKS stack so stacks running their own Traefik can refuse to
+# deploy before the shared controller filters on it.
+SHARED_GATEWAY_CLASS_SELECTOR = f"{GATEWAY_CLASS_LABEL}=shared"
 
 
 def setup_traefik(
@@ -180,6 +187,7 @@ def setup_traefik(
                 },
                 "gatewayClass": {
                     "enabled": True,
+                    "labels": {GATEWAY_CLASS_LABEL: "shared"},
                 },
                 "providers": {
                     # Not supporting legacy ingress resources
@@ -188,6 +196,12 @@ def setup_traefik(
                     },
                     "kubernetesGateway": {
                         "enabled": True,
+                        # Only serve Gateways of our own GatewayClass. Other
+                        # Traefik instances on the cluster (the telemetry
+                        # archive's internal one) share the controller name,
+                        # and without this filter their Gateways would be
+                        # exposed on this public NLB as well.
+                        "labelSelector": SHARED_GATEWAY_CLASS_SELECTOR,
                     },
                 },
                 # These are important for external-dns to actually work

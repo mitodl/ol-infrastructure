@@ -210,6 +210,7 @@ if __name__ == "__main__":
         "marimo-data",
         "mongodb-atlas",
         "monitoring",
+        "observability-archive",
         "ocw-site",
         "open-discussions",
         "open-metadata",
