@@ -2465,21 +2465,23 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
         release_issue=release_issue,
         serial_groups=serial_groups,
     )
-    return Pipeline(
-        resource_types=[
-            release_resource_type(),
-            github_deployments_resource(),
-            github_issues_resource(),
-        ],
-        resources=[
-            main_repo,
-            release_res,
-            release_gate,
-            release_issue,
-            deployment_rc,
-            deployment_prod,
-        ],
-        jobs=[cut_job, rc_job, production_job, abandon_job],
+    return _pin_release_resource_types(
+        Pipeline(
+            resource_types=[
+                release_resource_type(),
+                github_deployments_resource(),
+                github_issues_resource(),
+            ],
+            resources=[
+                main_repo,
+                release_res,
+                release_gate,
+                release_issue,
+                deployment_rc,
+                deployment_prod,
+            ],
+            jobs=[cut_job, rc_job, production_job, abandon_job],
+        )
     )
 
 

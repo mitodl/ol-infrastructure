@@ -98,14 +98,18 @@ APPS: dict[str, AppRegistration] = {
     "mitxonline": AppRegistration(
         slack_channel="product-mitx-online", release_resource_workflow=True
     ),
-    # Tag-only releases, not yet flipped: Doof still releases both until
-    # ocw-studio's site pipelines read tags instead of the release and
-    # release-candidate branches. Doof's channels, which the OCW team reads.
+    # Tag-only releases (release_kind="tag"): ocw-studio's site pipelines read
+    # the release tags, so nothing advances the release and release-candidate
+    # branches any more. Doof's channels, which the OCW team reads.
     "ocw-hugo-projects": AppRegistration(
-        slack_channel="doof-ocw-hugo-projects", release_kind="tag"
+        slack_channel="doof-ocw-hugo-projects",
+        release_resource_workflow=True,
+        release_kind="tag",
     ),
     "ocw-hugo-themes": AppRegistration(
-        slack_channel="doof-ocw-hugo-themes", release_kind="tag"
+        slack_channel="doof-ocw-hugo-themes",
+        release_resource_workflow=True,
+        release_kind="tag",
     ),
     "ocw-studio": AppRegistration(
         repo_main_branch="master",

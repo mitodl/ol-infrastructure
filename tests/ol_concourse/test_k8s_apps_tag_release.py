@@ -61,10 +61,10 @@ def _index(plan: list[dict[str, Any]], key: str, name: str, nth: int = 0) -> int
     return matches[nth]
 
 
-def test_both_ocw_hugo_repos_are_tag_only_and_not_yet_flipped():
-    """Doof still releases them until ocw-studio reads tags."""
+def test_both_ocw_hugo_repos_are_tag_only_and_flipped():
+    """ocw-studio reads their tags, so the release workflow owns them."""
     assert set(TAG_APPS) == {"ocw-hugo-themes", "ocw-hugo-projects"}
-    assert not any(release_resource_workflow(app) for app in TAG_APPS)
+    assert all(release_resource_workflow(app) for app in TAG_APPS)
 
 
 @pytest.mark.parametrize("app_name", TAG_APPS)
