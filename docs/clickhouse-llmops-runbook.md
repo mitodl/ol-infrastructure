@@ -478,8 +478,10 @@ upgrade goes to QA first.
      LTS lines newer needs an intermediate version first.
    - Operator: `CLICKHOUSE_OPERATOR_VERSION` in `bridge/lib/versions.py`,
      applied with the `data.QA` stack of `substructure/aws/eks`, which installs the
-     operator. The constant is shared, so CI applies it on merge and QA and
-     Production wait at their gates. The apply updates the CRDs, the config
+     operator. The constant is shared and CI applies it on merge, so to
+     canary in QA before CI, apply `data.QA` from the branch before merging.
+     Otherwise CI goes first and QA and Production wait at their gates. The
+     apply updates the CRDs, the config
      ConfigMaps and the `ol-overrides` ClickHouseOperatorConfiguration before
      it replaces the operator pod (a `config.kubernetes.io/depends-on`
      annotation on the Deployment, whose rolling update has no surge, so the
