@@ -8,6 +8,7 @@ nothing on the read path is exposed; the SSH tunnel is further restricted to the
 two query-frontends.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 import pulumi_kubernetes as kubernetes
@@ -30,6 +31,14 @@ PDC_AGENT_REPLICAS = 2
 PDC_AGENT_CONNECTIONS = 2
 
 
+@dataclass
+class PdcReadPath:
+    """The PDC network the Cloud datasources attach to, and the provider to make them with."""
+
+    network: cloud.PrivateDataSourceConnectNetwork
+    provider: grafana.Provider
+
+
 def query_frontend_hosts(namespace: str) -> dict[str, str]:
     """Return each backend's in-cluster host:port for the Cloud datasources."""
     return {
@@ -47,7 +56,7 @@ def build(  # noqa: PLR0913
     k8s_labels: K8sGlobalLabels,
     node_selector: dict[str, str],
     tolerations: list[dict[str, str]],
-) -> cloud.PrivateDataSourceConnectNetwork:
+) -> PdcReadPath:
     """Create the PDC network and token in Grafana Cloud and run the agent."""
     env = stack_info.env_suffix
     grafana_provider = grafana.Provider(
@@ -220,4 +229,4 @@ def build(  # noqa: PLR0913
             ),
         ),
     )
-    return pdc_network
+    return PdcReadPath(network=pdc_network, provider=grafana_provider)

@@ -5,8 +5,8 @@ A Traefik release of its own in the archive namespace, behind an internal NLB
 that only the peered VPCs' pod CIDRs can reach, terminating TLS with a
 cert-manager certificate. Routes are Gateway API HTTPRoutes bound to a dedicated
 GatewayClass, so the cluster's shared Traefik, which watches every namespace,
-never picks them up. Phase 0 ships `/ready`; the Loki and Mimir push routes are
-added with their backends.
+never picks them up. `/ready` proves the path end to end; each backend adds
+its push routes with `push_route()` when it lands.
 """
 
 from dataclasses import dataclass
@@ -347,4 +347,53 @@ def build(  # noqa: PLR0913
         push_auth_middleware=push_auth_middleware,
         security_group=security_group,
         domain=domain,
+    )
+
+
+def push_route(  # noqa: PLR0913
+    *,
+    name: str,
+    stack_info: StackInfo,
+    namespace: str,
+    k8s_labels: K8sGlobalLabels,
+    ingress: ArchiveIngress,
+    paths: list[str],
+    backend_service: str,
+    backend_port: int,
+    depends_on: list[Resource],
+) -> kubernetes.apiextensions.CustomResource:
+    """Route exact push paths to a backend behind the basic-auth middleware.
+
+    Exact matches only: a backend's other endpoints (query, ring, ready) stay
+    unreachable from outside the cluster even with the credential.
+    """
+    return kubernetes.apiextensions.CustomResource(
+        f"telemetry-archive-{name}-route-{stack_info.env_suffix}",
+        api_version="gateway.networking.k8s.io/v1",
+        kind="HTTPRoute",
+        metadata={
+            "name": f"telemetry-archive-{name}",
+            "namespace": namespace,
+            "labels": k8s_labels.model_dump(),
+        },
+        spec={
+            "parentRefs": [{"name": GATEWAY_NAME, "sectionName": LISTENER_NAME}],
+            "hostnames": [ingress.domain],
+            "rules": [
+                {
+                    "matches": [
+                        {"path": {"type": "Exact", "value": path}} for path in paths
+                    ],
+                    "filters": [ingress.push_auth_middleware.gateway_filter],
+                    "backendRefs": [{"name": backend_service, "port": backend_port}],
+                }
+            ],
+        },
+        opts=ResourceOptions(
+            depends_on=[
+                ingress.gateway,
+                ingress.push_auth_middleware,
+                *depends_on,
+            ]
+        ),
     )
