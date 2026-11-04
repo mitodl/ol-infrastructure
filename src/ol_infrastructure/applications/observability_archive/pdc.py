@@ -88,10 +88,16 @@ def build(  # noqa: PLR0913
         alert_tier=AlertTier.ticket, component=Component.agent
     )
     selector_labels = {"app.kubernetes.io/name": "pdc-agent"}
+    # Deliberately unnamed (Pulumi auto-naming). The agent reads the token from
+    # its environment once at startup and re-signs its SSH certificate with that
+    # same value for the rest of its life, so a rotated token has to roll the
+    # pods. pulumi-kubernetes already replaces a Secret whose data changes
+    # (provider/pkg/provider/diff.go, v4.34.2); auto-naming makes that
+    # replacement a new name, which changes the pod template below and rolls
+    # the Deployment. A fixed name would be replaced in place and roll nothing.
     token_secret = kubernetes.core.v1.Secret(
         f"telemetry-archive-pdc-token-{env}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="pdc-agent-token",
             namespace=namespace,
             labels=agent_labels,
         ),
@@ -185,11 +191,33 @@ def build(  # noqa: PLR0913
                                 requests={"cpu": "50m", "memory": "64Mi"},
                                 limits={"memory": "256Mi"},
                             ),
+                            # Ready means "a tunnel is up", so max_unavailable=0
+                            # keeps the old agents until a replacement can serve
+                            # queries. The agent has no health endpoint (its
+                            # metrics mux serves only /metrics, and Grafana's own
+                            # manifests ship no probe), but it only starts that
+                            # server after the token has signed its SSH key, and
+                            # it records a time_to_connect sample when the PDC
+                            # gateway banner arrives, so a count of at least one
+                            # is a completed handshake (pdc-agent v0.0.67,
+                            # cmd/pdc/main.go and pkg/ssh/metrics.go). The image
+                            # is alpine, so busybox wget and grep are present.
+                            readiness_probe=kubernetes.core.v1.ProbeArgs(
+                                exec_=kubernetes.core.v1.ExecActionArgs(
+                                    command=[
+                                        "sh",
+                                        "-c",
+                                        f"wget -qO- http://127.0.0.1:{PDC_AGENT_METRICS_PORT}/metrics"
+                                        " | grep -Eq '^pdc_agent_ssh_time_to_connect_seconds_count"
+                                        r"\{[^}]*\} [1-9]'",
+                                    ]
+                                ),
+                                period_seconds=5,
+                            ),
                         )
                     ],
                 ),
             ),
         ),
-        opts=ResourceOptions(depends_on=[token_secret]),
     )
     return pdc_network
