@@ -100,9 +100,10 @@ APPS: dict[str, AppRegistration] = {
     ),
     # Tag-only releases (release_kind="tag"): ocw-studio's site pipelines read
     # the release tags, so nothing advances the release and release-candidate
-    # branches any more. Doof's channels, which the OCW team reads.
+    # branches any more. One channel, which the OCW team reads, serves both:
+    # ocw-hugo-projects is released rarely and never had a channel of its own.
     "ocw-hugo-projects": AppRegistration(
-        slack_channel="doof-ocw-hugo-projects",
+        slack_channel="doof-ocw-hugo-themes",
         release_resource_workflow=True,
         release_kind="tag",
     ),
