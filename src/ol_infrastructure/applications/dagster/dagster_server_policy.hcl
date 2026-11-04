@@ -102,6 +102,41 @@ path "postgres-xpro/creds/readonly/*" {
 path "postgres-xpro/creds/readonly" {
   capabilities = ["read"]
 }
+# Application databases for upcoming data_loading dlt sources. In production the
+# loaders connect to each database's read replica; the dynamic user is created on
+# the primary and reaches the replica by physical replication.
+path "postgres-mitlearn/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-mitlearn/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-odl-video-service/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-odl-video-service/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-learn-ai/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-learn-ai/creds/readonly" {
+  capabilities = ["read"]
+}
+# OCW Studio's mount carries the environment in its name, and this policy file is
+# shared by every Dagster stack, so both environments are listed.
+path "postgres-ocw-studio-applications-qa/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-ocw-studio-applications-qa/creds/readonly" {
+  capabilities = ["read"]
+}
+path "postgres-ocw-studio-applications-production/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-ocw-studio-applications-production/creds/readonly" {
+  capabilities = ["read"]
+}
 path "secret-data/" {
   capabilities = ["list"]
 }

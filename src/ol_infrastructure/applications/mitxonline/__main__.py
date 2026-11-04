@@ -1188,6 +1188,11 @@ export(
     "mitxonline",
     {
         "rds_host": mitxonline_db.db_instance.address,
+        **(
+            {"rds_replica_host": mitxonline_db.db_replica.address}
+            if mitxonline_db_config.read_replica
+            else {}
+        ),
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
     },
