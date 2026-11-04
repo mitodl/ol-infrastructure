@@ -44,6 +44,7 @@ pulumi-provisioner's ``env_vars_from_files``).
 
 import hashlib
 import json
+from collections.abc import Mapping
 from typing import NamedTuple
 
 import pulumi
@@ -59,7 +60,7 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
 )
 from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
-    read_image_internal_schema,
+    read_image_internal_schema_range,
 )
 from ol_infrastructure.applications.omnigraph.lock_handoff import (
     MIGRATION_ARMED_ANNOTATION,
@@ -76,6 +77,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     create_maintenance_window,
 )
 from ol_infrastructure.applications.omnigraph.storage import (
+    next_written_internal_schema,
     storage_uri_for,
     validate_image_internal_schema,
 )
@@ -342,6 +344,9 @@ class OmnigraphDataTier(NamedTuple):
     # binary as the server — the storage-format migration Job loads with it —
     # cannot drift onto a different one.
     server_image: str | Output[str]
+    # The highest storage format an image deployed onto this root writes, for
+    # the stack to export, by root. See next_written_internal_schema.
+    written_internal_schema: dict[str, int]
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -369,6 +374,8 @@ def create_data_tier(  # noqa: PLR0913
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
+    deployed_written_internal_schema: Mapping[str, float] | None,
+    storage_restored_to_format: int | None,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
 
@@ -494,21 +501,42 @@ def create_data_tier(  # noqa: PLR0913
     # failure instead. A label that cannot be read is NOT a failure — an image
     # predating the label, or a run without ECR access, warns and skips, since
     # refusing those would make a rollback impossible.
+    image_min_internal_schema: int | None
+    image_internal_schema: int | None
     try:
-        image_internal_schema: int | None = read_image_internal_schema(
-            OMNIGRAPH_SERVER_ECR_REPOSITORY, omnigraph_server_image, aws_config.region
+        image_min_internal_schema, image_internal_schema = (
+            read_image_internal_schema_range(
+                OMNIGRAPH_SERVER_ECR_REPOSITORY,
+                omnigraph_server_image,
+                aws_config.region,
+            )
         )
     except ImageSchemaUnavailableError as exc:
         pulumi.log.warn(
             f"skipping the image storage-format check: {exc}",
         )
-        image_internal_schema = None
+        image_min_internal_schema = image_internal_schema = None
     validate_image_internal_schema(
         image_internal_schema,
         internal_schema_version,
         migrate_to_prefix,
         migration_armed=migration_armed,
+        image_min_internal_schema=image_min_internal_schema,
     )
+    written_internal_schema = next_written_internal_schema(
+        deployed_written_internal_schema,
+        storage_prefix,
+        image_internal_schema,
+        migration_armed=migration_armed,
+        restored_to=storage_restored_to_format,
+    )
+    # Exported here, before any resource that runs the image is registered,
+    # and not at the end of __main__. A failed update still writes the
+    # outputs registered so far, but a program exception between the
+    # Deployment and a later export would roll the new image with the old
+    # mark, letting an older image back onto a root the new one has written.
+    # Read back by the next deploy as deployed_written_internal_schema.
+    pulumi.export("written_internal_schema", written_internal_schema)
 
     # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,
     # organization-wide, plus the `code-bridge` graph and one `code-<repo>`
@@ -1268,4 +1296,5 @@ def create_data_tier(  # noqa: PLR0913
         maintenance=omnigraph_maintenance,
         storage_uri=storage_uri,
         server_image=omnigraph_server_image,
+        written_internal_schema=written_internal_schema,
     )

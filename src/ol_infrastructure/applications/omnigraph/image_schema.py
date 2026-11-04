@@ -46,6 +46,12 @@ from botocore.exceptions import BotoCoreError, ClientError
 #: agent-kit side by `just check-omnigraph-pins` and named in both Dockerfiles.
 IMAGE_SCHEMA_LABEL = "edu.mit.ol.omnigraph.internal-schema"
 
+#: The oldest format the image's binary opens in place (agent-kit's
+#: ``_OMNIGRAPH_MIN_INTERNAL_SCHEMA``). omnigraph 0.14 writes 16 and opens 14,
+#: so a 0.14 image serves a fmt14 root without a rebuild. Images built before
+#: the label serve only the format they write.
+MIN_IMAGE_SCHEMA_LABEL = "edu.mit.ol.omnigraph.min-internal-schema"
+
 #: Asked for explicitly because ECR otherwise returns whatever media type it
 #: feels like, and a manifest we cannot parse is indistinguishable from an
 #: image with no label. Both the Docker v2 and OCI spellings are listed: the
@@ -161,20 +167,24 @@ def _get_manifest(
     return manifest
 
 
-def read_image_internal_schema(
+def read_image_internal_schema_range(
     repository_name: str, image_ref: str, region: str
-) -> int:
-    """Return the storage format the image at ``image_ref`` declares it reads.
+) -> tuple[int, int]:
+    """Return the storage formats the image at ``image_ref`` declares it reads.
 
     :param repository_name: ECR repository name, e.g. ``omnigraph-server``.
     :param image_ref: Fully-qualified reference, as deployed — the same string
         the Deployment's pod spec carries.
     :param region: AWS region the ECR repository lives in.
-    :returns: The value of the ``edu.mit.ol.omnigraph.internal-schema`` label.
-    :rtype: int
+    :returns: ``(oldest served, written)``: the
+        ``edu.mit.ol.omnigraph.min-internal-schema`` and
+        ``edu.mit.ol.omnigraph.internal-schema`` labels. An image without the
+        first serves only the format it writes.
+    :rtype: tuple[int, int]
     :raises ImageSchemaUnavailableError: on an unreachable or unreadable registry,
         an unparseable manifest, or an image carrying no such label. All of
         these are non-fatal — see this module's docstring.
+    :raises ValueError: when either label is present but not an integer.
     """
     client = boto3.client("ecr", region_name=region, config=_ECR_CLIENT_CONFIG)
     manifest = _get_manifest(client, repository_name, _image_id(image_ref))
@@ -231,15 +241,39 @@ def read_image_internal_schema(
     # `config` is optional in the OCI image-config spec and `Labels` is null
     # rather than absent on an image that declares none, so neither is indexed
     # directly.
-    labels = _mapping(_mapping(config).get("config")).get("Labels")
-    declared = _mapping(labels).get(IMAGE_SCHEMA_LABEL)
-    if declared is None:
+    labels = _mapping(_mapping(_mapping(config).get("config")).get("Labels"))
+    if labels.get(IMAGE_SCHEMA_LABEL) is None:
         msg = (
             f"{image_ref} carries no {IMAGE_SCHEMA_LABEL} label. Images built "
             "from agent-kit before #358 do not, so this is expected on a "
             "rollback and means only that the format check is skipped."
         )
         raise ImageSchemaUnavailableError(msg)
+    written = _int_label(
+        labels, IMAGE_SCHEMA_LABEL, "OMNIGRAPH_INTERNAL_SCHEMA", image_ref
+    )
+    if labels.get(MIN_IMAGE_SCHEMA_LABEL) is None:
+        return written, written
+    oldest = _int_label(
+        labels, MIN_IMAGE_SCHEMA_LABEL, "OMNIGRAPH_MIN_INTERNAL_SCHEMA", image_ref
+    )
+    return oldest, written
+
+
+def _int_label(
+    labels: dict[str, Any], label: str, build_arg: str, image_ref: str
+) -> int:
+    """Parse one storage-format label that is known to be present.
+
+    :param labels: The image config's labels.
+    :param label: The label to parse.
+    :param build_arg: The agent-kit build arg that fills it, for the message.
+    :param image_ref: The image, for the message.
+    :returns: The label as an integer.
+    :rtype: int
+    :raises ValueError: when the value is not an integer.
+    """
+    declared = labels[label]
     try:
         return int(declared)
     except (TypeError, ValueError) as exc:
@@ -251,9 +285,9 @@ def read_image_internal_schema(
         # "no label" would let a broken build turn the gate off silently, so it
         # fails the preview instead.
         msg = (
-            f"{image_ref} declares {IMAGE_SCHEMA_LABEL}={declared!r}, which is "
+            f"{image_ref} declares {label}={declared!r}, which is "
             "not an integer storage-format number. An empty value means the "
-            "image build did not expand OMNIGRAPH_INTERNAL_SCHEMA — see "
+            f"image build did not expand {build_arg} — see "
             "agent-kit's `just check-omnigraph-pins`. Rebuild the image; do "
             "not work around this by deploying it anyway."
         )
