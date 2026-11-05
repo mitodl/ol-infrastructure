@@ -79,6 +79,7 @@ def _build(  # noqa: PLR0913
     boot_budget_seconds: int | None = None,
     deployed_marks: dict[str, float] | None = None,
     deployed_witan_http_api_contracts: list[str] | None = None,
+    memory: dict[str, str] | None = None,
 ) -> tuple[_Mocks, data_tier.OmnigraphDataTier]:
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
@@ -116,6 +117,7 @@ def _build(  # noqa: PLR0913
         deployed_written_internal_schema=deployed_marks,
         storage_restored_to_format=None,
         deployed_witan_http_api_contracts=deployed_witan_http_api_contracts,
+        **(memory or {}),
     )
     return mocks, tier
 
@@ -356,6 +358,32 @@ def test_a_boot_budget_lengthens_the_probe_and_both_rollout_waits(monkeypatch):
             "pulumi.com/patchForce": "true",
             "pulumi.com/timeoutSeconds": "4025",
         }
+
+    return tier.deployment.urn.apply(check)
+
+
+@pytest.mark.parametrize(
+    ("memory", "expected"),
+    [
+        (None, ("512Mi", "2Gi")),
+        (
+            {"server_memory_request": "2Gi", "server_memory_limit": "4Gi"},
+            ("2Gi", "4Gi"),
+        ),
+    ],
+)
+@pulumi.runtime.test
+def test_the_server_memory_envelope_follows_the_stack(monkeypatch, memory, expected):
+    """CI and QA keep the default; Production's config raises it."""
+    mocks, tier = _build(monkeypatch, served_format=14, image_format=14, memory=memory)
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        resources = container["resources"]
+        assert (resources["requests"]["memory"], resources["limits"]["memory"]) == (
+            expected
+        )
 
     return tier.deployment.urn.apply(check)
 
