@@ -97,6 +97,15 @@ class ImageSchemaUnavailableError(Exception):
     """
 
 
+class ImageLabelMissingError(ImageSchemaUnavailableError):
+    """The image was read and carries no such label: it predates the label.
+
+    Split from a registry that couldn't be read, because a caller reading an
+    image it is deploying right now knows the image exists, so only this case
+    is a legitimate rollback rather than a fault to fail on.
+    """
+
+
 def _mapping(value: object) -> dict[str, Any]:
     """Return ``value`` when it is a JSON object, else an empty mapping.
 
@@ -353,8 +362,10 @@ def read_image_http_api_contracts(
         ``HTTP_API_CONTRACTS_LABEL`` for a witan image.
     :returns: The contracts, in label order.
     :rtype: tuple[str, ...]
-    :raises ImageSchemaUnavailableError: on an unreadable registry or an image
-        built before the label existed. Non-fatal, as for the format label.
+    :raises ImageLabelMissingError: when the image was built before the label
+        existed.
+    :raises ImageSchemaUnavailableError: on an unreadable registry. Both are
+        non-fatal to the omnigraph check, as for the format label.
     :raises ValueError: when the label is present but isn't a comma-separated
         list of ``<major>.<minor>`` contracts, which means a broken build.
     """
@@ -365,7 +376,7 @@ def read_image_http_api_contracts(
             f"{image_ref} carries no {label} label. Images built from agent-kit "
             "before it was added do not, so the HTTP-contract check is skipped."
         )
-        raise ImageSchemaUnavailableError(msg)
+        raise ImageLabelMissingError(msg)
     contracts = tuple(declared.split(",")) if isinstance(declared, str) else ()
     if not contracts or not all(_CONTRACT.fullmatch(c) for c in contracts):
         msg = (

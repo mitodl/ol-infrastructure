@@ -18,6 +18,7 @@ from ol_infrastructure.applications.omnigraph.image_schema import (
     HTTP_API_CONTRACTS_LABEL,
     IMAGE_SCHEMA_LABEL,
     MIN_IMAGE_SCHEMA_LABEL,
+    ImageLabelMissingError,
     ImageSchemaUnavailableError,
     _image_id,
     check_http_api_contract,
@@ -405,8 +406,20 @@ def test_an_image_without_the_contract_label_is_unavailable_not_fatal(
     """Every image built before agent-kit added the label, rollbacks included."""
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: "16"}}})
-    with pytest.raises(ImageSchemaUnavailableError, match="carries no"):
+    with pytest.raises(ImageLabelMissingError, match="carries no"):
         read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACT_LABEL)
+
+
+def test_an_unreadable_registry_is_not_a_missing_label(patched) -> None:
+    """The witan stack exports null only for a missing label and fails on this.
+
+    A registry blip during a witan deploy must not switch the omnigraph check
+    off until the next witan deploy.
+    """
+    patched(_FakeEcr({}), {})
+    with pytest.raises(ImageSchemaUnavailableError) as caught:
+        read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACTS_LABEL)
+    assert not isinstance(caught.value, ImageLabelMissingError)
 
 
 @pytest.mark.parametrize("declared", ["", "0.14,", "latest", 14])

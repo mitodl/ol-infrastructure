@@ -104,7 +104,7 @@ from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.omnigraph.image_schema import (
     HTTP_API_CONTRACTS_LABEL,
-    ImageSchemaUnavailableError,
+    ImageLabelMissingError,
     read_image_http_api_contracts,
 )
 from ol_infrastructure.applications.witan.break_glass import (
@@ -863,6 +863,25 @@ witan_image_repository = (
     f"{witan_aws_account.account_id}.dkr.ecr.{aws_config.region}.amazonaws.com/witan"
 )
 witan_image = format_docker_image_ref(witan_image_repository, "WITAN")
+# The HTTP contracts this image negotiates, exported below for the omnigraph
+# stack, which refuses a server image whose contract the running witan can't
+# speak. Read off the image here, while it is being deployed and so certainly
+# still in ECR, rather than by the omnigraph stack later: ECR's keep-last-N
+# lifecycle rule can delete an image that is still running. Read before any
+# resource is registered, so a malformed label or an unreadable registry fails
+# the deploy before anything rolls. Only an image that predates the label
+# exports null (the omnigraph check then skips with a warning); a registry
+# error must not, or one blip would switch the check off until the next witan
+# deploy.
+try:
+    witan_http_api_contracts: list[str] | None = list(
+        read_image_http_api_contracts(
+            witan_image, aws_config.region, HTTP_API_CONTRACTS_LABEL
+        )
+    )
+except ImageLabelMissingError as exc:
+    pulumi.log.warn(f"exporting no witan_http_api_contracts: {exc}")
+    witan_http_api_contracts = None
 # `service.version` on every span and metric this stack's workloads emit. The
 # same tag-or-digest `witan_image` is built from, so a trace in Tempo names the
 # exact artifact it came from and not a build-time guess at one.
@@ -1107,23 +1126,9 @@ export("view_reaper_schedule", WITAN_REAP_VIEWS_SCHEDULE)
 export("witan_domain", WITAN_DOMAIN)
 export("witan_oidc_issuer", KEYCLOAK_ISSUER)
 export("witan_image_repository", witan_image_repository)
-# The HTTP contracts this image negotiates, read by the omnigraph stack's
-# preview, which refuses a server image whose contract the running witan can't
-# speak. Read off the image here, while it is being deployed and so certainly
-# still in ECR, rather than by the omnigraph stack later: ECR's keep-last-N
-# lifecycle rule can delete an image that is still running. Resolved through
-# the serving Deployment, which Pulumi awaits until it has rolled, so the
-# output describes what is serving rather than what is still rolling out. An
-# unlabelled image exports null and the omnigraph check skips with a warning.
-try:
-    witan_http_api_contracts: list[str] | None = list(
-        read_image_http_api_contracts(
-            witan_image, aws_config.region, HTTP_API_CONTRACTS_LABEL
-        )
-    )
-except ImageSchemaUnavailableError as exc:
-    pulumi.log.warn(f"exporting no witan_http_api_contracts: {exc}")
-    witan_http_api_contracts = None
+# Resolved through the serving Deployment, which Pulumi awaits until it has
+# rolled, so the output describes what is serving rather than what is still
+# rolling out. See witan_http_api_contracts above.
 export(
     "witan_http_api_contracts",
     witan_serving_tier.deployment.metadata.apply(lambda _: witan_http_api_contracts),

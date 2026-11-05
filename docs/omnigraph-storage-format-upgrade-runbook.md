@@ -105,9 +105,13 @@ In QA and Production the refusal happens in
 `preview-ol-application-omnigraph-<env>`, so no gate issue opens. In CI it
 fails `deploy-ol-application-omnigraph-ci`. Either way nothing re-triggers it:
 re-run that job by hand once witan's deploy has finished, then release the new
-gate. A server image built before the label, or a witan stack that exports no
+gate. A server image built before the label, or one whose labels ECR can't
+serve, skips the whole check with a warning. A witan stack that exports no
 contracts (its last deploy predates the export, or its image predates the
-label), skips the witan half of the check with a warning.
+label) skips only the witan half; the probe is still checked. The witan stack
+fails its own deploy, before anything rolls, if it can't read its image's
+labels for any other reason, so a registry error there can't switch the check
+off.
 
 The omnigraph stack references the witan stack, which in turn reads
 `omnigraph_server_addr` from it. A reference to a stack that doesn't exist
