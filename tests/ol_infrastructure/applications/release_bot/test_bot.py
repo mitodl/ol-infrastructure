@@ -83,6 +83,18 @@ def _no_running_release_build(monkeypatch):
     monkeypatch.setattr(bot.concourse, "active_build_url", AsyncMock(return_value=None))
 
 
+# The real one, before the release_build_watch fixture replaces it for every test.
+_start_release_build_watch = bot._start_release_build_watch
+
+
+@pytest.fixture(autouse=True)
+def release_build_watch(monkeypatch):
+    """Record build watches instead of polling Concourse after every trigger."""
+    watch = MagicMock()
+    monkeypatch.setattr(bot, "_start_release_build_watch", watch)
+    return watch
+
+
 @pytest.fixture(autouse=True)
 def _no_pending_hotfix(monkeypatch):
     """Default to no pending hotfix, since one changes what /doof release does."""
@@ -4106,3 +4118,209 @@ async def test_abandon_triggers_the_configured_abandon_job(
 def test_production_link_names_the_configured_production_job(tag_repos):
     url = bot._production_job_url("my-theme", tag_repos["my-theme"])
     assert url.endswith("/pipelines/my-theme-pipeline/jobs/promote-my-theme-production")
+
+
+# ---------------------------------------------------------------------------
+# Reporting a release build that does not succeed
+# ---------------------------------------------------------------------------
+
+_BUILD_URL = "https://cicd.example/builds/42"
+
+
+def _slack_unreachable() -> AsyncMock:
+    """Return a `respond` that raises, as Bolt's does when Slack is unreachable."""
+    return AsyncMock(side_effect=OSError("Slack is unreachable"))
+
+
+async def test_release_watches_its_build_even_if_the_reply_fails(
+    repos, slack, monkeypatch, release_build_watch
+):
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(return_value=_BUILD_URL)
+    )
+
+    with pytest.raises(OSError, match="unreachable"):
+        await bot._cmd_release(
+            repos,
+            slack.ack,
+            _slack_unreachable(),
+            _command("my-app"),
+            {"user_id": "UDANA"},
+        )
+
+    release_build_watch.assert_called_once_with(
+        "my-app", repos["my-app"], _BUILD_URL, requester="UDANA"
+    )
+
+
+@pytest.mark.usefixtures("hotfix_api")
+async def test_hotfix_watches_its_build_even_if_the_reply_fails(
+    repos, slack, release_build_watch
+):
+    with pytest.raises(OSError, match="unreachable"):
+        await bot._cmd_hotfix(
+            repos,
+            slack.ack,
+            _slack_unreachable(),
+            _command("my-app aaaaaaa"),
+            {"user_id": "UDANA"},
+        )
+
+    release_build_watch.assert_called_once_with(
+        "my-app", repos["my-app"], "http://build/1", requester="UDANA", hotfix_sha=_SHA
+    )
+
+
+def test_a_build_watch_runs_in_the_background(repos, monkeypatch):
+    started: list[object] = []
+
+    def _capture(coro):
+        started.append(coro.cr_code.co_name)
+        coro.close()
+
+    monkeypatch.setattr(bot.asyncio, "create_task", _capture)
+
+    _start_release_build_watch("my-app", repos["my-app"], _BUILD_URL, requester=None)
+
+    assert started == ["_watch_release_build"]
+
+
+def _build_statuses(monkeypatch, *statuses):
+    """Make the build report *statuses* in turn, raising any exception given."""
+    queue = list(statuses)
+
+    async def _status(build_id):
+        assert build_id == 42
+        status = queue.pop(0)
+        if isinstance(status, Exception):
+            raise status
+        return status
+
+    monkeypatch.setattr(bot.concourse, "build_status", _status)
+    monkeypatch.setattr(bot.asyncio, "sleep", AsyncMock())
+
+
+async def _watch(repos, hotfix_sha=None):
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+    await bot._watch_release_build(
+        app,
+        "my-app",
+        repos["my-app"],
+        _BUILD_URL,
+        "C123",
+        requester="UDANA",
+        hotfix_sha=hotfix_sha,
+    )
+    return app.client.chat_postMessage
+
+
+async def test_a_failed_release_build_says_how_to_supersede_what_it_cut(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "pending", "started", "failed")
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_IN_FLIGHT)
+    )
+
+    post = await _watch(repos)
+
+    post.assert_awaited_once()
+    assert post.call_args.kwargs["channel"] == "C123"
+    text = post.call_args.kwargs["text"]
+    assert text.splitlines()[0] == (
+        f"❌ <@UDANA> `my-app` release build failed: {_BUILD_URL}"
+    )
+    assert "`/doof release my-app supersede 2026.8.3.1`" in text
+    assert "`/doof abandon my-app`" in text
+    assert "Concourse" not in text
+
+
+async def test_a_release_build_that_failed_before_the_cut_says_release_again(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "errored")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    text = (await _watch(repos)).call_args.kwargs["text"]
+
+    assert "release build errored" in text
+    assert "To try again: `/doof release my-app`" in text
+    assert "supersede" not in text
+
+
+async def test_a_failed_hotfix_build_says_abandon_then_hotfix_again(repos, monkeypatch):
+    """Superseding would cut the tracked branch, not the hotfix."""
+    _build_statuses(monkeypatch, "aborted")
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_IN_FLIGHT)
+    )
+
+    text = (await _watch(repos, hotfix_sha=_SHA)).call_args.kwargs["text"]
+
+    assert "hotfix build of `aaaaaaa` was aborted" in text
+    assert (
+        "`/doof abandon my-app`, and once that build finishes, "
+        "`/doof hotfix my-app aaaaaaa`"
+    ) in text
+    assert "supersede" not in text
+
+
+async def test_a_hotfix_build_that_failed_before_the_cut_says_hotfix_again(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "failed")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    text = (await _watch(repos, hotfix_sha=_SHA)).call_args.kwargs["text"]
+
+    assert "To try again: `/doof hotfix my-app aaaaaaa`" in text
+    assert "/doof release" not in text
+
+
+async def test_a_successful_release_build_posts_nothing(repos, monkeypatch):
+    _build_statuses(monkeypatch, "started", "succeeded")
+
+    post = await _watch(repos)
+
+    post.assert_not_awaited()
+
+
+async def test_a_build_watch_survives_a_failed_status_poll(repos, monkeypatch):
+    _build_statuses(monkeypatch, RuntimeError("Concourse is down"), "failed")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    post = await _watch(repos)
+
+    post.assert_awaited_once()
+
+
+async def test_a_failure_report_that_slack_rejects_is_retried(repos, monkeypatch):
+    _build_statuses(monkeypatch, "failed", "failed")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock(side_effect=[RuntimeError("Slack"), None])
+
+    await bot._watch_release_build(
+        app, "my-app", repos["my-app"], _BUILD_URL, "C123", requester=None
+    )
+
+    assert app.client.chat_postMessage.await_count == 2
+
+
+async def test_a_failure_report_survives_not_knowing_what_is_in_flight(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "failed")
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(side_effect=RuntimeError("GitHub is down")),
+    )
+
+    text = (await _watch(repos)).call_args.kwargs["text"]
+
+    assert "release build failed" in text
+    assert "To try again: `/doof release my-app`, which says if" in text
