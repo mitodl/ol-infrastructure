@@ -419,19 +419,26 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
     The operator automatically creates a service named ``keeper-clickhouse`` which is used
     by the ClickHouseInstallation for ZooKeeper-compatible coordination.
     """
-    tolerations = (
-        [
-            {
-                "key": "ol.mit.edu/io-workload",
-                "operator": "Equal",
-                "value": "true",
-                "effect": "NoSchedule",
-            }
-        ]
+    # Leave the keys out entirely off io-optimized nodes. The operator diffs the
+    # CHK spec against status.normalizedCompleted, where an empty nodeSelector
+    # or tolerations list was serialized away to nil, so `{}` and `[]` read as a
+    # change on every pass: operator 0.26.0 re-reconciled the CHK every few
+    # seconds in all three data clusters and it never left InProgress.
+    io_scheduling: dict[str, Any] = (
+        {
+            "tolerations": [
+                {
+                    "key": "ol.mit.edu/io-workload",
+                    "operator": "Equal",
+                    "value": "true",
+                    "effect": "NoSchedule",
+                }
+            ],
+            "nodeSelector": IO_OPTIMIZED_NODE_SELECTOR,
+        }
         if use_io_optimized
-        else []
+        else {}
     )
-    node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized else {}
     affinity: dict[str, Any] = {}
     if replicas > 1:
         affinity["podAntiAffinity"] = {
@@ -537,8 +544,7 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                             ),
                             "spec": {
                                 "securityContext": {"fsGroup": 101},
-                                "tolerations": tolerations,
-                                "nodeSelector": node_selector,
+                                **io_scheduling,
                                 **({"affinity": affinity} if affinity else {}),
                                 **(
                                     {
