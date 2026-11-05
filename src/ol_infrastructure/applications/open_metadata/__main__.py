@@ -570,70 +570,36 @@ if stack_info.name != "CI":
     )
     connector_secrets.append(starrocks_connector_secret)
 
-# OM ships with several system bots, each with its own JWT used by a specific
-# workflow type.  All known bots are listed here (SOPS key → OM hyphenated name).
-# Any bot whose token appears in the SOPS file gets its own Vault secret and a
-# VSO-managed K8s secret (``om-<bot>``).  The K8s secret exposes a single key
-# ``OM_BOT_JWT_TOKEN`` so all ingestion scripts can use the same env-var name.
-_OM_BOTS: dict[str, str] = {
-    "ingestion_bot": "ingestion-bot",
-    "lineage_bot": "lineage-bot",
-    "profiler_bot": "profiler-bot",
-    "data_insight_bot": "data-insight-bot",
-}
+# The system bots whose JWTs the substructure stack's CronOMJobs use. That
+# stack reads each token from OpenMetadata and writes it to
+# secret-openmetadata/<bot>; this syncs it into a K8s secret (``om-<bot>``)
+# with the single key ``OM_BOT_JWT_TOKEN``, so every ingestion script reads the
+# same env var. The substructure stack has no CI stack, so neither do these.
+#
+# Only the Jobs read them, so like the Superset secret they stay out of the
+# server's envFrom and have no restart target. The server would otherwise fail
+# to start in a new environment until the substructure stack, which needs the
+# server running to read the tokens, had written them.
+_OM_BOTS = ("ingestion-bot", "lineage-bot", "profiler-bot")
 
-for _bot_key, _bot_name in _OM_BOTS.items():
-    if not open_metadata_connector_secrets.get(_bot_key):
-        continue
-    _k8s_secret_name = f"om-{_bot_name}"  # pragma: allowlist secret
-    vault.generic.Secret(
-        f"open-metadata-{_bot_name}-vault-secret-{stack_info.env_suffix}",
-        path=f"secret-openmetadata/{_bot_name}",
-        data_json=Output.secret(json.dumps(open_metadata_connector_secrets[_bot_key])),
-        opts=ResourceOptions(
-            depends_on=[open_metadata_connector_vault_mount],
-            parent=vault_k8s_resources,
-        ),
-    )
+for _bot_name in _OM_BOTS if stack_info.name != "CI" else ():
     OLVaultK8SSecret(
         f"open-metadata-{stack_info.name}-{_bot_name}-secret",
         OLVaultK8SStaticSecretConfig(
             name=f"openmetadata-{_bot_name}",
             namespace=open_metadata_namespace,
             dest_secret_labels=k8s_global_labels,
-            dest_secret_name=_k8s_secret_name,
+            dest_secret_name=f"om-{_bot_name}",
             labels=k8s_global_labels,
             mount="secret-openmetadata",
             mount_type="kv-v2",
             path=_bot_name,
-            restart_target_kind="Deployment",
-            restart_target_name="openmetadata",
             templates={"OM_BOT_JWT_TOKEN": '{{ get .Secrets "token" }}'},
             vaultauth=vault_k8s_resources.auth_name,
         ),
         opts=ResourceOptions(
             delete_before_replace=True,
             parent=vault_k8s_resources,
-        ),
-    )
-    connector_secret_names.append(_k8s_secret_name)
-
-# A copy of the ingestion bot token for the contracts sync pipeline in
-# ol_concourse/pipelines/applications/ol_data_contracts_sync.py, which
-# publishes ol-data-platform's contracts/ to production OpenMetadata. Concourse
-# shares this Vault but reads only secret-concourse/<team>/*. Dagster's token
-# is dagster-bot's, written by substructure/open_metadata.
-if stack_info.env_suffix == "production":
-    vault.generic.Secret(
-        f"open-metadata-concourse-contracts-bot-secret-{stack_info.env_suffix}",
-        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
-        data_json=Output.secret(
-            json.dumps(
-                {
-                    "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
-                    "server_url": f"https://{open_metadata_config.require('domain')}/api",
-                }
-            )
         ),
     )
 

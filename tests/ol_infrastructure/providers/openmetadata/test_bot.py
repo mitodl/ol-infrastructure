@@ -4,7 +4,8 @@ The fake server follows OpenMetadata 2.0.5 where the provider depends on it
 (UserResource, BotResource): ``PUT /v1/users`` for a new bot user generates its
 token and gives it DefaultBotRole; for an existing one it keeps the token and
 the roles it holds; a user's ``roles`` come back only when ``fields=roles`` is
-asked for; and deleting a bot deletes its user.
+asked for; and deleting a bot deletes its user. The bots the server seeds
+(BotResource.initialize, json/data/bot) carry provider ``system``.
 """
 
 import copy
@@ -17,6 +18,7 @@ import requests
 from ol_infrastructure.providers.openmetadata import (
     OpenMetadataBotProvider,
     OpenMetadataBotSpec,
+    OpenMetadataSystemBotProvider,
 )
 
 from .fakes import FakeResponse
@@ -33,6 +35,7 @@ class FakeOpenMetadata:
         self.users: dict[str, dict[str, Any]] = {}
         self.bots: dict[str, dict[str, Any]] = {}
         self.tokens_issued = 0
+        self.writes: list[tuple[str, str]] = []
         for role in ("DefaultBotRole", "DagsterBotRole", "IngestionBotRole"):
             self.roles[role] = {"id": str(uuid.uuid4()), "name": role}
 
@@ -69,6 +72,12 @@ class FakeOpenMetadata:
         self.users[name] = user
         return user
 
+    def add_system_bot(self, name: str, roles: list[str]) -> dict[str, Any]:
+        """Seed a bot the way BotResource.initialize does."""
+        user = self.add_user(name, roles, token=f"seeded-{name}")
+        self.bots[name] = {"name": name, "botUser": name, "provider": "system"}
+        return user
+
     def _view(
         self, user: dict[str, Any] | None, params: dict[str, str]
     ) -> dict[str, Any] | None:
@@ -89,6 +98,8 @@ class FakeOpenMetadata:
         """Route a request; a handler that returns None means 404."""
         path = url.removeprefix(f"{SERVER}/v1/")
         params = params or {}
+        if method != "GET":
+            self.writes.append((method, path))
         # Checked in order, so a longer prefix comes before a shorter one.
         routes: dict[tuple[str, str], Any] = {
             ("GET", "roles/name/"): self.roles.get,
@@ -387,3 +398,81 @@ def test_delete_removes_the_bot_and_its_user(server: FakeOpenMetadata) -> None:
 
     assert server.users == {}
     assert server.bots == {}
+
+
+def _system_props(**overrides: Any) -> dict[str, Any]:
+    connection = ("server_url", "token_url", "client_id", "client_secret")
+    return {
+        **{key: _props()[key] for key in connection},
+        "name": "ingestion-bot",
+        **overrides,
+    }
+
+
+def test_system_bot_reads_the_seeded_token_without_writing(
+    server: FakeOpenMetadata,
+) -> None:
+    user = server.add_system_bot("ingestion-bot", ["DefaultBotRole"])
+    before = copy.deepcopy(server.users)
+    provider = OpenMetadataSystemBotProvider()
+
+    created = provider.create(_system_props())
+    read = provider.read(created.id, created.outs)
+    updated = provider.update(created.id, read.outs, _system_props())
+    provider.delete(created.id, updated.outs)
+
+    assert created.id == user["id"]
+    assert created.outs["token"] == "seeded-ingestion-bot"  # noqa: S105
+    assert read.outs["token"] == "seeded-ingestion-bot"  # noqa: S105
+    assert updated.outs["token"] == "seeded-ingestion-bot"  # noqa: S105
+    assert server.writes == []
+    assert server.users == before
+    assert "ingestion-bot" in server.bots
+
+
+def test_system_bot_follows_a_token_regenerated_in_the_ui(
+    server: FakeOpenMetadata,
+) -> None:
+    server.add_system_bot("ingestion-bot", ["DefaultBotRole"])
+    provider = OpenMetadataSystemBotProvider()
+    created = provider.create(_system_props())
+    server.users["ingestion-bot"]["token"] = "regenerated-in-ui"  # noqa: S105
+
+    read = provider.read(created.id, created.outs)
+
+    assert read.outs["token"] == "regenerated-in-ui"  # noqa: S105
+    assert server.writes == []
+
+
+@pytest.mark.usefixtures("server")
+def test_system_bot_refuses_a_missing_bot() -> None:
+    with pytest.raises(ValueError, match="not a bot OpenMetadata seeds"):
+        OpenMetadataSystemBotProvider().create(_system_props())
+
+
+@pytest.mark.usefixtures("server")
+def test_system_bot_refuses_a_bot_made_by_hand() -> None:
+    OpenMetadataBotProvider().create(_props())
+    with pytest.raises(ValueError, match="not a bot OpenMetadata seeds"):
+        OpenMetadataSystemBotProvider().create(_system_props(name="dagster-bot"))
+
+
+def test_system_bot_read_of_a_deleted_bot_drops_it(server: FakeOpenMetadata) -> None:
+    server.add_system_bot("ingestion-bot", ["DefaultBotRole"])
+    provider = OpenMetadataSystemBotProvider()
+    created = provider.create(_system_props())
+    del server.users["ingestion-bot"]
+
+    assert provider.read(created.id, created.outs).id == ""
+
+
+def test_system_bot_diff(server: FakeOpenMetadata) -> None:
+    server.add_system_bot("ingestion-bot", ["DefaultBotRole"])
+    provider = OpenMetadataSystemBotProvider()
+    outs = provider.create(_system_props()).outs
+
+    assert not provider.diff("id", outs, _system_props()).changes
+    assert provider.diff("id", outs, _system_props(client_id="other")).changes
+    renamed = provider.diff("id", outs, _system_props(name="lineage-bot"))
+    assert renamed.replaces == ["name"]
+    assert not renamed.delete_before_replace
