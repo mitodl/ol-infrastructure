@@ -194,29 +194,28 @@ def startup_probe_failure_threshold(boot_budget_seconds: int | None) -> int:
 # Both env vars are confirmed present in the 0.8.1 server binary.
 #
 # WHY THE DEFAULTS ARE WRONG FOR THIS DEPLOYMENT, specifically the byte cap.
-# The upstream default is 4 GiB of in-flight bytes per actor — TWICE this pod's
-# entire memory limit. A cap above the limit can never bind: the pod OOMKills
-# before admission control ever declines a write, which turns a designed
-# backpressure signal (429 + client retry, already implemented in agent-kit's
-# OmnigraphClient) into a hard restart of a single-replica Recreate Deployment.
-# The cap is only useful below the memory limit, so it has to be set here.
+# The upstream default is 4 GiB of in-flight bytes per actor — twice the
+# default memory limit, and equal to Production's. A cap at or above the limit
+# can never bind: the pod OOMKills before admission control ever declines a
+# write, which turns a designed backpressure signal (429 + client retry,
+# already implemented in agent-kit's OmnigraphClient) into a hard restart of a
+# single-replica Recreate Deployment. The cap is only useful below the memory
+# limit, so it has to be set here.
 #
-# SIZING. The cap is PER ACTOR and there is no global limiter, so total
-# in-flight bytes are (concurrent actors x cap) and no single setting can bound
-# them. Sized against realistic peak concurrency rather than the worst case:
-# a handful of agent sessions plus svc-witan-ci, call it 4 concurrent writers;
-# reserving ~768 MiB of the 2 GiB for the server's own working set and Lance
-# buffers leaves ~1.25 GiB to share, so ~320 MiB each, rounded down to 256 MiB.
-# The pod's memory limit remains the real backstop for a concurrency spike
-# beyond that — this bounds the single-runaway-actor case, which is the one
-# that actually shows up (a CI reindex streaming a large NDJSON load).
+# SIZING. The cap is PER ACTOR, so total in-flight bytes are (concurrent
+# actors x cap) up to the server's global byte cap (OMNIGRAPH_GLOBAL_BYTES_MAX,
+# 256 MiB by default in the 0.14 server's workload.rs). Sized against
+# realistic peak concurrency rather than the worst case: a handful of agent
+# sessions plus svc-witan-ci, call it 4 concurrent writers; reserving ~768 MiB
+# of the 2 GiB for the server's own working set and Lance buffers leaves
+# ~1.25 GiB to share, so ~320 MiB each, rounded down to 256 MiB. The pod's
+# memory limit remains the real backstop for a concurrency spike beyond that —
+# this bounds the single-runaway-actor case, which is the one that actually
+# shows up (a CI reindex streaming a large NDJSON load).
 #
 # The ~768 MiB reserve turned out low for Production, where the server's own
-# working set reached 1.9 GiB (DEFAULT_SERVER_MEMORY_LIMIT), and that stack
-# runs a larger limit. The 0.14 server also caps in-flight bytes across all
-# actors (OMNIGRAPH_GLOBAL_BYTES_MAX, 256 MiB by default in
-# omnigraph-server's workload.rs), so the per-actor cap is no longer the only
-# byte bound. Neither moves this 256 MiB.
+# working set reached 1.9 GiB, so that stack runs a larger limit (see the
+# comment on DEFAULT_SERVER_MEMORY_LIMIT). That doesn't move this 256 MiB.
 #
 # ★ THE COUNT IS NOW SIZED AGAINST THE DEADLINE, NOT AGAINST MEMORY. ★
 # It was 8, derived from this pod's memory limit and described as "far above any
@@ -1025,9 +1024,9 @@ def create_data_tier(  # noqa: PLR0913
                                 ),
                                 # Per-actor admission caps, set deliberately
                                 # rather than inherited — the upstream byte
-                                # default is twice this pod's memory limit and
-                                # therefore unreachable. See the constants for
-                                # the sizing, and the stack's
+                                # default (4 GiB) is at or above this pod's
+                                # memory limit and therefore unreachable. See
+                                # the constants for the sizing, and the stack's
                                 # `omnigraph:per_actor_*` config to retune an
                                 # environment without a code change.
                                 kubernetes.core.v1.EnvVarArgs(

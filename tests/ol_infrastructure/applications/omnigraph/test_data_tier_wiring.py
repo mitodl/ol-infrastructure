@@ -374,7 +374,7 @@ def test_a_boot_budget_lengthens_the_probe_and_both_rollout_waits(monkeypatch):
 )
 @pulumi.runtime.test
 def test_the_server_memory_envelope_follows_the_stack(monkeypatch, memory, expected):
-    """CI and QA keep the default; Production's config raises it."""
+    """The defaults (CI, QA) and an override (Production's values) reach the server."""
     mocks, tier = _build(monkeypatch, served_format=14, image_format=14, memory=memory)
 
     def check(_: object) -> None:
