@@ -636,19 +636,29 @@ def test_unreachable_server_stops_at_the_first_schema_request(server):
     Job past its deadline before any FAIL line printed.
     """
     server.backend_schemas.add("ol_warehouse_qa_aaa_first")
+    listed = False
     owner_calls = []
 
+    # Goes down once the owner pass has listed the catalog's schemas, so every
+    # earlier step (reconcile_roles loads schemas too) completes first.
     def down_after_listing(method, path, body):
-        if "/schemas/ol_warehouse_qa_" in path or "/owners/" in path:
+        nonlocal listed
+        if listed:
             owner_calls.append(path)
             msg = f"{method} {path} failed: TimeoutError()"
             raise UnreachableError(msg)
+        listed = (method, path) == (
+            "GET",
+            f"/api/metalakes/{METALAKE}/catalogs/{CATALOG}/schemas",
+        )
         return server(method, path, body)
 
     with pytest.raises(UnreachableError):
         reconcile(Gravitino(down_after_listing, METALAKE), _desired(), list, ADMIN)
 
-    assert len(owner_calls) == 1
+    assert owner_calls == [
+        f"/api/metalakes/{METALAKE}/catalogs/{CATALOG}/schemas/ol_warehouse_qa_aaa_first"
+    ]
 
 
 def test_two_users_resolving_to_one_principal_are_both_refused(server, capsys):
