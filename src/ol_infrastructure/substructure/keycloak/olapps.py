@@ -2034,6 +2034,9 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 },
             ),
             org=OrgConfig(
+                # Unlike Board Infinity, ISFT staff sign in with their
+                # institutional @isft.uz address, so the domain routes them
+                # here and limits this IdP to asserting isft.uz emails.
                 org_domains=["isft.uz"],
                 org_name="International School of Finance Technology and Science",
                 org_alias="ISFT",
