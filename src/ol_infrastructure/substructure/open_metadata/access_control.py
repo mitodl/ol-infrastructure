@@ -55,14 +55,15 @@ POLICIES: list[OpenMetadataPolicySpec] = [
     # wins over every allow, ViewAll covers ViewBasic (CompiledRule), and admins
     # skip policy evaluation, so only admins can read alerts through
     # /v1/events/subscriptions.  The change-event feed (GET /v1/events) is not
-    # authorized at all and keeps each alert's create and update, URL included,
-    # for the change-event retention period; no policy can close that.
+    # permission-checked (any valid token reads it) and keeps each alert's
+    # create and update, URL included, for the change-event retention period;
+    # no policy can close that.
     OpenMetadataPolicySpec(
         name="HideAlertDestinationsPolicy",
         display_name="Hide Alert Destinations Policy",
         description=(
             "Hides alerts and notifications, whose Slack webhook URLs are "
-            "returned unmasked, from everyone but admins."
+            "returned unmasked, from the alerts API for every user but admins."
         ),
         rules=[
             OpenMetadataPolicyRule(
