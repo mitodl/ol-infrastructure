@@ -1485,8 +1485,7 @@ def _announcing(
 async def _cmd_doof(repos, ack, respond, command, context):
     parts = command["text"].split(None, 1)
     if not parts or parts[0] not in _SUBCOMMANDS:
-        await ack()
-        await respond(_USAGE)
+        await _cmd_help(repos, ack, respond, command, context)
         return
     subcommand, *rest = parts
     sub_command = dict(command, text=rest[0] if rest else "")
