@@ -15,7 +15,9 @@ state and unusable principals are refused.
 import copy
 import re
 import socket
+import socketserver
 import ssl
+import threading
 from typing import Any
 
 import pytest
@@ -776,4 +778,36 @@ def test_unreachable_keycloak_is_a_fail_line_not_a_traceback(closed_port):
     with pytest.raises(ReconcileError, match=r"Keycloak token request to .* failed"):
         KeycloakToken(issuer, "client", "secret").get()
     with pytest.raises(ReconcileError, match=r"Keycloak GET .* failed"):
+        keycloak_get(f"{issuer}/users", _FreshToken())
+
+
+class _ErrorCutShort(socketserver.BaseRequestHandler):
+    def handle(self) -> None:
+        self.request.recv(65536)
+        self.request.sendall(
+            b"HTTP/1.1 500 Internal Server Error\r\n"
+            b"Content-Length: 100\r\n\r\ncut short"
+        )
+
+
+@pytest.fixture
+def error_cut_short() -> Any:
+    """Return the URL of a server whose 500 body stops short of its length."""
+    with socketserver.ThreadingTCPServer(("127.0.0.1", 0), _ErrorCutShort) as srv:
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        yield f"http://127.0.0.1:{srv.server_address[1]}"
+        srv.shutdown()
+
+
+def test_error_body_cut_short_is_a_fail_line_not_a_traceback(error_cut_short):
+    issuer = f"{error_cut_short}/realms/r"
+    send = gravitino_transport(
+        f"{error_cut_short}/api", ssl.create_default_context(), _FreshToken()
+    )
+
+    with pytest.raises(UnreachableError, match=r"GET .*/api/metalakes/m failed"):
+        send("GET", "/metalakes/m", None)
+    with pytest.raises(UnreachableError, match=r"Keycloak token request to .* failed"):
+        KeycloakToken(issuer, "client", "secret").get()
+    with pytest.raises(UnreachableError, match=r"Keycloak GET .* failed"):
         keycloak_get(f"{issuer}/users", _FreshToken())

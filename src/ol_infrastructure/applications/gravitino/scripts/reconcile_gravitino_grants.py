@@ -673,14 +673,17 @@ class KeycloakToken:
                 data=self._body,
                 method="POST",
             )
+            # The outer guard also catches an error body that is cut short.
             try:
-                with urllib.request.urlopen(  # noqa: S310
-                    request, timeout=REQUEST_TIMEOUT_SECONDS
-                ) as response:
-                    payload = json.load(response)
-            except urllib.error.HTTPError as err:
-                msg = f"Keycloak token request failed: {err.code} {err.read().decode()}"
-                raise ReconcileError(msg) from err
+                try:
+                    with urllib.request.urlopen(  # noqa: S310
+                        request, timeout=REQUEST_TIMEOUT_SECONDS
+                    ) as response:
+                        payload = json.load(response)
+                except urllib.error.HTTPError as err:
+                    body = err.read().decode()
+                    msg = f"Keycloak token request failed: {err.code} {body}"
+                    raise ReconcileError(msg) from err
             except (OSError, http.client.HTTPException) as err:
                 msg = f"Keycloak token request to {self._issuer} failed: {err!r}"
                 raise UnreachableError(msg) from err
@@ -696,14 +699,16 @@ def keycloak_get(url: str, token: KeycloakToken) -> Any:
     request = urllib.request.Request(  # noqa: S310
         url, headers={"Authorization": f"Bearer {token.get()}"}
     )
+    # The outer guard also catches an error body that is cut short.
     try:
-        with urllib.request.urlopen(  # noqa: S310
-            request, timeout=REQUEST_TIMEOUT_SECONDS
-        ) as response:
-            return json.load(response)
-    except urllib.error.HTTPError as err:
-        msg = f"Keycloak GET {url} returned {err.code}: {err.read().decode()}"
-        raise ReconcileError(msg) from err
+        try:
+            with urllib.request.urlopen(  # noqa: S310
+                request, timeout=REQUEST_TIMEOUT_SECONDS
+            ) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as err:
+            msg = f"Keycloak GET {url} returned {err.code}: {err.read().decode()}"
+            raise ReconcileError(msg) from err
     except (OSError, http.client.HTTPException) as err:
         msg = f"Keycloak GET {url} failed: {err!r}"
         raise UnreachableError(msg) from err
@@ -787,21 +792,23 @@ def gravitino_transport(
                 "Content-Type": "application/json",
             },
         )
+        # Refused, reset, timed out or cut short (an error body included):
+        # Gravitino is down or restarting.
         try:
-            with urllib.request.urlopen(  # noqa: S310
-                request, timeout=REQUEST_TIMEOUT_SECONDS, context=context
-            ) as response:
-                return response.status, json.load(response)
-        except urllib.error.HTTPError as err:
-            raw = err.read().decode()
             try:
-                return err.code, json.loads(raw)
-            except json.JSONDecodeError:
-                return err.code, {"type": "non-JSON response", "message": raw[:500]}
-        # Refused, reset, timed out or cut short: Gravitino is down or restarting.
+                with urllib.request.urlopen(  # noqa: S310
+                    request, timeout=REQUEST_TIMEOUT_SECONDS, context=context
+                ) as response:
+                    return response.status, json.load(response)
+            except urllib.error.HTTPError as err:
+                status, raw = err.code, err.read().decode()
         except (OSError, http.client.HTTPException) as err:
             msg = f"{method} {base_uri}{path} failed: {err!r}"
             raise UnreachableError(msg) from err
+        try:
+            return status, json.loads(raw)
+        except json.JSONDecodeError:
+            return status, {"type": "non-JSON response", "message": raw[:500]}
 
     return send
 
