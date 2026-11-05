@@ -87,12 +87,16 @@ def _held_roles(user: dict[str, Any]) -> list[str]:
     )
 
 
-def _token(client: OpenMetadataClient, user_id: str) -> str:
+def _jwt_config(client: OpenMetadataClient, user_id: str) -> dict[str, Any]:
     auth_mechanism = client.get(f"users/auth-mechanism/{user_id}")
     if auth_mechanism is None:
         msg = f"bot user {user_id} has no authentication mechanism"
         raise RuntimeError(msg)
-    return auth_mechanism["config"]["JWTToken"]
+    return auth_mechanism["config"]
+
+
+def _token(client: OpenMetadataClient, user_id: str) -> str:
+    return _jwt_config(client, user_id)["JWTToken"]
 
 
 def _apply(client: OpenMetadataClient, props: dict[str, Any]) -> dict[str, Any]:
@@ -308,14 +312,24 @@ class OpenMetadataBot(dynamic.Resource):
 def _system_bot_outs(
     client: OpenMetadataClient, props: dict[str, Any], user: dict[str, Any]
 ) -> dict[str, Any]:
-    return {**props, "user_id": user["id"], "token": _token(client, user["id"])}
+    config = _jwt_config(client, user["id"])
+    # The jobs that hold the token run unattended, and nothing here would
+    # notice an expired one before they fail.
+    if config["JWTTokenExpiry"] != "Unlimited":
+        msg = (
+            f"system bot {props['name']!r} has a token that expires "
+            f"({config['JWTTokenExpiry']}); regenerate it with Unlimited expiry"
+        )
+        raise ValueError(msg)
+    return {**props, "user_id": user["id"], "token": config["JWTToken"]}
 
 
 class OpenMetadataSystemBotProvider(dynamic.ResourceProvider):
     """Reads the token of a bot OpenMetadata seeds, without changing the bot.
 
-    Its token is the one the server generated when it first seeded the bot,
-    which never expires, so reading it leaves every holder of it working.
+    The server seeds the token with Unlimited expiry, and reading it does not
+    revoke it, so every holder of it keeps working. A token regenerated in the
+    UI with any other expiry fails the read rather than reaching Vault.
     """
 
     def create(self, props: dict[str, Any]) -> dynamic.CreateResult:

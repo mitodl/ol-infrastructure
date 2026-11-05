@@ -582,7 +582,29 @@ if stack_info.name != "CI":
 # server running to read the tokens, had written them.
 _OM_BOTS = ("ingestion-bot", "lineage-bot", "profiler-bot")
 
+# The substructure stack owns these Vault secrets' data now. The resources stay
+# for one release so retain_on_delete reaches this stack's state; deleting them
+# without it would delete the secrets the substructure stack writes. Remove them
+# (and the SOPS keys they read) in the next release, once that is deployed.
+_retained_vault_secret_opts = ResourceOptions(
+    retain_on_delete=True, ignore_changes=["data_json"]
+)
+
 for _bot_name in _OM_BOTS if stack_info.name != "CI" else ():
+    vault.generic.Secret(
+        f"open-metadata-{_bot_name}-vault-secret-{stack_info.env_suffix}",
+        path=f"secret-openmetadata/{_bot_name}",
+        data_json=Output.secret(
+            json.dumps(open_metadata_connector_secrets[_bot_name.replace("-", "_")])
+        ),
+        opts=ResourceOptions.merge(
+            _retained_vault_secret_opts,
+            ResourceOptions(
+                depends_on=[open_metadata_connector_vault_mount],
+                parent=vault_k8s_resources,
+            ),
+        ),
+    )
     OLVaultK8SSecret(
         f"open-metadata-{stack_info.name}-{_bot_name}-secret",
         OLVaultK8SStaticSecretConfig(
@@ -601,6 +623,23 @@ for _bot_name in _OM_BOTS if stack_info.name != "CI" else ():
             delete_before_replace=True,
             parent=vault_k8s_resources,
         ),
+    )
+
+# Retained for one release like the bot secrets above; the substructure stack
+# writes it now.
+if stack_info.env_suffix == "production":
+    vault.generic.Secret(
+        f"open-metadata-concourse-contracts-bot-secret-{stack_info.env_suffix}",
+        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
+        data_json=Output.secret(
+            json.dumps(
+                {
+                    "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
+                    "server_url": f"https://{open_metadata_config.require('domain')}/api",
+                }
+            )
+        ),
+        opts=_retained_vault_secret_opts,
     )
 
 # IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.

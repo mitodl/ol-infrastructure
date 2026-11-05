@@ -1205,6 +1205,10 @@ vault.generic.Secret(
 # syncs each secret-openmetadata/<bot> into the om-<bot> K8s secret the Jobs
 # above read as OM_BOT_JWT_TOKEN. The other seeded bots (autoClassification-bot,
 # governance-bot, scim-bot, testsuite-bot, usage-bot) have no consumer.
+#
+# The token is read on refresh, so one regenerated in the UI reaches Vault only
+# at the next `pulumi up --refresh` of this stack, and the Jobs fail with the
+# old one until then. Regenerate a token only alongside that update.
 om_system_bots = {
     bot_name: OpenMetadataSystemBot(
         f"om-{bot_name}-{stack_info.env_suffix}",

@@ -126,7 +126,13 @@ class FakeOpenMetadata:
         user = self._user_by_id(user_id)
         if user is None:
             return None
-        return {"authType": "JWT", "config": {"JWTToken": user["token"]}}
+        return {
+            "authType": "JWT",
+            "config": {
+                "JWTToken": user["token"],
+                "JWTTokenExpiry": user.get("token_expiry", "Unlimited"),
+            },
+        }
 
     def _generate_token(self, user_id: str) -> dict[str, Any]:
         user = self._user_by_id(user_id)
@@ -442,6 +448,16 @@ def test_system_bot_follows_a_token_regenerated_in_the_ui(
 
     assert read.outs["token"] == "regenerated-in-ui"  # noqa: S105
     assert server.writes == []
+
+
+def test_system_bot_refuses_a_token_that_expires(server: FakeOpenMetadata) -> None:
+    server.add_system_bot("ingestion-bot", ["DefaultBotRole"])
+    provider = OpenMetadataSystemBotProvider()
+    created = provider.create(_system_props())
+    server.users["ingestion-bot"]["token_expiry"] = "30"  # noqa: S105
+
+    with pytest.raises(ValueError, match=r"has a token that expires \(30\)"):
+        provider.read(created.id, created.outs)
 
 
 @pytest.mark.usefixtures("server")
