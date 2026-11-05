@@ -368,6 +368,13 @@ against any real API. Each carries the annotations `ol-restricted-on` and
 before deleting, look for any 403 in each key's project, whatever credential it is attributed
 to. After about two weeks with none, delete them.
 
+The 403 check does not cover "Geocoding LTI Module". The Geocoding API reports a rejected key
+in the response body, as `status: REQUEST_DENIED` on an HTTP 200. That was observed on
+2026-11-05 with an invalid key and with no key; a key restricted away from Geocoding was not
+tested. A consumer of that key could fail for the whole window without a single 403. Before
+deleting it, look for any `geocoding-backend.googleapis.com` call in `mitx-residential`,
+whatever its response code, and check the LTI module's own logs if its deployment can be found.
+
 | Project | Key | Created |
 |---|---|---|
 | `mitx-residential` | API key 4 | 2017-11-30 |
