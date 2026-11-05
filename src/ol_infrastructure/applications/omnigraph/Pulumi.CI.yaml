@@ -72,5 +72,12 @@ config:
   # other is caught here instead of reaching the cluster as a crash-looping
   # server, same incident this comment already describes above.
   omnigraph:internal_schema_version: 14
+  # The nightly cleanup keeps each branch's head commit (`--keep 1`) instead of
+  # 2 days of commits, so its plan reads the head instead of every older
+  # commit manifest. CI goes first; QA and Production stay on the age until a
+  # QA cleanup is measured. This is one-way: removing it, or raising it, makes
+  # cleanup refuse to sweep tables whose old commits it still retains. Read
+  # maintenance.py below DEFAULT_CLEANUP_OLDER_THAN before changing it.
+  omnigraph:cleanup_keep: 1
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagHdMkilOMMReBzl5ZFVAxo4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMp4JVj0Zbv48c45+qAgEQgDt/KPJs42c+WEXeS2IPS6gVYHOCM2L51SVYdqGNpSII1XjPkxQgj6ypYwhz6wdA7GrvJjK9P89/US3Nww==

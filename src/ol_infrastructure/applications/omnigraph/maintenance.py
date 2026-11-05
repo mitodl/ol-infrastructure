@@ -168,6 +168,26 @@ DEFAULT_CLEANUP_SCHEDULE = "20 4 * * 0"
 # `aws s3 sync` backups.
 DEFAULT_CLEANUP_OLDER_THAN = "2d"
 
+# `omnigraph:cleanup_keep` replaces the age with a count, passed as `--keep N`
+# alone. The image's CLI carries a backport of ModernRelay/omnigraph#1188
+# (agent-kit docker/patches/omnigraph-cleanup-keep-from-listing.patch), so
+# cleanup takes each branch's `__manifest` version numbers from the
+# `_versions/` listing. `--keep 1` then reads only the head and, on a writer
+# branch, its fork-point base, so its plan stops growing with the commits
+# below them. `--older-than` still reads the commit time of every other
+# version, and cleanup never removes `__manifest` versions (#644), so that set
+# grows by one per commit. The two are never passed together: a cutoff makes
+# cleanup read every version the count leaves undecided, so the pair costs what
+# `--older-than` alone does, and the image refuses it.
+#
+# `--keep 1` is one-way. It deletes the table versions only older commits pin,
+# and those commits stay listed. A later run whose policy retains one of them
+# (a larger count, or an age that still covers it) finds its pins gone and
+# refuses that table's sweep, deleting nothing for it (#644; omnigraph
+# collector.rs resolve_roots). It also keeps no history between runs, so the
+# `query --snapshot` undelete above lasts until the next cleanup night, after
+# which the restore is the bucket's noncurrent versions or a backup.
+
 # Both jobs are S3-bound, single-threaded per graph, and run over a store whose
 # graphs are small. An hour without finishing means a wedged S3 connection or a
 # held lock, not slow progress — and the deadline has to stay well under the
@@ -545,6 +565,7 @@ def create_maintenance_window(  # noqa: PLR0913
     cleanup_iso_weekdays: tuple[int, ...],
     depends_on: list[Resource],
     *,
+    cleanup_keep: int | None = None,
     suspend: bool = False,
 ) -> OmnigraphMaintenanceWindow:
     """Provision the nightly stop-window CronJob and its ServiceAccount's Role.
@@ -565,6 +586,9 @@ def create_maintenance_window(  # noqa: PLR0913
         command gives up on a server that has not stopped within it plus
         ``SERVER_STOP_MARGIN_SECONDS``, so a server still draining writes is
         not taken for a stuck one.
+    :param cleanup_keep: run ``cleanup --keep`` with this count instead of
+        ``--older-than cleanup_older_than``. See the comment below
+        ``DEFAULT_CLEANUP_OLDER_THAN``, including why it is one-way.
     :param cleanup_iso_weekdays: UTC days ``cleanup`` also runs on (1 is
         Monday), rendered as the comma list the image parses. Empty means the
         window only optimizes.
@@ -695,9 +719,18 @@ def create_maintenance_window(  # noqa: PLR0913
                                                 )
                                             ),
                                         ),
+                                        # The image takes exactly one of
+                                        # the two (agent-kit
+                                        # omnigraph_maintenance.py
+                                        # parse_cleanup_retention).
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="OMNIGRAPH_CLEANUP_OLDER_THAN",
                                             value=cleanup_older_than,
+                                        )
+                                        if cleanup_keep is None
+                                        else kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_CLEANUP_KEEP",
+                                            value=str(cleanup_keep),
                                         ),
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="OMNIGRAPH_CLEANUP_ISO_WEEKDAY",

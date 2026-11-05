@@ -372,6 +372,7 @@ def create_data_tier(  # noqa: PLR0913
     boot_budget_seconds: int | None = None,
     maintenance_schedule: str = DEFAULT_MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays: tuple[int, ...] = DEFAULT_CLEANUP_ISO_WEEKDAYS,
+    cleanup_keep: int | None = None,
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
@@ -419,7 +420,8 @@ def create_data_tier(  # noqa: PLR0913
     ``maintenance_schedule`` and ``cleanup_iso_weekdays`` set the nightly stop
     window that replaces the optimize and cleanup sweeps on that format, and
     ``optimize_schedule`` / ``cleanup_schedule`` are then unused. See
-    ``maintenance.create_maintenance_window``.
+    ``maintenance.create_maintenance_window``. ``cleanup_keep`` is read only
+    by that window.
 
     ``deployed_witan_http_api_contracts`` is the witan stack's
     ``witan_http_api_contracts`` output. The server image's HTTP contract is
@@ -1271,6 +1273,7 @@ def create_data_tier(  # noqa: PLR0913
                     schedule=maintenance_schedule,
                     cleanup_older_than=cleanup_older_than,
                     cleanup_iso_weekdays=cleanup_iso_weekdays,
+                    cleanup_keep=cleanup_keep,
                     # Behind the Deployment: the window needs the Lease the
                     # Deployment already waits for, and a graph the first boot
                     # has not applied yet fails its `optimize`.
@@ -1282,6 +1285,12 @@ def create_data_tier(  # noqa: PLR0913
                 ).cron_job
             ]
         )
+    elif cleanup_keep is not None:
+        msg = (
+            "omnigraph:cleanup_keep is read only by the format-14 maintenance "
+            "window; this stack's format runs the pre-0.12 sweeps"
+        )
+        raise ValueError(msg)
     else:
         omnigraph_maintenance = create_maintenance(
             stack_info=stack_info,
