@@ -34,6 +34,16 @@ AIRBYTE_CHART_VERSION = "2.4.0"
 SUPERSET_CHART_VERSION = "0.22.8"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
+# The Stripe-written PayPal adapter, run unmodified from the vendor image
+# (docs/plans/paypal-adapter-eks-deployment.md, P4). The pod pulls by digest so
+# a re-pushed tag cannot change what runs in the payment path. The distinct
+# marker routes these two lines to a dedicated Renovate manager that moves the
+# tag and digest together; the generic manager would bump only the tag. These
+# PRs never automerge: run `cosign verify` on the new digest before approving.
+# The two assignments must stay adjacent and in this order for that manager.
+# renovate-digest: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters
+PAYPAL_ADAPTER_VERSION = "2.4.2"
+PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:89ef36f0a06aa83788c1a465f95ffabd9b5b1a1e9e8e99eef57e484d67c28ba8"  # pragma: allowlist secret
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.18.2"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
