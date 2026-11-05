@@ -421,10 +421,13 @@ lightdash_chart = kubernetes.helm.v3.Release(
                     "PGDATABASE": lightdash_db_config.db_name,
                     "PGSSL": "true",
                     "PGSSLMODE": "no-verify",
-                    "S3_REGION": "us-east-1",
+                    # Lightdash leaves S3 unconfigured unless S3_ENDPOINT is set.
+                    "S3_ENDPOINT": f"https://s3.{aws_config.region}.amazonaws.com",
+                    "S3_REGION": aws_config.region,
                     "S3_BUCKET": lightdash_bucket_name,
-                    # Use IRSA (EKS pod identity via metadata service)
-                    "S3_USE_CREDENTIALS_FROM": "ecs",
+                    # IRSA injects AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE, which
+                    # only the token_file source reads ("ecs" is container metadata).
+                    "S3_USE_CREDENTIALS_FROM": "token_file",
                     "AUTH_DISABLE_PASSWORD_AUTHENTICATION": "true",  # pragma: allowlist secret # noqa: E501
                 }
             ),
