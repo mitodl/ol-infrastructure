@@ -115,6 +115,22 @@
       ],
       dependencyDashboardApproval: true,
     },
+    {
+      // The PayPal adapter runs in the payment path and is pinned by digest
+      // (docs/plans/paypal-adapter-eks-deployment.md, P4). The renovate-digest
+      // manager below moves tag and digest together, but nothing here checks
+      // the image signature, and a merge deploys straight to QA.
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'stripe/orchestration-adapters',
+      ],
+      automerge: false,
+      prBodyNotes: [
+        'Before approving, run `cosign verify` against the new `PAYPAL_ADAPTER_IMAGE_DIGEST` as the Stripe adapter docs show. Merging deploys to QA; Production waits on the preview gate.',
+      ],
+    },
   ],
   pip_requirements: {
     managerFilePatterns: [
@@ -129,6 +145,18 @@
       ],
       matchStrings: [
         '# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?)(?: packageName=(?<packageName>.+?))?(?: registryUrl=(?<registryUrl>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s*.+\\s*=\\s*"(?<currentValue>.+?)"',
+      ],
+    },
+    {
+      // A tag pinned by digest: the version line followed by its digest line.
+      // Its marker is renovate-digest so the generic manager above, which
+      // would move only the tag, never matches it.
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^src/bridge/lib/versions.py$/',
+      ],
+      matchStrings: [
+        '# renovate-digest: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?) packageName=(?<packageName>.+?)\\n\\w+_VERSION = "(?<currentValue>.+?)"\\n\\w+_IMAGE_DIGEST = "(?<currentDigest>sha256:[a-f0-9]{64})"',
       ],
     },
   ],
