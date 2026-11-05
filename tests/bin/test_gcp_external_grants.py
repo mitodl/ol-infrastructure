@@ -319,6 +319,17 @@ def test_missing_vault_addr_is_reported_actionably(grants, monkeypatch):
     assert "export" in str(caught.value)
 
 
+def test_missing_vault_token_is_reported_actionably(grants, monkeypatch, tmp_path):
+    """A bare FileNotFoundError on ~/.vault-token does not say to log in."""
+    monkeypatch.setenv("VAULT_ADDR", "https://vault.example.test")
+    monkeypatch.delenv("VAULT_TOKEN", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with pytest.raises(grants.ProbeError) as caught:
+        grants._load_vault("secret-xpro/google-sheets:x")
+    assert "VAULT_TOKEN" in str(caught.value)
+    assert "vault login" in str(caught.value)
+
+
 def test_markdown_renders_a_row_per_grant(grants):
     rows = grants._markdown_rows(
         [{"credential": "sa@x", "grants": [_grant()], "errors": {}}]

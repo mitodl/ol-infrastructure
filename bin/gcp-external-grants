@@ -221,10 +221,17 @@ def _load_vault(spec: str) -> dict[str, Any]:
             "export VAULT_ADDR=https://vault-production.odl.mit.edu"
         )
         raise ProbeError(message)
-    token = (
-        os.environ.get("VAULT_TOKEN")
-        or Path.home().joinpath(".vault-token").read_text().strip()
-    )
+    token = os.environ.get("VAULT_TOKEN")
+    if not token:
+        token_file = Path.home() / ".vault-token"
+        try:
+            token = token_file.read_text().strip()
+        except OSError as error:
+            message = (
+                f"VAULT_TOKEN is not set and {token_file} is unreadable "
+                f"({error.strerror or error}) -- run `vault login` first"
+            )
+            raise ProbeError(message) from error
     client = hvac.Client(url=address, token=token)
     data = _read_vault_secret(client, mount, subpath)
     return _normalise_private_key(_extract_key(data, field))
