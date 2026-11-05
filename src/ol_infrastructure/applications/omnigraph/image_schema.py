@@ -248,10 +248,37 @@ def _image_labels(repository_name: str, image_ref: str, region: str) -> dict[str
     ) as exc:
         msg = f"could not read the image config for {image_ref}: {exc}"
         raise ImageSchemaUnavailableError(msg) from exc
-    # `config` is optional in the OCI image-config spec and `Labels` is null
-    # rather than absent on an image that declares none, so neither is indexed
-    # directly.
-    return _mapping(_mapping(_mapping(config).get("config")).get("Labels"))
+    return _labels_of(config, image_ref)
+
+
+def _labels_of(config: object, image_ref: str) -> dict[str, Any]:
+    """Return the labels in a parsed image-config blob.
+
+    `config` is optional in the OCI image-config spec and `Labels` is null
+    rather than absent on an image that declares none, so both of those read
+    as "no labels". Any other shape is a broken document, not an image
+    without labels: it raises the plain (non-missing-label) error, so a caller
+    that treats a missing label as legitimate doesn't treat this so.
+
+    :param config: The parsed image-config blob.
+    :param image_ref: The image, for the message.
+    :returns: The labels, ``{}`` when the image declares none.
+    :rtype: dict[str, Any]
+    :raises ImageSchemaUnavailableError: on any other shape.
+    """
+    if not isinstance(config, dict):
+        msg = f"the image config for {image_ref} is not a JSON object"
+        raise ImageSchemaUnavailableError(msg)
+    inner = config.get("config")
+    if inner is None:
+        return {}
+    labels = inner.get("Labels") if isinstance(inner, dict) else inner
+    if labels is None:
+        return {}
+    if not isinstance(inner, dict) or not isinstance(labels, dict):
+        msg = f"the image config for {image_ref} has a malformed config.Labels"
+        raise ImageSchemaUnavailableError(msg)
+    return labels
 
 
 def read_image_internal_schema_range(
@@ -370,13 +397,15 @@ def read_image_http_api_contracts(
         list of ``<major>.<minor>`` contracts, which means a broken build.
     """
     labels = _image_labels(repository_name(image_ref), image_ref, region)
-    declared = labels.get(label)
-    if declared is None:
+    # Only an absent key is a pre-label image. A key present with a null or
+    # empty value is a broken build and falls through to the ValueError below.
+    if label not in labels:
         msg = (
             f"{image_ref} carries no {label} label. Images built from agent-kit "
             "before it was added do not, so the HTTP-contract check is skipped."
         )
         raise ImageLabelMissingError(msg)
+    declared = labels[label]
     contracts = tuple(declared.split(",")) if isinstance(declared, str) else ()
     if not contracts or not all(_CONTRACT.fullmatch(c) for c in contracts):
         msg = (

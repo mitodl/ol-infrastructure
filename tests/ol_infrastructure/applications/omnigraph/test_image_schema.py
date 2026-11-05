@@ -370,7 +370,7 @@ def test_a_non_object_config_blob_is_unavailable_not_fatal(
     """A presigned URL that serves something other than an image config."""
     client = _FakeEcr({_DIGEST: _image_manifest()})
     patched(client, config_blob)
-    with pytest.raises(ImageSchemaUnavailableError, match="carries no"):
+    with pytest.raises(ImageSchemaUnavailableError, match="not a JSON object"):
         read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
 
 
@@ -408,6 +408,47 @@ def test_an_image_without_the_contract_label_is_unavailable_not_fatal(
     patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: "16"}}})
     with pytest.raises(ImageLabelMissingError, match="carries no"):
         read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACT_LABEL)
+
+
+@pytest.mark.parametrize(
+    "config_blob",
+    [
+        None,
+        ["a", "list"],
+        {"config": "not-a-mapping"},
+        {"config": {"Labels": "not-a-mapping"}},
+    ],
+)
+def test_a_malformed_config_blob_is_not_a_missing_label(
+    patched, config_blob: object
+) -> None:
+    """Only an absent label may null the witan export; a broken blob must not."""
+    patched(_FakeEcr({_DIGEST: _image_manifest()}), config_blob)
+    with pytest.raises(ImageSchemaUnavailableError) as caught:
+        read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACTS_LABEL)
+    assert not isinstance(caught.value, ImageLabelMissingError)
+
+
+@pytest.mark.parametrize(
+    "config_blob", [{}, {"config": None}, {"config": {"Labels": None}}]
+)
+def test_an_image_declaring_no_labels_is_a_missing_label(
+    patched, config_blob: object
+) -> None:
+    patched(_FakeEcr({_DIGEST: _image_manifest()}), config_blob)
+    with pytest.raises(ImageLabelMissingError):
+        read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACTS_LABEL)
+
+
+def test_a_null_contract_label_fails_the_preview(patched) -> None:
+    """Present but null is a broken build, not a pre-label image."""
+    patched(
+        _FakeEcr({_DIGEST: _image_manifest()}),
+        {"config": {"Labels": {HTTP_API_CONTRACTS_LABEL: None}}},
+    )
+    with pytest.raises(ValueError, match="not a comma-separated list") as caught:
+        read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACTS_LABEL)
+    assert not isinstance(caught.value, ImageSchemaUnavailableError)
 
 
 def test_an_unreadable_registry_is_not_a_missing_label(patched) -> None:

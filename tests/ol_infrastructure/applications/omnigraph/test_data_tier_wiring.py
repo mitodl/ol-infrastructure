@@ -55,6 +55,20 @@ class _Mocks(pulumi.runtime.Mocks):
         }
 
 
+@pytest.fixture(autouse=True)
+def _no_ecr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the HTTP-contract check off the network.
+
+    Pulumi mocks don't intercept boto3, so without this every case reaches the
+    real ECR. A test that wants a mismatch patches the reader again after this.
+    """
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda *_: ("0.14",),
+    )
+
+
 def _build(  # noqa: PLR0913
     monkeypatch: pytest.MonkeyPatch,
     *,
