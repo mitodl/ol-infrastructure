@@ -48,6 +48,29 @@ _DATA_ASSET_RESOURCES: list[str] = [
 ]
 
 POLICIES: list[OpenMetadataPolicySpec] = [
+    # A Slack destination's webhook URL is stored and returned unmasked
+    # (EventSubscriptionRepository only masks it on /testDestination), and the
+    # default policies give everyone ViewAll on every resource, so anyone who
+    # can log in could read the URL and post to the alert channel.  A deny rule
+    # wins over every allow, ViewAll covers ViewBasic (CompiledRule), and admins
+    # skip policy evaluation, so only admins can see alerts.
+    OpenMetadataPolicySpec(
+        name="HideAlertDestinationsPolicy",
+        display_name="Hide Alert Destinations Policy",
+        description=(
+            "Hides alerts and notifications, whose Slack webhook URLs are "
+            "returned unmasked, from everyone but admins."
+        ),
+        rules=[
+            OpenMetadataPolicyRule(
+                name="HideAlertDestinationsPolicy-EventSubscriptions",
+                description="Deny reading alerts and notifications.",
+                effect="deny",
+                resources=["eventsubscription"],
+                operations=["ViewAll"],
+            ),
+        ],
+    ),
     OpenMetadataPolicySpec(
         name="DataEngineerPolicy",
         display_name="Data Engineer Policy",
@@ -210,19 +233,25 @@ ROLES: list[OpenMetadataRoleSpec] = [
         ),
         policies=["DataContributorPolicy"],
     ),
+    # Bots inherit no team policies, so these two, whose tokens live outside
+    # OpenMetadata's own deployment, carry the deny themselves.
     OpenMetadataRoleSpec(
         name="DagsterBotRole",
         display_name="Dagster Bot Role",
         description="Role of dagster-bot.",
-        policies=["DagsterBotPolicy"],
+        policies=["DagsterBotPolicy", "HideAlertDestinationsPolicy"],
     ),
     OpenMetadataRoleSpec(
         name="MetricsSyncBotRole",
         display_name="Metrics Sync Bot Role",
         description="Role of metrics-sync-bot.",
-        policies=["MetricsSyncBotPolicy"],
+        policies=["HideAlertDestinationsPolicy", "MetricsSyncBotPolicy"],
     ),
 ]
+
+# Every user inherits the Organization team's policies.  OrganizationPolicy is
+# the one the server seeds there (owner-based edit rights); it stays.
+ORGANIZATION_POLICIES: list[str] = ["HideAlertDestinationsPolicy", "OrganizationPolicy"]
 
 # Each is a Group (the only team type that can own assets and hold users) under
 # Organization.  Asset ownership and alert routing refer to these names, so

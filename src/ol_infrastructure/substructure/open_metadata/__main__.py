@@ -53,6 +53,7 @@ from ol_infrastructure.providers.openmetadata import (
     OpenMetadataEventSubscriptionSpec,
 )
 from ol_infrastructure.providers.openmetadata.access_control import (
+    OpenMetadataOrganizationPolicies,
     OpenMetadataPolicy,
     OpenMetadataRole,
     OpenMetadataTeam,
@@ -62,6 +63,7 @@ from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
     OPENMETADATA_PROVISIONER_VAULT_NAME,
 )
 from ol_infrastructure.substructure.open_metadata.access_control import (
+    ORGANIZATION_POLICIES,
     POLICIES,
     ROLES,
     TEAMS,
@@ -1033,6 +1035,16 @@ om_roles = {
     )
     for spec in ROLES
 }
+OpenMetadataOrganizationPolicies(
+    f"om-organization-policies-{stack_info.env_suffix}",
+    connection=om_connection,
+    policies=ORGANIZATION_POLICIES,
+    opts=ResourceOptions(
+        depends_on=[
+            om_policies[name] for name in ORGANIZATION_POLICIES if name in om_policies
+        ]
+    ),
+)
 # Deleting a team would also take it off every asset it owns and the glossary
 # it reviews.
 om_teams = [
@@ -1217,9 +1229,9 @@ vault.generic.Secret(
 # supersedes a running one or the quality run cannot be triggered, neither of
 # which says the contract failed.
 #
-# OpenMetadata returns a Slack destination's endpoint unmasked to anyone with
-# ViewAll on eventsubscription, which every user holds through the default
-# policies, so the webhook URL is readable inside OpenMetadata.
+# OpenMetadata returns a Slack destination's endpoint unmasked to anyone who
+# can read the alert, so HideAlertDestinationsPolicy (access_control.py) keeps
+# alerts from every user and bot but admins and the system bots.
 #
 # QA and Production hold the same webhook, so both environments' contract
 # failures post to one channel.
