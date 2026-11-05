@@ -973,7 +973,7 @@ ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 # old input versions, which may no longer exist). The release bot reports an
 # approved issue that Production has not taken.
 RELEASE_RESOURCE_TYPE_TAGS = {
-    "release": "61d491d29fd432d4ef94f469129af1ad7d948f9b",  # pragma: allowlist secret
+    "release": "0269465f5d737f5b661afdff845168c785c0833f",  # pragma: allowlist secret
     "github-issues": "9ab0f9739aa61b39071be0022dcaec1bc8f0688c",  # pragma: allowlist secret
     "github-deployments": "efb28bc297f104f4bc8d63e33d07b114f710e2b3",  # pragma: allowlist secret
 }
