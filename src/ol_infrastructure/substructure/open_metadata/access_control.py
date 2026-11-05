@@ -53,7 +53,10 @@ POLICIES: list[OpenMetadataPolicySpec] = [
     # default policies give everyone ViewAll on every resource, so anyone who
     # can log in could read the URL and post to the alert channel.  A deny rule
     # wins over every allow, ViewAll covers ViewBasic (CompiledRule), and admins
-    # skip policy evaluation, so only admins can see alerts.
+    # skip policy evaluation, so only admins can read alerts through
+    # /v1/events/subscriptions.  The change-event feed (GET /v1/events) is not
+    # authorized at all and keeps each alert's create and update, URL included,
+    # for the change-event retention period; no policy can close that.
     OpenMetadataPolicySpec(
         name="HideAlertDestinationsPolicy",
         display_name="Hide Alert Destinations Policy",

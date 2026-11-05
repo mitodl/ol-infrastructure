@@ -1231,7 +1231,9 @@ vault.generic.Secret(
 #
 # OpenMetadata returns a Slack destination's endpoint unmasked to anyone who
 # can read the alert, so HideAlertDestinationsPolicy (access_control.py) keeps
-# alerts from every user and bot but admins and the system bots.
+# alerts from every user and bot but admins and the system bots.  The
+# unauthorized change-event feed (GET /v1/events) still carries the URL from
+# each create or update of the alert until change events are pruned.
 #
 # QA and Production hold the same webhook, so both environments' contract
 # failures post to one channel.

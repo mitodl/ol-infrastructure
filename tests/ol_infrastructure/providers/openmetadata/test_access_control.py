@@ -520,13 +520,36 @@ def test_a_policy_dropped_from_organization_by_hand_is_put_back(
     assert read.outs["drift"] == ["policies"]
 
     provider.update(created.id, read.outs, _organization_props())
-    assert len(organization["policies"]) == len(ORGANIZATION_POLICIES)
+    assert sorted(ref["name"] for ref in organization["policies"]) == sorted(
+        ORGANIZATION_POLICIES
+    )
 
 
 def test_a_missing_organization_is_not_created(server: FakeOpenMetadata) -> None:
     with pytest.raises(ValueError, match="creates it at boot"):
         OpenMetadataOrganizationPoliciesProvider().create(_organization_props())
     assert server.writes == []
+
+
+def test_read_of_a_missing_organization_drops_it(server: FakeOpenMetadata) -> None:
+    provider = OpenMetadataOrganizationPoliciesProvider()
+
+    assert provider.read(str(uuid.uuid4()), _organization_props()).id == ""
+    assert server.writes == []
+
+
+def test_every_user_keeps_organization_policy_and_loses_alert_reads() -> None:
+    # Dropping OrganizationPolicy would take owner-based edits from every user.
+    assert "OrganizationPolicy" in ORGANIZATION_POLICIES
+    assert "HideAlertDestinationsPolicy" in ORGANIZATION_POLICIES
+    hide = next(spec for spec in POLICIES if spec.name == "HideAlertDestinationsPolicy")
+    assert [(rule.effect, rule.resources, rule.operations) for rule in hide.rules] == [
+        ("deny", ["eventsubscription"], ["ViewAll"])
+    ]
+    # Bots inherit no team policies, so the bots with custom roles carry it.
+    for role in ("DagsterBotRole", "MetricsSyncBotRole"):
+        spec = next(spec for spec in ROLES if spec.name == role)
+        assert "HideAlertDestinationsPolicy" in spec.policies
 
 
 def test_organization_policies_refuse_a_team_of_another_type(
