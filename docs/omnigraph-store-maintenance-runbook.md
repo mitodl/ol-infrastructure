@@ -273,7 +273,8 @@ writer branch's base). Its plan no longer grows with the commit manifests.
 `--older-than` still reads one manifest per older commit. Setting
 `omnigraph:cleanup_keep` switches the window to `--keep` alone; the stack
 refuses it together with `omnigraph:cleanup_older_than`, and the image refuses
-both env vars together, because the pair costs what `--older-than` costs.
+both env vars together, because with both cleanup reads every commit below
+the newest N and its plan grows as `--older-than`'s does.
 
 It is one-way. A `--keep 1` run deletes the table versions that only older
 commits pin, and those commits stay listed (#644). A later run that retains

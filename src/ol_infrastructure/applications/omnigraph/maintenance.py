@@ -177,8 +177,8 @@ DEFAULT_CLEANUP_OLDER_THAN = "2d"
 # below them. `--older-than` still reads the commit time of every other
 # version, and cleanup never removes `__manifest` versions (#644), so that set
 # grows by one per commit. The two are never passed together: a cutoff makes
-# cleanup read every version the count leaves undecided, so the pair costs what
-# `--older-than` alone does, and the image refuses it.
+# cleanup read every version below the newest N, so the pair's plan grows with
+# history as `--older-than` alone does, and the image refuses it.
 #
 # `--keep 1` is one-way. It deletes the table versions only older commits pin,
 # and those commits stay listed. A later run whose policy retains one of them
