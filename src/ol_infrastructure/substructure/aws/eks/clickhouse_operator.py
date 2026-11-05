@@ -104,11 +104,14 @@ def _prepare_operator_deployment(objs: list[dict[str, Any]]) -> None:
     The CRDs, the config ConfigMaps and the ClickHouseOperatorConfiguration go
     in first, so a new operator never starts against old CRDs or config. The
     ConfigGroup's own heuristics only order CRDs before custom resources, not
-    before a Deployment. A rolling update with no surge stops the old operator
-    before the new one starts, so the two never reconcile side by side (the
-    operator has no leader election). It stays type RollingUpdate because a
-    server-side apply cannot drop the defaulted rollingUpdate block that type
-    Recreate forbids.
+    before a Deployment. A rolling update with no surge narrows the overlap
+    between the old and new operator to the old pod's shutdown, but doesn't
+    prevent it: a terminating pod doesn't count against maxUnavailable, so the
+    new pod can start while the old one is still inside its grace period (the
+    bundle sets none, so the default 30s). The operator has no leader election,
+    so both can reconcile during that window. It stays type RollingUpdate
+    because a server-side apply cannot drop the defaulted rollingUpdate block
+    that type Recreate forbids.
 
     The CRDs stay in this ConfigGroup: a child's URN is
     ``<group name>:<namespace>/<name>``, so moving them to another group would
