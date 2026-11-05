@@ -209,8 +209,9 @@ opts = ResourceOptions(providers=[provider])
 # Deployed stacks get these variables from Vault through VSO. Here one plain
 # Secret carries the same names, with the values secrets.yaml gives them.
 local_secrets = manifest(APP_DIR / "secrets.yaml", root_domain)
-# The admin API's client pair, which apps-infra writes into this namespace (the
-# deployed stacks read it from keycloak-admin-b2b in Vault).
+# The admin and membership client pairs, which apps-infra writes into this
+# namespace (the deployed stacks read them from keycloak-admin-b2b and
+# keycloak-admin-b2b-membership in Vault).
 MOUNTED_SECRETS = [SECRET_NAME, "mitxonline-keycloak-admin"]
 unmounted = sorted(set(local_secrets["supplied_by"].values()) - set(MOUNTED_SECRETS))
 if unmounted:
