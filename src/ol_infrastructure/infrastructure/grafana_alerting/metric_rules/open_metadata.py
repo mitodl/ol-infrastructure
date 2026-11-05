@@ -19,7 +19,10 @@ outside: CronOMJobs stop producing pods. ``kube_pod_start_time`` of the OMJob
 main pods (``om-ingest-<cronomjob>-<epoch>-main``) catches that whatever the
 cause. data-production had one such stall from about 07:00 to 16:00Z on
 2026-11-03 with no OutOfMemoryError logged. The ``max_over_time`` over 7d keeps
-the last start visible after the pod itself has been deleted.
+the last start visible after the pod itself has been deleted. A stall that
+outlasts the window leaves no series, and NoData maps to OK so that stacks
+without OpenMetadata stay quiet, so the alert resolves after 7 days of stall
+while ingestion is still down.
 
 The 3h threshold leans on ``om-ingest-team-keycloak-sync``, which runs hourly
 in every environment (substructure/open_metadata/__main__.py). Every other

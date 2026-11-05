@@ -14,9 +14,11 @@ ServiceAccount token.
 import json
 import os
 import ssl
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
@@ -64,10 +66,20 @@ def main() -> None:
         if not continue_token:
             break
 
+    gone = 0
     for name in expired:
-        call("DELETE", f"{base_url}/{name}")
+        try:
+            call("DELETE", f"{base_url}/{name}")
+        except urllib.error.HTTPError as error:
+            # The OpenMetadata server deletes OMJobs itself (e.g. when a
+            # pipeline is removed), so one can disappear between list and
+            # delete.
+            if error.code != HTTPStatus.NOT_FOUND:
+                raise
+            gone += 1
     print(  # noqa: T201
-        f"deleted {len(expired)} OMJobs in {namespace} that finished before "
+        f"deleted {len(expired) - gone} OMJobs ({gone} already gone) in "
+        f"{namespace} that finished before "
         f"{cutoff:%Y-%m-%dT%H:%M:%SZ}"
     )
 
