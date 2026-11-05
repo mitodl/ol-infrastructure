@@ -6,6 +6,8 @@ users with a direct client-role mapping, leaves the file empty or unmatchable, a
 permitted_groups then refuses every OIDC login.
 """
 
+import json
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Self
@@ -245,12 +247,11 @@ class _TokenResponse:
         return b'{"access_token": "token"}'
 
 
-@pytest.mark.parametrize("changed", [True, False])
-def test_changed_file_marks_only_a_changed_configmap(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, changed: bool
-) -> None:
-    """The marker the reload container waits on exists only after a write."""
-    marker = tmp_path / "changed"
+@pytest.fixture
+def keycloak_returns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[set[str]], None]:
+    """Return a function that sets the ol_data_analyst holders main() sees."""
     monkeypatch.setenv("KEYCLOAK_ISSUER_URL", "https://sso.example.com/realms/r")
     monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "ol-starrocks-client")
     monkeypatch.setenv("KEYCLOAK_CLIENT_SECRET", "secret")
@@ -258,12 +259,29 @@ def test_changed_file_marks_only_a_changed_configmap(
         keycloak_group_sync.urllib.request, "urlopen", lambda *_: _TokenResponse()
     )
     monkeypatch.setattr(keycloak_group_sync, "_api_get", lambda *_: [{"id": CLIENT}])
-    monkeypatch.setattr(
-        keycloak_group_sync,
-        "effective_role_members",
-        lambda *_: {"ol_data_analyst": {"alice"}},
-    )
     monkeypatch.setattr(keycloak_group_sync, "_GOVERNANCE_ROLES", ("ol_data_analyst",))
+
+    def returns(holders: set[str]) -> None:
+        monkeypatch.setattr(
+            keycloak_group_sync,
+            "effective_role_members",
+            lambda *_: {"ol_data_analyst": holders},
+        )
+
+    return returns
+
+
+@pytest.mark.parametrize("changed", [True, False])
+def test_changed_file_marks_only_a_changed_configmap(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    keycloak_returns: Callable[[set[str]], None],
+    *,
+    changed: bool,
+) -> None:
+    """The marker the reload container waits on exists only after a write."""
+    marker = tmp_path / "changed"
+    keycloak_returns({"alice"})
     monkeypatch.setattr(
         keycloak_group_sync, "write_configmap_in_cluster", lambda *_: changed
     )
@@ -310,3 +328,87 @@ def test_in_cluster_write_refuses_to_empty_a_populated_file(
             "starrocks", "lakehouse-starrocks-oidc-groups", ""
         )
     assert [method for method, _, _ in fake.calls] == ["GET"]
+
+
+class FakeKubectl:
+    """Stand-in for kubectl get and apply against one ConfigMap."""
+
+    def __init__(self, configmap: dict[str, Any] | None) -> None:
+        """Start with the ConfigMap as kubectl get returns it, or None if missing."""
+        self.configmap = configmap
+        self.calls: list[str] = []
+
+    def run(self, args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        """Record the kubectl verb; an apply replaces the ConfigMap."""
+        verb = args[1]
+        self.calls.append(verb)
+        stdout = b""
+        if verb == "get" and self.configmap is not None:
+            stdout = json.dumps(self.configmap).encode()
+        if verb == "apply":
+            self.configmap = json.loads(kwargs["input"])
+            stdout = b"configmap/lakehouse-starrocks-oidc-groups configured"
+        return subprocess.CompletedProcess(args, 0, stdout, b"")
+
+
+@pytest.fixture
+def kubectl(monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeKubectl]:
+    """Return a function that installs a FakeKubectl and runs the bootstrap form."""
+    monkeypatch.setattr(
+        "sys.argv",
+        ["keycloak_group_sync.py", "--configmap=lakehouse-starrocks-oidc-groups"],
+    )
+
+    def install(configmap: dict[str, Any] | None) -> FakeKubectl:
+        fake = FakeKubectl(configmap)
+        monkeypatch.setattr(keycloak_group_sync.subprocess, "run", fake.run)
+        return fake
+
+    return install
+
+
+def test_bootstrap_refuses_to_empty_a_populated_configmap(
+    keycloak_returns: Callable[[set[str]], None],
+    kubectl: Callable[..., FakeKubectl],
+) -> None:
+    """The CronJob would reload the empty file, so the bootstrap must not write it."""
+    keycloak_returns(set())
+    fake = kubectl({"data": {"groups.txt": "ol_data_analyst:alice"}})
+
+    with pytest.raises(SystemExit, match="Refusing to replace the non-empty"):
+        keycloak_group_sync.main()
+    assert fake.calls == ["get"]
+
+
+@pytest.mark.parametrize(
+    "configmap", [None, {}, {"data": {}}, {"data": {"groups.txt": ""}}]
+)
+def test_bootstrap_writes_an_empty_file_to_a_fresh_configmap(
+    keycloak_returns: Callable[[set[str]], None],
+    kubectl: Callable[..., FakeKubectl],
+    configmap: dict[str, Any] | None,
+) -> None:
+    """A fresh stack, where nobody holds a role yet, still gets its file."""
+    keycloak_returns(set())
+    fake = kubectl(configmap)
+
+    keycloak_group_sync.main()
+
+    assert fake.calls == ["get", "apply"]
+    assert fake.configmap is not None
+    assert fake.configmap["data"] == {"groups.txt": ""}
+
+
+def test_bootstrap_writes_a_populated_file_without_reading_first(
+    keycloak_returns: Callable[[set[str]], None],
+    kubectl: Callable[..., FakeKubectl],
+) -> None:
+    """Only an empty write needs the current content."""
+    keycloak_returns({"alice"})
+    fake = kubectl({"data": {"groups.txt": "ol_data_analyst:bob"}})
+
+    keycloak_group_sync.main()
+
+    assert fake.calls == ["apply"]
+    assert fake.configmap is not None
+    assert fake.configmap["data"] == {"groups.txt": "ol_data_analyst:alice"}

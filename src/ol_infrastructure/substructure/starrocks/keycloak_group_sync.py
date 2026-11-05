@@ -180,25 +180,78 @@ def render_group_file(members: dict[str, set[str]]) -> str:
     )
 
 
-def _kubectl_apply(namespace: str, configmap: str, group_file: str) -> None:
+def _refuse_to_empty(
+    namespace: str, configmap: str, current: str, group_file: str
+) -> None:
+    """Exit rather than replace a populated group file with an empty one.
+
+    The CronJob's reload makes an empty file live within one run, and an empty
+    file refuses every OIDC login. Keycloak returning no role mappings looks the
+    same as nobody holding a role, so fail and alert rather than guess. To empty
+    the file on purpose, clear the ConfigMap's data by hand.
+    """
+    if current and not group_file:
+        sys.exit(
+            f"Refusing to replace the non-empty {_GROUP_FILE_KEY} in "
+            f"{namespace}/{configmap} with an empty one: Keycloak returned no "
+            "governance role holders"
+        )
+
+
+def _kubectl(args: list[str], stdin: bytes | None = None) -> str:
+    """Run kubectl and return its stdout; exit on a non-zero status."""
+    result = subprocess.run(  # noqa: S603
+        ["kubectl", *args],  # noqa: S607
+        input=stdin,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        sys.exit(
+            f"kubectl {args[0]} failed (exit {result.returncode}):\n"
+            f"{result.stderr.decode()}"
+        )
+    return result.stdout.decode()
+
+
+def write_configmap_kubectl(namespace: str, configmap: str, group_file: str) -> None:
+    """Apply the group file to the ConfigMap with kubectl, from the Pulumi runner.
+
+    A changed sync script re-runs this on existing stacks, not only fresh ones,
+    so it refuses an empty write over a populated file as the CronJob does. A
+    ConfigMap that is missing or has no group file yet is written either way.
+
+    :param namespace: Namespace of the ConfigMap.
+    :param configmap: ConfigMap name.
+    :param group_file: The rendered groups.txt.
+    """
+    if not group_file:
+        existing = _kubectl(
+            [
+                "get",
+                "configmap",
+                configmap,
+                f"--namespace={namespace}",
+                "--ignore-not-found",
+                "--output=json",
+            ]
+        )
+        current = (
+            (json.loads(existing).get("data") or {}).get(_GROUP_FILE_KEY, "")
+            if existing.strip()
+            else ""
+        )
+        _refuse_to_empty(namespace, configmap, current, group_file)
     manifest = {
         "apiVersion": "v1",
         "kind": "ConfigMap",
         "metadata": {"name": configmap, "namespace": namespace},
         "data": {_GROUP_FILE_KEY: group_file},
     }
-    result = subprocess.run(
-        ["kubectl", "apply", "--validate=false", "-f", "-"],  # noqa: S607
-        input=json.dumps(manifest).encode(),
-        capture_output=True,
-        check=False,
+    applied = _kubectl(
+        ["apply", "--validate=false", "-f", "-"], json.dumps(manifest).encode()
     )
-    if result.returncode != 0:
-        sys.exit(
-            f"kubectl apply failed (exit {result.returncode}):\n"
-            f"{result.stderr.decode()}"
-        )
-    sys.stdout.write(result.stdout.decode().strip() + "\n")
+    sys.stdout.write(applied.strip() + "\n")
 
 
 def _k8s_request(
@@ -249,16 +302,7 @@ def write_configmap_in_cluster(namespace: str, configmap: str, group_file: str) 
     if current == group_file:
         sys.stdout.write(f"ConfigMap {namespace}/{configmap} is already current\n")
         return False
-    # The reload that follows makes an empty file live within one run, and an empty
-    # file refuses every OIDC login. Keycloak returning no role mappings looks the
-    # same as nobody holding a role, so fail and alert rather than guess. To empty
-    # the file on purpose, clear the ConfigMap's data by hand.
-    if current and not group_file:
-        sys.exit(
-            f"Refusing to replace the non-empty {_GROUP_FILE_KEY} in "
-            f"{namespace}/{configmap} with an empty one: Keycloak returned no "
-            "governance role holders"
-        )
+    _refuse_to_empty(namespace, configmap, current, group_file)
     _k8s_request("PATCH", path, {"data": {_GROUP_FILE_KEY: group_file}})
     sys.stdout.write(f"Updated ConfigMap {namespace}/{configmap}\n")
     return True
@@ -326,7 +370,7 @@ def main() -> None:
     )
 
     if not args.in_cluster:
-        _kubectl_apply(args.namespace, args.configmap, group_file)
+        write_configmap_kubectl(args.namespace, args.configmap, group_file)
         return
     changed = write_configmap_in_cluster(args.namespace, args.configmap, group_file)
     if changed and args.changed_file:
