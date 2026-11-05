@@ -305,22 +305,31 @@ def _gcloud_token() -> tuple[str, str]:
 def _access_token(key: dict[str, Any]) -> str:
     """Exchange a service-account key for an access token via the JWT bearer flow."""
     now = int(time.time())
-    assertion = jwt.encode(
-        {
-            "iss": key["client_email"],
-            "scope": " ".join(SCOPES),
-            "aud": TOKEN_URL,
-            "iat": now,
-            "exp": now + 3600,
-        },
-        key["private_key"],
-        algorithm="RS256",
-    )
-    response = requests.post(
-        TOKEN_URL,
-        data={"grant_type": JWT_BEARER, "assertion": assertion},
-        timeout=TIMEOUT,
-    )
+    try:
+        assertion = jwt.encode(
+            {
+                "iss": key["client_email"],
+                "scope": " ".join(SCOPES),
+                "aud": TOKEN_URL,
+                "iat": now,
+                "exp": now + 3600,
+            },
+            key["private_key"],
+            algorithm="RS256",
+        )
+    except (jwt.PyJWTError, TypeError) as error:
+        # Only the exception type: the key material must never reach output.
+        message = f"private_key is not a usable RSA PEM ({type(error).__name__})"
+        raise ProbeError(message) from error
+    try:
+        response = requests.post(
+            TOKEN_URL,
+            data={"grant_type": JWT_BEARER, "assertion": assertion},
+            timeout=TIMEOUT,
+        )
+    except requests.RequestException as error:
+        message = f"token exchange transport: {type(error).__name__}"
+        raise ProbeError(message) from error
     if not response.ok:
         # Google echoes the assertion back in some errors, and the assertion can
         # mint tokens until it expires, so only the OAuth error code is reported.

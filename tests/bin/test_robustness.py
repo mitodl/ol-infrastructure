@@ -140,6 +140,34 @@ def test_gcloud_token_failure_is_reported_not_raised(grants, monkeypatch):
     assert result["grants"] == []
 
 
+def test_unparseable_private_key_is_reported_not_raised(grants):
+    """PyJWT raises InvalidKeyError on a bad PEM, which _probe_one did not catch."""
+    key = {
+        "client_email": "probe@example.iam.gserviceaccount.com",
+        "private_key": "-----BEGIN-----\nAAA\n-----END-----",
+    }
+    reported = grants._probe_one(key, grants.Ownership(set(), set()))["errors"]
+    assert reported == {
+        "token": "private_key is not a usable RSA PEM (InvalidKeyError)"
+    }
+
+
+def test_token_exchange_transport_failure_is_reported_not_raised(grants, monkeypatch):
+    """A connection error on the token POST must not abort the run."""
+
+    def refuse(*_args, **_kwargs):
+        raise grants.requests.ConnectionError
+
+    monkeypatch.setattr(grants.jwt, "encode", lambda *_a, **_k: "assertion")
+    monkeypatch.setattr(grants.requests, "post", refuse)
+    result = grants._probe_one(
+        {"client_email": "probe@example.test", "private_key": "x"},
+        grants.Ownership(set(), set()),
+    )
+    assert result["errors"] == {"token": "token exchange transport: ConnectionError"}
+    assert result["grants"] == []
+
+
 def test_duplicates_are_detected_even_when_every_probe_errored(grants, capsys):
     """Two sources reaching one credential still means one went unprobed.
 
