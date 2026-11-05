@@ -60,6 +60,32 @@ def test_non_json_error_body_does_not_crash(grants, monkeypatch):
     assert "502" in str(caught.value)
 
 
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"error": "quota exhausted"}, "HTTP 403: quota exhausted"),
+        (["not", "an", "object"], "HTTP 403: Forbidden"),
+        ({"error": {"message": "no access"}}, "HTTP 403: no access"),
+    ],
+)
+def test_non_google_json_error_body_does_not_crash(grants, monkeypatch, body, expected):
+    """Only Google's {"error": {...}} shape has .get; anything else must not raise."""
+
+    class Response:
+        ok = False
+        status_code = 403
+        reason = "Forbidden"
+        content = b"{}"
+
+        def json(self):
+            return body
+
+    monkeypatch.setattr(grants.requests, "get", lambda *_a, **_k: Response())
+    with pytest.raises(grants.ProbeError) as caught:
+        grants._get("https://example.test/x", "token")
+    assert str(caught.value) == expected
+
+
 def test_non_json_success_body_does_not_crash(grants, monkeypatch):
     class Response:
         ok = True

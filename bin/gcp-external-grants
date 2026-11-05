@@ -351,14 +351,17 @@ def _get(url: str, token: str, **params: Any) -> dict[str, Any]:
     if not response.ok:
         # An error body is not guaranteed to be JSON -- a proxy or gateway can
         # return HTML, and parsing it blindly turns a reportable HTTP error into
-        # a crash.
+        # a crash. The same goes for JSON that is not Google's
+        # {"error": {"message": ...}} shape, e.g. {"error": "text"}.
         try:
-            detail = response.json().get("error", {}) if response.content else {}
+            body = response.json() if response.content else {}
         except ValueError:
-            detail = {}
+            body = {}
+        error = body.get("error") if isinstance(body, dict) else None
+        detail = error.get("message") if isinstance(error, dict) else error
         message = (
             f"HTTP {response.status_code}: "
-            f"{detail.get('message') or response.reason or '(no detail)'}"[:180]
+            f"{detail or response.reason or '(no detail)'}"[:180]
         )
         raise ProbeError(message)
     try:
