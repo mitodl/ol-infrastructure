@@ -88,9 +88,9 @@ call for about 15 minutes.
 
 1. Release witan's gate and wait for `deploy-ol-application-witan-<env>` to
    finish, then for the previous witan pod to be gone
-   (`kubectl -n witan get pods`). Pulumi counts the rollout done once the new
-   pod is ready, while the old one can keep making graph calls through its
-   10s preStop drain and up to 120s of graceful shutdown
+   (`kubectl -n witan get pods`). The deploy job can finish while the old pod
+   is still terminating, and it keeps making graph calls through its 10s
+   preStop drain and up to 120s of graceful shutdown
    (`applications/witan/deployment.py`).
 2. Release omnigraph's gate.
 
