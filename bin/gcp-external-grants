@@ -965,7 +965,9 @@ def _markdown_rows(results: list[dict[str, Any]]) -> str:
         # A credential that produced nothing must still occupy a row. Pasting a
         # table where it is simply absent turns "not asked" into "asked, found
         # nothing" -- the exact conflation this whole exercise exists to avoid.
-        if not result["grants"]:
+        # The same holds per probe: a credential with Drive grants whose
+        # BigQuery probe failed must not read as "no BigQuery access".
+        if result["errors"] or not result["grants"]:
             reason = (
                 "; ".join(
                     f"{probe}: {error}" for probe, error in result["errors"].items()

@@ -370,6 +370,21 @@ def test_a_credential_that_failed_still_gets_a_row(grants):
     assert "VAULT_ADDR is not set" in rows
 
 
+def test_a_failed_probe_is_shown_alongside_other_grants(grants):
+    """One probe's grants must not hide another probe's failure."""
+    rows = grants._markdown_rows(
+        [
+            {
+                "credential": "sa@x",
+                "grants": [_grant(product="Drive/Sheets (direct share)")],
+                "errors": {"bigquery": "HTTP 429: quota"},
+            }
+        ]
+    )
+    assert "| sa@x | **NOT ENUMERATED** |" in rows
+    assert "bigquery: HTTP 429: quota" in rows
+
+
 def test_a_credential_with_no_grants_is_not_silently_dropped(grants):
     rows = grants._markdown_rows(
         [{"credential": "sa@quiet", "grants": [], "errors": {}}]
