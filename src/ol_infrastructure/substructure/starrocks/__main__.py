@@ -40,14 +40,26 @@ from pulumi_vault.generic.get_secret import get_secret_output as vault_get_secre
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
 from ol_infrastructure.lib import pulumi_projects
+from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import query_engine_lake_access
 from ol_infrastructure.lib.data_lake_access import GOVERNANCE_ROLES
+from ol_infrastructure.lib.ol_types import (
+    Application,
+    BusinessUnit,
+    K8sAppLabels,
+    Product,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
     require_stack_output_value,
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.substructure.starrocks.group_sync_job import (
+    GROUP_PROVIDER_ADMIN_ROLE,
+    create_group_sync_job,
+)
 from ol_infrastructure.substructure.starrocks.resource_groups import (
     Classifier,
     QueryQueueSettings,
@@ -73,6 +85,7 @@ _kube_config: str = (
     if isinstance(_kube_config_raw, dict)
     else _kube_config_raw
 )
+setup_k8s_provider(_kube_config)
 
 STARROCKS_MYSQL_PORT = 9030
 MAX_TTL = ONE_MONTH_SECONDS * 6
@@ -136,6 +149,22 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT admin TO USER '{{name}}'@'%';",
             "ALTER USER '{{name}}'@'%' DEFAULT ROLE admin;",
+        ],
+        "revoke": ["DROP USER '{{name}}'@'%';"],
+        "renew": [],
+        "rollback": [],
+    },
+    # For the starrocks-group-sync CronJob (group_sync_job.py), to run ALTER GROUP
+    # PROVIDER. That needs SECURITY on SYSTEM, which also covers security
+    # integrations. Only the starrocks VaultAuth policy names this path, but
+    # Dagster's policy reads database-starrocks/creds/*, and the admin role's
+    # user_admin can grant group_provider_admin anyway, so this narrows the
+    # CronJob's own credential rather than adding a new privilege boundary.
+    GROUP_PROVIDER_ADMIN_ROLE: {
+        "create": [
+            "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
+            f"GRANT {GROUP_PROVIDER_ADMIN_ROLE} TO USER '{{{{name}}}}'@'%';",
+            f"ALTER USER '{{{{name}}}}'@'%' DEFAULT ROLE {GROUP_PROVIDER_ADMIN_ROLE};",
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -217,8 +246,9 @@ starrocks_db_connection = vault.generic.Secret(
     ),
 )
 
+vault_database_roles: dict[str, vault.database.SecretBackendRole] = {}
 for role_name, role_defs in starrocks_role_statements.items():
-    vault.database.SecretBackendRole(
+    vault_database_roles[role_name] = vault.database.SecretBackendRole(
         f"starrocks-{stack_info.env_suffix}-vault-database-role-{role_name}",
         backend=starrocks_vault_mount.path,
         db_name="starrocks",
@@ -491,6 +521,10 @@ CREATE ROLE IF NOT EXISTS admin;
 -- included. It exists only to classify its users into the batch resource group.
 CREATE ROLE IF NOT EXISTS batch_readonly;
 GRANT readonly TO ROLE batch_readonly;
+-- group_provider_admin: held only by the group sync CronJob's Vault user, to run
+-- ALTER GROUP PROVIDER (group_sync_job.py).
+CREATE ROLE IF NOT EXISTS group_provider_admin;
+GRANT SECURITY ON SYSTEM TO ROLE group_provider_admin;
 
 -- Governance roles for OIDC-authenticated human users.  Names match the
 -- Keycloak ol-starrocks-client roles exactly for 1:1 claim-to-role mapping.
@@ -1104,8 +1138,10 @@ if oidc_enabled:
         },
         # The script hash is here so a fix to the sync logic re-runs it; the
         # SQL hash alone left a broken groups.txt in place from June 2026. The
-        # file group provider reads the file only at CREATE GROUP PROVIDER and FE
-        # start, so a new file takes effect after the next FE restart.
+        # file group provider reads the file only at CREATE or ALTER GROUP
+        # PROVIDER and FE start. This run is the bootstrap for a fresh stack; the
+        # starrocks-group-sync CronJob below keeps the file current and runs the
+        # ALTER that makes the FEs re-read it.
         triggers=_integration_sql.apply(
             lambda sql: [
                 hashlib.sha256(sql.encode()).hexdigest(),
@@ -1148,7 +1184,7 @@ if oidc_enabled:
         + f"\nDROP GROUP PROVIDER IF EXISTS {_group_provider_name};"
     )
 
-    command.local.Command(
+    group_provider_setup_cmd = command.local.Command(
         f"starrocks-{stack_info.env_suffix}-group-provider-setup",
         create=_exec_sql,
         update=_exec_sql,
@@ -1181,6 +1217,39 @@ if oidc_enabled:
                 group_sync_cmd,
             ],
         ),
+    )
+
+    # The scheduled form of group_sync_cmd, which also reloads the provider so a
+    # Keycloak role change takes effect within a run instead of at the next FE
+    # restart. See group_sync_job.py. The VaultAuth and the OIDC Secret are created
+    # by the applications stack under these names (OLVaultK8SResources names its
+    # VaultAuth "<application_name>-auth").
+    create_group_sync_job(
+        stack_info,
+        _k8s_namespace,
+        K8sAppLabels(
+            application=Application.starrocks,
+            product=Product.data,
+            service=Services.starrocks,
+            ou=BusinessUnit.data,
+            source_repository="https://github.com/mitodl/ol-infrastructure",
+            stack=stack_info,
+        ).model_dump(),
+        configmap_name=_group_file_cm,
+        group_provider=_group_provider_name,
+        group_file_path=_group_file_path,
+        fe_host=applications_stack.require_output("fe_mysql_internal_host"),
+        mysql_port=db_port,
+        ssl_enabled=ssl_enabled,
+        vault_mount=starrocks_vault_mount.path,
+        vault_auth_name=f"starrocks-{stack_info.env_prefix}-auth",
+        oidc_secret_name=f"{stack_info.env_prefix}-starrocks-oidc-config",
+        # group_provider_setup_cmd depends on roles_setup_cmd, which creates the
+        # native role the Vault role's GRANT names.
+        depends_on=[
+            vault_database_roles[GROUP_PROVIDER_ADMIN_ROLE],
+            group_provider_setup_cmd,
+        ],
     )
 
     # Pre-create OIDC-authenticated user accounts from config.
