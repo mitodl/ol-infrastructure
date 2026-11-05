@@ -475,15 +475,27 @@ def test_markdown_row_width_is_constant(grants):
     assert len(widths) == 1, f"ragged markdown table: {widths}"
 
 
-def test_dataset_enumeration_failure_is_not_fatal(grants, monkeypatch):
-    """A project we can list but not enumerate is still a real grant."""
+def test_dataset_enumeration_failure_is_not_fatal_or_silent(owner, grants, monkeypatch):
+    """A project we can list but not enumerate is still a real grant.
 
-    def boom(*_args, **_kwargs):
-        message = "403"
-        raise grants.ProbeError(message)
+    Its failure must not render as "none visible", which reads as a finding.
+    """
 
-    monkeypatch.setattr(grants, "_get", boom)
-    assert grants._datasets_in("token", "some-project") == []
+    def fake_get(url, *_args, **_kwargs):
+        if url.endswith("/datasets"):
+            message = "HTTP 403: denied"
+            raise grants.ProbeError(message)
+        return {"projects": [{"id": "mitx-pipeline-main-dc29"}]}
+
+    monkeypatch.setattr(grants, "_get", fake_get)
+    [grant] = grants._probe_bigquery("token", owner)
+    assert grant["resource_id"] == "mitx-pipeline-main-dc29"
+    assert grant["datasets"] is None
+    rows = grants._markdown_rows(
+        [{"credential": "sa@x", "grants": [grant], "errors": {}}]
+    )
+    assert "none visible" not in rows
+    assert "NOT ENUMERATED: HTTP 403: denied" in rows
 
 
 def test_dataset_enumeration_paginates(grants, monkeypatch):

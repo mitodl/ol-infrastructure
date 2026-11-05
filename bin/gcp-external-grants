@@ -735,6 +735,17 @@ def _probe_bigquery(token: str, owner: Ownership) -> list[dict[str, Any]]:
             project_id = project.get("id", "")
             third_party = owner.classify_project(project_id)
             parent = owner.parent_of(project_id)
+            # A project we can list but not enumerate is still a real grant, so
+            # the failure is recorded on the grant rather than dropping it. It
+            # must not read as an empty list, which renders as "none visible".
+            datasets: list[str] | None = None
+            datasets_error = ""
+            try:
+                datasets = _datasets_in(token, project_id)
+            except ProbeError as error:
+                datasets_error = str(error)
+            except requests.RequestException as error:
+                datasets_error = f"transport: {type(error).__name__}"
             grants.append(
                 {
                     "product": "BigQuery",
@@ -752,7 +763,8 @@ def _probe_bigquery(token: str, owner: Ownership) -> list[dict[str, Any]]:
                         else (parent or "none (standalone legacy project)")
                     ),
                     "third_party": third_party,
-                    "datasets": _datasets_in(token, project_id),
+                    "datasets": datasets,
+                    "datasets_error": datasets_error,
                 }
             )
         page = payload.get("nextPageToken")
@@ -769,22 +781,19 @@ def _datasets_in(token: str, project_id: str) -> list[str]:
     negotiation: re-issuing one dataset grant is a different conversation from
     re-issuing project-wide access.
 
-    `all=true` includes hidden datasets. Failures return [] rather than raising --
-    a project we can list but not enumerate is still a real grant worth reporting.
+    `all=true` includes hidden datasets. Failures raise; the caller records them
+    on the grant.
     """
     ids: list[str] = []
     page: str | None = None
     while True:
-        try:
-            payload = _get(
-                f"https://bigquery.googleapis.com/bigquery/v2/projects/{project_id}/datasets",
-                token,
-                all=True,
-                maxResults=200,
-                **({"pageToken": page} if page else {}),
-            )
-        except (ProbeError, requests.RequestException):
-            return ids
+        payload = _get(
+            f"https://bigquery.googleapis.com/bigquery/v2/projects/{project_id}/datasets",
+            token,
+            all=True,
+            maxResults=200,
+            **({"pageToken": page} if page else {}),
+        )
         ids.extend(
             entry.get("datasetReference", {}).get("datasetId", "")
             for entry in payload.get("datasets", [])
@@ -932,6 +941,14 @@ MARKDOWN_HEADER = (
 DATASET_PREVIEW = 12
 
 
+def _datasets_cell(grant: dict[str, Any]) -> str:
+    """Render a grant's datasets, or why they could not be enumerated."""
+    if grant.get("datasets_error"):
+        return f"NOT ENUMERATED: {grant['datasets_error']}"
+    datasets = grant.get("datasets")
+    return "" if datasets is None else _render_datasets(datasets)
+
+
 def _render_datasets(datasets: list[str]) -> str:
     """Name the datasets, truncating so one wide project cannot swamp a table."""
     if not datasets:
@@ -955,11 +972,7 @@ def _markdown_rows(results: list[dict[str, Any]]) -> str:
                 grant["access"],
                 grant["granted_by"],
                 third_party_label[grant["third_party"]],
-                (
-                    _render_datasets(grant["datasets"])
-                    if grant.get("datasets") is not None
-                    else ""
-                ),
+                _datasets_cell(grant),
             ]
             lines.append("| " + " | ".join(str(cell) for cell in cells) + " |")
         # A credential that produced nothing must still occupy a row. Pasting a
@@ -1002,6 +1015,8 @@ def _print_report(results: list[dict[str, Any]]) -> None:
             datasets = grant.get("datasets")
             if datasets is not None:
                 print(f"    datasets ({len(datasets)}) {_render_datasets(datasets)}")
+            elif grant.get("datasets_error"):
+                print(f"    datasets {_datasets_cell(grant)}")
         for probe, error in result["errors"].items():
             print(f"  [{probe}] {error}")
 
