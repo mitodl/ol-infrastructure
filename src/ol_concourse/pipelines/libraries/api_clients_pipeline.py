@@ -242,7 +242,11 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         Job(
             name=Identifier(f"publish-{subpath}"),
             plan=[
-                GetStep(get=node_image.name, trigger=True),
+                # An input to the build, never a reason to publish. VERSION
+                # only moves when generate-clients bumps it, so a new image
+                # digest would republish a version npm already has and fail
+                # (403). The clients repo get below is the only trigger.
+                GetStep(get=node_image.name),
                 GetStep(
                     get=api_clients_repository.name,
                     passed=[generate_clients_job.name],
