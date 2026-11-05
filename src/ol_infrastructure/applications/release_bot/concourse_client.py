@@ -80,6 +80,11 @@ async def trigger_job(pipeline: str, job: str, team: str | None = None) -> str:
     return f"{CONCOURSE_URL}/builds/{build['id']}"
 
 
+def build_id(build_url: str) -> int:
+    """Return the id of the build at *build_url*, as `trigger_job` returns it."""
+    return int(build_url.rstrip("/").rsplit("/", 1)[-1])
+
+
 def job_url(pipeline: str, job: str, team: str | None = None) -> str:
     """Return the web UI URL of *job*, whose newest build is listed first."""
     return (
@@ -183,10 +188,11 @@ async def active_build_url(
 
 _CHECK_POLL_SECONDS = 2
 _CHECK_TIMEOUT_SECONDS = 180
-_TERMINAL_BUILD_STATUSES = frozenset({"succeeded", "failed", "errored", "aborted"})
+TERMINAL_BUILD_STATUSES = frozenset({"succeeded", "failed", "errored", "aborted"})
 
 
-async def _get_build_status(build_id: int) -> str:
+async def build_status(build_id: int) -> str:
+    """Return a build's status: `pending`, `started`, or a terminal one."""
     token = await _get_token()
     url = f"{CONCOURSE_URL}/api/v1/builds/{build_id}"
     async with (
@@ -285,7 +291,7 @@ async def check_resource(pipeline: str, resource: str) -> None:
     deadline = time.monotonic() + _CHECK_TIMEOUT_SECONDS
     while True:
         if build_id is not None:
-            status = await _get_build_status(build_id)
+            status = await build_status(build_id)
         else:
             # No build to poll. The resource's own summary describes the
             # latest check, but only once this check has actually landed --
@@ -295,7 +301,7 @@ async def check_resource(pipeline: str, resource: str) -> None:
             if (current.get("last_checked") or 0) > last_checked:
                 status = (current.get("build") or {}).get("status")
 
-        if status in _TERMINAL_BUILD_STATUSES:
+        if status in TERMINAL_BUILD_STATUSES:
             if status != "succeeded":
                 where = f" {CONCOURSE_URL}/builds/{build_id}" if build_id else ""
                 msg = f"Check of {pipeline}/{resource} {status}.{where}"
