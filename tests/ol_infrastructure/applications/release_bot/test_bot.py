@@ -3633,6 +3633,20 @@ async def test_help_is_a_subcommand_not_only_a_parse_failure(mixed_repos, slack)
         assert f"/doof {subcommand}" in bot._USAGE
 
 
+@pytest.mark.parametrize("text", ["", "relase my-app"])
+async def test_bare_or_unknown_doof_replies_exactly_as_help(text, mixed_repos, slack):
+    await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command("help"), {})
+    help_acks = slack.ack.call_args_list
+    help_calls = slack.respond.call_args_list
+    slack.ack.reset_mock()
+    slack.respond.reset_mock()
+
+    await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command(text), {})
+
+    assert slack.ack.call_args_list == help_acks
+    assert slack.respond.call_args_list == help_calls
+
+
 def _live_deployment(version, sha, environment, url="", age=timedelta(hours=5)):
     return {
         "id": 1,
