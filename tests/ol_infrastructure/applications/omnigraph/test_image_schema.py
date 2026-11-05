@@ -14,11 +14,17 @@ from typing import Any
 import pytest
 
 from ol_infrastructure.applications.omnigraph.image_schema import (
+    HTTP_API_CONTRACT_LABEL,
+    HTTP_API_CONTRACTS_LABEL,
     IMAGE_SCHEMA_LABEL,
     MIN_IMAGE_SCHEMA_LABEL,
     ImageSchemaUnavailableError,
     _image_id,
+    check_http_api_contract,
+    read_image_http_api_contracts,
     read_image_internal_schema_range,
+    repository_name,
+    validate_http_api_contract,
 )
 
 _REPOSITORY = "omnigraph-server"
@@ -365,3 +371,116 @@ def test_a_non_object_config_blob_is_unavailable_not_fatal(
     patched(client, config_blob)
     with pytest.raises(ImageSchemaUnavailableError, match="carries no"):
         read_image_internal_schema_range(_REPOSITORY, _BY_DIGEST, "us-east-1")
+
+
+# ── HTTP-contract labels: the deploy-order check ─────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "image_ref",
+    [f"{_REGISTRY}/witan@{_DIGEST}", f"{_REGISTRY}/witan:abc1234"],
+)
+def test_repository_name_from_either_ref_shape(image_ref: str) -> None:
+    assert repository_name(image_ref) == "witan"
+
+
+@pytest.mark.parametrize(
+    ("label", "declared", "expected"),
+    [
+        (HTTP_API_CONTRACT_LABEL, "0.14", ("0.14",)),
+        (HTTP_API_CONTRACTS_LABEL, "0.14,0.13", ("0.14", "0.13")),
+    ],
+)
+def test_reads_the_contract_labels(
+    patched, label: str, declared: str, expected: tuple[str, ...]
+) -> None:
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(client, {"config": {"Labels": {label: declared}}})
+    assert read_image_http_api_contracts(_BY_DIGEST, "us-east-1", label) == expected
+
+
+def test_an_image_without_the_contract_label_is_unavailable_not_fatal(
+    patched,
+) -> None:
+    """Every image built before agent-kit added the label, rollbacks included."""
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: "16"}}})
+    with pytest.raises(ImageSchemaUnavailableError, match="carries no"):
+        read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACT_LABEL)
+
+
+@pytest.mark.parametrize("declared", ["", "0.14,", "latest", 14])
+def test_a_present_but_malformed_contract_label_fails_the_preview(
+    patched, declared: object
+) -> None:
+    """An empty label is an unexpanded build arg, not an old image."""
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(client, {"config": {"Labels": {HTTP_API_CONTRACTS_LABEL: declared}}})
+    with pytest.raises(ValueError, match="not a comma-separated list") as caught:
+        read_image_http_api_contracts(_BY_DIGEST, "us-east-1", HTTP_API_CONTRACTS_LABEL)
+    assert not isinstance(caught.value, ImageSchemaUnavailableError)
+
+
+_PROBE = ("0.14", "0.13")
+
+
+def test_a_witan_that_negotiates_the_server_contract_passes() -> None:
+    validate_http_api_contract("0.14", ["0.14", "0.13"], _PROBE)
+
+
+def test_a_server_contract_the_witan_cannot_speak_is_refused() -> None:
+    """The 2026-11-04 Production shape: a 0.14 server ahead of a 0.13-only witan."""
+    with pytest.raises(ValueError, match="Release witan's gate first") as caught:
+        validate_http_api_contract("0.14", ["0.13"], _PROBE)
+    # QA and Production refuse in the preview job, so that's what to re-run.
+    assert "preview-ol-application-omnigraph-<env>" in str(caught.value)
+
+
+def test_a_server_contract_the_council_probe_cannot_speak_is_refused() -> None:
+    with pytest.raises(ValueError, match="council probe"):
+        validate_http_api_contract("0.15", ["0.15", "0.14"], _PROBE)
+
+
+def test_the_probe_is_checked_even_when_witan_exports_nothing() -> None:
+    with pytest.raises(ValueError, match="council probe"):
+        validate_http_api_contract("0.15", None, _PROBE)
+
+
+def _server_label(monkeypatch: pytest.MonkeyPatch, contracts: tuple[str, ...]) -> None:
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda _ref, _region, label: (
+            contracts if label == HTTP_API_CONTRACT_LABEL else pytest.fail(label)
+        ),
+    )
+
+
+def test_check_skips_when_witan_exports_no_contracts(monkeypatch) -> None:
+    _server_label(monkeypatch, ("0.14",))
+    reason = check_http_api_contract(_BY_DIGEST, None, "us-east-1")
+    assert reason is not None
+    assert "witan_http_api_contracts" in reason
+
+
+def test_check_skips_on_an_unlabelled_server_image(patched) -> None:
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(client, {"config": {"Labels": {}}})
+    reason = check_http_api_contract(_BY_DIGEST, ["0.14"], "us-east-1")
+    assert reason is not None
+    assert "carries no" in reason
+
+
+def test_check_refuses_a_mismatch_without_reading_the_witan_image(
+    monkeypatch,
+) -> None:
+    """Only the server image is read from ECR; witan's list comes from its stack."""
+    _server_label(monkeypatch, ("0.14",))
+    with pytest.raises(ValueError, match=r"speaks only 0\.13"):
+        check_http_api_contract(_BY_DIGEST, ["0.13"], "us-east-1")
+
+
+def test_a_server_label_naming_two_contracts_fails_the_preview(monkeypatch) -> None:
+    _server_label(monkeypatch, ("0.14", "0.13"))
+    with pytest.raises(ValueError, match="exactly one contract"):
+        check_http_api_contract(_BY_DIGEST, ["0.14"], "us-east-1")

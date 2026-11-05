@@ -305,6 +305,15 @@ DEPLOYED_WRITTEN_INTERNAL_SCHEMA: dict[str, float] | None = optional_stack_outpu
 STORAGE_RESTORED_TO_FORMAT: int | None = omnigraph_config.get_int(
     "storage_restored_to_format"
 )
+# ── Nor may the server move to an HTTP contract the running witan can't speak.
+# The witan stack reads this stack's omnigraph_server_addr, so the reference
+# runs both ways; each reads the other's last completed deploy. A reference to
+# a stack that doesn't exist fails the program, so a new environment needs
+# `pulumi stack init` for the witan stack before this stack's first deploy
+# (see the runbook). See image_schema.check_http_api_contract.
+DEPLOYED_WITAN_HTTP_API_CONTRACTS: list[str] | None = optional_stack_output_value(
+    make_stack_reference(projects.WITAN, stack_info.name), "witan_http_api_contracts"
+)
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
 # environment to turn it on; leaving it unset keeps that environment on the
@@ -1128,6 +1137,7 @@ data_tier = create_data_tier(
     migrate_to_prefix=MIGRATE_TO_PREFIX,
     deployed_written_internal_schema=DEPLOYED_WRITTEN_INTERNAL_SCHEMA,
     storage_restored_to_format=STORAGE_RESTORED_TO_FORMAT,
+    deployed_witan_http_api_contracts=DEPLOYED_WITAN_HTTP_API_CONTRACTS,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,

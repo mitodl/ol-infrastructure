@@ -95,12 +95,18 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pulumi
 import pulumi_aws as aws
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.omnigraph.image_schema import (
+    HTTP_API_CONTRACTS_LABEL,
+    ImageSchemaUnavailableError,
+    read_image_http_api_contracts,
+)
 from ol_infrastructure.applications.witan.break_glass import (
     BREAK_GLASS_CRONJOB_NAME,
     create_break_glass_cronjob,
@@ -1101,6 +1107,27 @@ export("view_reaper_schedule", WITAN_REAP_VIEWS_SCHEDULE)
 export("witan_domain", WITAN_DOMAIN)
 export("witan_oidc_issuer", KEYCLOAK_ISSUER)
 export("witan_image_repository", witan_image_repository)
+# The HTTP contracts this image negotiates, read by the omnigraph stack's
+# preview, which refuses a server image whose contract the running witan can't
+# speak. Read off the image here, while it is being deployed and so certainly
+# still in ECR, rather than by the omnigraph stack later: ECR's keep-last-N
+# lifecycle rule can delete an image that is still running. Resolved through
+# the serving Deployment, which Pulumi awaits until it has rolled, so the
+# output describes what is serving rather than what is still rolling out. An
+# unlabelled image exports null and the omnigraph check skips with a warning.
+try:
+    witan_http_api_contracts: list[str] | None = list(
+        read_image_http_api_contracts(
+            witan_image, aws_config.region, HTTP_API_CONTRACTS_LABEL
+        )
+    )
+except ImageSchemaUnavailableError as exc:
+    pulumi.log.warn(f"exporting no witan_http_api_contracts: {exc}")
+    witan_http_api_contracts = None
+export(
+    "witan_http_api_contracts",
+    witan_serving_tier.deployment.metadata.apply(lambda _: witan_http_api_contracts),
+)
 export("omnigraph_server_addr", omnigraph_server_addr)
 # Which principal ran this environment's migrations, and the name to pass to
 # `kubectl create job --from=cronjob/…` for a break-glass pod (null where the

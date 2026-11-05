@@ -60,6 +60,7 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
 )
 from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
+    check_http_api_contract,
     read_image_internal_schema_range,
 )
 from ol_infrastructure.applications.omnigraph.lock_handoff import (
@@ -376,6 +377,7 @@ def create_data_tier(  # noqa: PLR0913
     migration_armed: bool = False,
     deployed_written_internal_schema: Mapping[str, float] | None,
     storage_restored_to_format: int | None,
+    deployed_witan_http_api_contracts: list[str] | None,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
 
@@ -418,6 +420,11 @@ def create_data_tier(  # noqa: PLR0913
     window that replaces the optimize and cleanup sweeps on that format, and
     ``optimize_schedule`` / ``cleanup_schedule`` are then unused. See
     ``maintenance.create_maintenance_window``.
+
+    ``deployed_witan_http_api_contracts`` is the witan stack's
+    ``witan_http_api_contracts`` output. The server image's HTTP contract is
+    checked against it; see
+    ``image_schema.check_http_api_contract``.
     """
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
     # service — omnigraph is generic and a future second instance would get its
@@ -523,6 +530,15 @@ def create_data_tier(  # noqa: PLR0913
         migration_armed=migration_armed,
         image_min_internal_schema=image_min_internal_schema,
     )
+    # ★ CAN THE WITAN THAT IS RUNNING TALK TO THIS SERVER? A contract bump
+    # deployed ahead of witan fails every witan graph call until witan catches
+    # up (Production 2026-11-04). The witan stack exports its contracts only
+    # once its Deployment has rolled, so this reads what is serving, not what
+    # is queued. Unreadable labels skip, as above.
+    if skipped := check_http_api_contract(
+        omnigraph_server_image, deployed_witan_http_api_contracts, aws_config.region
+    ):
+        pulumi.log.warn(f"skipping the HTTP-contract check: {skipped}")
     written_internal_schema = next_written_internal_schema(
         deployed_written_internal_schema,
         storage_prefix,

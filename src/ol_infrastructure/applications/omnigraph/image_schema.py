@@ -30,15 +30,24 @@ broken image build rather than an old image, and raises ``ValueError`` so the
 preview fails. That is the shape an un-expanded build arg takes (the label
 comes out ``""``), and reading it as "no label" would let a broken build switch
 the gate off with nothing failing anywhere.
+
+The same images also label the omnigraph HTTP contracts they speak, which the
+deploy-order check (``validate_http_api_contract``) reads with the same rules.
 """
 
 import json
+import re
+from collections.abc import Sequence
 from typing import Any
 
 import boto3
 import requests
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import BotoCoreError, ClientError
+
+from ol_infrastructure.applications.omnigraph.scripts.check_council_health import (
+    SUPPORTED_HTTP_API_CONTRACTS as PROBE_HTTP_API_CONTRACTS,
+)
 
 #: The OCI label agent-kit's docker/omnigraph-server.Dockerfile and
 #: docker/witan.Dockerfile stamp onto their runtime stage. Changing this string
@@ -167,24 +176,16 @@ def _get_manifest(
     return manifest
 
 
-def read_image_internal_schema_range(
-    repository_name: str, image_ref: str, region: str
-) -> tuple[int, int]:
-    """Return the storage formats the image at ``image_ref`` declares it reads.
+def _image_labels(repository_name: str, image_ref: str, region: str) -> dict[str, Any]:
+    """Return the OCI labels of the linux/amd64 image at ``image_ref``.
 
     :param repository_name: ECR repository name, e.g. ``omnigraph-server``.
-    :param image_ref: Fully-qualified reference, as deployed — the same string
-        the Deployment's pod spec carries.
+    :param image_ref: Fully-qualified reference, as deployed.
     :param region: AWS region the ECR repository lives in.
-    :returns: ``(oldest served, written)``: the
-        ``edu.mit.ol.omnigraph.min-internal-schema`` and
-        ``edu.mit.ol.omnigraph.internal-schema`` labels. An image without the
-        first serves only the format it writes.
-    :rtype: tuple[int, int]
-    :raises ImageSchemaUnavailableError: on an unreachable or unreadable registry,
-        an unparseable manifest, or an image carrying no such label. All of
-        these are non-fatal — see this module's docstring.
-    :raises ValueError: when either label is present but not an integer.
+    :returns: The image config's labels, ``{}`` when it declares none.
+    :rtype: dict[str, Any]
+    :raises ImageSchemaUnavailableError: on an unreachable or unreadable
+        registry or an unparseable manifest.
     """
     client = boto3.client("ecr", region_name=region, config=_ECR_CLIENT_CONFIG)
     manifest = _get_manifest(client, repository_name, _image_id(image_ref))
@@ -241,7 +242,29 @@ def read_image_internal_schema_range(
     # `config` is optional in the OCI image-config spec and `Labels` is null
     # rather than absent on an image that declares none, so neither is indexed
     # directly.
-    labels = _mapping(_mapping(_mapping(config).get("config")).get("Labels"))
+    return _mapping(_mapping(_mapping(config).get("config")).get("Labels"))
+
+
+def read_image_internal_schema_range(
+    repository_name: str, image_ref: str, region: str
+) -> tuple[int, int]:
+    """Return the storage formats the image at ``image_ref`` declares it reads.
+
+    :param repository_name: ECR repository name, e.g. ``omnigraph-server``.
+    :param image_ref: Fully-qualified reference, as deployed — the same string
+        the Deployment's pod spec carries.
+    :param region: AWS region the ECR repository lives in.
+    :returns: ``(oldest served, written)``: the
+        ``edu.mit.ol.omnigraph.min-internal-schema`` and
+        ``edu.mit.ol.omnigraph.internal-schema`` labels. An image without the
+        first serves only the format it writes.
+    :rtype: tuple[int, int]
+    :raises ImageSchemaUnavailableError: on an unreachable or unreadable registry,
+        an unparseable manifest, or an image carrying no such label. All of
+        these are non-fatal — see this module's docstring.
+    :raises ValueError: when either label is present but not an integer.
+    """
+    labels = _image_labels(repository_name, image_ref, region)
     if labels.get(IMAGE_SCHEMA_LABEL) is None:
         msg = (
             f"{image_ref} carries no {IMAGE_SCHEMA_LABEL} label. Images built "
@@ -292,3 +315,148 @@ def _int_label(
             "not work around this by deploying it anyway."
         )
         raise ValueError(msg) from exc
+
+
+#: The HTTP contract an omnigraph-server image speaks (agent-kit
+#: ``OMNIGRAPH_HTTP_API_CONTRACT``, e.g. ``0.14``).
+HTTP_API_CONTRACT_LABEL = "edu.mit.ol.omnigraph.http-api-contract"
+
+#: Every HTTP contract a witan image's client negotiates, comma-separated
+#: (agent-kit ``WITAN_HTTP_API_CONTRACTS``, e.g. ``0.14,0.13``). Both names are
+#: held to witan-core's declarations by agent-kit's `just check-omnigraph-pins`.
+HTTP_API_CONTRACTS_LABEL = "edu.mit.ol.omnigraph.http-api-contracts"
+
+_CONTRACT = re.compile(r"\d+\.\d+")
+
+
+def repository_name(image_ref: str) -> str:
+    """Return the ECR repository name in a fully-qualified image reference.
+
+    :param image_ref: ``<registry>/<name>@sha256:...`` or ``<registry>/<name>:<tag>``.
+    :returns: ``<name>``, e.g. ``witan``.
+    :rtype: str
+    """
+    path = image_ref.split("/", 1)[-1]
+    if "@" in path:
+        return path.split("@", 1)[0]
+    return path.rsplit(":", 1)[0]
+
+
+def read_image_http_api_contracts(
+    image_ref: str, region: str, label: str
+) -> tuple[str, ...]:
+    """Return the omnigraph HTTP contracts the image at ``image_ref`` labels.
+
+    :param image_ref: Fully-qualified reference, as deployed.
+    :param region: AWS region the ECR repository lives in.
+    :param label: ``HTTP_API_CONTRACT_LABEL`` for a server image,
+        ``HTTP_API_CONTRACTS_LABEL`` for a witan image.
+    :returns: The contracts, in label order.
+    :rtype: tuple[str, ...]
+    :raises ImageSchemaUnavailableError: on an unreadable registry or an image
+        built before the label existed. Non-fatal, as for the format label.
+    :raises ValueError: when the label is present but isn't a comma-separated
+        list of ``<major>.<minor>`` contracts, which means a broken build.
+    """
+    labels = _image_labels(repository_name(image_ref), image_ref, region)
+    declared = labels.get(label)
+    if declared is None:
+        msg = (
+            f"{image_ref} carries no {label} label. Images built from agent-kit "
+            "before it was added do not, so the HTTP-contract check is skipped."
+        )
+        raise ImageSchemaUnavailableError(msg)
+    contracts = tuple(declared.split(",")) if isinstance(declared, str) else ()
+    if not contracts or not all(_CONTRACT.fullmatch(c) for c in contracts):
+        msg = (
+            f"{image_ref} declares {label}={declared!r}, which is not a "
+            "comma-separated list of HTTP contracts (e.g. 0.14,0.13). An empty "
+            "value means the image build did not expand its build arg; see "
+            "agent-kit's `just check-omnigraph-pins`. Rebuild the image."
+        )
+        raise ValueError(msg)
+    return contracts
+
+
+def validate_http_api_contract(
+    server_contract: str,
+    witan_contracts: Sequence[str] | None,
+    probe_contracts: Sequence[str],
+) -> None:
+    """Refuse a server contract the running witan or the council probe can't speak.
+
+    Concourse orders nothing between the witan and omnigraph deploy gates. On
+    2026-11-04 Production released both together, the 0.14 server finished
+    ten minutes before witan started, and the running witan (contract 0.13
+    only) failed every graph call for about 15 minutes. witan-core negotiates
+    the contract per server, but only a witan already running can negotiate.
+
+    :param server_contract: The deploying server image's contract.
+    :param witan_contracts: The contracts the deployed witan image speaks, or
+        ``None`` when the witan stack exports none (skipped).
+    :param probe_contracts: The council probe's ``SUPPORTED_HTTP_API_CONTRACTS``.
+    :raises ValueError: when either can't speak ``server_contract``.
+    """
+    if server_contract not in probe_contracts:
+        msg = (
+            f"this omnigraph-server image speaks HTTP contract {server_contract}, "
+            "but the council probe (scripts/check_council_health.py "
+            f"SUPPORTED_HTTP_API_CONTRACTS) speaks only {','.join(probe_contracts)}, "
+            "so every probe run would fail. Add the contract there in the same "
+            "change."
+        )
+        raise ValueError(msg)
+    if witan_contracts is None or server_contract in witan_contracts:
+        return
+    msg = (
+        f"this omnigraph-server image speaks HTTP contract {server_contract}, "
+        f"but the deployed witan speaks only {','.join(witan_contracts)}. Every "
+        "witan graph call would fail from the moment this server rolls until "
+        "witan deploys. Release witan's gate first and wait for "
+        "deploy-ol-application-witan-<env> to finish. Then re-run "
+        "preview-ol-application-omnigraph-<env> (QA, Production) or "
+        "deploy-ol-application-omnigraph-ci (CI) by hand: nothing re-triggers "
+        "it. See docs/omnigraph-storage-format-upgrade-runbook.md."
+    )
+    raise ValueError(msg)
+
+
+def check_http_api_contract(
+    server_image: str, witan_contracts: Sequence[str] | None, region: str
+) -> str | None:
+    """Refuse ``server_image`` when the running witan can't speak its contract.
+
+    The witan side is the witan stack's ``witan_http_api_contracts`` output,
+    which that stack reads off its own image while deploying it, rather than a
+    read of the running witan image here: ECR's keep-last-N lifecycle rule can
+    delete an image that is still running, and a skipped check would then
+    open exactly the window this exists to close.
+
+    :param server_image: The omnigraph-server image being deployed.
+    :param witan_contracts: The witan stack's ``witan_http_api_contracts``,
+        ``None`` before it exports one or when its image is unlabelled.
+    :param region: AWS region the ECR repository lives in.
+    :returns: Why (part of) the check was skipped, or ``None`` when it all ran.
+    :rtype: str | None
+    :raises ValueError: when the server's contract isn't spoken, or a label is
+        malformed.
+    """
+    try:
+        server = read_image_http_api_contracts(
+            server_image, region, HTTP_API_CONTRACT_LABEL
+        )
+    except ImageSchemaUnavailableError as exc:
+        return str(exc)
+    if len(server) != 1:
+        msg = (
+            f"{server_image} declares {HTTP_API_CONTRACT_LABEL}={','.join(server)}; "
+            "a server speaks exactly one contract."
+        )
+        raise ValueError(msg)
+    validate_http_api_contract(server[0], witan_contracts, PROBE_HTTP_API_CONTRACTS)
+    if witan_contracts is None:
+        return (
+            "the witan stack exports no witan_http_api_contracts (a deploy that "
+            "predates the export, or an image that predates the label)"
+        )
+    return None

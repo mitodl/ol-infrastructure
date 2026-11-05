@@ -75,6 +75,46 @@ writes a newer format onto a root:
    is still at zero (Pulumi doesn't put `replicas` back after something else
    changed it), and resume the CronJobs.
 
+#### Deploy witan first when the HTTP contract changes
+
+A release that changes the HTTP contract (`Omnigraph-Http-Api`, e.g. 0.13 to
+0.14) needs the witan that speaks it running before the server moves, whether
+or not the format changes too. witan-core negotiates the contract per server,
+but only a witan already running can negotiate. Concourse orders nothing
+between the two deploy gates: on 2026-11-04 Production released both together,
+`deploy-ol-application-omnigraph-production` finished at 20:37Z, witan's only
+started at 20:47Z, and the old witan (contract 0.13 only) failed every graph
+call for about 15 minutes.
+
+1. Release witan's gate and wait for `deploy-ol-application-witan-<env>` to
+   finish.
+2. Release omnigraph's gate.
+
+The omnigraph stack enforces this. agent-kit labels the server image with the
+contract it speaks (`edu.mit.ol.omnigraph.http-api-contract`) and the witan
+image with the contracts it negotiates
+(`edu.mit.ol.omnigraph.http-api-contracts`). The witan stack reads its own
+image's label while deploying it and exports the list as
+`witan_http_api_contracts` once its Deployment has rolled. The omnigraph stack
+refuses a server image whose contract isn't in that list ("Release witan's
+gate first"), and one the council probe's `SUPPORTED_HTTP_API_CONTRACTS`
+(`scripts/check_council_health.py`) doesn't list, so a contract bump in
+agent-kit needs a matching ol-infrastructure change to the probe first.
+
+In QA and Production the refusal happens in
+`preview-ol-application-omnigraph-<env>`, so no gate issue opens. In CI it
+fails `deploy-ol-application-omnigraph-ci`. Either way nothing re-triggers it:
+re-run that job by hand once witan's deploy has finished, then release the new
+gate. A server image built before the label, or a witan stack that exports no
+contracts (its last deploy predates the export, or its image predates the
+label), skips the witan half of the check with a warning.
+
+The omnigraph stack references the witan stack, which in turn reads
+`omnigraph_server_addr` from it. A reference to a stack that doesn't exist
+fails the program, so in a new environment run `pulumi stack init` for
+`ol-application-witan` first. The omnigraph stack then sees no export and
+skips, and witan deploys after it as usual.
+
 To go back:
 
 1. Pause the omnigraph pipeline's automatic deploys, then stop every writer as
