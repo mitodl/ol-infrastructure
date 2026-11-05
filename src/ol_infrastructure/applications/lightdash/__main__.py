@@ -30,6 +30,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -336,6 +337,12 @@ db_creds_secret = OLVaultK8SSecret(
             "PGPASSWORD": "{{ .Secrets.password }}",
         },
         vaultauth=vault_k8s_resources.auth_name,
+        # PGUSER/PGPASSWORD reach the pods as env vars, which Kubernetes doesn't
+        # update in a running container, so a rotated lease needs a restart.
+        restart_targets=[
+            OLVaultRestartTarget(kind="Deployment", name="lightdash-backend"),
+            OLVaultRestartTarget(kind="Deployment", name="lightdash-worker"),
+        ],
     ),
     opts=ResourceOptions(delete_before_replace=True, depends_on=vault_k8s_resources),
 )
