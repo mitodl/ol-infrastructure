@@ -75,8 +75,8 @@ config:
   # The nightly cleanup keeps each branch's head commit (`--keep 1`) instead of
   # 2 days of commits, so its plan reads the head instead of every older
   # commit manifest. CI goes first; QA and Production stay on the age until a
-  # QA cleanup is measured. This is one-way: removing it, or raising it, makes
-  # cleanup refuse to sweep tables whose old commits it still retains. Read
+  # QA cleanup is measured. Removing it refuses cleanup's sweep for about 2
+  # nights, and raising it can refuse indefinitely on a quiet branch. Read
   # maintenance.py below DEFAULT_CLEANUP_OLDER_THAN before changing it.
   omnigraph:cleanup_keep: 1
 secretsprovider: awskms://alias/infrastructure-secrets-ci

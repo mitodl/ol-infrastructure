@@ -413,14 +413,17 @@ COUNCIL_PROBE_SCHEDULE = omnigraph_config.get("council_probe_schedule") or (
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
 )
-# `cleanup --keep` in place of `--older-than`. One-way; see maintenance.py below
-# DEFAULT_CLEANUP_OLDER_THAN before setting or removing it.
+# `cleanup --keep` in place of `--older-than`. Moving off it has a cost; see
+# maintenance.py below DEFAULT_CLEANUP_OLDER_THAN before setting or removing it.
+# The upper bound is the CLI's: it parses the count as a u32.
 CLEANUP_KEEP: int | None = omnigraph_config.get_int("cleanup_keep")
+MAX_CLEANUP_KEEP = 2**32 - 1
 if CLEANUP_KEEP is not None and (
-    CLEANUP_KEEP < 1 or omnigraph_config.get("cleanup_older_than")
+    not 1 <= CLEANUP_KEEP <= MAX_CLEANUP_KEEP
+    or omnigraph_config.get("cleanup_older_than")
 ):
     msg = (
-        "omnigraph:cleanup_keep must be at least 1 and replaces "
+        f"omnigraph:cleanup_keep must be from 1 to {MAX_CLEANUP_KEEP} and replaces "
         "omnigraph:cleanup_older_than rather than combining with it, got "
         f"cleanup_keep={CLEANUP_KEEP!r}"
     )

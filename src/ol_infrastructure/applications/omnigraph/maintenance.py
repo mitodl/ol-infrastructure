@@ -172,21 +172,26 @@ DEFAULT_CLEANUP_OLDER_THAN = "2d"
 # alone. The image's CLI carries a backport of ModernRelay/omnigraph#1188
 # (agent-kit docker/patches/omnigraph-cleanup-keep-from-listing.patch), so
 # cleanup takes each branch's `__manifest` version numbers from the
-# `_versions/` listing. `--keep 1` then reads only the head and, on a writer
-# branch, its fork-point base, so its plan stops growing with the commits
-# below them. `--older-than` still reads the commit time of every other
-# version, and cleanup never removes `__manifest` versions (#644), so that set
-# grows by one per commit. The two are never passed together: a cutoff makes
+# `_versions/` listing. `--keep 1` then reads only what it retains (each
+# branch head, a non-main branch's base, merge bases and tags) and no manifest
+# for an older commit it drops. The listing still grows with commits, but the
+# per-commit manifest reads stop. `--older-than` still reads the commit time of
+# every other version, and cleanup never removes `__manifest` versions (#644),
+# so that set grows by one per commit. The two are never passed together: a cutoff makes
 # cleanup read every version below the newest N, so the pair's plan grows with
 # history as `--older-than` alone does, and the image refuses it.
 #
-# `--keep 1` is one-way. It deletes the table versions only older commits pin,
-# and those commits stay listed. A later run whose policy retains one of them
-# (a larger count, or an age that still covers it) finds its pins gone and
-# refuses that table's sweep, deleting nothing for it (#644; omnigraph
-# collector.rs resolve_roots). It also keeps no history between runs, so the
-# `query --snapshot` undelete above lasts until the next cleanup night, after
-# which the restore is the bucket's noncurrent versions or a backup.
+# Leaving `--keep 1` has a cost. It deletes the table versions only older
+# commits pin, and those commits stay listed. A later run whose policy retains
+# one of them finds its pins gone and refuses that table's sweep (#644;
+# omnigraph collector.rs resolve_roots), and one refused table stops data-file
+# deletion for every table in the graph on that run (protect_borrowed_files).
+# Back on an age, that lasts until the last `--keep 1` night is older than the
+# age. On a larger count, it lasts until each branch has that many newer
+# commits, which on a quiet writer branch may be never. It also keeps no
+# history between runs, so the `query --snapshot` undelete above lasts until
+# the next cleanup night, after which the restore is the bucket's noncurrent
+# versions or a backup.
 
 # Both jobs are S3-bound, single-threaded per graph, and run over a store whose
 # graphs are small. An hour without finishing means a wedged S3 connection or a

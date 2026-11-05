@@ -268,21 +268,24 @@ Query latency is driven by fragment count, which the nightly optimize handles.
 
 The image's CLI carries a backport of ModernRelay/omnigraph#1188, so `cleanup
 --keep N` with no `--older-than` takes each branch's commit numbers from the
-`_versions/` listing and reads only the commits it retains (the head, and a
-writer branch's base). Its plan no longer grows with the commit manifests.
-`--older-than` still reads one manifest per older commit. Setting
+`_versions/` listing and reads only the commits it retains (each branch head,
+a non-main branch's base, merge bases and tags). The listing still grows with
+commits, but it reads no manifest for an older commit it drops, while
+`--older-than` reads one per older commit. Setting
 `omnigraph:cleanup_keep` switches the window to `--keep` alone; the stack
 refuses it together with `omnigraph:cleanup_older_than`, and the image refuses
 both env vars together, because with both cleanup reads every commit below
 the newest N and its plan grows as `--older-than`'s does.
 
-It is one-way. A `--keep 1` run deletes the table versions that only older
-commits pin, and those commits stay listed (#644). A later run that retains
-one of them, with a larger count or an age that still covers it, refuses that
-table's sweep and deletes nothing for it. Do not remove or raise
-`omnigraph:cleanup_keep` on an environment that has run it without planning
-for that. It also keeps no history between cleanup nights, so the
-`query --snapshot` undelete above lasts only until the next one.
+Moving off it has a cost. A `--keep 1` run deletes the table versions that
+only older commits pin, and those commits stay listed (#644). A later run that
+retains one of them refuses that table's sweep, and one refused table stops
+data-file deletion for every table in the graph on that run. Removing
+`omnigraph:cleanup_keep` (back to `cleanup_older_than`) refuses until the last
+`--keep 1` night is older than that age, about 2 nights at the default.
+Raising it refuses until each branch has that many newer commits, which on a
+quiet writer branch may be never. It also keeps no history between cleanup
+nights, so the `query --snapshot` undelete above lasts only until the next one.
 
 ## Reading a failed run
 
