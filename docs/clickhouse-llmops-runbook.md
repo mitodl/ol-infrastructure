@@ -484,8 +484,10 @@ upgrade goes to QA first.
      apply updates the CRDs, the config
      ConfigMaps and the `ol-overrides` ClickHouseOperatorConfiguration before
      it replaces the operator pod (a `config.kubernetes.io/depends-on`
-     annotation on the Deployment, whose rolling update has no surge, so the
-     old operator stops before the new one starts). Never
+     annotation on the Deployment). The rolling update has no surge, which
+     narrows but doesn't close the overlap: the new operator can start while
+     the old one is still inside its 30s grace period, and with no leader
+     election both reconcile during that window. Never
      delete the CRDs, or move them to another ConfigGroup: deleting a CRD
      deletes every CHI and CHK of that kind. Read the release notes for changes
      to the Keeper defaults, which roll every Keeper pod, and for changes to
