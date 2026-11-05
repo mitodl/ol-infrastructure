@@ -55,6 +55,20 @@ class _Mocks(pulumi.runtime.Mocks):
         }
 
 
+@pytest.fixture(autouse=True)
+def _no_ecr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the HTTP-contract check off the network.
+
+    Pulumi mocks don't intercept boto3, so without this every case reaches the
+    real ECR. A test that wants a mismatch patches the reader again after this.
+    """
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda *_: ("0.14",),
+    )
+
+
 def _build(  # noqa: PLR0913
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -64,6 +78,7 @@ def _build(  # noqa: PLR0913
     migration_armed: bool = False,
     boot_budget_seconds: int | None = None,
     deployed_marks: dict[str, float] | None = None,
+    deployed_witan_http_api_contracts: list[str] | None = None,
 ) -> tuple[_Mocks, data_tier.OmnigraphDataTier]:
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
@@ -100,6 +115,7 @@ def _build(  # noqa: PLR0913
         boot_budget_seconds=boot_budget_seconds,
         deployed_written_internal_schema=deployed_marks,
         storage_restored_to_format=None,
+        deployed_witan_http_api_contracts=deployed_witan_http_api_contracts,
     )
     return mocks, tier
 
@@ -220,6 +236,22 @@ def test_the_mark_is_exported_before_the_server_deployment(monkeypatch):
 
     assert exported == {"written_internal_schema": {"": 16}}
     assert deployments == []
+
+
+def test_a_server_contract_the_deployed_witan_cannot_speak_is_refused(monkeypatch):
+    """The witan stack's export reaches the deploy-order guard."""
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda *_: ("0.14",),
+    )
+    with pytest.raises(ValueError, match="Release witan's gate first"):
+        _build(
+            monkeypatch,
+            served_format=16,
+            image_format=16,
+            deployed_witan_http_api_contracts=["0.13"],
+        )
 
 
 def test_a_rollback_below_the_roots_written_format_is_refused(monkeypatch):
