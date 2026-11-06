@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, Resource, ResourceOptions
 
-from bridge.lib.versions import MIMIR_DISTRIBUTED_CHART_VERSION
+from bridge.lib.versions import MIMIR_DISTRIBUTED_CHART_VERSION, MIMIR_VERSION
 from ol_infrastructure.applications.observability_archive.storage import (
     MIMIR_BLOCKS_STORAGE_PREFIX,
     MIMIR_RULER_STORAGE_PREFIX,
@@ -31,9 +31,6 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 RELEASE_NAME = "mimir"
 HTTP_PORT = 8080
-# Pinned explicitly rather than inherited from the chart's appVersion so a
-# chart bump and a Mimir bump are separate, reviewable diffs.
-MIMIR_IMAGE_TAG = "3.2.3"
 STORAGE_CLASS = "ebs-gp3-sc"
 
 # What Grafana Cloud promotes from OTLP resource attributes to metric labels,
@@ -260,7 +257,10 @@ def build(  # noqa: PLR0913
         )
 
     values: dict[str, object] = {
-        "image": {"repository": f"{registry}/grafana/mimir", "tag": MIMIR_IMAGE_TAG},
+        # Pinned in versions.py rather than inherited from the chart's
+        # appVersion, so Renovate proposes the image bump and the chart bump
+        # as separate, reviewable diffs.
+        "image": {"repository": f"{registry}/grafana/mimir", "tag": MIMIR_VERSION},
         "global": {"podLabels": pod_labels},
         "serviceAccount": {
             "create": True,
