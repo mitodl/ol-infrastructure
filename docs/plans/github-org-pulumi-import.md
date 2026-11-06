@@ -1146,3 +1146,133 @@ because the evidence is what makes a decision re-examinable when the estate chan
    Recommend deferring to its own project rather than smuggling it into this one. Note that
    §4.1's reasoning was rewritten on 2026-08-03: the resource is importable after all, and the
    reason to keep values out is the empty-diff gate, not a provider limitation.
+
+---
+
+## 10. Proposals for review (drafted 2026-10-26)
+
+These are drafts and nothing here has been applied. Each one needs a team decision before
+any YAML or Pulumi changes. Counts assume the 11 dormant repos are archived in the same
+batch: default-labels-repo, mit-open-bk (a fork), django-cas-mapper, edxcut, mit-moira,
+mitx_cas_mapper, realistic-mm-users, reddit-config, template-mit-demo,
+world_geographic_regions and xanalytics. That leaves 62 active non-fork repos, all
+`tier-1`.
+
+### 10.1 Topics vocabulary (CON-05)
+
+CON-05 fires on 152 of 161 active repos, but 98 of those are upstream forks. Topics on a
+fork describe somebody else's project, so **exempt `fork` from CON-05** the way CON-03
+already exempts them. That leaves the 62 repos below: 54 have no topics, and 8 already
+carry some.
+
+**Proposal:** every active non-fork repo carries exactly one **area** topic from a
+fixed list. Other topics stay free-form, so existing ones like `edx` or `django` are
+untouched. That makes the area enforceable from one validator in `archetypes.py`,
+using the same pattern as `tiers.py`. A free-form vocabulary can't be enforced at all.
+
+| Area topic | Repos (draft assignment; `?` means unsure) |
+|---|---|
+| `mit-learn` | mit-learn, learn-ai, mit-learn-api-clients, course-search-utils, open-podcast-data, open-resource-blocklists, open-video-data, open-discussions (predecessor; an archive candidate?) |
+| `mitx-online` | mitxonline, mitxonline-api-clients, mitxonline-theme |
+| `mitxpro` | mitxpro, mitxpro-theme |
+| `micromasters` | micromasters |
+| `mitx-residential` | mitx-theme, mitx-grading-library |
+| `ocw` | ocw-studio, ocw-hugo-themes, ocw-hugo-projects, ocw_oer_export, hacksnack |
+| `openedx` | open-edx-plugins, lehrer |
+| `odl-video` | odl-video-service, video_translation_demo `?` |
+| `data-platform` | ol-data-platform, ol-analytics-api, superset-nl-explorer, ol-notebook-extensions `?` |
+| `identity` | ol-keycloak, ol-keycloakify, keycloak-scim, access-forge, common-access |
+| `infrastructure` | ol-infrastructure, ol-concourse, concourse-workflow, ol-infra-health-checks, vault-raft-backup, vault-plugin-database-starrocks, alerting-omnibus, gwarek, apisix-testbed, oldevops-scratch |
+| `shared-libraries` | ol-django, django-aqueduct, smoot-design, eslint-config, redux-asserts, redux-hammock |
+| `dev-tooling` | .github, ol-github-workflows, release-script, agent-kit, open-learnix |
+| `org-docs` | handbook, hq, product, open-collaboration, platform-engineering-site, tech-talk-slides, ol-customizations-nytimes-library |
+
+To review: whether `openedx` should fold into the product areas, and the four `?`
+rows. Once it is agreed, rollout is one PR that gives each of the 62 repo files its area
+topic. micromasters, ocw-studio and ol-infrastructure already carry theirs. mitx-theme
+already carries `openedx`, which is also an area name, but is assigned `mitx-residential`,
+so the rollout replaces `openedx` there. Keeping both would fail the exactly-one-area
+validator. CON-05 then changes from "no topics" to "no area topic".
+
+### 10.2 Custom properties beyond `tier`
+
+The constraint comes from the `tier` rollout (PR #5317): a property defined as
+`required` with a `default_value` is applied to every repo as soon as it is created.
+So **both properties below are optional with no default**, and an audit rule reports
+any that are missing, so nothing is backfilled silently.
+
+- **`owning_team`**: `single_select`. Its allowed values are the GitHub team slugs that are
+  accountable for a repo: `devops`, `ol-data`, `odl-engineering`, `owners-mit-learn`,
+  `code-owners-mitx-online`. Using slugs rather than free text lets the property be
+  checked against `teams.yaml`. A `single_select` allowlist alone would not notice a
+  rename, so the rollout adds a validator in `archetypes.py` that fails when an
+  `owning_team` value is missing from `TEAM_IDS`, next to `_check_team_references`.
+  `odl-engineering` is the honest value for most repos. The property is still useful,
+  because it marks where `devops` or `ol-data` own a repo outright.
+- **`data_classification`**: `single_select` with `low-risk`, `medium-risk` and `high-risk`,
+  matching [MIT Information Protection's risk
+  classifications](https://infoprotect.mit.edu/risk-classifications/). It records the
+  highest-risk data the code handles or stores in production. Classification is a
+  judgement for the owning team, not something to infer here, so no draft values are
+  proposed. Once populated it becomes a ruleset target, for example requiring a second
+  review on `high-risk` repos.
+
+Order: agree the values, define both schemas in `organization/custom_properties.py`, then
+add per-repo values. That needs the code change in `repository.py` and the `imports`
+command that §5.2 calls out, because each property is its own
+`RepositoryCustomProperty`.
+
+### 10.3 Renaming `master` on the remaining 16 repos (CON-03)
+
+**Mechanism:** set `default_branch: main` in the repo YAML and pass `rename=True` to that
+repo's `BranchDefault`, behind a per-repo opt-in key. That key does not exist yet:
+`repository.py` builds `BranchDefault` with no `rename` argument. So step 0, before any
+wave, is the code change that adds the key and passes it through. Until that lands,
+setting `default_branch: main` on a `master` repo makes the apply fail, because the
+branch it switches to does not exist. The provider then renames the branch
+instead of switching to a branch that doesn't exist. GitHub [retargets open PRs, moves
+branch protection and redirects web
+URLs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-branches-in-your-repository/renaming-a-branch).
+It does **not** update workflow files, raw URLs, local clones or external consumers
+pinned to `@master`. Rulesets here target `~DEFAULT_BRANCH` and follow the rename.
+
+The waves below are ordered by what has to change outside GitHub. Counts are from
+2026-10-26: open PRs, plus lines mentioning `master` in the repo's own workflows.
+
+| Wave | Repo | Open PRs | `master` in workflows | Also needs |
+|---|---|---|---|---|
+| 1 | handbook | 5 | 0 | |
+| 1 | mitxpro-theme | 0 | 0 | |
+| 1 | open-podcast-data | 0 | 0 | |
+| 1 | open-resource-blocklists | 1 | 0 | |
+| 1 | redux-asserts | 11 | 0 | |
+| 2 | eslint-config | 10 | 1 | npm consumers pinned to a branch? |
+| 2 | mitx-grading-library | 10 | 1 | |
+| 2 | redux-hammock | 21 | 1 | |
+| 2 | release-script | 15 | 1 | |
+| 2 | vault-raft-backup | 9 | 3 | |
+| 3 | mitx-theme | 1 | 0 | `branch_override="master"` at `bridge/settings/openedx/version_matrix.py:434` and `:506` (not the `release=` field next to it, which names the Open edX release) |
+| 3 | micromasters | 51 | 3 | `repo_main_branch` in `bridge/settings/apps.py` |
+| 3 | mitxpro | 26 | 2 | `repo_main_branch` in `bridge/settings/apps.py` |
+| 3 | ocw-studio | 30 | 3 | `apps.py`, plus `ocw_course_publisher.py` pipeline |
+| 3 | odl-video-service | 17 | 2 | `repo_main_branch` in `bridge/settings/apps.py` |
+| 3 | open-discussions | 35 | 1 | decide archive-vs-rename first (§10.1) |
+
+After step 0, wave 1 needs only the YAML change. In wave 2 the same PR in each repo also fixes its
+workflow refs. In wave 3 an ol-infrastructure PR updates the deploy config in the same
+deploy window, and each product team is told first. Remember that GitHub closes an open
+PR whose head is the renamed branch.
+
+### 10.4 Actions secret values into Vault (deferred project)
+
+Per decision 4 in §9, this belongs in a separate witan project. The inventory to start from:
+the 62 active non-fork repos carry 64 Actions secret names across 17 repos, 51 of them
+distinct. Two patterns stand out:
+
+- `HEROKU_API_KEY` and `HEROKU_EMAIL` each appear on 6 repos. These are candidates for one
+  org-level secret scoped to those repos, or for removal if the Heroku deploys are gone.
+- `GH_PROJECT_AUTOMATION_TOKEN` appears on 3 repos. A long-lived GitHub token is the
+  usual case for a GitHub App installation token instead.
+
+The project should start with an SEC-09 rotation-age review of those names, so values
+are only moved for secrets that are still needed.
