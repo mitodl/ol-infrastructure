@@ -349,8 +349,11 @@ the build departs from the text above:
   image built before Phase 2 still loads the new module and a new image with the old module fails
   only on the new reference; `config.alloy` fans both the OTLP metrics and Alloy's self-metrics
   out to it, which needs a Concourse web AMI rebuild.
-- **Datasources** both carry `manageAlerts: false`, so neither is offered when a Grafana-managed
-  rule is built (D13 in the UI as well as in the test).
+- **Datasources** both carry `manageAlerts: false`, which keeps the archive (and its Mimir ruler)
+  out of the Alerting UI's data source-managed rules; the Mimir datasource also refuses to be a
+  Grafana-managed recording-rule target. Neither stops someone building a Grafana-managed alert
+  rule on the archive by hand (grafana/grafana#132468): D13 is enforced by the UID test for rules
+  declared in this repo, and by convention for anything created in the UI.
 - **`alloy-metrics`** gets a 1 GiB memory request for the second WAL; measured in the QA soak.
 - **Alerts** added to `metric_rules/telemetry_archive.py`: archive remote-write samples dropped or
   failed, Mimir compactor without a completed run in 24 hours, ruler evaluation failures.

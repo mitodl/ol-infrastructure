@@ -1057,6 +1057,7 @@ def setup_grafana(
                                             # enqueue_failed, which is what a full
                                             # non-blocking queue increments, is not.
                                             "otelcol_exporter_enqueue_failed_log_records_total",
+                                            "otelcol_exporter_enqueue_failed_metric_points_total",
                                             # alloy-logs' APISix cookie histograms, from
                                             # the stage.metrics above. The default list
                                             # keeps only loki_process_dropped_lines_total.
