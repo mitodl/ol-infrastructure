@@ -15,6 +15,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER,
     OPEN_METADATA_SESSION_EXPIRY_SECONDS,
+    SECONDS_IN_ONE_DAY,
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
 from bridge.secrets import sops as _bridge_sops
@@ -1326,6 +1327,10 @@ omjob_cleanup_cron_job = kubernetes.batch.v1.CronJob(
                 # The next day's run is the retry.
                 backoff_limit=0,
                 active_deadline_seconds=1800,
+                # failed_jobs_history_limit keeps a lone failed Job forever, and
+                # the WorkloadJobFailed rules alert while it exists. Two days
+                # keeps a failure visible past the next run.
+                ttl_seconds_after_finished=2 * SECONDS_IN_ONE_DAY,
                 template=kubernetes.core.v1.PodTemplateSpecArgs(
                     metadata=kubernetes.meta.v1.ObjectMetaArgs(
                         labels=omjob_cleanup_labels
