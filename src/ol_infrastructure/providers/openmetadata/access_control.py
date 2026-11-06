@@ -24,6 +24,8 @@ from .client import OpenMetadataClient, OpenMetadataConnection
 
 _CONNECTION_PROPS = ("server_url", "token_url", "client_id", "client_secret")
 _TEAM_TYPE = "Group"
+_ORGANIZATION_TEAM_TYPE = "Organization"
+ORGANIZATION_TEAM = "Organization"
 
 
 def _sorted_names(names: list[str]) -> list[str]:
@@ -408,6 +410,48 @@ class OpenMetadataTeamProvider(_AccessControlProvider):
             raise ValueError(msg)
 
 
+class OpenMetadataOrganizationPoliciesProvider(_AccessControlProvider):
+    """The policies of the ``Organization`` team, which every user inherits.
+
+    The server creates the team at first boot and refuses to delete it, so this
+    only adopts it and manages nothing else on it.  Bots inherit no team
+    policies.
+    """
+
+    collection = "teams"
+    kind = "team"
+    fields = "policies"
+    managed: ClassVar[dict[str, str]] = {"policies": "policies"}
+
+    def _create_body(
+        self, _client: OpenMetadataClient, props: dict[str, Any]
+    ) -> dict[str, Any]:
+        msg = f"team {props['name']!r} does not exist; the server creates it at boot"
+        raise ValueError(msg)
+
+    def _held(self, entity: dict[str, Any], _prop: str) -> Any:
+        return _ref_names(entity["policies"])
+
+    def _value(
+        self, client: OpenMetadataClient, props: dict[str, Any], _prop: str
+    ) -> Any:
+        return client.references("policies", "policy", props["policies"])
+
+    def _check(self, entity: dict[str, Any]) -> None:
+        if entity["teamType"] != _ORGANIZATION_TEAM_TYPE:
+            msg = (
+                f"team {entity['name']!r} has teamType {entity['teamType']!r}, "
+                f"expected {_ORGANIZATION_TEAM_TYPE!r}"
+            )
+            raise ValueError(msg)
+
+    def delete(self, _id: str, props: dict[str, Any]) -> None:
+        # Leave the policies as they are: dropping this resource stops managing
+        # them, and removing OrganizationPolicy would take every user's
+        # owner-based edit rights with it.
+        pulumi.log.info(f"Left the policies of team {props['name']} as they are")
+
+
 def _inputs(connection: OpenMetadataConnection, spec: BaseModel) -> dict[str, Any]:
     # None-valued fields are left out, as Pulumi would drop them anyway.
     return {
@@ -491,5 +535,37 @@ class OpenMetadataTeam(dynamic.Resource):
             OpenMetadataTeamProvider(),
             name,
             _inputs(connection, spec),
+            opts=_options(opts),
+        )
+
+
+class OpenMetadataOrganizationPolicies(dynamic.Resource):
+    """The exact policies of the ``Organization`` team, inherited by every user.
+
+    Name ``OrganizationPolicy`` among them unless every user's owner-based
+    rights should go.  Dropping this resource leaves the policies in place.
+
+    :param name: Pulumi resource name.
+    :param connection: The OpenMetadata API and an admin client for it.
+    :param policies: The names of the policies the team holds.
+    :param opts: Resource options; depend on the policies declared here.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        connection: OpenMetadataConnection,
+        policies: list[str],
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            OpenMetadataOrganizationPoliciesProvider(),
+            name,
+            {
+                **connection.to_props(),
+                "name": ORGANIZATION_TEAM,
+                "policies": _sorted_names(policies),
+                "drift": None,
+            },
             opts=_options(opts),
         )

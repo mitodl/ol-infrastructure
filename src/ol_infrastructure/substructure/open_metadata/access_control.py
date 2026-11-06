@@ -48,6 +48,40 @@ _DATA_ASSET_RESOURCES: list[str] = [
 ]
 
 POLICIES: list[OpenMetadataPolicySpec] = [
+    # A Slack destination's webhook URL is stored and returned unmasked
+    # (EventSubscriptionRepository only masks it on /testDestination), and the
+    # default policies give everyone ViewAll on every resource, so anyone who
+    # can log in could read the URL and post to the alert channel.  A deny rule
+    # wins over every allow and admins skip policy evaluation, so denying All
+    # leaves only admins able to read, edit or create alerts through
+    # /v1/events/subscriptions.  It also blocks the description edit the
+    # default DataConsumerPolicy allows, whose PATCH response carries the URL.
+    #
+    # Two reads no policy can close, so this keeps the URL from casual reads,
+    # not from a determined user:
+    # - A PATCH is authorized only for the operations its patch touches
+    #   (JsonPatchUtils.getMetadataOperations), so an empty patch passes for any
+    #   user and returns the whole alert.
+    # - The change-event feed (GET /v1/events) is not permission-checked and
+    #   keeps each alert's create and update, URL included, for the
+    #   change-event retention period.
+    OpenMetadataPolicySpec(
+        name="HideAlertDestinationsPolicy",
+        display_name="Hide Alert Destinations Policy",
+        description=(
+            "Keeps alerts and notifications, whose Slack webhook URLs are "
+            "returned unmasked, out of the alerts API for every user but admins."
+        ),
+        rules=[
+            OpenMetadataPolicyRule(
+                name="HideAlertDestinationsPolicy-EventSubscriptions",
+                description="Deny every operation on alerts and notifications.",
+                effect="deny",
+                resources=["eventsubscription"],
+                operations=["All"],
+            ),
+        ],
+    ),
     OpenMetadataPolicySpec(
         name="DataEngineerPolicy",
         display_name="Data Engineer Policy",
@@ -210,19 +244,25 @@ ROLES: list[OpenMetadataRoleSpec] = [
         ),
         policies=["DataContributorPolicy"],
     ),
+    # Bots inherit no team policies, so these two, whose tokens live outside
+    # OpenMetadata's own deployment, carry the deny themselves.
     OpenMetadataRoleSpec(
         name="DagsterBotRole",
         display_name="Dagster Bot Role",
         description="Role of dagster-bot.",
-        policies=["DagsterBotPolicy"],
+        policies=["DagsterBotPolicy", "HideAlertDestinationsPolicy"],
     ),
     OpenMetadataRoleSpec(
         name="MetricsSyncBotRole",
         display_name="Metrics Sync Bot Role",
         description="Role of metrics-sync-bot.",
-        policies=["MetricsSyncBotPolicy"],
+        policies=["HideAlertDestinationsPolicy", "MetricsSyncBotPolicy"],
     ),
 ]
+
+# Every user inherits the Organization team's policies.  OrganizationPolicy is
+# the one the server seeds there (owner-based edit rights); it stays.
+ORGANIZATION_POLICIES: list[str] = ["HideAlertDestinationsPolicy", "OrganizationPolicy"]
 
 # Each is a Group (the only team type that can own assets and hold users) under
 # Organization.  Asset ownership and alert routing refer to these names, so
