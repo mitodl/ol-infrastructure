@@ -323,10 +323,10 @@ the build departs from the text above:
 - **Caches**: results and metadata memcached only, at 128 MB (QA) / 256 MB (Production). The
   metadata cache is what keeps S3 LIST/GET calls, the one bill line that scales with queries,
   from growing with every store-gateway, querier and ruler bucket sync. No chunk or index cache.
-- **Series match Cloud's.** `distributor.otel_metric_suffixes_enabled: true` so the OTLP histogram
-  is `http_server_duration_milliseconds_*` here as in Cloud, and `limits.promote_otel_resource_attributes`
-  is Grafana Cloud's default promotion list, so `service_name`, `k8s_pod_name` and the rest are
-  labels in both. `out_of_order_time_window: 2h` absorbs a writer draining up to an hour of queued
+- **Series match Cloud's.** `limits.otel_metric_suffixes_enabled: true` so the OTLP histogram is
+  `http_server_duration_milliseconds_*` here as in Cloud, and `limits.promote_otel_resource_attributes`
+  (a comma-separated string) is Grafana Cloud's default promotion list, so `service_name`,
+  `k8s_pod_name` and the rest are labels in both. `out_of_order_time_window: 2h` absorbs a writer draining up to an hour of queued
   samples after an outage.
 - **Mimir's own metrics are filtered.** The chart's ServiceMonitors carry a `keep` relabeling to
   the families the alerts and a health dashboard read. Loki's Phase 1 ServiceMonitors are not
