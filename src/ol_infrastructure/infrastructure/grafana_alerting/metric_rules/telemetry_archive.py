@@ -17,11 +17,11 @@ there. Their drops are visible only in journald on the host.
 
 Metric names were confirmed against what the collectors emit before the rules
 landed; what reaches Cloud is checked in the QA soak of each phase.
-`otelcol_exporter_send_failed_log_records_total` and the
+`otelcol_exporter_send_failed_(log_records|metric_points)_total` and the
 `prometheus_remote_storage_samples_(dropped|failed)_total` pair are in the
-chart's default Alloy allowlist; `otelcol_exporter_enqueue_failed_log_records_total`
-is added to includeMetrics in substructure/aws/eks/grafana.py because it is
-what a full non-blocking queue increments. Mimir's own series arrive through
+chart's default Alloy allowlist; the `otelcol_exporter_enqueue_failed_*`
+counters are added to includeMetrics in substructure/aws/eks/grafana.py
+because they are what a full non-blocking queue increments. Mimir's own series arrive through
 its ServiceMonitors, filtered to the families named in
 observability_archive/mimir.py.
 
@@ -50,6 +50,15 @@ _ALLOY_DROPS_EXPR = (
     "sum by (cluster, namespace, pod, exporter) ("
     "rate({__name__=~"
     '"otelcol_exporter_(send|enqueue)_failed_log_records_total",'
+    ' exporter=~".*archive.*", collector_id=""}[10m])'
+    ") > 0"
+)
+# The same exporter carries OTLP metrics from Phase 2; scraped metrics take
+# the remote-write path and are covered by _REMOTE_WRITE_DROPS_EXPR below.
+_ALLOY_OTLP_METRIC_DROPS_EXPR = (
+    "sum by (cluster, namespace, pod, exporter) ("
+    "rate({__name__=~"
+    '"otelcol_exporter_(send|enqueue)_failed_metric_points_total",'
     ' exporter=~".*archive.*", collector_id=""}[10m])'
     ") > 0"
 )
@@ -165,6 +174,19 @@ def create(
                     "description": "The archive's compactor in {{ $labels.namespace }} on {{ $labels.cluster }} last applied retention more than a day ago. Data past retention is not being removed and delete requests are not being processed; the S3 lifecycle rule is the only backstop. Check the loki-compactor pod and its S3 access. See docs/telemetry-archive-runbook.md.",
                 },
                 datas=rd(_RETENTION_STALE_EXPR),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="TelemetryArchiveAlloyDroppingOtlpMetrics",
+                condition="C",
+                for_="30m",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", **_ROUTING},
+                annotations={
+                    "summary": "Alloy {{ $labels.pod }} on {{ $labels.cluster }} is dropping archive OTLP metrics",
+                    "description": "The archive exporter {{ $labels.exporter }} in {{ $labels.namespace }}/{{ $labels.pod }} on {{ $labels.cluster }} has failed to send or enqueue OTLP metric points for 30 minutes. Grafana Cloud delivery is unaffected by design; the archive is missing these application metrics. Check the archive write endpoint (docs/telemetry-archive-runbook.md) and the Mimir distributors in observability-archive on the operations cluster.",
+                },
+                datas=rd(_ALLOY_OTLP_METRIC_DROPS_EXPR),
             ),
             alerting.RuleGroupRuleArgs(
                 name="TelemetryArchiveAlloyDroppingMetrics",

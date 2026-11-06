@@ -85,6 +85,8 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/mitxonline/": ["NGINX_VERSION"],
     "applications/observability_archive/": [
         "LOKI_CHART_VERSION",
+        "MIMIR_DISTRIBUTED_CHART_VERSION",
+        "MIMIR_VERSION",
         "PDC_AGENT_VERSION",
         "TRAEFIK_CHART_VERSION",
     ],

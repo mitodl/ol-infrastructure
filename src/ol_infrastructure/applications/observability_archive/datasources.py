@@ -54,8 +54,12 @@ def loki_datasource(
                 # Long ranges are the point of this datasource. Loki splits
                 # them by split_queries_by_interval server side.
                 "timeout": 300,
-                # Plan D13 in the UI as well as in the test: the datasource
-                # is not offered when a Grafana-managed alert rule is built.
+                # Keeps the archive out of the Alerting UI's data
+                # source-managed rules. It does not stop a Grafana-managed
+                # rule from querying this datasource (grafana/grafana#132468);
+                # plan D13 is enforced for rules declared in this repo by
+                # test_no_archive_datasource_in_alert_rules.py and otherwise
+                # by convention.
                 "manageAlerts": False,
             }
         ),
@@ -89,7 +93,13 @@ def mimir_datasource(
                 # never shorter than two samples.
                 "timeInterval": "60s",
                 "queryTimeout": "300s",
+                # The archive's ruler exists for recording_rules.py, not for
+                # rules written in the Alerting UI; and Grafana-managed
+                # recording rules must not write into the archive. Neither
+                # setting stops a Grafana-managed alert rule from querying
+                # this datasource (see loki_datasource).
                 "manageAlerts": False,
+                "allowAsRecordingRulesTarget": False,
             }
         ),
         opts=ResourceOptions(provider=read_path.provider),
