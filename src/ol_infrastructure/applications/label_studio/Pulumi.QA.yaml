@@ -1,0 +1,14 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgEPqONFJyebewQ2KoZrB1GpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIKGRIXDnYbXcvexBAgEQgDv9J98CONmRb7T0eU0GlNrnsztSEfN1ERA/Qa1jJCACNvx2ZtbpeEDaXNt2hyw2pWQNUe2tRWLVonA8Mw==
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  label_studio:domain: label-studio-qa.ol.mit.edu
+  label_studio:db_instance_size: db.t4g.small
+  label_studio:admin_email: ol-data@mit.edu
+  label_studio:db_password:
+    secure: v1:u1jTc0Hqq71T9oyl:ELzZsw0WsJzs19ePooq7mxVLX0WnuZ6QHB/uRER5YkfqyYxMDZovLTGdqQ0YymROP/BQywByeVONTT4=
+  label_studio:admin_password:
+    secure: v1:RPBAewKxNEv3CPZO:tY04/AXowlMR9UTf20RdobFh9vEoXdX/9grwVv/SvLTDAGNaIrNHOPPH0GTT0O56IQcJXi/4LhMmrrg=
