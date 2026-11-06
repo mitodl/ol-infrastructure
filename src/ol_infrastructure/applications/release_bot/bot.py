@@ -1140,14 +1140,24 @@ _COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 _MAX_HOTFIX_COMMITS = 10
 
 
+def _abbreviate(shas: list[str]) -> list[str]:
+    """Return *shas* cut to seven digits, or in full if that makes two the same.
+
+    Two commits can share their first seven digits, and a retry command that
+    named both by the same seven would ask for one of them.
+    """
+    short = [sha[:7] for sha in shas]
+    return short if len(set(short)) == len(set(shas)) else list(shas)
+
+
 def _short_shas(shas: list[str]) -> str:
-    """Render *shas* as Slack code spans of their first seven digits."""
-    return ", ".join(f"`{sha[:7]}`" for sha in shas)
+    """Render *shas* as Slack code spans, abbreviated where that is unambiguous."""
+    return ", ".join(f"`{sha}`" for sha in _abbreviate(shas))
 
 
 def _hotfix_command(app_name: str, shas: list[str]) -> str:
     """Return the `/doof hotfix` that requests *shas* again."""
-    return f"/doof hotfix {app_name} {' '.join(sha[:7] for sha in shas)}"
+    return f"/doof hotfix {app_name} {' '.join(_abbreviate(shas))}"
 
 
 def _those(shas: list[str]) -> str:
@@ -1188,6 +1198,9 @@ async def _make_hotfix_requests(cfg, app_name, shas, pending) -> str | None:
 
     A request that fails part way is withdrawn, so the commits before it are
     not left for the next release build to cut as a hotfix nobody asked for.
+    The commit whose request failed is withdrawn too: GitHub can create a tag
+    and still fail the response, e.g. on a timeout.  It was not pending, so the
+    tag, if there is one, is this command's own.
     """
     requested: list[str] = []
     for sha in shas:
@@ -1198,10 +1211,15 @@ async def _make_hotfix_requests(cfg, app_name, shas, pending) -> str | None:
         except Exception:
             log.exception("Failed to request hotfix of %s for %s", sha, app_name)
             error = f"❌ Failed to request a hotfix of `{sha[:7]}`."
-            if requested and not await _withdraw_hotfix_requests(cfg.repo, requested):
+            if not await _withdraw_hotfix_requests(cfg.repo, [*requested, sha]):
+                if requested:
+                    return (
+                        f"{error} The {len(requested)} already requested could not "
+                        f"be withdrawn; `/doof abandon {app_name}` cancels them."
+                    )
                 return (
-                    f"{error} The {len(requested)} already requested could not be "
-                    f"withdrawn; `/doof abandon {app_name}` cancels them."
+                    f"{error} If it was created anyway, `/doof abandon {app_name}` "
+                    "cancels it."
                 )
             return error + (" Nothing was requested." if requested else "")
         requested.append(sha)

@@ -2635,11 +2635,57 @@ async def test_hotfix_withdraws_what_it_requested_when_a_request_fails(
         repos, slack.ack, slack.respond, _command("my-app aaaaaaa bbbbbbb"), {}
     )
 
-    cancel.assert_awaited_once_with("mitodl/my-app", [_SHA])
+    # The failed one too: GitHub can create a tag and still fail the response.
+    cancel.assert_awaited_once_with("mitodl/my-app", [_SHA, _OTHER_SHA])
     assert "Failed to request a hotfix of `bbbbbbb`. Nothing was requested." in (
         slack.said
     )
     assert not [c for c in hotfix_api.calls if c[0] in ("check", "trigger")]
+
+
+async def test_a_single_failed_request_keeps_its_message(
+    repos, slack, hotfix_api, monkeypatch
+):
+    hotfix_api.request_hotfix.side_effect = RuntimeError("timeout")
+    cancel = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot.github, "cancel_hotfix_requests", cancel)
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa"), {}
+    )
+
+    cancel.assert_awaited_once_with("mitodl/my-app", [_SHA])
+    assert slack.said == "❌ Failed to request a hotfix of `aaaaaaa`."
+
+
+async def test_a_single_failed_request_that_cannot_be_withdrawn_says_abandon(
+    repos, slack, hotfix_api, monkeypatch
+):
+    hotfix_api.request_hotfix.side_effect = RuntimeError("timeout")
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(side_effect=RuntimeError("x"))
+    )
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa"), {}
+    )
+
+    assert "If it was created anyway, `/doof abandon my-app` cancels it." in (
+        slack.said
+    )
+
+
+def test_retry_commands_name_commits_that_share_seven_digits_in_full():
+    """The same seven digits twice would ask for one commit, not two."""
+    first, second = "abcdef1" + "0" * 33, "abcdef1" + "1" * 33
+
+    assert bot._hotfix_command("my-app", [first, second]) == (
+        f"/doof hotfix my-app {first} {second}"
+    )
+    assert bot._short_shas([first, second]) == f"`{first}`, `{second}`"
+    assert bot._hotfix_command("my-app", [_SHA, _OTHER_SHA]) == (
+        "/doof hotfix my-app aaaaaaa bbbbbbb"
+    )
 
 
 async def test_hotfix_says_so_when_it_cannot_withdraw_a_partial_request(
