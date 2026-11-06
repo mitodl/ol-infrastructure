@@ -1,6 +1,12 @@
 """OpenMetadata resources for Pulumi."""
 
-from .bot import OpenMetadataBot, OpenMetadataBotProvider, OpenMetadataBotSpec
+from .bot import (
+    OpenMetadataBot,
+    OpenMetadataBotProvider,
+    OpenMetadataBotSpec,
+    OpenMetadataSystemBot,
+    OpenMetadataSystemBotProvider,
+)
 from .client import OpenMetadataConnection
 from .event_subscription import (
     AlertArgument,
@@ -20,4 +26,6 @@ __all__ = [
     "OpenMetadataEventSubscription",
     "OpenMetadataEventSubscriptionProvider",
     "OpenMetadataEventSubscriptionSpec",
+    "OpenMetadataSystemBot",
+    "OpenMetadataSystemBotProvider",
 ]

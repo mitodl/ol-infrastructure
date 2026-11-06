@@ -19,6 +19,11 @@ by hand under Settings > Bots before this provider were.
 update, as every dynamic provider does. After the provisioner's client secret
 changes, the refresh before an update fails with a 401 until one
 ``pulumi up --skip-refresh`` saves the new secret.
+
+The bots OpenMetadata seeds itself (ingestion-bot, lineage-bot and the rest,
+with provider ``system``) are read with ``OpenMetadataSystemBot`` instead. The
+server re-applies their seed roles on every boot and refuses to delete them, so
+that resource only reads the token and never writes to the bot.
 """
 
 from typing import Any, Literal
@@ -82,12 +87,16 @@ def _held_roles(user: dict[str, Any]) -> list[str]:
     )
 
 
-def _token(client: OpenMetadataClient, user_id: str) -> str:
+def _jwt_config(client: OpenMetadataClient, user_id: str) -> dict[str, Any]:
     auth_mechanism = client.get(f"users/auth-mechanism/{user_id}")
     if auth_mechanism is None:
         msg = f"bot user {user_id} has no authentication mechanism"
         raise RuntimeError(msg)
-    return auth_mechanism["config"]["JWTToken"]
+    return auth_mechanism["config"]
+
+
+def _token(client: OpenMetadataClient, user_id: str) -> str:
+    return _jwt_config(client, user_id)["JWTToken"]
 
 
 def _apply(client: OpenMetadataClient, props: dict[str, Any]) -> dict[str, Any]:
@@ -289,6 +298,117 @@ class OpenMetadataBot(dynamic.Resource):
                 "user_id": None,
                 "is_admin": None,
                 "bot_in_sync": None,
+                "token": None,
+            },
+            opts=pulumi.ResourceOptions.merge(
+                opts,
+                pulumi.ResourceOptions(
+                    additional_secret_outputs=["token", "client_secret"]
+                ),
+            ),
+        )
+
+
+def _system_bot_outs(
+    client: OpenMetadataClient, props: dict[str, Any], user: dict[str, Any]
+) -> dict[str, Any]:
+    config = _jwt_config(client, user["id"])
+    # The jobs that hold the token run unattended, and nothing here would
+    # notice an expired one before they fail.
+    if config["JWTTokenExpiry"] != "Unlimited":
+        msg = (
+            f"system bot {props['name']!r} has a token that expires "
+            f"({config['JWTTokenExpiry']}); regenerate it with Unlimited expiry"
+        )
+        raise ValueError(msg)
+    return {**props, "user_id": user["id"], "token": config["JWTToken"]}
+
+
+class OpenMetadataSystemBotProvider(dynamic.ResourceProvider):
+    """Reads the token of a bot OpenMetadata seeds, without changing the bot.
+
+    The server seeds the token with Unlimited expiry, and reading it does not
+    revoke it, so every holder of it keeps working. A token regenerated in the
+    UI with any other expiry fails the read rather than reaching Vault.
+    """
+
+    def create(self, props: dict[str, Any]) -> dynamic.CreateResult:
+        client = OpenMetadataClient(props)
+        name = props["name"]
+        bot = client.get(f"bots/name/{name}")
+        if bot is None or bot.get("provider") != "system":
+            msg = (
+                f"{name!r} is not a bot OpenMetadata seeds; manage it with "
+                "OpenMetadataBot"
+            )
+            raise ValueError(msg)
+        user = client.get(f"users/name/{name}")
+        if user is None:
+            msg = f"system bot {name!r} has no user"
+            raise RuntimeError(msg)
+        return dynamic.CreateResult(
+            id_=user["id"], outs=_system_bot_outs(client, props, user)
+        )
+
+    def read(self, id_: str, props: dict[str, Any]) -> dynamic.ReadResult:
+        client = OpenMetadataClient(props)
+        user = client.get(f"users/{id_}")
+        if user is None:
+            return dynamic.ReadResult(id_="", outs={})
+        return dynamic.ReadResult(id_=id_, outs=_system_bot_outs(client, props, user))
+
+    def diff(
+        self, _id: str, olds: dict[str, Any], news: dict[str, Any]
+    ) -> dynamic.DiffResult:
+        changed = [key for key in _CONNECTION_PROPS if olds.get(key) != news[key]]
+        replaces = ["name"] if olds["name"] != news["name"] else []
+        return dynamic.DiffResult(changes=bool(changed or replaces), replaces=replaces)
+
+    def update(
+        self, id_: str, _olds: dict[str, Any], news: dict[str, Any]
+    ) -> dynamic.UpdateResult:
+        client = OpenMetadataClient(news)
+        user = client.get(f"users/{id_}")
+        if user is None:
+            msg = (
+                f"bot user {id_} is not at {news['server_url']}; if it was "
+                "deleted, refresh."
+            )
+            raise ValueError(msg)
+        return dynamic.UpdateResult(outs=_system_bot_outs(client, news, user))
+
+    def delete(self, _id: str, props: dict[str, Any]) -> None:
+        # OpenMetadata refuses to delete a system bot, and the bot was never
+        # this resource's to delete.
+        pulumi.log.info(f"Left system bot {props['name']} in OpenMetadata")
+
+
+class OpenMetadataSystemBot(dynamic.Resource):
+    """A bot OpenMetadata seeds, whose JWT is a secret output.
+
+    :param name: Pulumi resource name.
+    :param connection: The OpenMetadata API and an admin client for it.
+    :param bot_name: The seeded bot's name, e.g. ``ingestion-bot``.
+    :param opts: Resource options.
+    """
+
+    user_id: pulumi.Output[str]
+    token: pulumi.Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        connection: OpenMetadataConnection,
+        bot_name: str,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            OpenMetadataSystemBotProvider(),
+            name,
+            {
+                **connection.to_props(),
+                "name": bot_name,
+                "user_id": None,
                 "token": None,
             },
             opts=pulumi.ResourceOptions.merge(

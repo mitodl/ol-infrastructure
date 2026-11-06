@@ -5,8 +5,8 @@ metadata connector, plus the IRSA role for the ``openmetadata-ingestion``
 service account so ingestion pods can access AWS Glue, S3, and RDS IAM auth.
 
 Connector credentials are read from Kubernetes secrets managed by the
-OpenMetadata application stack (via Vault Secrets Operator). The ingestion-bot
-JWT is injected the same way.
+OpenMetadata application stack (via Vault Secrets Operator). The system bots'
+JWTs are injected the same way, from the Vault secrets this stack writes.
 
 CronOMJob pods authenticate to the OpenMetadata server API using the bot JWT
 token from the ``om-ingestion-bot`` K8s secret, and to data sources via
@@ -51,6 +51,7 @@ from ol_infrastructure.providers.openmetadata import (
     OpenMetadataConnection,
     OpenMetadataEventSubscription,
     OpenMetadataEventSubscriptionSpec,
+    OpenMetadataSystemBot,
 )
 from ol_infrastructure.providers.openmetadata.access_control import (
     OpenMetadataPolicy,
@@ -447,8 +448,8 @@ def _make_cronjob(  # noqa: PLR0913
     :param opts: Optional Pulumi resource options (e.g. depends_on).
     :param bot_secret_name: K8s secret that holds the OM bot JWT token.
         Defaults to ``"om-ingestion-bot"`` for metadata ingestion workflows.
-        Use ``"om-lineage-bot"``, ``"om-profiler-bot"``, or
-        ``"om-data-insight-bot"`` for other workflow types.
+        Use ``"om-lineage-bot"`` or ``"om-profiler-bot"`` for other workflow
+        types.
     :param resources: Pod resource requests/limits. Defaults to
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
@@ -1199,6 +1200,41 @@ vault.generic.Secret(
         {"token": metrics_sync_bot.token, "server_url": om_api_url}
     ),
 )
+
+# The bots OpenMetadata seeds that something here uses. The application stack
+# syncs each secret-openmetadata/<bot> into the om-<bot> K8s secret the Jobs
+# above read as OM_BOT_JWT_TOKEN. The other seeded bots (autoClassification-bot,
+# governance-bot, scim-bot, testsuite-bot, usage-bot) have no consumer.
+#
+# The token is read on refresh, so one regenerated in the UI reaches Vault only
+# at the next `pulumi up --refresh` of this stack, and the Jobs fail with the
+# old one until then. Regenerate a token only alongside that update.
+om_system_bots = {
+    bot_name: OpenMetadataSystemBot(
+        f"om-{bot_name}-{stack_info.env_suffix}",
+        connection=om_connection,
+        bot_name=bot_name,
+    )
+    for bot_name in ("ingestion-bot", "lineage-bot", "profiler-bot")
+}
+for bot_name, system_bot in om_system_bots.items():
+    vault.generic.Secret(
+        f"om-{bot_name}-vault-secret-{stack_info.env_suffix}",
+        path=f"secret-openmetadata/{bot_name}",
+        data_json=Output.json_dumps({"token": system_bot.token}),
+    )
+
+# The contracts sync pipeline in ol_concourse/pipelines/applications/
+# ol_data_contracts_sync.py publishes ol-data-platform's contracts/ to
+# production OpenMetadata as the ingestion bot.
+if stack_info.env_suffix == "production":
+    vault.generic.Secret(
+        f"om-concourse-contracts-bot-vault-secret-{stack_info.env_suffix}",
+        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
+        data_json=Output.json_dumps(
+            {"token": om_system_bots["ingestion-bot"].token, "server_url": om_api_url}
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
