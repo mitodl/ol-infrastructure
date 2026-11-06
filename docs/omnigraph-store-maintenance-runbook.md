@@ -34,7 +34,9 @@ finishes, for every witan user. The command is in the server image (agent-kit
 4. runs `optimize` on every graph in `cluster.yaml`, then on the days in
    `omnigraph:cleanup_iso_weekdays` (default every day; Production and QA set
    `[]`, so their windows only optimize) also
-   `cleanup --older-than <cleanup_older_than>`, force-unlocking after each;
+   `cleanup --older-than <cleanup_older_than>` (or `cleanup --keep
+   <cleanup_keep>` where `omnigraph:cleanup_keep` is set, CI only), force-unlocking
+   after each;
 5. scales the Deployment back to the replica count it found and releases the
    Lease.
 
@@ -261,6 +263,29 @@ for as long as the commit before the delete is retained. Past that, and for a
 bad cleanup, the restore is the bucket's noncurrent object versions (30 days)
 or an `aws s3 sync` backup.
 Query latency is driven by fragment count, which the nightly optimize handles.
+
+### `omnigraph:cleanup_keep` (`--keep 1`)
+
+The image's CLI carries a backport of ModernRelay/omnigraph#1188, so `cleanup
+--keep N` with no `--older-than` takes each branch's commit numbers from the
+`_versions/` listing and reads only the commits it retains (each branch head,
+a non-main branch's base, merge bases and tags). The listing still grows with
+commits, but it reads no manifest for an older commit it drops, while
+`--older-than` reads one per older commit. Setting
+`omnigraph:cleanup_keep` switches the window to `--keep` alone; the stack
+refuses it together with `omnigraph:cleanup_older_than`, and the image refuses
+both env vars together, because with both cleanup reads every commit below
+the newest N and its plan grows as `--older-than`'s does.
+
+Moving off it has a cost. A `--keep 1` run deletes the table versions that
+only older commits pin, and those commits stay listed (#644). A later run that
+retains one of them refuses that table's sweep, and one refused table stops
+data-file deletion for every table in the graph on that run. Removing
+`omnigraph:cleanup_keep` (back to `cleanup_older_than`) refuses until the last
+`--keep 1` night is older than that age, about 2 nights at the default.
+Raising it refuses until each branch has that many newer commits, which on a
+quiet writer branch may be never. It also keeps no history between cleanup
+nights, so the `query --snapshot` undelete above lasts only until the next one.
 
 ## Reading a failed run
 

@@ -424,6 +424,21 @@ COUNCIL_PROBE_SCHEDULE = omnigraph_config.get("council_probe_schedule") or (
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
 )
+# `cleanup --keep` in place of `--older-than`. Moving off it has a cost; see
+# maintenance.py below DEFAULT_CLEANUP_OLDER_THAN before setting or removing it.
+# The upper bound is the CLI's: it parses the count as a u32.
+CLEANUP_KEEP: int | None = omnigraph_config.get_int("cleanup_keep")
+MAX_CLEANUP_KEEP = 2**32 - 1
+if CLEANUP_KEEP is not None and (
+    not 1 <= CLEANUP_KEEP <= MAX_CLEANUP_KEEP
+    or omnigraph_config.get("cleanup_older_than")
+):
+    msg = (
+        f"omnigraph:cleanup_keep must be from 1 to {MAX_CLEANUP_KEEP} and replaces "
+        "omnigraph:cleanup_older_than rather than combining with it, got "
+        f"cleanup_keep={CLEANUP_KEEP!r}"
+    )
+    raise ValueError(msg)
 
 # Per-actor admission caps (data_tier.py). Overridable per environment for the
 # same reason the schedules above are, and a sharper one: the count's default is
@@ -1158,6 +1173,7 @@ data_tier = create_data_tier(
     boot_budget_seconds=BOOT_BUDGET_SECONDS,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
+    cleanup_keep=CLEANUP_KEEP,
     # Arming a migration suspends the maintenance CronJobs for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and

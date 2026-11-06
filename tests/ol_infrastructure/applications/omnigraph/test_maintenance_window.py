@@ -40,7 +40,10 @@ SECONDS_TO_NEXT_WRITER = 40 * 60
 
 
 def _window(
-    *, suspend: bool = False, cleanup_iso_weekdays: tuple[int, ...] = (1, 3, 7)
+    *,
+    suspend: bool = False,
+    cleanup_iso_weekdays: tuple[int, ...] = (1, 3, 7),
+    cleanup_keep: int | None = None,
 ):
     return create_maintenance_window(
         stack_info=STACK_INFO,
@@ -56,6 +59,7 @@ def _window(
         cleanup_older_than="30d",
         cleanup_iso_weekdays=cleanup_iso_weekdays,
         depends_on=[],
+        cleanup_keep=cleanup_keep,
         suspend=suspend,
     )
 
@@ -218,6 +222,27 @@ def test_no_cleanup_days_render_as_an_empty_list():
         # The real provider drops the empty value and keeps the entry, as
         # `pulumi preview` shows. The image reads both as no cleanup days.
         assert env["OMNIGRAPH_CLEANUP_ISO_WEEKDAY"] in ("", None)
+
+    return window.cron_job.urn.apply(check)
+
+
+@pulumi.runtime.test
+def test_a_cleanup_count_replaces_the_age():
+    """The image refuses both retentions at once (agent-kit
+    docker/omnigraph_maintenance.py parse_cleanup_retention).
+    """
+    mocks = RecordingMocks()
+    pulumi.runtime.set_mocks(mocks, preview=False)
+    window = _window(cleanup_keep=1)
+
+    def check(_: object) -> None:
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
+        (container,) = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"][
+            "containers"
+        ]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        assert env["OMNIGRAPH_CLEANUP_KEEP"] == "1"
+        assert "OMNIGRAPH_CLEANUP_OLDER_THAN" not in env
 
     return window.cron_job.urn.apply(check)
 
