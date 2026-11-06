@@ -331,6 +331,14 @@ def _route_groups(bindings: definition.MitxonlineBindings):
     return direct, prefixed
 
 
+def test_oidc_timeout_is_unset_unless_the_bindings_set_it():
+    deployed = definition.direct_oidc_config(_deployed_bindings())
+    local = _local_bindings(oidc_secret_name=LOCAL_OIDC_SECRET, oidc_timeout=10)
+
+    assert deployed.oidc_timeout is None
+    assert definition.direct_oidc_config(local).oidc_timeout == 10
+
+
 def test_routes_follow_the_bound_hostnames():
     direct, prefixed = _route_groups(_deployed_bindings())
 
