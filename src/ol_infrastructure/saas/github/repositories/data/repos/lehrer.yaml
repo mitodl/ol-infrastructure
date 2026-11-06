@@ -13,6 +13,9 @@ allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
+copilot_code_review:
+  review_draft_pull_requests: false
+  review_on_push: false
 description: Dagger-based build pipeline for Open edX platform images
 has_discussions: false
 has_projects: true

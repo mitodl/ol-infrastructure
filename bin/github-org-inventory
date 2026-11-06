@@ -46,7 +46,12 @@ from ol_infrastructure.lib.github_helper import (
     GITHUB_API,
     get_installation_token,
 )
+from ol_infrastructure.saas.github.repositories.archetypes import (
+    COPILOT_REVIEW_KEY,
+    STRICT_REQUIRED_CHECKS_KEY,
+)
 from ol_infrastructure.saas.github.repositories.rulesets import (
+    COPILOT_REVIEW_RULESET_NAME,
     RELEASE_BRANCHES_RULESET_NAME,
     REQUIRED_CHECKS_RULESET_NAME,
 )
@@ -270,8 +275,12 @@ def _required_checks(
     name: str,
     protection: Any,
     rulesets: list[dict[str, Any]],
-) -> tuple[list[str], list[str]]:
-    """Split a repo's required check contexts into (ours, everyone else's).
+) -> tuple[list[str], list[str], bool]:
+    """Split a repo's required check contexts into (ours, everyone else's, strict).
+
+    `strict` is our ruleset's "require branches to be up to date" setting, read back
+    for the same reason as the contexts: a hand-added `required_status_checks_strict`
+    would otherwise be deleted by the next `crawl`.
 
     THIS EXISTS BECAUSE `crawl` REBUILDS EVERY YAML FROM SCRATCH. A key the crawl does
     not derive from live state is not preserved, it is deleted -- so a hand-added
@@ -304,6 +313,7 @@ def _required_checks(
     """
     ours: list[str] = []
     foreign: list[str] = []
+    strict = False
     if protection:
         foreign.extend(
             (protection.get("required_status_checks") or {}).get("contexts", []) or []
@@ -324,9 +334,16 @@ def _required_checks(
         ]
         if detail.get("name") == REQUIRED_CHECKS_RULESET_NAME:
             ours.extend(contexts)
+            strict = strict or any(
+                (rule.get("parameters") or {}).get(
+                    "strict_required_status_checks_policy", False
+                )
+                for rule in detail.get("rules") or []
+                if rule.get("type") == "required_status_checks"
+            )
         else:
             foreign.extend(contexts)
-    return sorted(set(ours)), sorted(set(foreign))
+    return sorted(set(ours)), sorted(set(foreign)), strict
 
 
 def _release_branches(
@@ -363,6 +380,40 @@ def _release_branches(
         ) or []
         branches.update(ref.removeprefix("refs/heads/") for ref in includes)
     return sorted(branches)
+
+
+def _copilot_review(
+    client: httpx.Client,
+    name: str,
+    rulesets: list[dict[str, Any]],
+) -> dict[str, bool] | None:
+    """Recover the parameters of our Copilot review ruleset, if the repo has one.
+
+    Same reasoning as `_release_branches`: `crawl` rebuilds every repo YAML, so a
+    `copilot_code_review` value it does not derive from live state is deleted by the
+    next crawl, and Pulumi then wants to remove the ruleset.
+
+    Only OUR ruleset counts, identified by `COPILOT_REVIEW_RULESET_NAME`. A hand-made
+    Copilot ruleset is not copied into the data, so nobody declares it by accident.
+    """
+    for listed in rulesets:
+        if listed.get("source_type") != "Repository":
+            continue
+        if listed.get("name") != COPILOT_REVIEW_RULESET_NAME:
+            continue
+        detail = _maybe(client, f"/repos/{ORG}/{name}/rulesets/{listed['id']}")
+        if not detail:
+            continue
+        for rule in detail.get("rules") or []:
+            if rule.get("type") == "copilot_code_review":
+                parameters = rule.get("parameters") or {}
+                return {
+                    "review_draft_pull_requests": bool(
+                        parameters.get("review_draft_pull_requests")
+                    ),
+                    "review_on_push": bool(parameters.get("review_on_push")),
+                }
+    return None
 
 
 def _push_restrictions(
@@ -446,10 +497,11 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             _maybe(client, f"/repos/{ORG}/{name}/environments?per_page=30") or {}
         )
 
-        required_checks, foreign_required_checks = _required_checks(
-            client, name, protection, rulesets
+        required_checks, foreign_required_checks, strict_required_checks = (
+            _required_checks(client, name, protection, rulesets)
         )
         release_branches = _release_branches(client, name, rulesets)
+        copilot_review = _copilot_review(client, name, rulesets)
         push_restrictions = _push_restrictions(protection)
 
         return {
@@ -496,7 +548,9 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             ),
             "required_status_checks": required_checks,
             "foreign_required_status_checks": foreign_required_checks,
+            "required_status_checks_strict": strict_required_checks,
             "protected_release_branches": release_branches,
+            "copilot_code_review": copilot_review,
             "ruleset_count": len(rulesets),
             "rulesets": [
                 {
@@ -566,7 +620,9 @@ _EXPECTED_REPO_KEYS = frozenset(
         "ruleset_count",
         "required_status_checks",
         "foreign_required_status_checks",
+        "required_status_checks_strict",
         "protected_release_branches",
+        "copilot_code_review",
         "secret_scanning",
         "secret_scanning_push_protection",
         "dependabot_security_updates",
@@ -1263,11 +1319,16 @@ def crawl(
         # The one genuinely per-repo rule (§5.4) -- check names differ per repo.
         if repo["required_status_checks"]:
             doc["required_status_checks"] = repo["required_status_checks"]
+        if repo["required_status_checks_strict"]:
+            doc[STRICT_REQUIRED_CHECKS_KEY] = True
         # Same reasoning: without this, `crawl` deletes the declaration on every repo
         # that has one and Pulumi tries to remove the ruleset it protects. See
         # `_release_branches`.
         if repo["protected_release_branches"]:
             doc["protected_release_branches"] = repo["protected_release_branches"]
+        # Same again for Copilot review. See `_copilot_review`.
+        if repo["copilot_code_review"]:
+            doc[COPILOT_REVIEW_KEY] = repo["copilot_code_review"]
         if repo["teams"]:
             doc["teams"] = repo["teams"]
         # "Not enforced" must not become "not recorded". Where the archetype has no

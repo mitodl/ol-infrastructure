@@ -579,6 +579,18 @@ Copilot review whether or not anyone framed it as a decision. Three things follo
    `organization_copilot_seat_management` / `organization_copilot_agent_settings` remains
    correct. An audit-only read is the option worth revisiting in phase 4.
 
+**Decided 2026-10-26.** Copilot review stays per repo and covers exactly the six repos that
+had it. Each declares `copilot_code_review` (`review_draft_pull_requests`, `review_on_push`)
+in its YAML, and `rulesets.py` builds a managed `copilot-code-review` ruleset from it. The
+parameters were captured live: `review_on_push` is false on all six, and
+`review_draft_pull_requests` is true only on `open-edx-plugins`. The hand-made rulesets
+also carried `deletion` and `non_fast_forward` with no bypass actors, so the managed ones
+keep both with an empty bypass list. Dropping them would let org owners bypass those
+rules on these repos, through `baseline-default-branch`. The hand-made rulesets are deleted
+once the managed ones exist. Widening to an org ruleset targeting `tier` remains open as a
+team decision, because it adds a Copilot reviewer to every tier-1 PR and draws on the
+premium-request budget. Seats and agent settings stay out of scope.
+
 ### 4.7 People are not in the estate; teams are
 
 Decided 2026-08-05. Two rules that reinforce each other.

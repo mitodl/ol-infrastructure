@@ -23,6 +23,7 @@ name: ol-analytics-api
 required_status_checks:
 - prek
 - test
+required_status_checks_strict: true
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
