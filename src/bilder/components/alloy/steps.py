@@ -63,17 +63,19 @@ def install_alloy(alloy_config: AlloyConfig):
 
 @deploy("Configure Alloy.")
 def configure_alloy(alloy_config: AlloyConfig):
-    # At the moment alloy only supports the one configuration file
-    # /etc/alloy/config.alloy
-    # and it is not currently templated
-    files.put(
-        name=f"Create alloy configuration file {alloy_config.configuration_file}",
-        src=str(Path(__file__).resolve().parent.joinpath("files", "config.alloy")),
-        dest=str(alloy_config.configuration_file),
-        user=alloy_config.user,
-        group=alloy_config.user,
-        mode="0644",
-    )
+    # config.alloy is the whole pipeline; archive.alloy is the module it
+    # imports for the telemetry archive leg, shipped as a discarding sink and
+    # replaced by cloud-init where an archive exists. Neither is templated.
+    files_dir = Path(__file__).resolve().parent.joinpath("files")
+    for filename in ("config.alloy", "archive.alloy"):
+        files.put(
+            name=f"Create alloy configuration file {filename}",
+            src=str(files_dir.joinpath(filename)),
+            dest=str(alloy_config.configuration_directory.joinpath(filename)),
+            user=alloy_config.user,
+            group=alloy_config.user,
+            mode="0644",
+        )
 
 
 @deploy("Configure Alloy: Setup systemd service")

@@ -1,0 +1,18 @@
+// The archive leg of the log pipeline (ADR-0014), as shipped in the image:
+// a sink that discards. On hosts whose environment has a telemetry archive,
+// cloud-init overwrites this file with the exporter in
+// ol_infrastructure.lib.telemetry_archive before Alloy starts. Hosts in an
+// environment without one (CI) keep this copy, so Alloy always has a valid
+// module to import and the Grafana Cloud leg never depends on the archive.
+declare "log_sink" {
+  export "input" {
+    value = otelcol.exporter.loki.discard.input
+  }
+
+  // An otelcol exporter with nobody to forward to converts each batch and
+  // drops it. Chosen over a processor with an empty output or the debug
+  // exporter because it has no output block to get wrong and logs nothing.
+  otelcol.exporter.loki "discard" {
+    forward_to = []
+  }
+}

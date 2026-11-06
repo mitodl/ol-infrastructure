@@ -204,6 +204,45 @@ processing, and `Loki (archive, 13mo)` works in Explore and Logs Drilldown.
 - **Soak**: no ingester restart loop, compactor running daily, S3 growth per day within the
   ADR's 12–24 GB/day compressed estimate.
 
+### Phase 1 as built (2026-11-04)
+
+Branch `md/202611_telemetry_archive_phase1`, on top of Phase 0. Where the build departs from
+the text above:
+
+- **One source of truth for writers.** `lib/telemetry_archive.py` holds the archive hostnames,
+  push paths, datasource UIDs, the push-credential read, and the shape of a bounded Vector sink.
+  The archive stack takes its domain from it too (the `observability_archive:domain` config key
+  is gone), and every writer reads the push credential from
+  `observability_archive/archive.<env>.yaml` instead of a copy in `alloy/grafana.<env>.yaml`.
+- **EC2 Vector needs no AMI rebuild.** Instead of a second sink in each image's log template,
+  cloud-init writes `/etc/vector/archive_logs.yaml` beside the image's templates; Vector merges
+  every file in its config directory. The sink's inputs and labels are a table in the lib module
+  that `tests/ol_infrastructure/lib/test_telemetry_archive.py` checks against the image
+  templates, which is what stands in for `vector validate` on a file the image never sees. CI
+  hosts get no file and ship to Cloud alone.
+- **EC2 Alloy imports a module.** `config.alloy` fans logs out to `archive.log_sink.default.input`
+  from `import.file "/etc/alloy/archive.alloy"`. The image ships that file as a discarding
+  `otelcol.exporter.loki { forward_to = [] }`; cloud-init overwrites it on QA and Production
+  hosts with an `otelcol.exporter.otlphttp` whose endpoint and credential come from
+  `/etc/default/alloy`. An unset endpoint would fail Alloy's initial load outright
+  (`otlphttp` Validate: "at least one endpoint must be specified"), so CI cannot simply leave
+  the variables empty, and the module is how the image stays environment-agnostic.
+- **vector-log-proxy** also gains Vector's `internal_metrics`, a `prometheus_exporter` on
+  `:9598` and a PodMonitor, which is what the drop-rate alert reads.
+- **Alerts** live in `metric_rules/telemetry_archive.py`: Alloy and Vector archive drop rates,
+  compactor retention older than a day, and `pdc-agent` available replicas below 2 (from
+  kube-state-metrics, which already reaches Cloud for the namespace, rather than a
+  `grafanacloud-usage` series the rules' datasource cannot see). EC2 Vector and Alloy drops are
+  not covered: neither host scrape carries the counters.
+- **Verified by `helm template`** against the pinned charts: the k8s-monitoring render shows one
+  Cloud and one archive writer per log feature, `archive_otlp` fed only logs, metrics features
+  to Cloud only, and `retry_on_failure`/`sending_queue` as specified; `block_on_overflow` is
+  absent because the chart renders it only when true and the default is false. The Loki render
+  shows one ingester StatefulSet (zone-aware replication off), the IRSA annotation, ECR-cached
+  images, and the retention, schema and compactor settings in the generated config.
+- **Not yet done**: the QA soak and its gates, the Production rollout, and the first instance
+  roll of the Concourse, Consul and Vault hosts after their stacks are applied.
+
 ## Phase 2: Mimir (metrics)
 
 Goal: every series Cloud receives also reaches the archive, OTLP metrics included, and

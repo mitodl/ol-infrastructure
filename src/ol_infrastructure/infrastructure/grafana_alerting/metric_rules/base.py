@@ -122,6 +122,12 @@ Sub-modules
                — New in 2026-11. OMJob main pods that have stopped starting,
                  which is what the omjob-operator looks like after its heap
                  runs out: Running, zero restarts, nothing reconciled.
+  telemetry_archive
+               — New in 2026-11. The self-hosted telemetry archive (ADR-0014):
+                 writers dropping the archive's copy of a log stream, the
+                 Loki compactor not applying retention, and the PDC agents
+                 Grafana Cloud reads through. Ticket tier throughout; the
+                 archive never pages and is never a rule's datasource.
 """
 
 import json
@@ -144,6 +150,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     otel_trace_pipeline,
     starrocks,
     synthetic_monitoring,
+    telemetry_archive,
     vector_edxapp_tracking,
     witan,
 )
@@ -257,6 +264,7 @@ def create(resource_opts: ResourceOptions) -> None:
     vector_edxapp_tracking.create(alerts_folder.uid, rd, resource_opts)
     alloy_pipeline.create(alerts_folder.uid, rd, resource_opts)
     open_metadata.create(alerts_folder.uid, rd, resource_opts)
+    telemetry_archive.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
     synthetic_monitoring.create(rd, resource_opts)
