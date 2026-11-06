@@ -15,6 +15,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER,
     OPEN_METADATA_SESSION_EXPIRY_SECONDS,
+    SECONDS_IN_ONE_DAY,
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
 from bridge.secrets import sops as _bridge_sops
@@ -40,6 +41,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -1198,6 +1200,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # after a restart and then flattens at 315-353Mi, with zero restarts in
             # either cluster. It is undersized, not leaking. The limit gives ~45%
             # headroom over the 353Mi peak; the request sits just above the plateau.
+            # The heap is a separate ceiling: the JVM takes its default 25% of
+            # the limit (128Mi), and the chart has no env passthrough to raise it.
+            # That heap ran out in QA (2026-11-03) and production (2026-10-30 and
+            # 2026-11-04) once ~1,800 OMJobs had piled up; omjob_cleanup_cron_job
+            # below keeps that count down.
             "omjobOperator": {
                 "enabled": True,
                 "image": {
@@ -1208,6 +1215,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "requests": {"cpu": "100m", "memory": "384Mi"},
                     "limits": {"cpu": "500m", "memory": "512Mi"},
                 },
+                # The heap exhaustion kills the operator's threads one by one but
+                # never the process, so the container stayed Running for a day
+                # without reconciling anything. The /health server's dispatcher
+                # thread is among the casualties, so its liveness probe turns
+                # that into a restart.
+                "healthCheck": {"enabled": True},
             },
             "envFrom": [
                 {
@@ -1241,6 +1254,131 @@ open_metadata_application = kubernetes.helm.v3.Release(
             *connector_secrets,
         ],
     ),
+)
+
+# The omjob-operator deletes an OMJob's pods after ttlSecondsAfterFinished but
+# never the OMJob, and the 2.0.7 operator ignores the CronOMJob
+# successful/failedJobsHistoryLimit fields. Each OMJob carries its CronOMJob's
+# whole pod spec, and the operator's informer cache holds all of them. About
+# 35 a day are created (since the hourly team-keycloak-sync), so 7 days keeps
+# ~250, where ~1,800 exhausted the heap. See scripts/omjob_cleanup.py.
+OMJOB_CLEANUP_NAME = "omjob-cleanup"
+OMJOB_RETENTION_DAYS = 7
+omjob_cleanup_labels = {**k8s_global_labels, "app.kubernetes.io/name": "omjob-cleanup"}
+omjob_cleanup_service_account = kubernetes.core.v1.ServiceAccount(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-service-account",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+)
+omjob_cleanup_role = kubernetes.rbac.v1.Role(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-role",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+    rules=[
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["pipelines.openmetadata.org"],
+            resources=["omjobs"],
+            verbs=["list", "delete"],
+        ),
+    ],
+)
+omjob_cleanup_role_binding = kubernetes.rbac.v1.RoleBinding(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-role-binding",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name=OMJOB_CLEANUP_NAME,
+            namespace=open_metadata_namespace,
+        )
+    ],
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        kind="Role",
+        name=OMJOB_CLEANUP_NAME,
+        api_group="rbac.authorization.k8s.io",
+    ),
+)
+omjob_cleanup_cron_job = kubernetes.batch.v1.CronJob(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-cron-job",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+    spec=kubernetes.batch.v1.CronJobSpecArgs(
+        # Clear of the 02:00-09:00 UTC ingestion runs.
+        schedule="0 12 * * *",
+        concurrency_policy="Forbid",
+        successful_jobs_history_limit=1,
+        failed_jobs_history_limit=3,
+        job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=omjob_cleanup_labels),
+            spec=kubernetes.batch.v1.JobSpecArgs(
+                # The next day's run is the retry.
+                backoff_limit=0,
+                active_deadline_seconds=1800,
+                # failed_jobs_history_limit keeps a lone failed Job forever, and
+                # the WorkloadJobFailed rules alert while it exists. Two days
+                # keeps a failure visible past the next run.
+                ttl_seconds_after_finished=2 * SECONDS_IN_ONE_DAY,
+                template=kubernetes.core.v1.PodTemplateSpecArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        labels=omjob_cleanup_labels
+                    ),
+                    spec=kubernetes.core.v1.PodSpecArgs(
+                        restart_policy="Never",
+                        service_account_name=OMJOB_CLEANUP_NAME,
+                        containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name=OMJOB_CLEANUP_NAME,
+                                image=cached_image_uri("python:3.12-slim"),
+                                command=[
+                                    "python",
+                                    "-c",
+                                    (
+                                        Path(__file__).parent
+                                        / "scripts"
+                                        / "omjob_cleanup.py"
+                                    ).read_text(),
+                                ],
+                                env=[
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="OMJOB_RETENTION_DAYS",
+                                        value=str(OMJOB_RETENTION_DAYS),
+                                    ),
+                                ],
+                                security_context=kubernetes.core.v1.SecurityContextArgs(
+                                    run_as_non_root=True,
+                                    run_as_user=1000,
+                                    run_as_group=1000,
+                                    allow_privilege_escalation=False,
+                                    read_only_root_filesystem=True,
+                                    capabilities=kubernetes.core.v1.CapabilitiesArgs(
+                                        drop=["ALL"]
+                                    ),
+                                ),
+                                resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                    requests={"cpu": "25m", "memory": "64Mi"},
+                                    limits={"cpu": "250m", "memory": "128Mi"},
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+            ),
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[omjob_cleanup_role_binding]),
 )
 
 gateway_config = OLEKSGatewayConfig(
