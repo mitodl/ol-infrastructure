@@ -83,7 +83,10 @@ _SYNTAX: dict[str, tuple[str, str]] = {
         "<app>",
         "cut a release (to replace one already in flight, add `supersede <version>`)",
     ),
-    "hotfix": ("<app> <sha>", "cut what production runs plus one commit"),
+    "hotfix": (
+        "<app> <sha> [<sha> ...]",
+        "cut what production runs plus the commits (up to 10)",
+    ),
     "preview": (
         "<app>",
         "show what the next release would contain (changes nothing)",
@@ -184,6 +187,9 @@ def _usage_hint(repos: dict[str, config.AppConfig], subcommand: str) -> str:
     if example_app is not None:
         example = (
             _syntax(subcommand)
+            # An example is one command that works as typed, so no optional
+            # repeats in it.
+            .replace(" [<sha> ...]", "")
             .replace("<app>", example_app)
             .replace("[app]", example_app)
             .replace("<sha>", _EXAMPLE_SHA)
@@ -361,11 +367,11 @@ async def _release(respond, app_name, cfg, context, *, supersede: str | None = N
         )
         return
     if pending:
-        short = pending[0][:7]
         await respond(
-            f"A hotfix of `{short}` is pending for `{app_name}`, so a release "
-            f"now would cut that hotfix instead. `/doof hotfix {app_name} {short}` "
-            f"continues it; `/doof abandon {app_name}` cancels it."
+            f"A hotfix of {_short_shas(pending)} is pending for `{app_name}`, so a "
+            f"release now would cut that hotfix instead. "
+            f"`{_hotfix_command(app_name, pending)}` continues it; "
+            f"`/doof abandon {app_name}` cancels it."
         )
         return
 
@@ -437,12 +443,12 @@ async def _cmd_preview(repos, ack, respond, command, _context):
         await respond(f"❌ Could not check `{app_name}` for a pending hotfix.")
         return
     if pending:
-        short = pending[0][:7]
         await respond(
-            f"*Release preview for `{app_name}`* — a hotfix of `{short}` is "
-            "pending, so the next cut would be that hotfix (what production "
-            "runs plus that commit), not a normal release.\n"
-            f"`/doof hotfix {app_name} {short}` continues it; "
+            f"*Release preview for `{app_name}`* — a hotfix of "
+            f"{_short_shas(pending)} is pending, so the next cut would be that "
+            f"hotfix (what production runs plus {_those(pending)}), not a normal "
+            "release.\n"
+            f"`{_hotfix_command(app_name, pending)}` continues it; "
             f"`/doof abandon {app_name}` cancels it."
         )
         return
@@ -1128,20 +1134,98 @@ async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
 
 _COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
 
+# The most commits one hotfix may carry. The release resource refuses more
+# (MAX_HOTFIX_COMMITS in ol-concourse resources/release), but only once the
+# build is running and every request is spent, so it is refused here first.
+_MAX_HOTFIX_COMMITS = 10
 
-async def _request_hotfix(cfg, app_name, ref):
-    """Request a hotfix of *ref*; return (full sha, None) or (None, error).
+
+def _short_shas(shas: list[str]) -> str:
+    """Render *shas* as Slack code spans of their first seven digits."""
+    return ", ".join(f"`{sha[:7]}`" for sha in shas)
+
+
+def _hotfix_command(app_name: str, shas: list[str]) -> str:
+    """Return the `/doof hotfix` that requests *shas* again."""
+    return f"/doof hotfix {app_name} {' '.join(sha[:7] for sha in shas)}"
+
+
+def _those(shas: list[str]) -> str:
+    return "that commit" if len(shas) == 1 else "those commits"
+
+
+async def _withdraw_hotfix_requests(repo: str, shas: list[str]) -> bool:
+    """Delete the requests just made for *shas*; return whether they all went."""
+    try:
+        await github.cancel_hotfix_requests(repo, shas)
+    except Exception:
+        log.exception("Failed to withdraw hotfix requests %s in %s", shas, repo)
+        return False
+    return True
+
+
+async def _resolve_hotfix_refs(cfg, refs) -> tuple[list[str], list[str]]:
+    """Return (full shas, refs that cannot be found) for *refs*, in order.
+
+    A commit named twice, or by two abbreviations, counts once.
+    """
+    shas: list[str] = []
+    missing: list[str] = []
+    for ref in refs:
+        try:
+            sha = await github.resolve_commit(cfg.repo, ref)
+        except Exception:
+            log.exception("Failed to resolve %s in %s", ref, cfg.repo)
+            missing.append(ref)
+            continue
+        if sha not in shas:
+            shas.append(sha)
+    return shas, missing
+
+
+async def _make_hotfix_requests(cfg, app_name, shas, pending) -> str | None:
+    """Request every commit of *shas* not already *pending*; return an error or None.
+
+    A request that fails part way is withdrawn, so the commits before it are
+    not left for the next release build to cut as a hotfix nobody asked for.
+    """
+    requested: list[str] = []
+    for sha in shas:
+        if sha in pending:
+            continue
+        try:
+            await github.request_hotfix(cfg.repo, sha)
+        except Exception:
+            log.exception("Failed to request hotfix of %s for %s", sha, app_name)
+            error = f"❌ Failed to request a hotfix of `{sha[:7]}`."
+            if requested and not await _withdraw_hotfix_requests(cfg.repo, requested):
+                return (
+                    f"{error} The {len(requested)} already requested could not be "
+                    f"withdrawn; `/doof abandon {app_name}` cancels them."
+                )
+            return error + (" Nothing was requested." if requested else "")
+        requested.append(sha)
+    return None
+
+
+async def _request_hotfix(cfg, app_name, refs):
+    """Request a hotfix of *refs*; return (full shas, None) or (None, error).
+
+    Every ref is resolved before the first request is made, so a typo in the
+    third hash never leaves two requests on the remote: any request left there
+    is cut by the next release build, as a hotfix, until someone abandons it.
 
     The release resource refuses an in-flight release too, but only once the
     build is running, so it is checked here first. A request already pending
     for the same commit is reused, which is what makes `/doof hotfix` safe to
-    re-run after a failed trigger.
+    re-run after a failed trigger. Anything pending that is not part of this
+    request is refused: every pending request would be cut as one hotfix.
     """
-    try:
-        sha = await github.resolve_commit(cfg.repo, ref)
-    except Exception:
-        log.exception("Failed to resolve %s in %s", ref, cfg.repo)
-        return None, f"❌ Could not find commit `{ref}` in `{cfg.repo}`."
+    shas, missing = await _resolve_hotfix_refs(cfg, refs)
+    if missing:
+        names = ", ".join(f"`{ref}`" for ref in missing)
+        found = f"❌ Could not find commit {names} in `{cfg.repo}`."
+        return None, found + (" Nothing was requested." if len(refs) > 1 else "")
     try:
         in_flight = await github.in_flight_release(cfg.repo)
         pending = await github.pending_hotfix_requests(cfg.repo)
@@ -1156,57 +1240,67 @@ async def _request_hotfix(cfg, app_name, ref):
             f"`{app_name}`. Promote it or `/doof abandon {app_name}` before "
             "cutting a hotfix."
         )
-    others = [p for p in pending if p != sha]
+    others = [p for p in pending if p not in shas]
     if others:
         return None, (
-            f"A hotfix of `{others[0][:7]}` is already pending for `{app_name}`. "
-            f"`/doof abandon {app_name}` cancels it."
+            f"A hotfix of {_short_shas(others)} is already pending for "
+            f"`{app_name}`. `/doof abandon {app_name}` cancels it."
         )
-    if sha not in pending:
-        try:
-            await github.request_hotfix(cfg.repo, sha)
-        except Exception:
-            log.exception("Failed to request hotfix of %s for %s", sha, app_name)
-            return None, f"❌ Failed to request a hotfix of `{sha[:7]}`."
-    return sha, None
+    if error := await _make_hotfix_requests(cfg, app_name, shas, pending):
+        return None, error
+    return shas, None
 
 
 async def _cmd_hotfix(repos, ack, respond, command, context):
-    """Cut a hotfix: what production runs plus one commit.
+    """Cut a hotfix: what production runs plus one or more commits.
 
-    The SHA reaches the release job through a `hotfix/<sha>` tag, because
-    triggering a Concourse job carries no parameters. The release resource's
-    check sees the tag and hands the job a hotfix version; cutting it deletes
-    the tag, whether or not the cut succeeds.
+    The SHAs reach the release job through `hotfix/<sha>` tags, one per commit,
+    because triggering a Concourse job carries no parameters. The release
+    resource's check sees the tags and hands the job one hotfix version;
+    cutting it deletes every tag, whether or not the cut succeeds, so a failed
+    cut is retried by naming all the commits again.
     """
     await ack()
-    app_name, _, ref = command["text"].strip().partition(" ")
-    ref = ref.strip().lower()
+    app_name, _, rest = command["text"].strip().partition(" ")
+    # A commit typed twice is one commit. Commas are separators too, for a
+    # list pasted from somewhere else.
+    refs = list(dict.fromkeys(rest.lower().replace(",", " ").split()))
     cfg, error = _resolve_app(repos, app_name, "hotfix")
     if cfg is None:
         await _refuse(respond, error)
         return
-    if not _COMMIT_SHA_RE.match(ref):
-        problem = (
-            f"`{_slack_escape(ref)}` is not a commit SHA."
-            if ref
-            else "`/doof hotfix` needs the commit to hotfix."
-        )
+    bad = [ref for ref in refs if not _COMMIT_SHA_RE.match(ref)]
+    if not refs or bad:
+        if not refs:
+            problem = "`/doof hotfix` needs the commit to hotfix."
+        else:
+            names = ", ".join(f"`{_slack_escape(ref)}`" for ref in bad)
+            verb = "is not a commit SHA" if len(bad) == 1 else "are not commit SHAs"
+            problem = f"{names} {verb}."
         await _refuse(respond, f"{problem}\n{_usage_hint(repos, 'hotfix')}")
         return
+    if len(refs) > _MAX_HOTFIX_COMMITS:
+        await _refuse(
+            respond,
+            f"A hotfix carries at most {_MAX_HOTFIX_COMMITS} commits and "
+            f"{len(refs)} were given. A hotfix is production plus a fix; "
+            f"`/doof release {app_name}` ships more.\n{_usage_hint(repos, 'hotfix')}",
+        )
+        return
     async with _app_lock(app_name):
-        await _hotfix(respond, app_name, cfg, ref, context)
+        await _hotfix(respond, app_name, cfg, refs, context)
 
 
-async def _hotfix(respond, app_name, cfg, ref, context):
-    sha, error = await _request_hotfix(cfg, app_name, ref)
-    if sha is None:
+async def _hotfix(respond, app_name, cfg, refs, context):
+    shas, error = await _request_hotfix(cfg, app_name, refs)
+    if shas is None:
         await respond(error)
         return
 
     retry = (
-        f"The hotfix is requested but not started: `/doof hotfix {app_name} "
-        f"{sha[:7]}` retries, `/doof abandon {app_name}` cancels."
+        f"The hotfix is requested but not started: "
+        f"`{_hotfix_command(app_name, shas)}` retries, "
+        f"`/doof abandon {app_name}` cancels."
     )
     try:
         # Same reason as /doof release: without a check, the job binds the
@@ -1225,11 +1319,11 @@ async def _hotfix(respond, app_name, cfg, ref, context):
         _release_requesters[app_name] = requester
     # Before the reply, for the same reason as in `_release`.
     _start_release_build_watch(
-        app_name, cfg, build_url, requester=requester, hotfix_sha=sha
+        app_name, cfg, build_url, requester=requester, hotfix_shas=shas
     )
     await respond(
-        f"🚑 Hotfix of `{sha[:7]}` triggered for `{app_name}`: what production "
-        f"runs plus that commit. Build: {build_url}"
+        f"🚑 Hotfix of {_short_shas(shas)} triggered for `{app_name}`: what "
+        f"production runs plus {_those(shas)}. Build: {build_url}"
     )
 
 
@@ -1247,7 +1341,12 @@ _BUILD_STATUS_PHRASES = {
 
 
 def _start_release_build_watch(
-    app_name, cfg, build_url, *, requester: str | None, hotfix_sha: str | None = None
+    app_name,
+    cfg,
+    build_url,
+    *,
+    requester: str | None,
+    hotfix_shas: list[str] | None = None,
 ) -> None:
     """Report in the app's channel if the build at *build_url* does not succeed."""
     channel = _announce_channel(cfg)
@@ -1266,7 +1365,7 @@ def _start_release_build_watch(
             build_url,
             channel,
             requester=requester,
-            hotfix_sha=hotfix_sha,
+            hotfix_shas=hotfix_shas,
         )
     )
 
@@ -1279,7 +1378,7 @@ async def _watch_release_build(  # noqa: PLR0913
     channel,
     *,
     requester: str | None,
-    hotfix_sha: str | None = None,
+    hotfix_shas: list[str] | None = None,
 ) -> None:
     """Poll a release build and post the way forward if it does not succeed.
 
@@ -1302,7 +1401,7 @@ async def _watch_release_build(  # noqa: PLR0913
         if status == "succeeded":
             return
         text = await _build_failure_text(
-            app_name, cfg, build_url, status, requester, hotfix_sha
+            app_name, cfg, build_url, status, requester, hotfix_shas
         )
         try:
             await app.client.chat_postMessage(
@@ -1325,7 +1424,7 @@ async def _build_failure_text(  # noqa: PLR0913
     build_url,
     status: str,
     requester: str | None,
-    hotfix_sha: str | None,
+    hotfix_shas: list[str] | None,
 ) -> str:
     """Say a release build did not succeed, and which command to run next.
 
@@ -1337,7 +1436,11 @@ async def _build_failure_text(  # noqa: PLR0913
     below work from every state this job can stop in, because they start from
     a fresh check of what is in flight.
     """
-    what = f"hotfix build of `{hotfix_sha[:7]}`" if hotfix_sha else "release build"
+    what = (
+        f"hotfix build of {_short_shas(hotfix_shas)}"
+        if hotfix_shas
+        else "release build"
+    )
     mention = f"<@{requester}> " if requester else ""
     lines = [
         f"❌ {mention}`{app_name}` {what} {_BUILD_STATUS_PHRASES[status]}: {build_url}"
@@ -1348,10 +1451,10 @@ async def _build_failure_text(  # noqa: PLR0913
         log.exception("Failed to check in-flight release for %s", app_name)
         # Both commands refuse, naming `supersede` or `/doof abandon`, when a
         # release is in the way, so either is safe to suggest blind.
-        if hotfix_sha:
+        if hotfix_shas:
             lines.append(
                 "Could not check what is in flight. To try again: "
-                f"`/doof hotfix {app_name} {hotfix_sha[:7]}`, which says if a "
+                f"`{_hotfix_command(app_name, hotfix_shas)}`, which says if a "
                 "release must be abandoned first."
             )
         else:
@@ -1361,12 +1464,12 @@ async def _build_failure_text(  # noqa: PLR0913
                 f"`{_SUPERSEDE}` first."
             )
         return "\n".join(lines)
-    if hotfix_sha:
+    if hotfix_shas:
         # A hotfix refuses to start while a release is in flight, and
         # superseding would cut the tracked branch rather than the hotfix.
         # `/doof abandon` only triggers the abandon job, so a hotfix typed
         # straight after it still finds the release in flight.
-        retry = f"`/doof hotfix {app_name} {hotfix_sha[:7]}`"
+        retry = f"`{_hotfix_command(app_name, hotfix_shas)}`"
         if in_flight:
             lines.append(
                 f"Release {_describe_in_flight(in_flight)} is in flight. To try "
@@ -1375,6 +1478,11 @@ async def _build_failure_text(  # noqa: PLR0913
             )
         else:
             lines.append(f"To try again: {retry}")
+        if len(hotfix_shas) > 1:
+            # The release resource spends every request when a cut fails.
+            lines.append(
+                "A failed cut spends every request, so retrying names every commit."
+            )
     elif in_flight:
         lines += [
             f"Release {_describe_in_flight(in_flight)} is in flight.",
