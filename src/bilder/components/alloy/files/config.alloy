@@ -28,10 +28,13 @@ prometheus.scrape "integrations_alloy" {
   scrape_interval = "60s"
 }
 
-// Send the metrics about ourselves to the same receiver we use for OTEL stuff below
+// Send the metrics about ourselves to the same receivers we use for OTEL stuff below
 // After cleaning up the labels some more.
 prometheus.relabel "integrations_alloy" {
-  forward_to = [prometheus.remote_write.grafana_cloud_mimir.receiver]
+  forward_to = [
+    prometheus.remote_write.grafana_cloud_mimir.receiver,
+    archive.metric_sink.default.receiver,
+  ]
   rule {
     source_labels = ["__name__"]
     regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
@@ -115,8 +118,9 @@ otelcol.processor.transform "add_resource_attributes_as_metric_attributes" {
 // Logs stop 1
 otelcol.processor.batch "grafana_cloud_otel" {
   output {
-    // Logs fan out to Grafana Cloud and to the telemetry archive (ADR-0014).
-    // The archive sink is a module so the image stays environment-agnostic:
+    // Logs fan out to Grafana Cloud and to the telemetry archive (ADR-0014);
+    // metrics do the same after otelcol.exporter.prometheus below. The archive
+    // sinks are a module so the image stays environment-agnostic:
     // archive.alloy as shipped discards, and cloud-init replaces it on hosts
     // whose environment has an archive. The batch processor's fan-out does
     // not wait on one consumer for the other, and the archive exporter's
@@ -135,6 +139,7 @@ import.file "archive" {
 }
 
 archive.log_sink "default" { }
+archive.metric_sink "default" { }
 
 otelcol.exporter.loki "grafana_cloud_loki" {
   forward_to = [loki.write.grafana_cloud_loki.receiver]
@@ -163,7 +168,13 @@ otelcol.auth.basic "grafana_cloud_tempo" {
 }
 
 otelcol.exporter.prometheus "grafana_cloud_mimir" {
-  forward_to = [prometheus.remote_write.grafana_cloud_mimir.receiver]
+  // Each prometheus.remote_write has its own WAL and queue, so the archive
+  // leg (sample_age_limit, no 429 retries) cannot hold samples back from
+  // Cloud.
+  forward_to = [
+    prometheus.remote_write.grafana_cloud_mimir.receiver,
+    archive.metric_sink.default.receiver,
+  ]
 }
 
 prometheus.remote_write "grafana_cloud_mimir" {

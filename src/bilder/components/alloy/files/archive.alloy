@@ -1,9 +1,9 @@
-// The archive leg of the log pipeline (ADR-0014), as shipped in the image:
-// a sink that discards. On hosts whose environment has a telemetry archive,
-// cloud-init overwrites this file with the exporter in
+// The archive legs of the log and metric pipelines (ADR-0014), as shipped in
+// the image: sinks that discard. On hosts whose environment has a telemetry
+// archive, cloud-init overwrites this file with the exporters in
 // ol_infrastructure.lib.telemetry_archive before Alloy starts. Hosts in an
 // environment without one (CI) keep this copy, so Alloy always has a valid
-// module to import and the Grafana Cloud leg never depends on the archive.
+// module to import and the Grafana Cloud legs never depend on the archive.
 declare "log_sink" {
   export "input" {
     value = otelcol.exporter.loki.discard.input
@@ -13,6 +13,18 @@ declare "log_sink" {
   // drops it. Chosen over a processor with an empty output or the debug
   // exporter because it has no output block to get wrong and logs nothing.
   otelcol.exporter.loki "discard" {
+    forward_to = []
+  }
+}
+
+declare "metric_sink" {
+  export "receiver" {
+    value = prometheus.relabel.discard.receiver
+  }
+
+  // A relabel stage with no rules and nobody to forward to: accepts every
+  // sample and drops it, with no WAL on disk.
+  prometheus.relabel "discard" {
     forward_to = []
   }
 }
