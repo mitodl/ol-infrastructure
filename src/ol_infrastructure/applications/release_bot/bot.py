@@ -1226,12 +1226,8 @@ async def _make_hotfix_requests(cfg, app_name, shas, pending) -> str | None:
     return None
 
 
-async def _request_hotfix(cfg, app_name, refs):
-    """Request a hotfix of *refs*; return (full shas, None) or (None, error).
-
-    Every ref is resolved before the first request is made, so a typo in the
-    third hash never leaves two requests on the remote: any request left there
-    is cut by the next release build, as a hotfix, until someone abandons it.
+async def _hotfix_blocker(cfg, app_name, shas):
+    """Return (pending requests, None), or (None, why *shas* cannot be requested).
 
     The release resource refuses an in-flight release too, but only once the
     build is running, so it is checked here first. A request already pending
@@ -1239,11 +1235,6 @@ async def _request_hotfix(cfg, app_name, refs):
     re-run after a failed trigger. Anything pending that is not part of this
     request is refused: every pending request would be cut as one hotfix.
     """
-    shas, missing = await _resolve_hotfix_refs(cfg, refs)
-    if missing:
-        names = ", ".join(f"`{ref}`" for ref in missing)
-        found = f"❌ Could not find commit {names} in `{cfg.repo}`."
-        return None, found + (" Nothing was requested." if len(refs) > 1 else "")
     try:
         in_flight = await github.in_flight_release(cfg.repo)
         pending = await github.pending_hotfix_requests(cfg.repo)
@@ -1264,6 +1255,10 @@ async def _request_hotfix(cfg, app_name, refs):
             f"A hotfix of {_short_shas(others)} is already pending for "
             f"`{app_name}`. `/doof abandon {app_name}` cancels it."
         )
+    # A hotfix build that has been triggered but not cut has no release branch
+    # yet, so GitHub shows nothing in flight. `_app_lock` serializes commands,
+    # not builds: requests made now would change the pending set under it, and
+    # its cut deletes every tag, these included.
     try:
         running = await concourse.active_build_url(
             cfg.pipeline, config.job_name(app_name, cfg, "release_job")
@@ -1279,6 +1274,24 @@ async def _request_hotfix(cfg, app_name, refs):
             f"A release build for `{app_name}` is already running: {running}. "
             "Wait for it to finish before requesting a hotfix."
         )
+    return pending, None
+
+
+async def _request_hotfix(cfg, app_name, refs):
+    """Request a hotfix of *refs*; return (full shas, None) or (None, error).
+
+    Every ref is resolved before the first request is made, so a typo in the
+    third hash never leaves two requests on the remote: any request left there
+    is cut by the next release build, as a hotfix, until someone abandons it.
+    """
+    shas, missing = await _resolve_hotfix_refs(cfg, refs)
+    if missing:
+        names = ", ".join(f"`{ref}`" for ref in missing)
+        found = f"❌ Could not find commit {names} in `{cfg.repo}`."
+        return None, found + (" Nothing was requested." if len(refs) > 1 else "")
+    pending, error = await _hotfix_blocker(cfg, app_name, shas)
+    if pending is None:
+        return None, error
     if error := await _make_hotfix_requests(cfg, app_name, shas, pending):
         return None, error
     return shas, None

@@ -2359,6 +2359,37 @@ async def test_hotfix_refuses_while_a_release_is_in_flight(repos, slack, hotfix_
     assert hotfix_api.calls == []
 
 
+async def test_hotfix_refuses_while_a_release_build_is_running(
+    repos, slack, hotfix_api, monkeypatch
+):
+    """A triggered hotfix has no release branch until its cut, so GitHub misses it."""
+    running = AsyncMock(return_value="http://ci/builds/7")
+    monkeypatch.setattr(bot.concourse, "active_build_url", running)
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command(f"my-app {_SHA}"), {}
+    )
+
+    running.assert_awaited_once_with("my-app-pipeline", "build-my-app-release-image")
+    assert "already running: http://ci/builds/7" in slack.said
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_refuses_when_the_running_build_lookup_fails(
+    repos, slack, hotfix_api, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.concourse, "active_build_url", AsyncMock(side_effect=RuntimeError("boom"))
+    )
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command(f"my-app {_SHA}"), {}
+    )
+
+    assert "Could not check whether a release build" in slack.said
+    assert hotfix_api.calls == []
+
+
 async def test_hotfix_refuses_while_another_hotfix_is_pending(repos, slack, hotfix_api):
     hotfix_api.pending_hotfix_requests.return_value = [_OTHER_SHA]
 
