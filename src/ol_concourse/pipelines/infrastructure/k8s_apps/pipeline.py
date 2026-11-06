@@ -1641,10 +1641,12 @@ def _build_release_image_job(
             file=f"{release_res.name}/version",
             reveal=True,
         ),
-        # The commit a hotfix cherry-picks onto production, or empty for a
-        # normal release. The release resource's check sets it while a
-        # `hotfix/<sha>` request tag is pending, which is how `/doof hotfix`
-        # gets a SHA to a job whose trigger carries no parameters.
+        # The commits a hotfix cherry-picks onto production, one SHA or
+        # several separated by whitespace, or empty for a normal release. The
+        # release resource's check sets it while `hotfix/<sha>` request tags
+        # are pending, which is how `/doof hotfix` gets SHAs to a job whose
+        # trigger carries no parameters. `commit_hash` takes the whole string,
+        # so the number of commits does not change this plan.
         LoadVarStep(
             load_var="hotfix",
             file=f"{release_res.name}/hotfix",
@@ -1664,7 +1666,7 @@ def _build_release_image_job(
             },
         ),
         # Build from the cut release, not from main_repo. A hotfix is
-        # production plus one commit, which main_repo does not hold, and
+        # production plus its commits, which main_repo does not hold, and
         # Concourse does not document a put writing back to its inputs, so the
         # put's checkout is not something later steps can rely on. For a normal
         # release, releases/<version> is the tree main_repo holds after
@@ -1672,7 +1674,7 @@ def _build_release_image_job(
         # which case the branch is what was actually tagged.
         _checkout_release_task(main_repo, release_source),
         # The commit the version tag points at: the pre-bump HEAD for a normal
-        # release, the cherry-picked commit for a hotfix.
+        # release, the last cherry-picked commit for a hotfix.
         LoadVarStep(
             load_var="git_ref",
             file=f"{release_source}/.git/release_ref",

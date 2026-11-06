@@ -949,6 +949,17 @@ def test_cancel_hotfix_requests_deletes_only_requests(fake_repo):
     assert [r.ref for r in repo.refs] == ["refs/tags/2026.9.1.1"]
 
 
+def test_cancel_hotfix_requests_can_take_back_just_some(fake_repo):
+    """A request that failed part way withdraws its own, not what was pending."""
+    other = "b" * 40
+    repo = fake_repo(
+        _RefsRepo(f"refs/tags/hotfix/{_HOTFIX_SHA}", f"refs/tags/hotfix/{other}")
+    )
+
+    assert github._cancel_hotfix_requests_sync("mitodl/thing", [other]) == [other]
+    assert [r.ref for r in repo.refs] == [f"refs/tags/hotfix/{_HOTFIX_SHA}"]
+
+
 def test_hotfix_tags_not_named_for_a_full_sha_are_not_requests(fake_repo):
     """The release resource ignores these, so they must not block releases here."""
     repo = fake_repo(
