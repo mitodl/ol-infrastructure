@@ -2,8 +2,9 @@
 
 Phase 0 built what Loki and Mimir share: the S3 buckets and IRSA roles, the
 internal write endpoint, and the Private Data Source Connect agent through which
-Grafana Cloud reads the archive. Phase 1 adds Loki, its push routes and its
-Cloud datasource. Mimir follows in Phase 2. See
+Grafana Cloud reads the archive. Phase 1 added Loki, its push routes and its
+Cloud datasource. Phase 2 adds Mimir, its push routes, the recording rules its
+ruler evaluates, and its Cloud datasource. See
 docs/plans/telemetry-archive-implementation-plan.md.
 """
 
@@ -19,7 +20,9 @@ from ol_infrastructure.applications.observability_archive import (
     datasources,
     ingress,
     loki,
+    mimir,
     pdc,
+    recording_rules,
     storage,
 )
 from ol_infrastructure.components.applications.eks import (
@@ -41,8 +44,11 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
 from ol_infrastructure.lib.telemetry_archive import (
     ARCHIVE_DOMAINS,
+    ARCHIVE_NAMESPACE,
     LOKI_PUSH_PATH,
     OTLP_LOGS_PATH,
+    OTLP_METRICS_PATH,
+    PROMETHEUS_PUSH_PATH,
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
 
@@ -54,7 +60,7 @@ archive_config = Config("observability_archive")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
 
-NAMESPACE = "observability-archive"
+NAMESPACE = ARCHIVE_NAMESPACE
 APPLICATION_NAME = "observability-archive"
 VAULT_MOUNT_PATH = "secret-observability-archive"
 PUSH_AUTH_SECRET_NAME = "telemetry-archive-push-auth"  # noqa: S105  # pragma: allowlist secret
@@ -248,6 +254,43 @@ ingress.push_route(
 )
 
 ##################################
+#        Mimir (Phase 2)         #
+##################################
+
+mimir_storage = archive_storage["mimir"]
+mimir_release = mimir.build(
+    stack_info=stack_info,
+    aws_config=aws_config,
+    k8s_global_labels=k8s_global_labels,
+    namespace=NAMESPACE,
+    cluster_name=cluster_stack.require_output("cluster_name"),
+    bucket_name=mimir_storage.bucket_name,
+    irsa_role_arn=mimir_storage.irsa_role.role.arn,
+    service_account=mimir_storage.service_account,
+    retention_days=retention_days,
+    node_selector=ARCHIVE_NODE_SELECTOR,
+    tolerations=ARCHIVE_TOLERATIONS,
+    depends_on=[mimir_storage.bucket, mimir_storage.irsa_role],
+)
+ingress.push_route(
+    name="mimir-push",
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_labels=k8s_labels,
+    ingress=archive_ingress,
+    paths=[PROMETHEUS_PUSH_PATH, OTLP_METRICS_PATH],
+    backend_service=mimir_release.distributor_service,
+    backend_port=mimir_release.http_port,
+    depends_on=[mimir_release.release],
+)
+recording_rules.build(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_labels=k8s_labels,
+    depends_on=[mimir_release.release],
+)
+
+##################################
 #    Read path (Grafana Cloud)   #
 ##################################
 
@@ -265,6 +308,12 @@ if "cloud_access_policy_token" in grafana_secrets:
         tolerations=ARCHIVE_TOLERATIONS,
     )
     datasources.loki_datasource(
+        stack_info=stack_info,
+        namespace=NAMESPACE,
+        retention_days=retention_days,
+        read_path=read_path,
+    )
+    datasources.mimir_datasource(
         stack_info=stack_info,
         namespace=NAMESPACE,
         retention_days=retention_days,
@@ -294,3 +343,5 @@ export(
 export("nlb_security_group_id", archive_ingress.security_group.id)
 export("loki_push_url", f"https://{archive_domain}{LOKI_PUSH_PATH}")
 export("loki_otlp_logs_url", f"https://{archive_domain}{OTLP_LOGS_PATH}")
+export("mimir_push_url", f"https://{archive_domain}{PROMETHEUS_PUSH_PATH}")
+export("mimir_otlp_metrics_url", f"https://{archive_domain}{OTLP_METRICS_PATH}")

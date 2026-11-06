@@ -414,8 +414,8 @@ def cloud_init_user_data(  # noqa: PLR0913
     vault_creds = read_yaml_secrets(  # noqa: F841
         Path(f"pulumi/vault.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
     )
-    # The telemetry archive (ADR-0014) gets a copy of the host logs through a
-    # Vector sink file written beside the image's templates. None in CI.
+    # The telemetry archive (ADR-0014) gets a copy of the host logs and metrics
+    # through Vector sink files written beside the image's templates. None in CI.
     archive = telemetry_archive.push_target(stack_info.env_suffix)
     cloud_config_contents = {
         "write_files": [
@@ -495,7 +495,10 @@ def cloud_init_user_data(  # noqa: PLR0913
                 "owner": "root:root",
             },
             *(
-                [telemetry_archive.ec2_vector_sink_file("vault", archive)]
+                [
+                    telemetry_archive.ec2_vector_sink_file("vault", archive),
+                    telemetry_archive.ec2_vector_metric_sink_file("vault", archive),
+                ]
                 if archive
                 else []
             ),

@@ -16,7 +16,10 @@ from ol_infrastructure.applications.observability_archive.pdc import (
     query_frontend_hosts,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
-from ol_infrastructure.lib.telemetry_archive import ARCHIVE_LOKI_DATASOURCE_UID
+from ol_infrastructure.lib.telemetry_archive import (
+    ARCHIVE_LOKI_DATASOURCE_UID,
+    ARCHIVE_MIMIR_DATASOURCE_UID,
+)
 
 DAYS_PER_YEAR = 365
 
@@ -51,6 +54,42 @@ def loki_datasource(
                 # Long ranges are the point of this datasource. Loki splits
                 # them by split_queries_by_interval server side.
                 "timeout": 300,
+                # Plan D13 in the UI as well as in the test: the datasource
+                # is not offered when a Grafana-managed alert rule is built.
+                "manageAlerts": False,
+            }
+        ),
+        opts=ResourceOptions(provider=read_path.provider),
+    )
+
+
+def mimir_datasource(
+    *,
+    stack_info: StackInfo,
+    namespace: str,
+    retention_days: int,
+    read_path: PdcReadPath,
+) -> grafana.oss.DataSource:
+    """`Mimir (archive, …)`: the archive's Mimir query-frontend, reached over PDC."""
+    host = query_frontend_hosts(namespace)["mimir"]
+    return grafana.oss.DataSource(
+        f"telemetry-archive-mimir-datasource-{stack_info.env_suffix}",
+        type="prometheus",
+        name=f"Mimir (archive, {retention_label(retention_days)})",
+        uid=ARCHIVE_MIMIR_DATASOURCE_UID,
+        url=f"http://{host}/prometheus",
+        access_mode="proxy",
+        private_data_source_connect_network_id=read_path.network.pdc_network_id,
+        json_data_encoded=json.dumps(
+            {
+                "httpMethod": "POST",
+                "prometheusType": "Mimir",
+                "prometheusVersion": "2.9.1",
+                # The collectors' scrape interval, so $__rate_interval is
+                # never shorter than two samples.
+                "timeInterval": "60s",
+                "queryTimeout": "300s",
+                "manageAlerts": False,
             }
         ),
         opts=ResourceOptions(provider=read_path.provider),
