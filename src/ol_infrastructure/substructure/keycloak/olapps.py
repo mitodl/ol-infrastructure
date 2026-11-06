@@ -2013,6 +2013,73 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         )
         # BOARD INFINITY [END]
 
+        # ISFT ORG [START]
+        # Same private_key_jwt + PKCE S256 pattern as Board Infinity; their
+        # discovery doc offers only private_key_jwt for token endpoint auth.
+        isft_oidc_identity_provider = onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="ISFT",
+                idp_display_name=(
+                    "International School of Finance Technology and Science"
+                ),
+                org_oidc_metadata_url="https://sso.isft.uz/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("isft_oidc_discovery.json"),
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+                extra_config={
+                    "pkceEnabled": "true",
+                    "pkceMethod": "S256",
+                },
+            ),
+            org=OrgConfig(
+                # Unlike Board Infinity, ISFT staff sign in with their
+                # institutional @isft.uz address, so the domain routes them
+                # here and limits this IdP to asserting isft.uz emails.
+                org_domains=["isft.uz"],
+                org_name="International School of Finance Technology and Science",
+                org_alias="ISFT",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-full-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="fullName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-first-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="given_name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-last-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="family_name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        # ISFT ORG [END]
+
     # B2B Organizations [END]
 
     if stack_info.env_suffix in ["ci", "qa"]:
