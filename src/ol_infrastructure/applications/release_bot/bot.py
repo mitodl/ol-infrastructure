@@ -1264,6 +1264,21 @@ async def _request_hotfix(cfg, app_name, refs):
             f"A hotfix of {_short_shas(others)} is already pending for "
             f"`{app_name}`. `/doof abandon {app_name}` cancels it."
         )
+    try:
+        running = await concourse.active_build_url(
+            cfg.pipeline, config.job_name(app_name, cfg, "release_job")
+        )
+    except Exception:
+        log.exception("Failed to check for a running release build: %s", app_name)
+        return None, (
+            f"❌ Could not check whether a release build for `{app_name}` is "
+            "already running. Not requesting a hotfix."
+        )
+    if running:
+        return None, (
+            f"A release build for `{app_name}` is already running: {running}. "
+            "Wait for it to finish before requesting a hotfix."
+        )
     if error := await _make_hotfix_requests(cfg, app_name, shas, pending):
         return None, error
     return shas, None
