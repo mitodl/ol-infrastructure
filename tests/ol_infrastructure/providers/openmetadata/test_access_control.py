@@ -544,7 +544,7 @@ def test_every_user_keeps_organization_policy_and_loses_alert_reads() -> None:
     assert "HideAlertDestinationsPolicy" in ORGANIZATION_POLICIES
     hide = next(spec for spec in POLICIES if spec.name == "HideAlertDestinationsPolicy")
     assert [(rule.effect, rule.resources, rule.operations) for rule in hide.rules] == [
-        ("deny", ["eventsubscription"], ["ViewAll"])
+        ("deny", ["eventsubscription"], ["All"])
     ]
     # Bots inherit no team policies, so the bots with custom roles carry it.
     for role in ("DagsterBotRole", "MetricsSyncBotRole"):

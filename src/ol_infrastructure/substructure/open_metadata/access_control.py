@@ -52,26 +52,33 @@ POLICIES: list[OpenMetadataPolicySpec] = [
     # (EventSubscriptionRepository only masks it on /testDestination), and the
     # default policies give everyone ViewAll on every resource, so anyone who
     # can log in could read the URL and post to the alert channel.  A deny rule
-    # wins over every allow, ViewAll covers ViewBasic (CompiledRule), and admins
-    # skip policy evaluation, so only admins can read alerts through
-    # /v1/events/subscriptions.  The change-event feed (GET /v1/events) is not
-    # permission-checked (any valid token reads it) and keeps each alert's
-    # create and update, URL included, for the change-event retention period;
-    # no policy can close that.
+    # wins over every allow and admins skip policy evaluation, so denying All
+    # leaves only admins able to read, edit or create alerts through
+    # /v1/events/subscriptions.  It also blocks the description edit the
+    # default DataConsumerPolicy allows, whose PATCH response carries the URL.
+    #
+    # Two reads no policy can close, so this keeps the URL from casual reads,
+    # not from a determined user:
+    # - A PATCH is authorized only for the operations its patch touches
+    #   (JsonPatchUtils.getMetadataOperations), so an empty patch passes for any
+    #   user and returns the whole alert.
+    # - The change-event feed (GET /v1/events) is not permission-checked and
+    #   keeps each alert's create and update, URL included, for the
+    #   change-event retention period.
     OpenMetadataPolicySpec(
         name="HideAlertDestinationsPolicy",
         display_name="Hide Alert Destinations Policy",
         description=(
-            "Hides alerts and notifications, whose Slack webhook URLs are "
-            "returned unmasked, from the alerts API for every user but admins."
+            "Keeps alerts and notifications, whose Slack webhook URLs are "
+            "returned unmasked, out of the alerts API for every user but admins."
         ),
         rules=[
             OpenMetadataPolicyRule(
                 name="HideAlertDestinationsPolicy-EventSubscriptions",
-                description="Deny reading alerts and notifications.",
+                description="Deny every operation on alerts and notifications.",
                 effect="deny",
                 resources=["eventsubscription"],
-                operations=["ViewAll"],
+                operations=["All"],
             ),
         ],
     ),
