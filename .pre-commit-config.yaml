@@ -93,6 +93,10 @@ repos:
     - "(^encryptedkey:|^secure:|^secretsprovider:)"
     - --exclude-files
     - src/bridge/secrets/
+    # Derived projection of versions.py, one bare value per file; an image digest
+    # pin is a hex string with no room for an inline allowlist pragma.
+    - --exclude-files
+    - src/bridge/lib/version_pins/
     - --exclude-files
     - poetry.lock
     - --exclude-files
@@ -116,7 +120,7 @@ repos:
     - tests/ol_infrastructure/applications/mitxonline/fixtures/vso_secrets_main\.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-  rev: "v0.17.0"
+  rev: "v0.17.1"
   hooks:
   - id: ruff-format
   - id: ruff-check

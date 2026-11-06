@@ -842,15 +842,18 @@ else:
 
 # Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is the Production
 # Opik's API for every environment; the workspace/project are static for our OSS
-# install. The Opik SDK stamps OPIK_ENVIRONMENT on every trace and span as Opik's
-# environment, which is what tells the environments apart in the shared learn-ai
-# project. It is the stack's environment, so QA reports "qa" as mit-learn and
-# dagster do, not MITOL_ENVIRONMENT's "rc". The Keycloak client id/secret and token
-# URL arrive via envFrom (see the VSO secret above). Do NOT set OPIK_API_KEY: the
-# app's Keycloak auth flow owns the Authorization header (see the opik stack's
-# OPIK_SDK_KEYCLOAK_AUTH.md).
+# install. learn-ai traces its chatbots through ol-llm, which puts
+# OL_LLM_ENVIRONMENT on every trace and span as Opik's environment, and that is what
+# tells the environments apart in the shared learn-ai project. The Opik SDK stamps
+# OPIK_ENVIRONMENT on whatever it traces without ol-llm. Both are the stack's
+# environment, so QA reports "qa" as mit-learn and dagster do, not
+# MITOL_ENVIRONMENT's "rc", which the app otherwise falls back to. The Keycloak
+# client id/secret and token URL arrive via envFrom (see the VSO secret above). Do
+# NOT set OPIK_API_KEY: ol-llm refuses to start with it alongside the OPIK_KEYCLOAK_*
+# variables (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
 env_vars.update(
     {
+        "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
         "OPIK_URL_OVERRIDE": opik_api_url(),
         "OPIK_WORKSPACE": "default",
         "OPIK_PROJECT_NAME": "learn-ai",
@@ -1061,6 +1064,11 @@ export(
     "learn_ai",
     {
         "rds_host": learn_ai_db.app_db.db_instance.address,
+        **(
+            {"rds_replica_host": learn_ai_db.app_db.db_replica.address}
+            if learn_ai_db.app_db_config.read_replica
+            else {}
+        ),
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
     },

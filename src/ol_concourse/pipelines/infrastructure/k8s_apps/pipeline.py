@@ -967,13 +967,15 @@ ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 # Bumping a tag resets the same histories, once, on each pipeline's next check
 # after k8s-apps-meta regenerates them, even when the image itself is
 # unchanged: the type's source is what changed. Introducing these pins was
-# such a bump. So bump deliberately, and afterwards re-run the QA job of every
-# app with an open release issue. The release bot reports an approved issue
-# that Production has not taken.
+# such a bump. So bump deliberately, and afterwards check that each app with an
+# open release issue still lists its release resource as an input of its latest
+# QA build; where it does not, start a new QA build (fly rerun-build reuses the
+# old input versions, which may no longer exist). The release bot reports an
+# approved issue that Production has not taken.
 RELEASE_RESOURCE_TYPE_TAGS = {
-    "release": "eaa392681a2c2be5ea93abe1f3144844f0e65415",  # pragma: allowlist secret
+    "release": "0269465f5d737f5b661afdff845168c785c0833f",  # pragma: allowlist secret
     "github-issues": "9ab0f9739aa61b39071be0022dcaec1bc8f0688c",  # pragma: allowlist secret
-    "github-deployments": "0bc607fd2912156998d379155a2acc8f8249d00a",  # pragma: allowlist secret
+    "github-deployments": "efb28bc297f104f4bc8d63e33d07b114f710e2b3",  # pragma: allowlist secret
 }
 
 
@@ -2324,7 +2326,7 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
         generated_changelog=app_release_changelog(app_name),
     )
     cut_job_name = jobs["release"]
-    rc_job_name = f"deploy-{app_name}-rc"
+    rc_job_name = jobs["qa"]
     serial_groups = [f"{app_name}-release"]
     release_current = Identifier(f"{app_name}-release-current")
     version_var = LoadVarStep(
@@ -2465,21 +2467,23 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
         release_issue=release_issue,
         serial_groups=serial_groups,
     )
-    return Pipeline(
-        resource_types=[
-            release_resource_type(),
-            github_deployments_resource(),
-            github_issues_resource(),
-        ],
-        resources=[
-            main_repo,
-            release_res,
-            release_gate,
-            release_issue,
-            deployment_rc,
-            deployment_prod,
-        ],
-        jobs=[cut_job, rc_job, production_job, abandon_job],
+    return _pin_release_resource_types(
+        Pipeline(
+            resource_types=[
+                release_resource_type(),
+                github_deployments_resource(),
+                github_issues_resource(),
+            ],
+            resources=[
+                main_repo,
+                release_res,
+                release_gate,
+                release_issue,
+                deployment_rc,
+                deployment_prod,
+            ],
+            jobs=[cut_job, rc_job, production_job, abandon_job],
+        )
     )
 
 

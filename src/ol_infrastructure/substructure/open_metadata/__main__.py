@@ -5,8 +5,8 @@ metadata connector, plus the IRSA role for the ``openmetadata-ingestion``
 service account so ingestion pods can access AWS Glue, S3, and RDS IAM auth.
 
 Connector credentials are read from Kubernetes secrets managed by the
-OpenMetadata application stack (via Vault Secrets Operator). The ingestion-bot
-JWT is injected the same way.
+OpenMetadata application stack (via Vault Secrets Operator). The system bots'
+JWTs are injected the same way, from the Vault secrets this stack writes.
 
 CronOMJob pods authenticate to the OpenMetadata server API using the bot JWT
 token from the ``om-ingestion-bot`` K8s secret, and to data sources via
@@ -51,8 +51,10 @@ from ol_infrastructure.providers.openmetadata import (
     OpenMetadataConnection,
     OpenMetadataEventSubscription,
     OpenMetadataEventSubscriptionSpec,
+    OpenMetadataSystemBot,
 )
 from ol_infrastructure.providers.openmetadata.access_control import (
+    OpenMetadataOrganizationPolicies,
     OpenMetadataPolicy,
     OpenMetadataRole,
     OpenMetadataTeam,
@@ -62,6 +64,7 @@ from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
     OPENMETADATA_PROVISIONER_VAULT_NAME,
 )
 from ol_infrastructure.substructure.open_metadata.access_control import (
+    ORGANIZATION_POLICIES,
     POLICIES,
     ROLES,
     TEAMS,
@@ -447,8 +450,8 @@ def _make_cronjob(  # noqa: PLR0913
     :param opts: Optional Pulumi resource options (e.g. depends_on).
     :param bot_secret_name: K8s secret that holds the OM bot JWT token.
         Defaults to ``"om-ingestion-bot"`` for metadata ingestion workflows.
-        Use ``"om-lineage-bot"``, ``"om-profiler-bot"``, or
-        ``"om-data-insight-bot"`` for other workflow types.
+        Use ``"om-lineage-bot"`` or ``"om-profiler-bot"`` for other workflow
+        types.
     :param resources: Pod resource requests/limits. Defaults to
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
@@ -1033,6 +1036,16 @@ om_roles = {
     )
     for spec in ROLES
 }
+OpenMetadataOrganizationPolicies(
+    f"om-organization-policies-{stack_info.env_suffix}",
+    connection=om_connection,
+    policies=ORGANIZATION_POLICIES,
+    opts=ResourceOptions(
+        depends_on=[
+            om_policies[name] for name in ORGANIZATION_POLICIES if name in om_policies
+        ]
+    ),
+)
 # Deleting a team would also take it off every asset it owns and the glossary
 # it reviews.
 om_teams = [
@@ -1200,6 +1213,41 @@ vault.generic.Secret(
     ),
 )
 
+# The bots OpenMetadata seeds that something here uses. The application stack
+# syncs each secret-openmetadata/<bot> into the om-<bot> K8s secret the Jobs
+# above read as OM_BOT_JWT_TOKEN. The other seeded bots (autoClassification-bot,
+# governance-bot, scim-bot, testsuite-bot, usage-bot) have no consumer.
+#
+# The token is read on refresh, so one regenerated in the UI reaches Vault only
+# at the next `pulumi up --refresh` of this stack, and the Jobs fail with the
+# old one until then. Regenerate a token only alongside that update.
+om_system_bots = {
+    bot_name: OpenMetadataSystemBot(
+        f"om-{bot_name}-{stack_info.env_suffix}",
+        connection=om_connection,
+        bot_name=bot_name,
+    )
+    for bot_name in ("ingestion-bot", "lineage-bot", "profiler-bot")
+}
+for bot_name, system_bot in om_system_bots.items():
+    vault.generic.Secret(
+        f"om-{bot_name}-vault-secret-{stack_info.env_suffix}",
+        path=f"secret-openmetadata/{bot_name}",
+        data_json=Output.json_dumps({"token": system_bot.token}),
+    )
+
+# The contracts sync pipeline in ol_concourse/pipelines/applications/
+# ol_data_contracts_sync.py publishes ol-data-platform's contracts/ to
+# production OpenMetadata as the ingestion bot.
+if stack_info.env_suffix == "production":
+    vault.generic.Secret(
+        f"om-concourse-contracts-bot-vault-secret-{stack_info.env_suffix}",
+        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
+        data_json=Output.json_dumps(
+            {"token": om_system_bots["ingestion-bot"].token, "server_url": om_api_url}
+        ),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Alerts
@@ -1217,9 +1265,11 @@ vault.generic.Secret(
 # supersedes a running one or the quality run cannot be triggered, neither of
 # which says the contract failed.
 #
-# OpenMetadata returns a Slack destination's endpoint unmasked to anyone with
-# ViewAll on eventsubscription, which every user holds through the default
-# policies, so the webhook URL is readable inside OpenMetadata.
+# OpenMetadata returns a Slack destination's endpoint unmasked to anyone who
+# can read the alert, so HideAlertDestinationsPolicy (access_control.py) keeps
+# alerts from every user and bot but admins and the system bots.  Any valid
+# token can still read the URL through an empty PATCH of the alert or the
+# change-event feed (GET /v1/events); see that policy's comment.
 #
 # QA and Production hold the same webhook, so both environments' contract
 # failures post to one channel.

@@ -61,10 +61,10 @@ def _index(plan: list[dict[str, Any]], key: str, name: str, nth: int = 0) -> int
     return matches[nth]
 
 
-def test_both_ocw_hugo_repos_are_tag_only_and_not_yet_flipped():
-    """Doof still releases them until ocw-studio reads tags."""
+def test_both_ocw_hugo_repos_are_tag_only_and_flipped():
+    """ocw-studio reads their tags, so the release workflow owns them."""
     assert set(TAG_APPS) == {"ocw-hugo-themes", "ocw-hugo-projects"}
-    assert not any(release_resource_workflow(app) for app in TAG_APPS)
+    assert all(release_resource_workflow(app) for app in TAG_APPS)
 
 
 @pytest.mark.parametrize("app_name", TAG_APPS)
@@ -73,17 +73,19 @@ def test_the_jobs_are_the_ones_the_release_bot_drives(app_name):
     jobs = release_job_names(app_name)
     assert names == {
         jobs["release"],
-        f"deploy-{app_name}-rc",
+        jobs["qa"],
         jobs["production"],
         jobs["abandon"],
     }
     assert jobs["release"] == f"cut-{app_name}-release"
+    assert jobs["qa"] == f"deploy-{app_name}-rc"
     assert jobs["production"] == f"promote-{app_name}-production"
 
 
 def test_k8s_apps_keep_their_job_names():
     assert release_job_names("xpro") == {
         "release": "build-xpro-release-image",
+        "qa": "deploy-ol-application-xpro-qa",
         "production": "deploy-ol-application-xpro-production",
         "abandon": "abandon-xpro-release",
     }

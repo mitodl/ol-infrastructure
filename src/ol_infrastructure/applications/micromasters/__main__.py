@@ -1327,5 +1327,10 @@ export(
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
         "rds_host": micromasters_db.db_instance.address,
+        **(
+            {"rds_replica_host": micromasters_db.db_replica.address}
+            if micromasters_db_config.read_replica
+            else {}
+        ),
     },
 )

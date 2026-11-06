@@ -137,6 +137,8 @@ if __name__ == "__main__":
         "mit-learn",
         "mit-learn-nextjs",
         "mitxonline",
+        "ocw-hugo-projects",
+        "ocw-hugo-themes",
         "ocw-studio",
         "odl-video-service",
         "ol-analytics-api",

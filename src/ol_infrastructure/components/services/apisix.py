@@ -1179,8 +1179,11 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # each plugin's ``policy: redis``/``redis-cluster`` option (or
     # limit-count), just not configured by this component today.
     enable_rate_limiting: bool = False
-    # Key used to bucket requests.  ``remote_addr`` resolves to the real client
-    # IP because the gateway trusts Fastly's X-Forwarded-For (see trustedAddresses).
+    # Key used to bucket requests.  ``remote_addr`` is the TCP peer, which is the
+    # real client only because the NLB preserves client IPs
+    # (preserve_client_ip.enabled in apisix_official.py).  trustedAddresses does
+    # not rewrite it, so a request relayed through Fastly is keyed on the Fastly
+    # edge address and shares that bucket with everyone behind it.
     rate_limit_key: str = "remote_addr"
     rate_limit_rejected_code: int = Field(default=429, ge=200, le=599)
     # Thresholds are ~10x the observed worst-case single browser IP.  Measured

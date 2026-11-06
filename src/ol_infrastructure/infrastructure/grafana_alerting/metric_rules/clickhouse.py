@@ -77,10 +77,12 @@ _BACKUP_DURATION_WARN_SECONDS = int(CLICKHOUSE_TERMINATION_GRACE_SECONDS * 0.8)
 def _server_down(clusters: str) -> str:
     # The exporter records a fetch error per host per query type; system.metrics
     # is the first query it makes, so an error there means the host did not
-    # answer at all.
+    # answer at all. Exporter 0.27.4 renamed the label value from
+    # "system.metrics" to "system_metrics". The regex matches both because each
+    # data cluster's operator upgrades at its own gate, apart from this stack.
     return (
         f"max by ({_BY_HOST}) (chi_clickhouse_metric_fetch_errors"
-        f'{{cluster=~"{clusters}", fetch_type="system.metrics"}}) > 0'
+        f'{{cluster=~"{clusters}", fetch_type=~"system[._]metrics"}}) > 0'
     )
 
 

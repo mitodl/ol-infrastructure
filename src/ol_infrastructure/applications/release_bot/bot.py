@@ -412,6 +412,9 @@ async def _release(respond, app_name, cfg, context, *, supersede: str | None = N
             "its release branch will be deleted, and its tag too if it never "
             "reached production."
         )
+    # Before the reply: `respond` raises when Slack is unreachable, and the
+    # build runs either way.
+    _start_release_build_watch(app_name, cfg, build_url, requester=requester)
     await respond(message)
 
 
@@ -1220,10 +1223,168 @@ async def _hotfix(respond, app_name, cfg, ref, context):
     requester = (context or {}).get("user_id")
     if requester:
         _release_requesters[app_name] = requester
+    # Before the reply, for the same reason as in `_release`.
+    _start_release_build_watch(
+        app_name, cfg, build_url, requester=requester, hotfix_sha=sha
+    )
     await respond(
         f"🚑 Hotfix of `{sha[:7]}` triggered for `{app_name}`: what production "
         f"runs plus that commit. Build: {build_url}"
     )
+
+
+# Release builds run for minutes. The limit stops a watch on a build that
+# never finishes (stuck `pending` on a paused pipeline or with no workers, or
+# a hung step) from polling forever.
+_RELEASE_BUILD_POLL_SECONDS = 30
+_RELEASE_BUILD_WATCH_LIMIT = timedelta(hours=6)
+
+_BUILD_STATUS_PHRASES = {
+    "failed": "failed",
+    "errored": "errored",
+    "aborted": "was aborted",
+}
+
+
+def _start_release_build_watch(
+    app_name, cfg, build_url, *, requester: str | None, hotfix_sha: str | None = None
+) -> None:
+    """Report in the app's channel if the build at *build_url* does not succeed."""
+    channel = _announce_channel(cfg)
+    if _slack_app is None or not channel:
+        log.warning(
+            "Not watching %s for %s: no Slack channel to report a failure in",
+            build_url,
+            app_name,
+        )
+        return
+    asyncio.create_task(  # noqa: RUF006
+        _watch_release_build(
+            _slack_app,
+            app_name,
+            cfg,
+            build_url,
+            channel,
+            requester=requester,
+            hotfix_sha=hotfix_sha,
+        )
+    )
+
+
+async def _watch_release_build(  # noqa: PLR0913
+    app,
+    app_name,
+    cfg,
+    build_url,
+    channel,
+    *,
+    requester: str | None,
+    hotfix_sha: str | None = None,
+) -> None:
+    """Poll a release build and post the way forward if it does not succeed.
+
+    The watch lives in this process only, so a bot restart drops it. The
+    stuck-release nag still covers a cut that never finished.
+    """
+    build = concourse.build_id(build_url)
+    polls = int(
+        _RELEASE_BUILD_WATCH_LIMIT.total_seconds() // _RELEASE_BUILD_POLL_SECONDS
+    )
+    for _ in range(polls):
+        await asyncio.sleep(_RELEASE_BUILD_POLL_SECONDS)
+        try:
+            status = await concourse.build_status(build)
+        except Exception:
+            log.exception("Failed to poll release build %s for %s", build_url, app_name)
+            continue
+        if status not in concourse.TERMINAL_BUILD_STATUSES:
+            continue
+        if status == "succeeded":
+            return
+        text = await _build_failure_text(
+            app_name, cfg, build_url, status, requester, hotfix_sha
+        )
+        try:
+            await app.client.chat_postMessage(
+                channel=await slack_channels.resolve(app.client, channel), text=text
+            )
+        except Exception:
+            # Retried on the next poll: a build that failed before its cut
+            # leaves nothing in flight for the stuck-release reminder to find.
+            log.exception(
+                "Failed to report release build %s for %s", build_url, app_name
+            )
+            continue
+        return
+    log.warning("Stopped watching %s for %s: still not finished", build_url, app_name)
+
+
+async def _build_failure_text(  # noqa: PLR0913
+    app_name,
+    cfg,
+    build_url,
+    status: str,
+    requester: str | None,
+    hotfix_sha: str | None,
+) -> str:
+    """Say a release build did not succeed, and which command to run next.
+
+    The advice is always a `/doof` command, never "re-run the build in
+    Concourse". A re-run keeps the version it was scheduled with but cuts the
+    tracked branch as it is now, so once the build has pushed its tag and the
+    branch has moved on, the re-run refuses to overwrite the tag; a re-run of
+    a version abandoned or superseded since is refused outright. The commands
+    below work from every state this job can stop in, because they start from
+    a fresh check of what is in flight.
+    """
+    what = f"hotfix build of `{hotfix_sha[:7]}`" if hotfix_sha else "release build"
+    mention = f"<@{requester}> " if requester else ""
+    lines = [
+        f"❌ {mention}`{app_name}` {what} {_BUILD_STATUS_PHRASES[status]}: {build_url}"
+    ]
+    try:
+        in_flight = await github.in_flight_release(cfg.repo)
+    except Exception:
+        log.exception("Failed to check in-flight release for %s", app_name)
+        # Both commands refuse, naming `supersede` or `/doof abandon`, when a
+        # release is in the way, so either is safe to suggest blind.
+        if hotfix_sha:
+            lines.append(
+                "Could not check what is in flight. To try again: "
+                f"`/doof hotfix {app_name} {hotfix_sha[:7]}`, which says if a "
+                "release must be abandoned first."
+            )
+        else:
+            lines.append(
+                "Could not check what is in flight. To try again: "
+                f"`/doof release {app_name}`, which says if it needs "
+                f"`{_SUPERSEDE}` first."
+            )
+        return "\n".join(lines)
+    if hotfix_sha:
+        # A hotfix refuses to start while a release is in flight, and
+        # superseding would cut the tracked branch rather than the hotfix.
+        # `/doof abandon` only triggers the abandon job, so a hotfix typed
+        # straight after it still finds the release in flight.
+        retry = f"`/doof hotfix {app_name} {hotfix_sha[:7]}`"
+        if in_flight:
+            lines.append(
+                f"Release {_describe_in_flight(in_flight)} is in flight. To try "
+                f"again: `/doof abandon {app_name}`, and once that build "
+                f"finishes, {retry}"
+            )
+        else:
+            lines.append(f"To try again: {retry}")
+    elif in_flight:
+        lines += [
+            f"Release {_describe_in_flight(in_flight)} is in flight.",
+            f"• To try again: `/doof release {app_name} {_SUPERSEDE} "
+            f"{in_flight['version']}`",
+            f"• To drop it: `/doof abandon {app_name}`",
+        ]
+    else:
+        lines.append(f"To try again: `/doof release {app_name}`")
+    return "\n".join(lines)
 
 
 async def _cmd_help(
@@ -1485,8 +1646,7 @@ def _announcing(
 async def _cmd_doof(repos, ack, respond, command, context):
     parts = command["text"].split(None, 1)
     if not parts or parts[0] not in _SUBCOMMANDS:
-        await ack()
-        await respond(_USAGE)
+        await _cmd_help(repos, ack, respond, command, context)
         return
     subcommand, *rest = parts
     sub_command = dict(command, text=rest[0] if rest else "")
@@ -2126,8 +2286,9 @@ async def _deployed_since_close(cfg, repos, issue: dict[str, Any]) -> bool:
 
 
 def _qa_job_url(app_name: str, cfg) -> str:
-    # The QA job of the same Pulumi project as _production_job_url.
-    return concourse.job_url(cfg.pipeline, f"deploy-ol-application-{app_name}-qa")
+    # The job whose success makes the release deployable to Production: QA for
+    # a k8s app, the RC job for a tag-only one.
+    return concourse.job_url(cfg.pipeline, config.job_name(app_name, cfg, "qa_job"))
 
 
 def _overdue_approval(app_name: str, issue: dict[str, Any], now: datetime) -> bool:
@@ -2153,8 +2314,9 @@ def _stranded_text(app_name: str, cfg, issue: dict[str, Any], age: timedelta) ->
         f"{minutes} minutes ago, but Production has not taken it, so nothing "
         "has deployed. If the Production job has no pending build, Concourse "
         "has no QA run it can deploy (this happens after the release resource "
-        "types are updated): re-run the QA job, then approve the release issue "
-        f"it posts. QA: {_qa_job_url(app_name, cfg)} "
+        "types are updated): start a new QA build (not a re-run of an old one, "
+        "which reuses the old inputs), then approve the release issue it posts. "
+        f"QA: {_qa_job_url(app_name, cfg)} "
         f"Production: {_production_job_url(app_name, cfg)}"
     )
 

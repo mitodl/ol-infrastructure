@@ -44,6 +44,7 @@ pulumi-provisioner's ``env_vars_from_files``).
 
 import hashlib
 import json
+from collections.abc import Mapping
 from typing import NamedTuple
 
 import pulumi
@@ -59,7 +60,8 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
 )
 from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
-    read_image_internal_schema,
+    check_http_api_contract,
+    read_image_internal_schema_range,
 )
 from ol_infrastructure.applications.omnigraph.lock_handoff import (
     MIGRATION_ARMED_ANNOTATION,
@@ -76,6 +78,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     create_maintenance_window,
 )
 from ol_infrastructure.applications.omnigraph.storage import (
+    next_written_internal_schema,
     storage_uri_for,
     validate_image_internal_schema,
 )
@@ -120,7 +123,21 @@ CLUSTER_APPLY_ACTOR = "svc-witan-admin"
 # Named rather than inlined because the per-actor admission caps below are
 # derived from the memory limit, and a limit raised without revisiting the caps
 # would silently leave them mis-sized.
-SERVER_MEMORY_LIMIT = "2Gi"
+#
+# DEFAULTS, overridable per stack with `omnigraph:server_memory_request` and
+# `omnigraph:server_memory_limit`, because the environments do not use memory
+# alike. omnigraph 0.14 gives every graph its own Lance session with Lance
+# 13.0.0's default caches (6 GiB index + 1 GiB metadata, DEFAULT_INDEX_CACHE_SIZE
+# and DEFAULT_METADATA_CACHE_SIZE) and has no setting to shrink them, so no
+# server setting holds the process under this limit. What a pod holds follows
+# the write pattern. QA peaked at 338 MiB in the 14 days to 2026-11-05. Production
+# was OOMKilled on each of the four days from 2026-11-02 to 11-05. Each day one
+# actor committed one code_store_mutate every ~3.5s to a single long-lived
+# branch, and the working set (anonymous RSS, not page cache) stepped from
+# ~100-280 MiB to 1.5-1.9 GiB within 1-3 hours, then sat there until other
+# writers pushed it over 2 GiB.
+DEFAULT_SERVER_MEMORY_REQUEST = "512Mi"
+DEFAULT_SERVER_MEMORY_LIMIT = "2Gi"
 
 # How long the server drains in-flight requests after SIGTERM, and the pod's
 # grace around that. See termination_grace_period_seconds on the Deployment.
@@ -177,22 +194,28 @@ def startup_probe_failure_threshold(boot_budget_seconds: int | None) -> int:
 # Both env vars are confirmed present in the 0.8.1 server binary.
 #
 # WHY THE DEFAULTS ARE WRONG FOR THIS DEPLOYMENT, specifically the byte cap.
-# The upstream default is 4 GiB of in-flight bytes per actor — TWICE this pod's
-# entire memory limit. A cap above the limit can never bind: the pod OOMKills
-# before admission control ever declines a write, which turns a designed
-# backpressure signal (429 + client retry, already implemented in agent-kit's
-# OmnigraphClient) into a hard restart of a single-replica Recreate Deployment.
-# The cap is only useful below the memory limit, so it has to be set here.
+# The upstream default is 4 GiB of in-flight bytes per actor — twice the
+# default memory limit, and equal to Production's. A cap at or above the limit
+# can never bind: the pod OOMKills before admission control ever declines a
+# write, which turns a designed backpressure signal (429 + client retry,
+# already implemented in agent-kit's OmnigraphClient) into a hard restart of a
+# single-replica Recreate Deployment. The cap is only useful below the memory
+# limit, so it has to be set here.
 #
-# SIZING. The cap is PER ACTOR and there is no global limiter, so total
-# in-flight bytes are (concurrent actors x cap) and no single setting can bound
-# them. Sized against realistic peak concurrency rather than the worst case:
-# a handful of agent sessions plus svc-witan-ci, call it 4 concurrent writers;
-# reserving ~768 MiB of the 2 GiB for the server's own working set and Lance
-# buffers leaves ~1.25 GiB to share, so ~320 MiB each, rounded down to 256 MiB.
-# The pod's memory limit remains the real backstop for a concurrency spike
-# beyond that — this bounds the single-runaway-actor case, which is the one
-# that actually shows up (a CI reindex streaming a large NDJSON load).
+# SIZING. The cap is PER ACTOR, so total in-flight bytes are (concurrent
+# actors x cap) up to the server's global byte cap (OMNIGRAPH_GLOBAL_BYTES_MAX,
+# 256 MiB by default in the 0.14 server's workload.rs). Sized against
+# realistic peak concurrency rather than the worst case: a handful of agent
+# sessions plus svc-witan-ci, call it 4 concurrent writers; reserving ~768 MiB
+# of the 2 GiB for the server's own working set and Lance buffers leaves
+# ~1.25 GiB to share, so ~320 MiB each, rounded down to 256 MiB. The pod's
+# memory limit remains the real backstop for a concurrency spike beyond that —
+# this bounds the single-runaway-actor case, which is the one that actually
+# shows up (a CI reindex streaming a large NDJSON load).
+#
+# The ~768 MiB reserve turned out low for Production, where the server's own
+# working set reached 1.9 GiB, so that stack runs a larger limit (see the
+# comment on DEFAULT_SERVER_MEMORY_LIMIT). That doesn't move this 256 MiB.
 #
 # ★ THE COUNT IS NOW SIZED AGAINST THE DEADLINE, NOT AGAINST MEMORY. ★
 # It was 8, derived from this pod's memory limit and described as "far above any
@@ -342,6 +365,9 @@ class OmnigraphDataTier(NamedTuple):
     # binary as the server — the storage-format migration Job loads with it —
     # cannot drift onto a different one.
     server_image: str | Output[str]
+    # The highest storage format an image deployed onto this root writes, for
+    # the stack to export, by root. See next_written_internal_schema.
+    written_internal_schema: dict[str, int]
 
 
 def create_data_tier(  # noqa: PLR0913
@@ -369,6 +395,11 @@ def create_data_tier(  # noqa: PLR0913
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
+    deployed_written_internal_schema: Mapping[str, float] | None,
+    storage_restored_to_format: int | None,
+    deployed_witan_http_api_contracts: list[str] | None,
+    server_memory_request: str = DEFAULT_SERVER_MEMORY_REQUEST,
+    server_memory_limit: str = DEFAULT_SERVER_MEMORY_LIMIT,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
 
@@ -393,6 +424,10 @@ def create_data_tier(  # noqa: PLR0913
     task tk-upstream-omnigraph-a-single-row-insert-costs-a-f-eeeae3). Retuning
     should be a `pulumi config set` away, not a code change.
 
+    ``server_memory_request`` / ``server_memory_limit`` size the server
+    container. They default to the envelope CI and QA run in; see
+    DEFAULT_SERVER_MEMORY_LIMIT for why Production needs more.
+
     ``graph_removal_allowlist`` names the graphs the server entrypoint may
     delete when ``cluster.yaml`` stops declaring them. Only read once the
     served format is one whose binaries delete on apply (0.13, format 14).
@@ -411,6 +446,11 @@ def create_data_tier(  # noqa: PLR0913
     window that replaces the optimize and cleanup sweeps on that format, and
     ``optimize_schedule`` / ``cleanup_schedule`` are then unused. See
     ``maintenance.create_maintenance_window``.
+
+    ``deployed_witan_http_api_contracts`` is the witan stack's
+    ``witan_http_api_contracts`` output. The server image's HTTP contract is
+    checked against it; see
+    ``image_schema.check_http_api_contract``.
     """
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
     # service — omnigraph is generic and a future second instance would get its
@@ -494,21 +534,51 @@ def create_data_tier(  # noqa: PLR0913
     # failure instead. A label that cannot be read is NOT a failure — an image
     # predating the label, or a run without ECR access, warns and skips, since
     # refusing those would make a rollback impossible.
+    image_min_internal_schema: int | None
+    image_internal_schema: int | None
     try:
-        image_internal_schema: int | None = read_image_internal_schema(
-            OMNIGRAPH_SERVER_ECR_REPOSITORY, omnigraph_server_image, aws_config.region
+        image_min_internal_schema, image_internal_schema = (
+            read_image_internal_schema_range(
+                OMNIGRAPH_SERVER_ECR_REPOSITORY,
+                omnigraph_server_image,
+                aws_config.region,
+            )
         )
     except ImageSchemaUnavailableError as exc:
         pulumi.log.warn(
             f"skipping the image storage-format check: {exc}",
         )
-        image_internal_schema = None
+        image_min_internal_schema = image_internal_schema = None
     validate_image_internal_schema(
         image_internal_schema,
         internal_schema_version,
         migrate_to_prefix,
         migration_armed=migration_armed,
+        image_min_internal_schema=image_min_internal_schema,
     )
+    # ★ CAN THE WITAN THAT IS RUNNING TALK TO THIS SERVER? A contract bump
+    # deployed ahead of witan fails every witan graph call until witan catches
+    # up (Production 2026-11-04). The witan stack exports its contracts only
+    # once its Deployment has rolled, so this reads what is serving, not what
+    # is queued. Unreadable labels skip, as above.
+    if skipped := check_http_api_contract(
+        omnigraph_server_image, deployed_witan_http_api_contracts, aws_config.region
+    ):
+        pulumi.log.warn(f"skipping the HTTP-contract check: {skipped}")
+    written_internal_schema = next_written_internal_schema(
+        deployed_written_internal_schema,
+        storage_prefix,
+        image_internal_schema,
+        migration_armed=migration_armed,
+        restored_to=storage_restored_to_format,
+    )
+    # Exported here, before any resource that runs the image is registered,
+    # and not at the end of __main__. A failed update still writes the
+    # outputs registered so far, but a program exception between the
+    # Deployment and a later export would roll the new image with the old
+    # mark, letting an older image back onto a root the new one has written.
+    # Read back by the next deploy as deployed_written_internal_schema.
+    pulumi.export("written_internal_schema", written_internal_schema)
 
     # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,
     # organization-wide, plus the `code-bridge` graph and one `code-<repo>`
@@ -954,9 +1024,9 @@ def create_data_tier(  # noqa: PLR0913
                                 ),
                                 # Per-actor admission caps, set deliberately
                                 # rather than inherited — the upstream byte
-                                # default is twice this pod's memory limit and
-                                # therefore unreachable. See the constants for
-                                # the sizing, and the stack's
+                                # default (4 GiB) is at or above this pod's
+                                # memory limit and therefore unreachable. See
+                                # the constants for the sizing, and the stack's
                                 # `omnigraph:per_actor_*` config to retune an
                                 # environment without a code change.
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1112,8 +1182,11 @@ def create_data_tier(  # noqa: PLR0913
                             # per-stack override of it) — change one and
                             # revisit the other.
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "250m", "memory": "512Mi"},
-                                limits={"cpu": "1", "memory": SERVER_MEMORY_LIMIT},
+                                requests={
+                                    "cpu": "250m",
+                                    "memory": server_memory_request,
+                                },
+                                limits={"cpu": "1", "memory": server_memory_limit},
                             ),
                             volume_mounts=[
                                 # sub_path overlays only cluster.yaml, leaving
@@ -1268,4 +1341,5 @@ def create_data_tier(  # noqa: PLR0913
         maintenance=omnigraph_maintenance,
         storage_uri=storage_uri,
         server_image=omnigraph_server_image,
+        written_internal_schema=written_internal_schema,
     )

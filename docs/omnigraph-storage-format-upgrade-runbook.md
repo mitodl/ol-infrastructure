@@ -19,9 +19,11 @@ in a pod against S3.
 
 ## When this applies
 
-omnigraph storage is strict-single-version: a binary reads exactly one
-internal-schema (storage-format) version, and the version gate is enforced in
-both directions — including read-only opens. `omnigraph upgrade` converts a
+Before 0.14, omnigraph storage is strict-single-version: a binary reads exactly
+one internal-schema (storage-format) version, and the version gate is enforced
+in both directions — including read-only opens. (0.14 opens older formats in
+place; see [In-place upgrades](#in-place-upgrades-omnigraph-014-and-later).)
+`omnigraph upgrade` converts a
 standalone store in place, but it refuses a cluster-managed root, which is what
 every deployed graph is, so there is no in-place migration here. A
 mixed fleet where an old binary still writes a graph a newer binary has stamped
@@ -42,6 +44,105 @@ way until you either roll back or run the offline rebuild below.
 > This is the "offline export/rebuild" path referenced from `data_tier.py`'s
 > `strategy=Recreate` comment and from
 > [ADR-0009](adr/0009-deploy-witan-as-shared-multi-tenant-mcp-service.md).
+
+### In-place upgrades (omnigraph 0.14 and later)
+
+Not every format change is a rebuild. omnigraph 0.14 writes format 16 but
+opens a format-14 root in place (`omnigraph version`: `internal-schema 16
+(serves v14 to v16)`), and stamps each branch 16 on its first write. agent-kit
+labels both images with the range they serve
+(`edu.mit.ol.omnigraph.min-internal-schema` and
+`edu.mit.ol.omnigraph.internal-schema`), and preview accepts an image whose
+range covers `omnigraph:internal_schema_version` with no migration armed. Such
+an upgrade is an image deploy: `storage_prefix` and `internal_schema_version`
+stay as they are, and the rebuild procedure below doesn't apply.
+
+It is still one-way. A 0.13 binary refuses a branch 0.14 has stamped, and a
+0.14 server rewrites the S3 lock in a form 0.13 refuses on its first start. So
+the stack exports `written_internal_schema`, the highest format any image it
+deployed onto each root writes, and preview refuses a later image that writes
+less ("an image writing format 16 has already been deployed onto this root").
+There is no rollback by image alone, and an image deploy takes no backup (only
+the rebuild migration Job does). So before the first deploy of an image that
+writes a newer format onto a root:
+
+1. Stop every writer: suspend the maintenance CronJob, `witan-ci-indexer` and
+   the view reaper, let any Job they started finish, and scale
+   `omnigraph-server` to zero.
+2. Take a whole-root backup, `__cluster/` included, and verify it (object
+   count and bytes against the source prefix).
+3. Deploy the image, then scale `omnigraph-server` back to one replica if it
+   is still at zero (Pulumi doesn't put `replicas` back after something else
+   changed it), and resume the CronJobs.
+
+#### Deploy witan first when the HTTP contract changes
+
+A release that changes the HTTP contract (`Omnigraph-Http-Api`, e.g. 0.13 to
+0.14) needs the witan that speaks it running before the server moves, whether
+or not the format changes too. witan-core negotiates the contract per server,
+but only a witan already running can negotiate. Concourse orders nothing
+between the two deploy gates: on 2026-11-04 Production released both together,
+`deploy-ol-application-omnigraph-production` finished at 20:37Z, witan's only
+started at 20:47Z, and the old witan (contract 0.13 only) failed every graph
+call for about 15 minutes.
+
+1. Release witan's gate and wait for `deploy-ol-application-witan-<env>` to
+   finish, then for the previous witan pod to be gone
+   (`kubectl -n witan get pods`). The deploy job can finish while the old pod
+   is still terminating, and it keeps making graph calls through its 10s
+   preStop drain and up to 120s of graceful shutdown
+   (`applications/witan/deployment.py`).
+2. Release omnigraph's gate.
+
+The omnigraph stack enforces this. agent-kit labels the server image with the
+contract it speaks (`edu.mit.ol.omnigraph.http-api-contract`) and the witan
+image with the contracts it negotiates
+(`edu.mit.ol.omnigraph.http-api-contracts`). The witan stack reads its own
+image's label while deploying it and exports the list as
+`witan_http_api_contracts` once its Deployment has rolled. The omnigraph stack
+refuses a server image whose contract isn't in that list ("Release witan's
+gate first"), and one the council probe's `SUPPORTED_HTTP_API_CONTRACTS`
+(`scripts/check_council_health.py`) doesn't list, so a contract bump in
+agent-kit needs a matching ol-infrastructure change to the probe first.
+
+In QA and Production the refusal happens in
+`preview-ol-application-omnigraph-<env>`, so no gate issue opens. In CI it
+fails `deploy-ol-application-omnigraph-ci`. Either way nothing re-triggers it:
+re-run that job by hand once witan's deploy has finished, then release the new
+gate. A server image built before the label, or one whose labels ECR can't
+serve, skips the whole check with a warning. A witan stack that exports no
+contracts (its last deploy predates the export, or its image predates the
+label) skips only the witan half; the probe is still checked. The witan stack
+fails its own deploy, before anything rolls, if it can't read its image's
+labels for any other reason, so a registry error there can't switch the check
+off.
+
+The omnigraph stack references the witan stack, which in turn reads
+`omnigraph_server_addr` from it. A reference to a stack that doesn't exist
+fails the program, so in a new environment run `pulumi stack init` for
+`ol-application-witan` first. The omnigraph stack then sees no export and
+skips, and witan deploys after it as usual.
+
+To go back:
+
+1. Pause the omnigraph pipeline's automatic deploys, then stop every writer as
+   above. Nothing may write the root while it is restored: a running 0.14
+   server or maintenance Job would overwrite restored objects or stamp them
+   16 again.
+2. Restore the root from the backup, `__cluster/` included.
+3. Deploy the old image with `omnigraph:storage_restored_to_format` set to the
+   format it writes and no migration armed. That lowers the root's mark, and
+   preview accepts the old image on that one deploy.
+4. Scale `omnigraph-server` back to one replica if it is still at zero, then
+   resume the CronJobs once they run the old image, then the pipeline.
+5. Remove `storage_restored_to_format` in the next change. Preview refuses it
+   on any deploy that isn't a rollback, so a leftover can't permit a later
+   rollback that has no restore behind it.
+
+An aborted *rebuild* migration is different. Disarming it onto the old root with
+a new image whose range covers that root is now accepted, and that new image
+then upgrades the old root in place. To abort a rebuild without touching the
+old root, disarm with the old image's digest.
 
 ## First: is this actually a format bump?
 

@@ -55,20 +55,43 @@ class _Mocks(pulumi.runtime.Mocks):
         }
 
 
-def _build(
+@pytest.fixture(autouse=True)
+def _no_ecr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the HTTP-contract check off the network.
+
+    Pulumi mocks don't intercept boto3, so without this every case reaches the
+    real ECR. A test that wants a mismatch patches the reader again after this.
+    """
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda *_: ("0.14",),
+    )
+
+
+def _build(  # noqa: PLR0913
     monkeypatch: pytest.MonkeyPatch,
     *,
     served_format: int,
     image_format: int,
+    image_min_format: int | None = None,
     migration_armed: bool = False,
     boot_budget_seconds: int | None = None,
+    deployed_marks: dict[str, float] | None = None,
+    deployed_witan_http_api_contracts: list[str] | None = None,
+    memory: dict[str, str] | None = None,
 ) -> tuple[_Mocks, data_tier.OmnigraphDataTier]:
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     monkeypatch.setenv("OMNIGRAPH_DOCKER_SHA", "sha256:" + "a" * 64)
     monkeypatch.delenv("OMNIGRAPH_DOCKER_TAG", raising=False)
     monkeypatch.setattr(
-        data_tier, "read_image_internal_schema", lambda *_: image_format
+        data_tier,
+        "read_image_internal_schema_range",
+        lambda *_: (
+            image_format if image_min_format is None else image_min_format,
+            image_format,
+        ),
     )
     service_account = kubernetes.core.v1.ServiceAccount("omnigraph-server-sa")
     tier = data_tier.create_data_tier(
@@ -91,6 +114,10 @@ def _build(
         suspend_maintenance=migration_armed,
         migration_armed=migration_armed,
         boot_budget_seconds=boot_budget_seconds,
+        deployed_written_internal_schema=deployed_marks,
+        storage_restored_to_format=None,
+        deployed_witan_http_api_contracts=deployed_witan_http_api_contracts,
+        **(memory or {}),
     )
     return mocks, tier
 
@@ -156,6 +183,88 @@ def test_format_14_has_the_plan_gate_and_one_stop_window(monkeypatch):
         tier.plan_gate_job.urn,
         *(cj.urn for cj in tier.maintenance.cron_jobs),
     ).apply(check)
+
+
+@pulumi.runtime.test
+def test_an_image_opening_the_root_in_place_deploys_without_a_migration(monkeypatch):
+    """A 0.14 image (opens 14 to 16) on a fmt14 root. Swapping the reader's
+    (oldest, written) order would make the range empty and refuse this.
+    """
+    _, tier = _build(
+        monkeypatch,
+        served_format=14,
+        image_format=16,
+        image_min_format=14,
+        deployed_marks={"": 14.0},
+    )
+    assert tier.written_internal_schema == {"": 16}
+    return tier.deployment.urn
+
+
+def test_the_mark_is_exported_before_the_server_deployment(monkeypatch):
+    """A failed update keeps the outputs registered so far, but a program
+    exception after the Deployment and before a later export would roll the
+    new image with the old mark. Stopping the program at the export shows
+    nothing running the image was registered ahead of it.
+    """
+
+    class _ExportedError(Exception):
+        pass
+
+    exported: dict[str, object] = {}
+
+    def export(name: str, value: object) -> None:
+        exported[name] = value
+        raise _ExportedError
+
+    deployments: list[str] = []
+    real_deployment = data_tier.kubernetes.apps.v1.Deployment
+
+    def deployment(name: str, *args: object, **kwargs: object) -> object:
+        deployments.append(name)
+        return real_deployment(name, *args, **kwargs)
+
+    monkeypatch.setattr(data_tier.pulumi, "export", export)
+    monkeypatch.setattr(data_tier.kubernetes.apps.v1, "Deployment", deployment)
+
+    with pytest.raises(_ExportedError):
+        _build(
+            monkeypatch,
+            served_format=14,
+            image_format=16,
+            image_min_format=14,
+            deployed_marks={"": 14.0},
+        )
+
+    assert exported == {"written_internal_schema": {"": 16}}
+    assert deployments == []
+
+
+def test_a_server_contract_the_deployed_witan_cannot_speak_is_refused(monkeypatch):
+    """The witan stack's export reaches the deploy-order guard."""
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda *_: ("0.14",),
+    )
+    with pytest.raises(ValueError, match="Release witan's gate first"):
+        _build(
+            monkeypatch,
+            served_format=16,
+            image_format=16,
+            deployed_witan_http_api_contracts=["0.13"],
+        )
+
+
+def test_a_rollback_below_the_roots_written_format_is_refused(monkeypatch):
+    """The stack's last export reaches the guard: a 0.13 image after 0.14."""
+    with pytest.raises(ValueError, match="already been deployed onto this root"):
+        _build(
+            monkeypatch,
+            served_format=14,
+            image_format=14,
+            deployed_marks={"": 16.0},
+        )
 
 
 @pulumi.runtime.test
@@ -249,6 +358,32 @@ def test_a_boot_budget_lengthens_the_probe_and_both_rollout_waits(monkeypatch):
             "pulumi.com/patchForce": "true",
             "pulumi.com/timeoutSeconds": "4025",
         }
+
+    return tier.deployment.urn.apply(check)
+
+
+@pytest.mark.parametrize(
+    ("memory", "expected"),
+    [
+        (None, ("512Mi", "2Gi")),
+        (
+            {"server_memory_request": "2Gi", "server_memory_limit": "4Gi"},
+            ("2Gi", "4Gi"),
+        ),
+    ],
+)
+@pulumi.runtime.test
+def test_the_server_memory_envelope_follows_the_stack(monkeypatch, memory, expected):
+    """The defaults (CI, QA) and an override (Production's values) reach the server."""
+    mocks, tier = _build(monkeypatch, served_format=14, image_format=14, memory=memory)
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        resources = container["resources"]
+        assert (resources["requests"]["memory"], resources["limits"]["memory"]) == (
+            expected
+        )
 
     return tier.deployment.urn.apply(check)
 

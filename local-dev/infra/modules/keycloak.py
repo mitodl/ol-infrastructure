@@ -787,8 +787,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         )
 
     # MITx Online's admin API settings, under the names the deployed
-    # keycloak-admin-b2b template writes (applications/mitxonline/k8s_secrets.py);
-    # the local mitxonline program loads this Secret into its workloads. The
+    # keycloak-admin-b2b and keycloak-admin-b2b-membership entries in
+    # applications/mitxonline/vault_secrets.py write. The local mitxonline
+    # program loads this Secret into its workloads. The
     # discovery URL is in the program's env already.
     k8s.core.v1.Secret(
         "mitxonline-keycloak-admin",
