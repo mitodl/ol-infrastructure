@@ -680,8 +680,8 @@ gwarek_common_env = [
     core.v1.EnvVarArgs(name="SNAPSHOT_S3_BUCKET", value=gwarek_snapshot_bucket_name),
     core.v1.EnvVarArgs(name="WIKI_S3_BUCKET", value=gwarek_wiki_bucket_name),
     # Opik, for ol-llm's traces and managed prompts. The analyzer turns tracing
-    # on only when OPIK_URL_OVERRIDE is set, and fetches its prompts by the
-    # APP_ENV label. The OPIK_KEYCLOAK_* variables come in via env_from.
+    # on only when OPIK_URL_OVERRIDE is set, and fetches its prompts at versions
+    # pinned in its code. The OPIK_KEYCLOAK_* variables come in via env_from.
     core.v1.EnvVarArgs(
         name="OPIK_URL_OVERRIDE",
         value=opik_api_url(),
@@ -699,11 +699,10 @@ gwarek_common_env_from = [
         secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_app_secrets_k8s_name)
     ),
     core.v1.EnvFromSourceArgs(
-        # Optional: the Production keycloak stack writes it to Vault, and pods
-        # should still start if that stack hasn't applied yet.
-        secret_ref=core.v1.SecretEnvSourceArgs(
-            name=gwarek_opik_keycloak_k8s_name, optional=True
-        )
+        # Required: with OPIK_URL_OVERRIDE set and no credentials, APISIX refuses
+        # every Opik request, which ol-llm treats as a configuration error, so
+        # every analysis would fail. A pod that can't start says so sooner.
+        secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_opik_keycloak_k8s_name)
     ),
 ]
 
