@@ -307,6 +307,79 @@ Goal: every series Cloud receives also reaches the archive, OTLP metrics include
 - **QA series**: QA's 225k series on the canary's three ingesters stays under the per-ingester
   limit with 50 % headroom, or the canary's limits are raised, not its replica count.
 
+### Phase 2 as built (2026-11-06)
+
+Branch `md/202611_telemetry_archive_phase2`, on top of Phase 1 (`main` at `afe5c02fe`). Where
+the build departs from the text above:
+
+- **Classic architecture by explicit settings.** `mimir.py` sets `ingest_storage.enabled: false`,
+  `ingester.push_grpc_method_enabled: true` and `distributor.remote_timeout: 2s` rather than
+  applying the chart's `classic-architecture.yaml`, which nulls those keys out and whose effect
+  would depend on how the chart's config merge treats a null. The rendered `mimir.yaml` carries
+  no Kafka address and the render has no Kafka StatefulSet; the rollout operator is off because
+  nothing is zone-aware.
+- **Replication factor 1 on the store-gateway ring too**, not only the ingester ring. A
+  store-gateway restart makes its blocks unqueryable until they are reloaded; accepted under D3.
+- **Caches**: results and metadata memcached only, at 128 MB (QA) / 256 MB (Production). The
+  metadata cache is what keeps S3 LIST/GET calls, the one bill line that scales with queries,
+  from growing with every store-gateway, querier and ruler bucket sync. No chunk or index cache.
+- **Series match Cloud's.** `limits.otel_metric_suffixes_enabled: true` so the OTLP histogram is
+  `http_server_duration_milliseconds_*` here as in Cloud, and `limits.promote_otel_resource_attributes`
+  (a comma-separated string) is Grafana Cloud's default promotion list, so `service_name`,
+  `k8s_pod_name` and the rest are labels in both. `out_of_order_time_window: 2h` absorbs a writer draining up to an hour of queued
+  samples after an outage.
+- **Mimir's own metrics are filtered.** The chart's ServiceMonitors carry a `keep` relabeling to
+  the families the alerts and a health dashboard read. Loki's Phase 1 ServiceMonitors are not
+  filtered and put ~12k series into the QA Cloud stack on 2026-11-06; filtering them the same way
+  is a Phase 3 item.
+- **Recording rules are a PrometheusRule** (`recording_rules.py`) in the archive namespace,
+  labelled `ol.mit.edu/mimir-rules: "true"`, synced into the ruler by the operations cluster's
+  `alloy-metrics` through the `archive-metrics` destination's `rules` block. Only the operations
+  cluster runs the sync: two syncers against one tenant would each delete the other's groups. The
+  ruler is reached by its in-cluster Service because the archive ingress routes push paths only.
+  Three groups: per-service RED from `http_server_duration_milliseconds` (requests, 5xx, sum and
+  `le`-preserving buckets at 5m), namespace CPU and memory plus pod and node counts, and per-cluster
+  telemetry volume by signal from the collectors' self-metrics.
+- **One credential, one name.** The EC2 variables are `ARCHIVE_PUSH_USERNAME` and
+  `ARCHIVE_PUSH_PASSWORD` for both legs (Phase 1's `ARCHIVE_LOKI_*` and `ARCHIVE_OTLP_*` names
+  are gone); Alloy also reads `ARCHIVE_REMOTE_WRITE_ENDPOINT`. Vector gets a second cloud-init
+  file, `/etc/vector/archive_metrics.yaml`, with one `prometheus_remote_write` sink per host role
+  (Concourse web adds the exporter scrape to the host metrics; workers, Consul and Vault ship host
+  metrics only). The Alloy module gains a second declare, `metric_sink`, beside `log_sink`, so an
+  image built before Phase 2 still loads the new module and a new image with the old module fails
+  only on the new reference; `config.alloy` fans both the OTLP metrics and Alloy's self-metrics
+  out to it, which needs a Concourse web AMI rebuild.
+- **Datasources** both carry `manageAlerts: false`, which keeps the archive (and its Mimir ruler)
+  out of the Alerting UI's data source-managed rules; the Mimir datasource also refuses to be a
+  Grafana-managed recording-rule target. Neither stops someone building a Grafana-managed alert
+  rule on the archive by hand (grafana/grafana#132468): D13 is enforced by the UID test for rules
+  declared in this repo, and by convention for anything created in the UI.
+- **`alloy-metrics`** gets a 1 GiB memory request for the second WAL; measured in the QA soak.
+- **Alerts** added to `metric_rules/telemetry_archive.py`: archive remote-write samples dropped or
+  failed, Mimir compactor without a completed run in 24 hours, ruler evaluation failures.
+- **Verified by `helm template`** against the pinned charts: the Mimir render shows one ingester
+  and one store-gateway StatefulSet, every workload on the archive node group with the ticket-tier
+  labels, ECR-cached images, the IRSA annotation, and the config above; the k8s-monitoring render
+  shows `archive_metrics` beside `grafana_cloud_metrics` on alloy-metrics and alloy-singleton with
+  `sample_age_limit = "1h"`, `retry_on_http_429 = false`, `max_keepalive_time = "2h"`, the
+  `mimir.rules.kubernetes` block on the operations cluster's alloy-metrics only, and
+  `archive_otlp` now fed metrics as well as logs with the same `aggregate_on_attributes` collapse
+  as the Cloud destination.
+- **First QA rollout failed on config and CPU, both fixed the same day.** Mimir 3.2.3 rejected
+  `distributor.otel_metric_suffixes_enabled` (a per-tenant limit in 3.x despite the flag's prefix)
+  and a YAML list for `limits.promote_otel_resource_attributes` (a comma-separated string), so
+  every component crash-looped on the shared config; `helm template` cannot catch that, so the
+  render check now also feeds the rendered `mimir.yaml` to the pinned image
+  (`docker run grafana/mimir:<tag> -config.file=... -target=overrides-exporter`). The rest stayed
+  Pending because two QA nodes were at 99% CPU requests: the chart's memcached defaults request
+  500m each and Karpenter has no NodePool for the archive label. QA caches now request 50m, QA
+  ingester, querier and compactor requests are halved (Mimir ~3 vCPU in all), and the QA node
+  group is fixed at three nodes: Loki, the ingress and the node daemons already request ~5.4 of
+  the 7.8 vCPU two nodes offer.
+- **Not yet done**: the QA soak and its gates, the Production rollout, the Concourse web AMI
+  rebuild, and the instance roll of the Concourse, Consul and Vault hosts after their stacks are
+  applied.
+
 ## Phase 3: Hardening and handover
 
 Goal: the archive is something the team can neglect safely.

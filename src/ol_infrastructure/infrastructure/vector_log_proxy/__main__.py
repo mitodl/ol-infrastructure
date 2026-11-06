@@ -34,7 +34,12 @@ from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
 )
-from ol_infrastructure.lib.telemetry_archive import push_target, vector_loki_sink
+from ol_infrastructure.lib.telemetry_archive import (
+    PUSH_PASSWORD_ENV,
+    PUSH_USERNAME_ENV,
+    push_target,
+    vector_loki_sink,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 ##################################
@@ -121,10 +126,13 @@ grafana_credentials = read_yaml_secrets(
 
 heroku_proxy_credentials = proxy_credentials["heroku"]
 fastly_proxy_credentials = proxy_credentials["fastly"]
+# Keyed by the environment variable the archive sinks read, so the Vault
+# secret, the synced Kubernetes Secret and the Deployment's env all follow a
+# rename in lib/telemetry_archive.py.
 archive_credentials = (
     {
-        "archive_loki_username": archive.username,
-        "archive_loki_password": archive.password,
+        PUSH_USERNAME_ENV.lower(): archive.username,
+        PUSH_PASSWORD_ENV.lower(): archive.password,
     }
     if archive
     else {}
@@ -594,8 +602,8 @@ vector_deployment = kubernetes.apps.v1.Deployment(
                                     ),
                                 )
                                 for env_name, secret_key in (
-                                    ("ARCHIVE_LOKI_USER", "archive_loki_username"),
-                                    ("ARCHIVE_LOKI_PASSWORD", "archive_loki_password"),
+                                    (PUSH_USERNAME_ENV, PUSH_USERNAME_ENV.lower()),
+                                    (PUSH_PASSWORD_ENV, PUSH_PASSWORD_ENV.lower()),
                                 )
                                 if archive
                             ],

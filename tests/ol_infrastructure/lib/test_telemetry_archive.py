@@ -1,9 +1,9 @@
 """The archive writers' shared facts stay true to what they describe.
 
-The EC2 Vector sink is written by cloud-init beside an image's log template and
-names that template's transforms as inputs. A renamed transform would fail
+The EC2 Vector sinks are written by cloud-init beside an image's templates and
+name those templates' transforms as inputs. A renamed transform would fail
 Vector's config load on the next instance launch and take the Grafana Cloud
-sink down with it, and the image build's `vector validate` cannot see a file
+sinks down with it, and the image build's `vector validate` cannot see a file
 that is not in the image. This is the check that stands in for it.
 """
 
@@ -16,7 +16,15 @@ import yaml
 import bilder
 from ol_infrastructure.lib import telemetry_archive as ta
 
-IMAGES_DIR = Path(bilder.__file__).parent / "images"
+BILDER_DIR = Path(bilder.__file__).parent
+IMAGES_DIR = BILDER_DIR / "images"
+ALLOY_FILES_DIR = BILDER_DIR / "components" / "alloy" / "files"
+HOST_METRICS_TEMPLATE = (
+    BILDER_DIR / "components" / "vector" / "templates" / "host_metrics.yaml"
+)
+CONCOURSE_METRICS_TEMPLATE = (
+    IMAGES_DIR / "concourse" / "templates" / "vector" / "concourse_metrics.yaml"
+)
 
 
 def _target() -> ta.ArchivePushTarget:
@@ -58,13 +66,57 @@ def test_ec2_sink_file_is_a_bounded_loki_sink() -> None:
     entry = ta.ec2_vector_sink_file("consul", _target())
     (sink,) = yaml.safe_load(entry["content"])["sinks"].values()
 
-    assert entry["path"] == ta.EC2_VECTOR_SINK_PATH
+    assert entry["path"] == ta.EC2_VECTOR_LOG_SINK_PATH
     assert sink["type"] == "loki"
     assert sink["endpoint"] == "https://telemetry-archive-qa.ol.mit.edu"
     assert sink["buffer"]["when_full"] == "drop_newest"
     assert sink["healthcheck"] is False
     assert sink["request"]["retry_attempts"] == ta.VECTOR_SINK_RETRY_ATTEMPTS
-    assert sink["auth"]["user"] == "${ARCHIVE_LOKI_USER}"
+    assert sink["auth"]["user"] == "${ARCHIVE_PUSH_USERNAME}"
+
+
+def _metric_template_transforms(role: str) -> set[str]:
+    templates = [HOST_METRICS_TEMPLATE]
+    if role == "concourse-web":
+        templates.append(CONCOURSE_METRICS_TEMPLATE)
+    return {
+        transform
+        for template in templates
+        for transform in yaml.safe_load(template.read_text())["transforms"]
+    }
+
+
+@pytest.mark.parametrize("role", sorted(ta.EC2_VECTOR_METRIC_INPUTS))
+def test_ec2_metric_sink_inputs_are_transforms_the_role_installs(role: str) -> None:
+    """Every image has host_metrics.yaml; only Concourse web adds the exporter."""
+    assert set(ta.EC2_VECTOR_METRIC_INPUTS[role]) <= _metric_template_transforms(role)
+
+
+def test_ec2_metric_sink_mirrors_the_cloud_sinks() -> None:
+    """The archive receives exactly the transforms the Cloud remote-write sinks read."""
+    cloud_inputs = {
+        transform
+        for template in (HOST_METRICS_TEMPLATE, CONCOURSE_METRICS_TEMPLATE)
+        for sink in yaml.safe_load(template.read_text())["sinks"].values()
+        if sink["type"] == "prometheus_remote_write"
+        for transform in sink["inputs"]
+    }
+    assert set(ta.EC2_VECTOR_METRIC_INPUTS["concourse-web"]) == cloud_inputs
+
+
+def test_ec2_metric_sink_file_is_a_bounded_remote_write_sink() -> None:
+    """Same bounds as the log sink; the credential is the one push credential."""
+    entry = ta.ec2_vector_metric_sink_file("concourse-worker", _target())
+    (sink,) = yaml.safe_load(entry["content"])["sinks"].values()
+
+    assert entry["path"] == ta.EC2_VECTOR_METRIC_SINK_PATH
+    assert entry["path"] != ta.EC2_VECTOR_LOG_SINK_PATH
+    assert sink["type"] == "prometheus_remote_write"
+    assert sink["endpoint"] == "https://telemetry-archive-qa.ol.mit.edu/api/v1/push"
+    assert sink["inputs"] == [ta.HOST_METRICS_INPUT]
+    assert sink["buffer"]["when_full"] == "drop_newest"
+    assert sink["healthcheck"] is False
+    assert sink["auth"]["user"] == "${ARCHIVE_PUSH_USERNAME}"
 
 
 def test_env_lines_name_the_variables_the_configs_read() -> None:
@@ -73,36 +125,36 @@ def test_env_lines_name_the_variables_the_configs_read() -> None:
     vector_lines = ta.ec2_vector_env_lines(target)
     alloy_lines = ta.ec2_alloy_env_lines(target)
 
-    assert "ARCHIVE_LOKI_USER=u\n" in vector_lines
+    assert "ARCHIVE_PUSH_USERNAME=u\n" in vector_lines
     assert 'ARCHIVE_OTLP_ENDPOINT="https://telemetry-archive-qa.ol.mit.edu/otlp"\n' in (
         alloy_lines
     )
+    assert (
+        'ARCHIVE_REMOTE_WRITE_ENDPOINT="https://telemetry-archive-qa.ol.mit.edu/api/v1/push"\n'
+        in alloy_lines
+    )
     for variable in (
-        ta.ALLOY_ENDPOINT_ENV,
-        ta.ALLOY_USERNAME_ENV,
-        ta.ALLOY_PASSWORD_ENV,
+        ta.ALLOY_OTLP_ENDPOINT_ENV,
+        ta.ALLOY_REMOTE_WRITE_ENDPOINT_ENV,
+        ta.PUSH_USERNAME_ENV,
+        ta.PUSH_PASSWORD_ENV,
     ):
         assert f'sys.env("{variable}")' in ta.EC2_ALLOY_ARCHIVE_MODULE
 
 
 def test_alloy_module_exports_what_the_image_config_imports() -> None:
-    """config.alloy fans logs out to `archive.log_sink.default.input`."""
-    image_config = (
-        Path(bilder.__file__).parent / "components" / "alloy" / "files" / "config.alloy"
-    ).read_text()
-    image_default = (
-        Path(bilder.__file__).parent
-        / "components"
-        / "alloy"
-        / "files"
-        / "archive.alloy"
-    ).read_text()
+    """config.alloy fans logs and metrics out to the two declares in archive.alloy."""
+    image_config = (ALLOY_FILES_DIR / "config.alloy").read_text()
+    image_default = (ALLOY_FILES_DIR / "archive.alloy").read_text()
 
     assert "archive.log_sink.default.input" in image_config
+    assert "archive.metric_sink.default.receiver" in image_config
     assert f'filename = "{ta.EC2_ALLOY_MODULE_PATH}"' in image_config
     for module in (image_default, ta.EC2_ALLOY_ARCHIVE_MODULE):
         assert 'declare "log_sink"' in module
         assert 'export "input"' in module
+        assert 'declare "metric_sink"' in module
+        assert 'export "receiver"' in module
 
 
 def test_only_qa_and_production_have_an_archive() -> None:
