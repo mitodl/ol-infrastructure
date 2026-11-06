@@ -105,6 +105,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
         "vault/",
         "vector/",
     ],
+    "applications/lightdash/": ["lightdash/"],
     "applications/mailgun/": [],
     "applications/marimo_data/": [],
     "applications/micromasters/": ["fastly.yaml", "vector/"],
