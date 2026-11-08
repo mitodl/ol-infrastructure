@@ -4,7 +4,7 @@
 # mitodl/learn-ai-app image runs (latest, or the prebuilt_tags pin).
 # With a checkout it also serves the sandbox (frontend-demo); see sandbox.yaml.
 
-load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain", "pulumi_app_rows")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "learn-ai")
@@ -82,6 +82,19 @@ k8s_resource(
 # The apply timeout this resource needs (its apply includes the migrate Job)
 # is session-wide, so the root Tiltfile sets it.
 prebuilt_tags = os.environ.get('LOCAL_DEV_PREBUILT_IMAGE_TAGS', '')
+# Everything the render reads; .tiltignore keeps __pycache__ out of these.
+PROGRAM_DEPS = [
+    PROGRAM_DIR,
+    APPLY,
+    os.path.join(config.main_dir, 'local-dev/scripts/pulumi-clear-stale-lock.sh'),
+    os.path.join(config.main_dir, 'local-dev/scripts/pulumi-pending-objects.py'),
+    os.path.join(config.main_dir, 'src/ol_infrastructure/applications/learn_ai'),
+    os.path.join(config.main_dir, 'src/ol_infrastructure/components/services'),
+    os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
+    os.path.join(config.main_dir, 'src/bridge/lib'),
+    'secrets.yaml',
+    'llm-stub',
+]
 k8s_custom_deploy(
     DEPLOY_NAME,
     apply_cmd=[APPLY, 'learn-ai', 'up'],
@@ -90,19 +103,7 @@ k8s_custom_deploy(
     # naming them here makes a change re-apply, which os.putenv alone would not.
     apply_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
     delete_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
-    # Everything the render reads; .tiltignore keeps __pycache__ out of these.
-    deps=[
-        PROGRAM_DIR,
-        APPLY,
-        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-clear-stale-lock.sh'),
-        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-pending-objects.py'),
-        os.path.join(config.main_dir, 'src/ol_infrastructure/applications/learn_ai'),
-        os.path.join(config.main_dir, 'src/ol_infrastructure/components/services'),
-        os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
-        os.path.join(config.main_dir, 'src/bridge/lib'),
-        'secrets.yaml',
-        'llm-stub',
-    ],
+    deps=PROGRAM_DEPS,
     # Without a checkout nothing registers the image, and naming it here would
     # fail the Tiltfile load; the program then runs the published image.
     image_deps=[IMAGE] if HAS_CHECKOUT else [],
@@ -115,6 +116,17 @@ k8s_resource(
     links=[link('https://ai.learn.' + root_domain + '/admin/', 'learn-ai Django admin')] + (
         [link('https://ai-sandbox.learn.' + root_domain, 'learn-ai sandbox')] if HAS_CHECKOUT else []
     ),
+)
+
+# The Celery worker, beat and the model stub get resources of their own; see
+# "Celery resources" in local-dev/README.md.
+pulumi_app_rows(
+    'learn-ai',
+    workers=['all'],
+    beat=True,
+    extra_rows={'learn-ai-llm-stub': {'ol.mit.edu/component': 'llm-stub'}},
+    app_dir=APP_DIR if HAS_CHECKOUT else None,
+    deps=PROGRAM_DEPS,
 )
 
 # No image is published for the sandbox, so it exists only with a checkout.

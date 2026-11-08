@@ -176,3 +176,87 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None, labels=None)
     for p, content in contents:
         stamped = _stamp_workloads(content, fingerprint, image_tags)
         k8s_yaml(stamped if stamped != None else blob(content))
+
+
+_WORKLOAD_RESTART = "local-dev/scripts/workload-restart.py"
+
+
+def _label_selector(labels):
+    return ",".join(["%s=%s" % (k, labels[k]) for k in sorted(labels.keys())])
+
+
+def pulumi_app_rows(app, workers=[], beat=False, extra_rows={}, app_dir=None, src_path="/src", deps=[], namespace=None):
+    """Give each Celery worker, beat and extra Deployment of a Pulumi-rendered
+    app its own Tilt resource, named after the Deployment, beside <app>-app.
+
+    app is the app's name: its ol.mit.edu/application label and the prefix of
+    its Deployment names. namespace is where they run, when that is not the
+    app's name. workers lists the program's Celery worker names, beat says
+    whether it renders a beat Deployment, and extra_rows maps any other
+    Deployment's name to labels selecting its pods. pulumi-app-apply.sh
+    leaves these Deployments out of the app resource;
+    tests/local_dev/test_tilt_workload_rows.py checks both against the
+    rendered program and reads this call's arguments with ast, so they must
+    be literals.
+
+    A worker resource with app_dir copies that checkout to src_path in the
+    running container and restarts Celery in place (workload-restart.py now);
+    every other resource rolls its Deployment.
+
+    deps should be the app resource's deps: a change there re-applies the app,
+    which replaces the worker's pod (back on the image's code) whenever the
+    change reaches its pod template, so a worker resource with a checkout
+    shows it as pending. The resources are manual because running on that
+    change could restart a pod Pulumi is about to replace; each still runs
+    once at tilt up, after the app resource."""
+    script = os.path.join(config.main_dir, _WORKLOAD_RESTART)
+    namespace = namespace or app
+    app_row = "%s-app" % app
+    base = {"ol.mit.edu/application": app}
+    beat_row = "%s-celery-beat" % app
+    beat_labels = dict(base)
+    beat_labels.update({"ol.mit.edu/component": "celery", "ol.mit.edu/worker-name": "beat"})
+
+    def rollout_cmd(name):
+        return [script, "rollout", app, name, "--namespace", namespace, "--app-row", app_row]
+
+    rows = []
+    for worker in workers:
+        # The component's rule (celery_worker_deployment_name in
+        # components/services/k8s.py): "_" becomes "-" in the name, not in the label.
+        name = ("%s-%s-celery-worker" % (app, worker)).replace("_", "-")
+        labels = dict(base)
+        labels.update({"ol.mit.edu/component": "celery", "ol.mit.edu/worker-name": worker})
+        if app_dir:
+            cmd = [
+                script, "now", app, name,
+                "--namespace", namespace,
+                "--selector", _label_selector(labels),
+                "--container", "celery-worker",
+                "--app-dir", app_dir,
+                "--app-row", app_row,
+                "--src-path", src_path,
+            ]
+            if beat:
+                cmd += ["--beat-selector", _label_selector(beat_labels), "--beat-row", beat_row]
+            rows.append((name, labels, cmd, deps))
+        else:
+            rows.append((name, labels, rollout_cmd(name), []))
+    if beat:
+        rows.append((beat_row, beat_labels, rollout_cmd(beat_row), []))
+    for name in extra_rows:
+        labels = dict(base)
+        labels.update(extra_rows[name])
+        rows.append((name, labels, rollout_cmd(name), []))
+
+    for name, labels, cmd, row_deps in rows:
+        k8s_custom_deploy(name, apply_cmd=cmd, delete_cmd=["true"], deps=row_deps)
+        k8s_resource(
+            name,
+            labels=[app],
+            resource_deps=[app_row],
+            trigger_mode=TRIGGER_MODE_MANUAL,
+            # The Deployment's uid changes when the app row recreates the
+            # stack; the labels keep the row on the new pods.
+            extra_pod_selectors=[labels],
+        )

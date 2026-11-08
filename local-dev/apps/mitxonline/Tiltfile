@@ -3,7 +3,7 @@
 # When the sibling mitxonline repo is not checked out, the published
 # mitodl/mitxonline-app image runs (latest, or the prebuilt_tags pin).
 
-load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain", "pulumi_app_rows")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "mitxonline")
@@ -79,6 +79,18 @@ k8s_resource(
 # is session-wide, so the root Tiltfile sets it.
 root_domain = current_root_domain()
 prebuilt_tags = os.environ.get('LOCAL_DEV_PREBUILT_IMAGE_TAGS', '')
+# Everything the render reads; .tiltignore keeps __pycache__ out of these.
+PROGRAM_DEPS = [
+    PROGRAM_DIR,
+    APPLY,
+    os.path.join(config.main_dir, 'local-dev/scripts/pulumi-clear-stale-lock.sh'),
+    os.path.join(config.main_dir, 'local-dev/scripts/pulumi-pending-objects.py'),
+    os.path.join(config.main_dir, 'src/ol_infrastructure/applications/mitxonline'),
+    os.path.join(config.main_dir, 'src/ol_infrastructure/components/services'),
+    os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
+    os.path.join(config.main_dir, 'src/bridge/lib'),
+    'secrets.yaml',
+]
 k8s_custom_deploy(
     DEPLOY_NAME,
     apply_cmd=[APPLY, 'mitxonline', 'up'],
@@ -95,18 +107,7 @@ k8s_custom_deploy(
         ).lower(),
     },
     delete_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
-    # Everything the render reads; .tiltignore keeps __pycache__ out of these.
-    deps=[
-        PROGRAM_DIR,
-        APPLY,
-        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-clear-stale-lock.sh'),
-        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-pending-objects.py'),
-        os.path.join(config.main_dir, 'src/ol_infrastructure/applications/mitxonline'),
-        os.path.join(config.main_dir, 'src/ol_infrastructure/components/services'),
-        os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
-        os.path.join(config.main_dir, 'src/bridge/lib'),
-        'secrets.yaml',
-    ],
+    deps=PROGRAM_DEPS,
     # Without a checkout nothing registers the image, and naming it here would
     # fail the Tiltfile load; the program then runs the published image.
     image_deps=[IMAGE] if HAS_CHECKOUT else [],
@@ -115,4 +116,14 @@ k8s_resource(
     DEPLOY_NAME,
     labels=['mitxonline'],
     resource_deps=['local-infra-apps'],
+)
+
+# The Celery worker and beat get resources of their own; see "Celery resources"
+# in local-dev/README.md.
+pulumi_app_rows(
+    'mitxonline',
+    workers=['all'],
+    beat=True,
+    app_dir=APP_DIR if HAS_CHECKOUT else None,
+    deps=PROGRAM_DEPS,
 )

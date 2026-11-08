@@ -17,6 +17,11 @@ if k8s_context() != "local-dev":
         "\n  Run ./local-dev/scripts/start.sh, or pass --context local-dev to tilt up / tilt down."
     )
 
+# pulumi_app_rows (local-dev/tiltlib.star) relies on extra_pod_selectors to
+# follow pods its apply did not create, and workload-restart.py applies a
+# UIButton while Tilt runs; both are verified on 0.37.8 only.
+version_settings(constraint='>=0.37.8')
+
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
@@ -50,9 +55,10 @@ per_app_databases = cfg.get("per_app_databases", False)
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
 # update_settings is session-wide, so this applies to every app's apply:
 # a Pulumi-rendered app's apply includes its migrate Job, which Tilt's 30 s
-# default cuts off on a first apply.
+# default cuts off on a first apply, and a click on one of its Celery
+# resources first waits for that apply when it is running.
 if "mitxonline" in enabled_apps or "learn-ai" in enabled_apps:
-    update_settings(k8s_upsert_timeout_secs=300)
+    update_settings(k8s_upsert_timeout_secs=600)
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
 # derives from this value, the same one local-dev/tiltlib.star substitutes into

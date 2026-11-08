@@ -67,7 +67,7 @@ Install these tools before running setup. The install commands shown are Homebre
 | Docker Desktop, OrbStack, or Docker Engine (Linux) | 12–16 GB RAM for the VM (see note) | https://docs.docker.com/desktop/ or https://orbstack.dev/ |
 | kubectl | ≥ 1.28 | `brew install kubectl` |
 | k3d | ≥ 5.9 (tested; `setup.sh` uses `k3d registry create --image -v`) | `brew install k3d` |
-| Tilt | ≥ 0.33 | https://docs.tilt.dev/install.html |
+| Tilt | ≥ 0.37.8 | https://docs.tilt.dev/install.html |
 | Helm | ≥ 3.14 | `brew install helm` |
 | mkcert | ≥ 1.4 | `brew install mkcert` |
 | Pulumi CLI | ≥ 3.x | `brew install pulumi` |
@@ -257,10 +257,29 @@ odl-video-service derives Django permissions from Keycloak group membership: `ad
 
 With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your edits into the running containers — no rebuild. (Curious how? See [Two transports](ARCHITECTURE.md#two-transports-how-your-code-reaches-a-pod) in ARCHITECTURE.md.) What to expect:
 
-- **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt rebuilds the image and rolls the pods, so web, Celery and beat all run the new packages.
+- **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code; for mitxonline and learn-ai, click the worker's resource, which restarts it on your checkout (see [Celery resources](#celery-resources-mitxonline-learn-ai)). When `pyproject.toml` or `uv.lock` changes, Tilt rebuilds the image and rolls the pods, so web, Celery and beat all run the new packages.
 - **mitxonline frontends:** the bundles are compiled in the image, so an edit under `frontend/` or to the root yarn files rebuilds the image (about two minutes, including the pre-deploy Job, which re-runs `migrate`) and rolls the pods. The edit is live once the new pods are up.
 - **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.test` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
 - **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app:latest`). To run a specific release instead, add `"<app>=<tag>"` to `prebuilt_tags` in `tilt_config.json` (the Next.js frontend's key is `mit-learn-nextjs`). It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
+
+### Celery resources (mitxonline, learn-ai)
+
+Each of these apps has a Tilt resource per Deployment: `<app>-app` (the Pulumi apply and the webapp), `<app>-all-celery-worker` (local-dev runs one merged worker, named `all`, that consumes every queue), `<app>-celery-beat`, and for learn-ai `learn-ai-llm-stub`. Each shows its own pod's status and log, and its update button does one thing:
+
+| Resource | Update button |
+|---|---|
+| `mitxonline-app`, `learn-ai-app` | Rebuilds the image and recreates the whole stack (`pulumi destroy` + `up`, migrate Job included): about 3 minutes. Use it when your branch removes or renames Python modules, or to put a beat schedule change into effect. |
+| `<app>-all-celery-worker` | Restarts the worker on your checkout, now. The checkout is copied into the running container and Celery restarts in place; a task still running 5 s later is killed (whether it runs again depends on the task's acknowledgement settings). The resource shows "updating" until the worker answers a ping, and turns red, with the traceback in its log, if Celery crashes on your code. |
+| `<app>-celery-beat`, `learn-ai-llm-stub` | Rolling restart of the pod, on the image's code. |
+
+What that means while editing:
+
+- A save never restarts Celery. The worker runs your checkout as of the last click on its resource, so click it after changing task code or switching branches. The copy lives in the running container only: if the container restarts on its own (an out-of-memory kill, a cluster restart), the Celery worker is back on the image's code and Tilt shows no pending change. An image rebuild (`pyproject.toml`, `uv.lock`, mitxonline's `frontend/`) also puts the worker on your checkout, since the image is built from it.
+- When the app resource re-applies without rebuilding the image (an edit to the program, the stack file or `secrets.yaml`), Pulumi replaces the worker's pod if the change reaches it, such as a changed `secrets.yaml` value or worker setting, and the new pod runs the code of the last image build. The worker resource then shows Tilt's pending-changes marker on its update button; click it, and if `<app>-app` is still applying the click waits for it.
+- Beat runs the image's code. Whenever the worker resource runs (each click, and once at `tilt up`), it compares the beat schedule your checkout defines (`CELERY_BEAT_SCHEDULE` in `main/settings.py`) with the one beat is running; when they differ, its log shows the difference and a "Beat schedule is stale: recreate stack" button appears on the beat resource. That button recreates the stack. The button stays until a worker run finds the schedules equal, and is gone after a Tilt restart.
+- After switching to a branch that removes or renames a Python module, click `<app>-app` instead: the copy adds and overwrites files, it never deletes them, so a removed `tasks.py` keeps its tasks registered in the worker.
+- `tilt up` runs each of these resources once after its app resource is up: the worker restarts in place on your checkout, and beat and the model stub roll.
+- Without the app's checkout next to `ol-infrastructure`, the worker resource's button is a rolling restart too.
 
 ### Access logs
 
@@ -580,7 +599,7 @@ How it works — plain Kubernetes, visible in each YAML-applied app's `deploymen
 - Each app's Secret holds the variables deployed stacks read from Vault, described once in `src/ol_infrastructure/applications/<app>/vault_secrets.py`. Its `secrets.yaml` gives each of them a local value (`values:`) or leaves it unset (`unset:`), and the apply stops on a variable it does not account for, so a variable added for deployed stacks needs a local decision. A variable deployed stacks set outside Vault belongs in `LOCAL_ENV_DEFAULTS`, not in `secrets.yaml`. learn-ai's file also carries `canvas_syllabus_token`, the gateway's key for the `/http/canvas_*` routes, which is not a pod variable. mitxonline's also has `supplied_by:`, for variables another local Secret sets.
 - Editing the program, the stack file or `secrets.yaml` re-runs the program and rolls the pods; a `secrets.yaml` edit also re-runs the migrate Job. A `configmaps/app-env.local.yaml` for either app is not read: move its `data:` entries under `mitxonline:vars:` or `learn_ai:env_vars:` in the stack file and delete it; until then the apply log names its keys.
 - The overridden key names and the image in use (and learn-ai's model backend) appear in the `mitxonline-app` or `learn-ai-app` resource's log; `kubectl --context local-dev get deploy -n <app> <app>-app -o yaml` shows the merged result. Override values sit in the pod spec and in the Pulumi state under `local-dev/infra/.pulumi/`, so treat both as sensitive output.
-- learn-ai has one Tilt resource, `learn-ai-app`, for its webapp, Celery worker, beat, model stub and routes, so all their logs are under it.
+- The webapp's log is under `<app>-app`; the Celery worker, beat and learn-ai's model stub have resources of their own (see [Celery resources](#celery-resources-mitxonline-learn-ai)).
 - mitxonline's pre-deploy Job also runs `configure_wagtail`, so a fresh database gets its Wagtail site and index pages without a seed step (`seed.sh` has no mitxonline default for the same reason; `tilt trigger mitxonline-app` recreates the stack, Job included, so it repeats them). Logins come from Keycloak, and mitxonline finds the Django user by its Keycloak user id, so `seed-mitxonline-instance` looks up `admin@ol.test`'s id in Keycloak on the host and creates the superuser with it; the first login then signs in as that user.
 - The Job carries the component's `ttlSecondsAfterFinished` of 30 minutes, so `kubectl --context local-dev -n <app> logs job/<app>-app-pre-deploy` answers NotFound after that, and the next apply, whatever triggered it, re-creates the Job and re-runs migrate (about 25 s for mitxonline) before the pods roll. learn-ai's Job runs `migrate` then `createcachetable`, which is why `seed.sh` has no learn-ai default.
 - Before switching to a branch from before an app's program, run `tilt down` (or `local-dev/scripts/pulumi-app-apply.sh <app> down`, `<app>` being `mitxonline` or `learn-ai`): Tilt does not delete the Pulumi-owned objects, and the old YAML then serves the same hosts beside them.

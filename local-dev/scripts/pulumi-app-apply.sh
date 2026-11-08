@@ -76,7 +76,13 @@ up)
         kubectl_ logs -l "$selector,ol.mit.edu/job=pre-deploy" --all-containers --tail=100 1>&2 || :
         exit 1
     fi
-    kubectl_ get deploy,svc,apisixroute,apisixpluginconfig -l "$selector" -o yaml
+    # Celery, and local-only extras such as learn-ai's model stub, have Tilt
+    # resources of their own (tiltlib.star's pulumi_app_rows), so only the
+    # component's webapp and dev-shell Deployments stay here;
+    # tests/local_dev/test_tilt_workload_rows.py checks the two stay in step.
+    kubectl_ get deploy -l "$selector,ol.mit.edu/component in (webapp,dev-shell)" -o yaml
+    echo ---
+    kubectl_ get svc,apisixroute,apisixpluginconfig -l "$selector" -o yaml
     ;;
 down)
     pulumi_ destroy --yes --skip-preview
