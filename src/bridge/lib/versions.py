@@ -176,7 +176,7 @@ MCP_CONTEXT7_VERSION = "4.4.4"
 # AWS's official SigV4 proxy image, the stdio bridge to the managed AWS MCP Server
 # endpoint. Image tags track the PyPI package (mcp-proxy-for-aws) one-for-one.
 # renovate: datasource=docker depName=mcp-proxy-for-aws packageName=public.ecr.aws/mcp-proxy-for-aws/mcp-proxy-for-aws
-MCP_PROXY_FOR_AWS_VERSION = "1.7.0"
+MCP_PROXY_FOR_AWS_VERSION = "1.8.0"
 
 # Local-dev only (local-dev/infra). Deployed environments use a managed service
 # or nothing in these places; everything local-dev shares with a deployed stack
