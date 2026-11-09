@@ -1133,8 +1133,7 @@ server_config_job = kubernetes.batch.v1.Job(
         ttl_seconds_after_finished=86400,  # auto-clean after 24 h
     ),
     opts=ResourceOptions(
-        # The glossary the Job creates is owned by a team.
-        depends_on=[ingestion_irsa_role, *om_teams],
+        depends_on=[ingestion_irsa_role],
         delete_before_replace=True,
     ),
 )
