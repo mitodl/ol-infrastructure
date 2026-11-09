@@ -1,10 +1,13 @@
 """Run the falco VCL suites and guard how their main VCL is rendered."""
 
+import re
 from pathlib import Path
 
 import pytest
 
 from ol_infrastructure.lib.falco import (
+    FALCO_RELEASES,
+    REPO_ROOT,
     SUITES,
     VCL_TESTS_DIR,
     VclSnippet,
@@ -22,6 +25,35 @@ def test_suite_lints_and_passes(name: str):
     results = run_suite(load_suite(name))
     failures = [f"falco {r.command}:\n{r.output}" for r in results if not r.ok]
     assert not failures, "\n".join(failures)
+
+
+def _renovate_falco_pattern() -> re.Pattern[str]:
+    """Read the falco manager's matchString out of renovate.json5 as a Python regex."""
+    line = next(
+        line.strip()
+        for line in REPO_ROOT.joinpath("renovate.json5").read_text().splitlines()
+        if "github-release-attachments" in line
+        and "matchString" not in line
+        and line.strip().startswith("'")
+    )
+    pattern = line.rstrip(",").strip("'").replace("\\\\", "\\")
+    return re.compile(pattern.replace("(?<", "(?P<"))
+
+
+def test_renovate_manages_every_falco_platform():
+    """Renovate only moves the entries its regex matches; a miss pins that platform."""
+    matches = list(
+        _renovate_falco_pattern().finditer(
+            REPO_ROOT.joinpath("src/ol_infrastructure/lib/falco.py").read_text()
+        )
+    )
+    assert [(m["currentValue"], m["currentDigest"]) for m in matches] == list(
+        FALCO_RELEASES.values()
+    )
+
+
+def test_every_platform_pins_the_same_falco_release():
+    assert len({version for version, _ in FALCO_RELEASES.values()}) == 1
 
 
 def test_relative_falco_bin_is_resolved_before_the_cwd_changes(
