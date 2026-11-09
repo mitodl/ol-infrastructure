@@ -182,11 +182,14 @@ data:
             # Course pages reference the shared theme assets both at the root
             # and nested under the course path; both live at /static_shared/.
             rewrite ^/courses/o/.*/static_shared/(.*)$ /static_shared/$1 break;
-            rewrite ^/courses/o/(.*)$ /courses/$1;
             # Fastly's `req.url !~ "\.[^/]+$"`: a last path segment with no
             # dot is a page, so serve its index.html, with or without the
-            # trailing slash. No redirect, same as production.
-            rewrite ^((?:.*/)?[^./]+)/?$ $1/index.html break;
+            # trailing slash. No redirect, same as production. This one runs
+            # first, against the /courses/o/ form, so that both rewrites can
+            # end in `break`; a rewrite without it would send the changed URI
+            # back through location matching, into `location /`.
+            rewrite ^/courses/o/((?:.*/)?[^./]+)/?$ /courses/$1/index.html break;
+            rewrite ^/courses/o/(.*)$ /courses/$1 break;
             # Not appending $args drops the query string, as production does.
             proxy_pass http://rustfs/ocw-content-live-local$uri;
 
