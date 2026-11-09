@@ -1090,6 +1090,33 @@ if stack_info.env_suffix in ("qa", "production"):
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+# The Google Ads API credentials for the data_loading Google Ads dlt source.
+# Copied from the google_ads_optimization Concourse pipeline's secret so the
+# source pulls from the same manager account (the service account's access to it
+# is granted in Google Ads, not GCP). Production only: that pipeline uses this
+# credential to apply bid changes, so it can write to the live ad accounts, and
+# QA Vault is readable by every QA code location and by QA Concourse. Same
+# reasoning as the GitHub App above.
+if stack_info.env_suffix == "production":
+    google_ads_secrets = read_yaml_secrets(
+        Path("concourse/operations.production.yaml")
+    )["pipelines"]["main/google_ads_optimization"]
+    vault.generic.Secret(
+        f"dagster-google-ads-{stack_info.env_suffix}",
+        path="secret-data/pipelines/google_ads",
+        data_json=json.dumps(
+            {
+                key: google_ads_secrets[key]
+                for key in (
+                    "google_ads_json",
+                    "google_developer_token",
+                    "google_manager_account",
+                )
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
 # Sentry DSN for the code locations and run workers. Kept as its own secret
 # rather than folded into dagster-static-secrets because an OLVaultK8SSecret
 # reads a single Vault path, and the DSN is owned by the sentry stack.
