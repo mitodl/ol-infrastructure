@@ -32,7 +32,7 @@ repos:
       || exit 1; done' --
     language: python
     additional_dependencies:
-    - mypy==2.4.0
+    - mypy==2.4.1
     - pydantic>2.10
     - types-PyYAML
     - types-requests
