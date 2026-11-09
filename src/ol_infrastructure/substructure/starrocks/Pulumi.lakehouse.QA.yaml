@@ -12,6 +12,7 @@ config:
   starrocks:aws_region: us-east-1
   starrocks:domain: lakehouse.qa.starrocks.ol.mit.edu
   starrocks:oidc_enabled: "true"
+  starrocks:gravitino_catalog_enabled: "true"
   # ADR 0012 decision 3 asks for query queues, but the FE runs query queue v2,
   # which ignores resource groups. With the SELECT queue on, batch and
   # interactive share one slot pool and interactive queues behind batch; with
