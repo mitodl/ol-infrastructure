@@ -162,8 +162,8 @@ def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[
     Production reads the application's read replica so bulk extracts never load
     the primary. The replica only exists where stack_defaults gives one
     (production), so other environments read the primary. A production app stack
-    that does not export ``rds_replica_host`` yet falls back to the primary, so
-    this stack can apply before the app stacks that add the export.
+    that stops exporting ``rds_replica_host`` fails this lookup rather than
+    silently sending the loader back to the primary.
 
     :param app_stack: The application's stack reference.
     :param output_name: The application stack's export holding its RDS hosts.
@@ -171,10 +171,10 @@ def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[
     :returns: The host for the matching ``<NAME>_DB_HOST`` variable.
     :rtype: Output[str]
     """
-    hosts = app_stack.require_output(output_name)
-    if stack_info.env_suffix != "production":
-        return hosts["rds_host"]
-    return hosts.apply(lambda out: out.get("rds_replica_host", out["rds_host"]))
+    host_key = (
+        "rds_replica_host" if stack_info.env_suffix == "production" else "rds_host"
+    )
+    return app_stack.require_output(output_name)[host_key]
 
 
 # The ml code location traces its LLM calls to the Production Opik from every
