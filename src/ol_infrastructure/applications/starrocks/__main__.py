@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+import pulumi_command as command
 import pulumi_kubernetes as kubernetes
 import pulumi_vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions, export
@@ -60,7 +61,13 @@ stack_info = parse_stack()
 starrocks_config = Config("starrocks")
 
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
-setup_k8s_provider(require_stack_output_value(cluster_stack, "kube_config"))
+_kube_config_raw = require_stack_output_value(cluster_stack, "kube_config")
+_kube_config: str = (
+    json.dumps(_kube_config_raw)
+    if isinstance(_kube_config_raw, dict)
+    else _kube_config_raw
+)
+setup_k8s_provider(_kube_config)
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )
@@ -605,7 +612,34 @@ JDK_TRUST_STORE_PASSWORD = "changeit"  # pragma: allowlist secret  # noqa: S105
 fe_trust_store_jvm_opts = ""
 gravitino_ca_configmap: kubernetes.core.v1.ConfigMap | None = None
 if gravitino_catalog_enabled:
-    gravitino_stack = make_stack_reference(projects.GRAVITINO, stack_info.name)
+    gravitino_stack = make_stack_reference(projects.GRAVITINO_APP, stack_info.name)
+    _gravitino = gravitino_stack.require_output("gravitino")
+    # Only ca.crt leaves the cluster. The CA Secret also holds the key that signs
+    # the reconciler's mTLS client certificate, and an invoke leaves nothing in
+    # state, so the certificate in the ConfigMap is all this stack records. The
+    # gravitino stack names the CA Certificate after its Secret. The read goes
+    # through a variable, not a pipe, because /bin/sh has no pipefail and an
+    # empty read must not become an empty trust anchor.
+    _gravitino_ca_pem = command.local.run_output(
+        command=(
+            "_kf=$(mktemp)"
+            ' && printf \'%s\' "$KUBECONFIG_CONTENT" > "$_kf"'
+            ' && export KUBECONFIG="$_kf"'
+            ' && kubectl wait -n "$CA_NAMESPACE" --for=condition=Ready'
+            ' "certificate/$CA_SECRET_NAME" --timeout=120s >/dev/null'
+            ' && _ca=$(kubectl -n "$CA_NAMESPACE" get secret "$CA_SECRET_NAME"'
+            " -o jsonpath='{.data.ca\\.crt}')"
+            ' && test -n "$_ca"'
+            " && printf '%s' \"$_ca\" | base64 -d"
+            '; _rc=$?; rm -f "$_kf"; exit $_rc'
+        ),
+        environment={
+            "KUBECONFIG_CONTENT": _kube_config,
+            "CA_NAMESPACE": _gravitino["namespace"],
+            "CA_SECRET_NAME": _gravitino["ca_secret_name"],
+        },
+        logging=command.local.Logging.STDERR,
+    ).stdout
     _gravitino_ca_cm_name = f"{stack_info.env_prefix}-starrocks-gravitino-ca"
     gravitino_ca_configmap = kubernetes.core.v1.ConfigMap(
         f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-gravitino-ca-cm",
@@ -614,9 +648,7 @@ if gravitino_catalog_enabled:
             namespace=namespace,
             labels=k8s_app_labels.model_dump(),
         ),
-        data={
-            "ca.crt": gravitino_stack.require_output("gravitino")["ca_certificate_pem"]
-        },
+        data={"ca.crt": Output.unsecret(_gravitino_ca_pem)},
     )
     _fe_trust_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
     _fe_trust_spec["configMaps"] = [
@@ -638,6 +670,8 @@ if gravitino_catalog_enabled:
             'exec /opt/starrocks/fe_entrypoint.sh "$FE_SERVICE_NAME"\n'
         )
     }
+    # The Gravitino CA has no name constraints, so trusting it JVM-wide also
+    # trusts it for every other host the FE reaches (Keycloak JWKS, AWS).
     fe_trust_store_jvm_opts = (
         f" -Djavax.net.ssl.trustStore={FE_TRUST_STORE_PATH}"
         f" -Djavax.net.ssl.trustStorePassword={JDK_TRUST_STORE_PASSWORD}"
@@ -1017,6 +1051,12 @@ _needs_fe_config = (
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
 )
+if gravitino_catalog_enabled and not _needs_fe_config:
+    msg = (
+        "starrocks:gravitino_catalog_enabled needs the FE trust store options in"
+        " fe.conf, which is only rendered with SSL, CN or BE enabled"
+    )
+    raise ValueError(msg)
 if _needs_fe_config:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
