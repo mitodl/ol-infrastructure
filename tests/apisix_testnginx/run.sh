@@ -13,4 +13,8 @@ image=${APISIX_TESTNGINX_IMAGE:-ol-apisix-testnginx}
 cd "${repo_root}"
 docker build -t "${image}" -f tests/apisix_testnginx/Dockerfile .
 # --user root: the harness writes t/servroot and needs to bind a listener.
-exec docker run --rm --user root "${image}" "$@"
+# --init: without it prove runs as PID 1, nothing reaps the exited nginx, and
+# Test::Nginx (which checks liveness with `kill 0`) takes the zombie for a
+# running server -- every test block then sat out a 3s shutdown timeout and
+# ~3s of kill retries, which was ~220s of a ~225s run.
+exec docker run --rm --init --user root "${image}" "$@"

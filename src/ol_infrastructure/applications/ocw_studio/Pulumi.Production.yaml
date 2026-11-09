@@ -19,6 +19,7 @@ config:
     GITHUB_APP_ID: 13
     GITHUB_RATE_LIMIT_CHECK: "False"
     GITHUB_WEBHOOK_BRANCH: 'release'
+    OCW_HUGO_TAG_RELEASES: "True"
     GTM_ACCOUNT_ID: GTM-MQCSLSQ
     HUGO_CSRF_COOKIE_NAME: learn_csrftoken
     LEARN_AI_SYLLABUS_ENDPOINT: https://api.learn.mit.edu/ai/http/syllabus_agent/

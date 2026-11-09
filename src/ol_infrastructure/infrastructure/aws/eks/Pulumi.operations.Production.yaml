@@ -30,6 +30,7 @@ config:
   - toolhive-data
   - omnigraph
   - witan
+  - observability-archive
   eks:nodegroups:
     worker-xlarge:
       instance_type: c8i-flex.xlarge
@@ -45,6 +46,27 @@ config:
       version:
       tags: {}
       taints: {}
+      node_group_options: {}
+    archive-xlarge:
+      # Telemetry archive (ADR-0014). Single AZ on purpose: Loki and Mimir run at
+      # replication factor 1, so a multi-AZ ring would only add transfer cost.
+      instance_type: m8i-flex.xlarge
+      availability_zone: us-east-1a
+      labels:
+        ondemand: true
+        node_size: m8i-flex.xlarge
+        ol.mit.edu/archive_node: "true"
+      disk_size_gb: 250
+      scaling:
+        desired: 5
+        min: 5
+        max: 8
+      version:
+      tags: {}
+      taints:
+        ol.mit.edu/archive_workload:
+          value: "true"
+          effect: NoSchedule
       node_group_options: {}
   eks:traefik_min_replicas: '3'
   eks:traefik_max_replicas: '10'

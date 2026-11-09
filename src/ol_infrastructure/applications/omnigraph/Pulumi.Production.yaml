@@ -78,6 +78,18 @@ config:
   # (e.g. once the hot write paths are batched). In-flight memory stays bounded
   # by per_actor_bytes_max. Unquoted because __main__.py reads it with get_int.
   omnigraph:per_actor_inflight_max: 16
+  # The server was OOMKilled at the 2Gi default on each day from 2026-11-02 to
+  # 11-05. On each of those days one actor's code_store_mutate stream to a
+  # single branch (one commit every ~3.5s for hours) took the working set from
+  # ~100-280 MiB to 1.5-1.9 GiB within 1-3 hours, where it stayed, and other
+  # writers on top of that (users, the CI indexer) crossed 2Gi. On the way up
+  # it rose by as much as 740 MiB in 10 minutes, so the limit leaves ~2 GiB
+  # above the highest plateau (1.92 GiB on 11-03). The request is that plateau,
+  # so the pod is scheduled where the memory exists. data_tier.py's
+  # DEFAULT_SERVER_MEMORY_LIMIT has the upstream mechanism. Revisit when
+  # omnigraph can cap its per-graph Lance caches.
+  omnigraph:server_memory_request: 2Gi
+  omnigraph:server_memory_limit: 4Gi
   # The nightly window only optimizes here. 0.13's cleanup plans every object
   # under _versions/, 0.17 to 0.22s each (the 2026-10-20 backlog run's Job
   # logs), including the commit manifests it never removes. On 2026-10-21 the

@@ -1132,5 +1132,10 @@ export(
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
         "rds_host": xpro_db.db_instance.address,
+        **(
+            {"rds_replica_host": xpro_db.db_replica.address}
+            if xpro_db_config.read_replica
+            else {}
+        ),
     },
 )

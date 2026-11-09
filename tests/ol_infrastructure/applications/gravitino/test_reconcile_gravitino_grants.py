@@ -14,6 +14,10 @@ state and unusable principals are refused.
 
 import copy
 import re
+import socket
+import socketserver
+import ssl
+import threading
 from typing import Any
 
 import pytest
@@ -21,8 +25,12 @@ import pytest
 from ol_infrastructure.applications.gravitino.reconcile import render_desired_state
 from ol_infrastructure.applications.gravitino.scripts.reconcile_gravitino_grants import (  # noqa: E501
     Gravitino,
+    KeycloakToken,
     ReconcileError,
+    UnreachableError,
     governance_role_holders,
+    gravitino_transport,
+    keycloak_get,
     reconcile,
     usable_principal,
     validate_desired_roles,
@@ -623,6 +631,38 @@ def test_one_unloadable_schema_does_not_stop_the_owner_pass(server):
     assert server.owners[MART] == {"name": "ol_data_engineer", "type": "group"}
 
 
+def test_unreachable_server_stops_at_the_first_schema_request(server):
+    """The owner pass collects per-schema failures, but not this one.
+
+    A hung server would cost one timeout per remaining schema and could run the
+    Job past its deadline before any FAIL line printed.
+    """
+    server.backend_schemas.add("ol_warehouse_qa_aaa_first")
+    listed = False
+    owner_calls = []
+
+    # Goes down once the owner pass has listed the catalog's schemas, so every
+    # earlier step (reconcile_roles loads schemas too) completes first.
+    def down_after_listing(method, path, body):
+        nonlocal listed
+        if listed:
+            owner_calls.append(path)
+            msg = f"{method} {path} failed: TimeoutError()"
+            raise UnreachableError(msg)
+        listed = (method, path) == (
+            "GET",
+            f"/api/metalakes/{METALAKE}/catalogs/{CATALOG}/schemas",
+        )
+        return server(method, path, body)
+
+    with pytest.raises(UnreachableError):
+        reconcile(Gravitino(down_after_listing, METALAKE), _desired(), list, ADMIN)
+
+    assert owner_calls == [
+        f"/api/metalakes/{METALAKE}/catalogs/{CATALOG}/schemas/ol_warehouse_qa_aaa_first"
+    ]
+
+
 def test_two_users_resolving_to_one_principal_are_both_refused(server, capsys):
     _run(
         server,
@@ -701,3 +741,73 @@ def test_schema_iceberg_cannot_name_is_skipped_without_a_request(
     assert not any("your" in path for path in requested)
     assert "is not a name Iceberg can load" in capsys.readouterr().err
     assert server.owners[MART] == {"name": "ol_data_engineer", "type": "group"}
+
+
+@pytest.fixture
+def closed_port() -> int:
+    """Return a localhost port with nothing listening, as when Gravitino is down."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+class _FreshToken(KeycloakToken):
+    def __init__(self) -> None:
+        super().__init__("https://sso.example.com/realms/r", "client", "secret")
+
+    def get(self) -> str:
+        return "token"
+
+
+def test_refused_management_api_is_a_fail_line_not_a_traceback(closed_port):
+    send = gravitino_transport(
+        f"https://127.0.0.1:{closed_port}/api",
+        ssl.create_default_context(),
+        _FreshToken(),
+    )
+
+    with pytest.raises(
+        ReconcileError, match=r"GET https://127\.0\.0\.1:\d+/api/metalakes/m failed"
+    ):
+        send("GET", "/metalakes/m", None)
+
+
+def test_unreachable_keycloak_is_a_fail_line_not_a_traceback(closed_port):
+    issuer = f"http://127.0.0.1:{closed_port}/realms/r"
+
+    with pytest.raises(ReconcileError, match=r"Keycloak token request to .* failed"):
+        KeycloakToken(issuer, "client", "secret").get()
+    with pytest.raises(ReconcileError, match=r"Keycloak GET .* failed"):
+        keycloak_get(f"{issuer}/users", _FreshToken())
+
+
+class _ErrorCutShort(socketserver.BaseRequestHandler):
+    def handle(self) -> None:
+        self.request.recv(65536)
+        self.request.sendall(
+            b"HTTP/1.1 500 Internal Server Error\r\n"
+            b"Content-Length: 100\r\n\r\ncut short"
+        )
+
+
+@pytest.fixture
+def error_cut_short() -> Any:
+    """Return the URL of a server whose 500 body stops short of its length."""
+    with socketserver.ThreadingTCPServer(("127.0.0.1", 0), _ErrorCutShort) as srv:
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        yield f"http://127.0.0.1:{srv.server_address[1]}"
+        srv.shutdown()
+
+
+def test_error_body_cut_short_is_a_fail_line_not_a_traceback(error_cut_short):
+    issuer = f"{error_cut_short}/realms/r"
+    send = gravitino_transport(
+        f"{error_cut_short}/api", ssl.create_default_context(), _FreshToken()
+    )
+
+    with pytest.raises(UnreachableError, match=r"GET .*/api/metalakes/m failed"):
+        send("GET", "/metalakes/m", None)
+    with pytest.raises(UnreachableError, match=r"Keycloak token request to .* failed"):
+        KeycloakToken(issuer, "client", "secret").get()
+    with pytest.raises(UnreachableError, match=r"Keycloak GET .* failed"):
+        keycloak_get(f"{issuer}/users", _FreshToken())

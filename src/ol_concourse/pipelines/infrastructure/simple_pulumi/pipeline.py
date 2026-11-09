@@ -384,6 +384,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+        # CLICKHOUSE_TERMINATION_GRACE_SECONDS, shared with grafana-alerting.
+        additional_watched_paths=["src/bridge/lib/magic_numbers.py"],
     ),
     "data_warehouse": SimplePulumiParams(
         app_name="data_warehouse",
@@ -474,6 +476,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+        # CLICKHOUSE_TERMINATION_GRACE_SECONDS sets a ClickHouse alert threshold.
+        additional_watched_paths=["src/bridge/lib/magic_numbers.py"],
     ),
     "gravitino": SimplePulumiParams(
         app_name="gravitino",
@@ -619,6 +623,23 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+    ),
+    "paypal-adapter": SimplePulumiParams(
+        app_name="paypal-adapter",
+        pulumi_project_path="applications/paypal_adapter/",
+        pulumi_project_name="ol-application-paypal-adapter",
+        description=(
+            "Deploys the Stripe-written PayPal adapter that brokers PayPal "
+            "payments for Stripe Checkout via Pulumi. No CI stage: each stack "
+            "needs its own custom payment method in a Stripe account we do not "
+            "control. Both stages are preview-gated because the adapter is in "
+            "the payment path and the first deploys run before real "
+            "credentials exist."
+        ),
+        category="applications",
+        stages=["QA", "Production"],
+        topology="preview-gated",
+        auto_deploy_stages=[],
     ),
     "qdrant-cloud": SimplePulumiParams(
         app_name="qdrant-cloud",
@@ -803,6 +824,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="operations",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+    ),
+    "observability-archive": SimplePulumiParams(
+        app_name="observability-archive",
+        pulumi_project_path="applications/observability_archive/",
+        pulumi_project_name="ol-application-observability-archive",
+        description=(
+            "Deploys the self-hosted Loki/Mimir telemetry archive (ADR-0014) on the "
+            "operations EKS cluster via Pulumi."
+        ),
+        category="core-platform",
+        topology="preview-gated",
+        stages=["QA", "Production"],
     ),
     "aws-ecr": SimplePulumiParams(
         app_name="aws-ecr",

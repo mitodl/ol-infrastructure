@@ -188,6 +188,17 @@ def vault_secrets(
             },
         ),
         VaultSecret(
+            name="mitxonline-keycloak-admin-b2b-membership",
+            kind="static",
+            mount="secret-mitxonline",
+            mount_type="kv-v1",
+            path="keycloak-admin-b2b-membership",
+            env={
+                "KEYCLOAK_MEMBERSHIP_CLIENT_ID": ("client_id",),
+                "KEYCLOAK_MEMBERSHIP_CLIENT_SECRET": ("client_secret",),
+            },
+        ),
+        VaultSecret(
             name="global-mailgun",
             kind="static",
             mount="secret-global",

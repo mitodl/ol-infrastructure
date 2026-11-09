@@ -25,6 +25,8 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Input, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
+
 AUDIENCE_CLIENT_ID = "ol-memory-client"
 AUDIENCE_SCOPE_NAME = "ol-memory-audience"
 GENERAL_SCOPE_NAME = "ol-memory-general"
@@ -76,6 +78,7 @@ def create_ol_memory_resources(
         client_id=AUDIENCE_CLIENT_ID,
         enabled=True,
         access_type="BEARER-ONLY",
+        **MANAGED_CLIENT_ARGS,
         opts=resource_options,
     )
 
@@ -149,8 +152,7 @@ def create_ol_memory_resources(
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         standard_token_exchange_enabled=True,
         valid_redirect_uris=[],
@@ -199,8 +201,7 @@ def create_ol_memory_resources(
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=[],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),

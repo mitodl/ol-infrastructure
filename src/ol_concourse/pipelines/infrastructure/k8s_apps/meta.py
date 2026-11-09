@@ -80,6 +80,10 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
             # has to regenerate. Without this the documented one-field rollout
             # switch changes nothing that is deployed.
             "src/bridge/settings/apps.py",
+            # The Sentry org and project slugs that the source map upload job
+            # passes to sentry-cli are read from here, so a slug correction on
+            # its own has to regenerate the pipeline that carries them.
+            "src/bridge/settings/sentry.py",
             # learn-ai's static frontend jobs take their buckets, Fastly domains
             # and build variables from here (AppPipelineParams.static_frontend),
             # so an edit to it alone has to regenerate learn-ai-pipeline.
@@ -137,6 +141,8 @@ if __name__ == "__main__":
         "mit-learn",
         "mit-learn-nextjs",
         "mitxonline",
+        "ocw-hugo-projects",
+        "ocw-hugo-themes",
         "ocw-studio",
         "odl-video-service",
         "ol-analytics-api",

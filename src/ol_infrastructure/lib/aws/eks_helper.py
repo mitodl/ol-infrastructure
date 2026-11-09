@@ -25,6 +25,11 @@ def eks_client() -> Any:
     return boto3.client("eks")
 
 
+# Every Traefik on a cluster answers to the same Gateway API controller name,
+# so each instance selects its own GatewayClass by this label.
+GATEWAY_CLASS_LABEL = "ol.mit.edu/gateway-controller"
+
+
 def ecr_dockerhub_registry() -> str:
     """Build the address of the ECR pull-through cache of DockerHub.
 

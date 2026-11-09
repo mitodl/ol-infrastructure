@@ -28,6 +28,7 @@ import pulumi_tls as tls
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
+from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import (
     CLICKHOUSE_KEEPER_VERSION,
     CLICKHOUSE_OPERATOR_VERSION,  # noqa: F401 — for traceability
@@ -197,7 +198,6 @@ cluster_stack.require_output("namespaces").apply(
 )
 
 # Configuration values
-hot_data_days = int(clickhouse_config.get("hot_data_days") or "7")
 hot_storage_size = clickhouse_config.get("hot_storage_size") or "100Gi"
 storage_class = stateful_workload_storage["storage_class"]
 data_storage_class = (
@@ -223,10 +223,9 @@ keeper_resources = clickhouse_config.get_object("keeper_resources") or {
     "limits": {"memory": "512Mi"},
 }
 # Server waits on SIGTERM for running queries (shutdown_wait_unfinished_queries)
-# and, by default, for a running BACKUP (shutdown_wait_backups_and_restores).
-# The daily backup took 274s on production replica 0 on 2026-10-21, so the
-# kubelet's default 30s would SIGKILL a replica restarted during it.
-CLICKHOUSE_TERMINATION_GRACE_SECONDS = 300
+# and, by default, for a running BACKUP (shutdown_wait_backups_and_restores), so
+# the pod's grace period (CLICKHOUSE_TERMINATION_GRACE_SECONDS) has to outlast
+# the daily backup or a replica restarted during it is SIGKILLed.
 CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS = 60
 
 
@@ -291,15 +290,53 @@ IO_OPTIMIZED_NODE_AFFINITY = kubernetes.core.v1.AffinityArgs(
 # operator merges these into its own generated usersd configmap, so they live
 # in the *users* configuration space (where UsersConfigAccessStorage looks them
 # up) without us having to mount anything over /etc/clickhouse-server/users.d/.
+# max_concurrent_queries_for_user is counted per server, and ClickHouse refuses
+# a query over it with TOO_MANY_SIMULTANEOUS_QUERIES rather than queueing it, so
+# the write that loses the race fails like a quota refusal. At 10, production
+# opik-backend hit it on 2026-11-04 ("Current: 10, maximum: 10"), with CI, QA
+# and Production all tracing to this instance and more apps onboarding. 50 lets
+# bursts wait on CPU instead of failing; max_memory_usage still bounds each query.
 _LLMOPS_PROFILES = {
     "llmops_profile/max_memory_usage": "4000000000",
-    "llmops_profile/max_concurrent_queries_for_user": "10",
+    "llmops_profile/max_concurrent_queries_for_user": "50",
     "llmops_profile/readonly": "0",
 }
+# No hourly cap on query or error counts. The opik user carries every query
+# Opik makes: UI and API reads, the backend's own jobs, and trace and span
+# writes. Opik has one analytics user (databaseAnalytics in opik-backend's
+# config.yml; the freeform-SQL users are a separate feature), so its writes
+# cannot move to a user of their own. Nor is its write path insert-only:
+# TraceService.create(TraceBatch) reads the attachments table before it
+# inserts (2.2.137), so a cap on query_selects instead of queries would still
+# fail trace batches.
+#
+# queries was 20000. In the hours ending 19:00 and 20:00 UTC on 2026-11-03
+# production opik-backend logged 5,837 QUOTA_EXCEEDED exceptions against it,
+# trace batch writes among them. The Opik SDK retries a 500 twice over about
+# 10-20 s, which a quota refusing until the top of the hour outlasts, then
+# drops the batch. errors was 100 and goes for the same reason: ClickHouse adds every
+# failed query to it, including one a quota refused, and checks it before every
+# query, inserts included (executeQuery.cpp, 25.8). Once 100 queries of any
+# kind failed in an interval, every write was refused until it ended.
+# Per-tenant protection stays in llmops_profile (max_concurrent_queries_for_user,
+# max_memory_usage). ClickHouse still counts both in system.quotas_usage with
+# no limit set, which is where to measure the peak before reinstating either.
+#
+# The volume limits below are also hourly totals and also apply to the write
+# path's read, so one binding refuses trace writes until the hour ends. Kept
+# after measuring production over the 7 days to 2026-11-04, which include the
+# 2026-11-03 incident, as the busiest replica-hour of server-wide ClickHouse
+# ProfileEvents (every user, so opik's share is at most this): rows read
+# (SelectedRows) peaked at 416M of read_rows' 10B; SELECT time
+# (SelectQueryTimeMicroseconds) at 402 s and all query time
+# (QueryTimeMicroseconds) at 1,413 s of execution_time's 3,600 s. That window
+# ran under the old queries cap of 20000 and concurrency limit of 10, which
+# refused queries during the incident hours, so these peaks understate demand
+# then; the refusals were at most about a sixth of the cap. The
+# OpikClickHouseQuotaExceeded rules in grafana_alerting's opik_clickhouse log
+# rules match any quota type, so one of these binding pages.
 _LLMOPS_QUOTAS = {
     "llmops_quota/interval/duration": "3600",
-    "llmops_quota/interval/queries": "20000",
-    "llmops_quota/interval/errors": "100",
     "llmops_quota/interval/result_rows": "1000000000",
     "llmops_quota/interval/read_rows": "10000000000",
     "llmops_quota/interval/execution_time": "3600",
@@ -382,19 +419,26 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
     The operator automatically creates a service named ``keeper-clickhouse`` which is used
     by the ClickHouseInstallation for ZooKeeper-compatible coordination.
     """
-    tolerations = (
-        [
-            {
-                "key": "ol.mit.edu/io-workload",
-                "operator": "Equal",
-                "value": "true",
-                "effect": "NoSchedule",
-            }
-        ]
+    # Leave the keys out entirely off io-optimized nodes. The operator diffs the
+    # CHK spec against status.normalizedCompleted, where an empty nodeSelector
+    # or tolerations list was serialized away to nil, so `{}` and `[]` read as a
+    # change on every pass: operator 0.26.0 re-reconciled the CHK every few
+    # seconds in all three data clusters and it never left InProgress.
+    io_scheduling: dict[str, Any] = (
+        {
+            "tolerations": [
+                {
+                    "key": "ol.mit.edu/io-workload",
+                    "operator": "Equal",
+                    "value": "true",
+                    "effect": "NoSchedule",
+                }
+            ],
+            "nodeSelector": IO_OPTIMIZED_NODE_SELECTOR,
+        }
         if use_io_optimized
-        else []
+        else {}
     )
-    node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized else {}
     affinity: dict[str, Any] = {}
     if replicas > 1:
         affinity["podAntiAffinity"] = {
@@ -500,8 +544,7 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                             ),
                             "spec": {
                                 "securityContext": {"fsGroup": 101},
-                                "tolerations": tolerations,
-                                "nodeSelector": node_selector,
+                                **io_scheduling,
                                 **({"affinity": affinity} if affinity else {}),
                                 **(
                                     {
@@ -1171,14 +1214,16 @@ interserver_credentials_enabled = clickhouse_config.require_bool(
 # so apply this stack before it after flipping.
 tls_listeners_enabled = clickhouse_config.require_bool("tls_listeners_enabled")
 # Points the servers at Keeper's TLS port. Flip it per stack only after Keeper
-# is serving 9281 there. Operator 0.26 restarts a host for any zookeeper change
-# (isZookeeperChangeRequiresReboot is !a.Equals(b); the zookeeper/* "no" restart
-# rule is never consulted), so this rolls every replica in turn. A replica that
-# cannot complete the TLS handshake comes back with no Keeper session, its
-# replicated tables read-only, and the operator, which only waits for /ping,
-# moves on to the next one. Check system.zookeeper_connection (no row, or a
+# is serving 9281 there. Operator 0.26 restarted a host for any zookeeper
+# change. 0.27.4 consults the zookeeper/* "no" entry of
+# configurationRestartPolicy (isZookeeperChangeRequiresReboot), so the new port
+# reaches each replica as a host ConfigMap rewrite that the server hot-reloads,
+# with no restart. A replica that cannot complete the TLS handshake loses its
+# Keeper session and its replicated tables go read-only, and nothing in the
+# operator's reconcile notices. Check system.zookeeper_connection (no row, or a
 # port other than 9281, both mean stop) and system.replicas.is_readonly on the
-# first restarted replica.
+# first replica whose chi-clickhouse-deploy-confd-default-0-N ConfigMap shows
+# 9281.
 #
 # The operator does not abort an in-flight reconcile when the CHI changes. To
 # stop the roll: scale kube-system/clickhouse-operator to 0, set this back to
@@ -2120,7 +2165,7 @@ export(
         Keeper TLS: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{KEEPER_TLS_PORT}
 
         Tenants: opik_db
-        Hot/cold cutoff: {hot_data_days} days (table TTL MOVE expressions)
+        Hot/cold cutoff: per-table TTL MOVE expressions
         Cold storage: s3://{cold_bucket_name}/data/
     """),
 )

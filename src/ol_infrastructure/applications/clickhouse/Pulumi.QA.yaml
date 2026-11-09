@@ -1,16 +1,26 @@
 ---
 config:
   consul:address: https://consul-data-qa.odl.mit.edu
-  clickhouse:hot_data_days: '3'
   # Measured 2026-09-15: the hot volume grew 4.17 -> 9.08 GiB over 11 weeks
-  # (+1.95 GiB/month, the one non-prod volume with a real upward trend). Note
-  # that hot_data_days does NOT bound this -- it is informational only, and no
+  # (+1.95 GiB/month, the one non-prod volume with a real upward trend). No
   # deployed table carries a move TTL to the cold tier, so nothing ever tiers to
-  # S3. The growth is untiered system-log accumulation (system holds 5.38 GiB of
-  # the 6.0 GiB store; text_log, metric_log, asynchronous_metric_log and
-  # processors_profile_log have no TTL), so it is steady rather than
+  # S3. The growth was untiered system-log accumulation (system held 5.38 GiB of
+  # the 6.0 GiB store in text_log, metric_log, asynchronous_metric_log and
+  # processors_profile_log, none with a TTL then; #6018 has since removed three
+  # and given metric_log a 30-day TTL), so it is steady rather than
   # workload-driven: 100Gi is ~11x current usage and ~3.9 years of headroom at
   # the observed rate. data-ci already runs 100Gi.
+  #
+  # Replica 0's PVC is still 500Gi (created 2026-03-25, before this was set):
+  # the operator does not shrink an existing claim, and EBS cannot shrink in
+  # place. Getting it to 100Gi means deleting replica 0's PVC and copying the
+  # schema back from replica 1 (the schema-copy steps in the runbook's "Replica
+  # pod Pending on its data volume", with replica 1 as the source). That loop
+  # also copies Opik's Liquibase ledger: in QA default.DATABASECHANGELOG* are
+  # ReplicatedMergeTree on both replicas (180 rows each on 2026-11-04), unlike
+  # production, where only replica 0 holds the rows. Left as is until a
+  # recreated replica no longer serves Opik queries before its schema exists.
+  # Replica 1 was recreated on 2026-10-20 and has 100Gi.
   clickhouse:hot_storage_size: 100Gi
   # QA is the upgrade canary (docs/clickhouse-llmops-runbook.md), so it runs
   # replicated like production: 2 replicas exercise replication and the

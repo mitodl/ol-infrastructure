@@ -50,7 +50,10 @@ from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integra
 from ol_infrastructure.infrastructure.aws.eks.cert_manager import setup_cert_manager
 from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
 from ol_infrastructure.infrastructure.aws.eks.external_dns import setup_external_dns
-from ol_infrastructure.infrastructure.aws.eks.traefik import setup_traefik
+from ol_infrastructure.infrastructure.aws.eks.traefik import (
+    SHARED_GATEWAY_CLASS_SELECTOR,
+    setup_traefik,
+)
 from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
     setup_vault_secrets_operator,
 )
@@ -635,7 +638,32 @@ if not USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE:
         if ng_name != "io-optimized"
     }
 
+
+def pod_subnet_ids_in_zone(zone: str | None) -> Output[list[str]]:
+    """Return the pod subnets a node group may use, narrowed to one zone when asked.
+
+    A single-zone node group is for workloads that replicate nothing across
+    nodes (the telemetry archive at replication factor 1), where spreading a
+    ring over three zones buys cross-AZ transfer charges and no durability.
+    """
+    if not zone:
+        return target_vpc["k8s_pod_subnet_ids"]
+    return Output.all(
+        subnet_ids=target_vpc["k8s_pod_subnet_ids"],
+        subnet_zones=target_vpc["k8s_pod_subnet_zones"],
+    ).apply(
+        lambda subnets: [
+            subnet_id
+            for subnet_id, subnet_zone in zip(
+                subnets["subnet_ids"], subnets["subnet_zones"], strict=True
+            )
+            if subnet_zone == zone
+        ]
+    )
+
+
 for ng_name, ng_config in configured_node_groups.items():
+    node_group_subnet_ids = pod_subnet_ids_in_zone(ng_config.get("availability_zone"))
     taint_list = {}
     for taint_name, taint_config in ng_config["taints"].items() or {}:
         taint_list[taint_name] = eks.TaintArgs(
@@ -666,7 +694,7 @@ for ng_name, ng_config in configured_node_groups.items():
                     node_associate_public_ip_address=False,
                 ),
                 provider=k8s_provider,
-                subnet_ids=target_vpc["k8s_pod_subnet_ids"],
+                subnet_ids=node_group_subnet_ids,
                 vpc_id=target_vpc["id"],
             ),
             launch_template_tag_specifications=[
@@ -1302,6 +1330,7 @@ gateway_api_crds = setup_traefik(
     vpa_release=vpa_release,
     stack_info=stack_info,
 )
+export("traefik_gateway_class_selector", SHARED_GATEWAY_CLASS_SELECTOR)
 
 setup_apisix(
     cluster_name=cluster_name,

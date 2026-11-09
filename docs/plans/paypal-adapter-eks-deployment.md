@@ -37,7 +37,7 @@ checkout until it is healthy again.
 | P1 | Run on the `applications` EKS cluster, namespace `paypal-adapter`, next to mitxonline, which is the consumer. |
 | P2 | New Pulumi project `applications/paypal_adapter/` (`ol-application-paypal-adapter`), stacks `QA` and `Production`. No `CI` stack to start: each stack needs its own custom payment method in a Stripe account we do not control, and CI has no checkout to exercise it. |
 | P3 | Deploy the vendor image as is through `OLApplicationK8s` with the Django parts switched off (`import_nginx_config=False`, `init_migrations=False`, `init_collectstatic=False`), the edx_notes precedent. Fall back to a hand-written Deployment only if the spike in step 1 shows the component fights a non-Django container. |
-| P4 | Pull `stripe/orchestration-adapters:2.4.2@sha256:89ef36f0…` by digest through the ECR Docker Hub pull-through cache (`registry="dockerhub"`). Tag and digest pinned in `bridge/lib/versions.py`. No auto-updater: upgrades are a reviewed PR, QA before Production. |
+| P4 | Pull `stripe/orchestration-adapters:2.4.2@sha256:89ef36f0…` by digest through the ECR Docker Hub pull-through cache (`registry="dockerhub"`). Tag and digest pinned in `bridge/lib/versions.py` and moved together by a dedicated Renovate manager. No automerge and no auto-updater: upgrades are a reviewed PR, QA before Production. |
 | P5 | Secrets live in SOPS under `src/bridge/secrets/paypal_adapter/`, are written by Pulumi to a per-app Vault KV mount `secret-paypal-adapter`, and reach the pod as a `config.json` rendered by a `VaultStaticSecret` template, mounted at `/run/secrets/config.json`. The `VaultStaticSecret` restart-targets the Deployment, because the adapter only reads config at startup. |
 | P6 | Public hostnames `paypal-adapter-qa.ol.mit.edu` and `paypal-adapter.ol.mit.edu` on the existing APISIX gateway, cert-manager certificate with an `ApisixTls`, DNS by external-dns through `eks:apisix_domains`. The hostname is what Stripe's dashboard needs, so it goes to the Stripe-side owner before anything is deployed. |
 | P7 | Four routes, nothing else: `/paypal/payments` restricted to Stripe's published webhook IPs with the `ip-restriction` plugin; `/paypal/webhook`, `/paypal/approved`, `/paypal/canceled` public. `/monitor/*` has no route, so the gateway answers 404; probes and the PodMonitor hit the pod directly. |
@@ -82,13 +82,16 @@ redeploys ECS on a new release (`fargate-stack.yaml:867-1020`). It is optional t
 path is the wrong default here, and the terms only ask that updates land "in a timely manner".
 Instead:
 
-- `bridge/lib/versions.py` gets `PAYPAL_ADAPTER_VERSION = "2.4.2"` under a
-  `# renovate: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters`
-  marker, so a new tag shows up as a Renovate PR, and `PAYPAL_ADAPTER_IMAGE_DIGEST` next to
-  it. The digest is updated by hand from the adapter changelog or
-  `docker buildx imagetools inspect`, and `cosign verify` is run against it as the docs show
-  before it is committed. `vuln_scanner/__main__.py:185-195` records that the repo has no
-  digest-pin automation yet; that gap applies here too and is not closed by this plan.
+- `bridge/lib/versions.py` gets `PAYPAL_ADAPTER_VERSION = "2.4.2"` and
+  `PAYPAL_ADAPTER_IMAGE_DIGEST` on the next line, under a
+  `# renovate-digest: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters`
+  marker. A dedicated regex manager in `renovate.json5` captures both lines, so a new tag
+  shows up as one Renovate PR that moves the tag and digest together, and a re-pushed tag
+  shows up as a digest-only PR. The generic `# renovate:` manager would move only the tag,
+  and the pods would keep running the old image under the new version label.
+- A `packageRules` entry turns automerge off for `stripe/orchestration-adapters`, overriding
+  the org preset's `:automergeMinor`, and puts a reminder in the PR body: run `cosign verify`
+  against the new digest, as the vendor docs show, before approving.
 - The Concourse pipeline is `topology="preview-gated"` (step 7), so a bump deploys to QA on
   merge and to Production after a reviewed preview. Stripe's dashboard shows the running
   version under **Inspect in Workbench**, which is the post-deploy check.

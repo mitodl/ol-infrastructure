@@ -34,6 +34,16 @@ AIRBYTE_CHART_VERSION = "2.4.0"
 SUPERSET_CHART_VERSION = "0.22.8"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
+# The Stripe-written PayPal adapter, run unmodified from the vendor image
+# (docs/plans/paypal-adapter-eks-deployment.md, P4). The pod pulls by digest so
+# a re-pushed tag cannot change what runs in the payment path. The distinct
+# marker routes these two lines to a dedicated Renovate manager that moves the
+# tag and digest together; the generic manager would bump only the tag. These
+# PRs never automerge: run `cosign verify` on the new digest before approving.
+# The two assignments must stay adjacent and in this order for that manager.
+# renovate-digest: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters
+PAYPAL_ADAPTER_VERSION = "2.4.2"
+PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:89ef36f0a06aa83788c1a465f95ffabd9b5b1a1e9e8e99eef57e484d67c28ba8"  # pragma: allowlist secret
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.18.2"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
@@ -94,7 +104,7 @@ VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
 VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf325f88138c0a111955"  # pragma: allowlist secret
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
-CLICKHOUSE_OPERATOR_VERSION = "release-0.26.0"
+CLICKHOUSE_OPERATOR_VERSION = "release-0.27.4"
 # 24.8 -> 26.3 goes through 25.8: upstream supports a rolling upgrade only
 # between versions less than a year or two LTS lines apart. Stacks still on the
 # previous line pin clickhouse:version and set clickhouse:compatibility.
@@ -125,6 +135,12 @@ MARIMO_OPERATOR_VERSION = "v0.3.0"
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.6.0"
+# renovate: datasource=helm depName=loki packageName=loki registryUrl=https://grafana.github.io/helm-charts
+LOKI_CHART_VERSION = "7.5.0"
+# renovate: datasource=helm depName=mimir-distributed packageName=mimir-distributed registryUrl=https://grafana.github.io/helm-charts
+MIMIR_DISTRIBUTED_CHART_VERSION = "6.2.2"
+# renovate: datasource=docker depName=pdc-agent packageName=grafana/pdc-agent
+PDC_AGENT_VERSION = "0.0.67"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.4"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin

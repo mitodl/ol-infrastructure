@@ -1202,6 +1202,11 @@ export(
     "odl_video_service",
     {
         "rds_host": db_address,
+        **(
+            {"rds_replica_host": ovs_db.db_replica.address}
+            if ovs_db_config.read_replica
+            else {}
+        ),
         "redis_token": ovs_server_redis_cluster.cache_cluster.auth_token,
         "redis": ovs_server_redis_cluster.address,
         "mediaconvert_queue": ovs_mediaconvert.queue.id,

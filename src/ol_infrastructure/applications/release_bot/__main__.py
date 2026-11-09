@@ -22,6 +22,7 @@ from pulumi import Config, export, log, runtime
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.apps import APPS
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import release_job_names as app_release_job_names
 from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
@@ -99,6 +100,7 @@ default_repos_config = {
         # and it is also what makes the rollout a one-field change in
         # bridge.settings.apps.
         "release_workflow": app_release_resource_workflow(app_name),
+        **{f"{role}_job": job for role, job in app_release_job_names(app_name).items()},
         **(
             {"channel": app_slack_channel(app_name)}
             if app_slack_channel(app_name)

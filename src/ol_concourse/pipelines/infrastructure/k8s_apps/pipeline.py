@@ -33,10 +33,13 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
     TryStep,
 )
+from ol_concourse.lib.notifications import notification
 from ol_concourse.lib.resource_types import (
     github_deployments_resource,
+    github_issues_resource,
     pulumi_provisioner_resource,
     release_resource_type,
+    slack_notification_resource,
 )
 from ol_concourse.lib.resources import (
     git_repo,
@@ -45,16 +48,21 @@ from ol_concourse.lib.resources import (
     pulumi_provisioner,
     registry_image,
     release_resource,
+    slack_notification,
 )
 from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
+from bridge.settings.apps import PRODUCTION_TAG_PREFIX
 from bridge.settings.apps import github_repo as app_github_repo
 from bridge.settings.apps import release_changelog as app_release_changelog
+from bridge.settings.apps import release_job_names as app_release_job_names
+from bridge.settings.apps import release_kind as app_release_kind
 from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
+from bridge.settings.sentry import MIT_LEARN_SENTRY_PROJECT_SLUG, SENTRY_ORG_SLUG
 from ol_concourse.pipelines.applications.learn_ai_frontend.values import (
     ENVIRONMENTS as LEARN_AI_FRONTEND_ENVIRONMENTS,
 )
@@ -75,15 +83,23 @@ from ol_concourse.pipelines.versions_map import project_version_paths
 
 
 class SentrySourcemapsConfig(BaseModel):
-    """Config for uploading an app's source maps to Sentry after the image build.
+    """Config for uploading an app's source maps to Sentry from its pushed image.
+
+    The maps are read out of the image the release build pushed, which the
+    registry-image resource unpacks on ``get``, so the image build itself needs
+    no Sentry credentials and no special output format. See
+    :func:`_sourcemaps_upload_fragment`.
 
     Attributes:
-        org: Sentry organization slug (e.g. ``"mit-office-of-digital-learning"``).
-        project: Sentry project slug (e.g. ``"open-next"``).
+        org: Sentry organization slug. Take it from ``bridge.settings.sentry``.
+        project: Sentry project slug. Take it from ``bridge.settings.sentry``,
+            where a test checks it against the Sentry Pulumi program: a stale
+            slug makes ``sentry-cli`` fail with ``One or more projects are
+            invalid`` on every upload.
         auth_token_vault_key: Concourse credential reference for the Sentry auth
             token (e.g. ``"((sentry.mitlearn_auth_token))"``). The token needs the
             ``org:read`` and ``project:releases`` scopes.
-        rootfs_asset_path: Path, relative to the unpacked image rootfs, to the
+        rootfs_asset_path: Path, relative to the image's root filesystem, to the
             directory holding the built JS and ``.map`` files (with debug IDs
             already injected at build time). e.g. ``"app/frontends/main/.next"``
             for the Next.js ``output: "standalone"`` runner image.
@@ -128,11 +144,12 @@ class AppPipelineParams(BaseModel):
         github_repo (Optional[str]): The GitHub repository in ``owner/repo`` form used for release
             resources and GitHub Deployments. Defaults to ``mitodl/{repo_name}``. Only used by the
             release-resource workflow.
-        sentry_sourcemaps (Optional[SentrySourcemapsConfig]): When set, the app's
-            image build unpacks its rootfs and a decoupled task uploads the built
-            source maps to Sentry with an auth token -- the token never enters the
-            image build. See :class:`SentrySourcemapsConfig`. Left unset, no source
-            maps are uploaded.
+        sentry_sourcemaps (Optional[SentrySourcemapsConfig]): When set, a separate
+            job uploads the source maps out of each pushed release image to Sentry.
+            It runs after the image build, nothing downstream waits on it, and it
+            posts to Slack when it fails. The auth token is a task param of that
+            job and never enters the image build. See :class:`SentrySourcemapsConfig`.
+            Left unset, no source maps are uploaded.
         refresh_stack (bool): Whether the Pulumi deploy jobs run `pulumi refresh`
             before `up`. Defaults to True. Set False for apps whose Pulumi code
             provisions Fastly resources while the Fastly API token is being
@@ -229,8 +246,8 @@ pipeline_params = {
         },
         fastly_purge_scope="html-pages",
         sentry_sourcemaps=SentrySourcemapsConfig(
-            org="mit-office-of-digital-learning",
-            project="open-next",
+            org=SENTRY_ORG_SLUG,
+            project=MIT_LEARN_SENTRY_PROJECT_SLUG,
             auth_token_vault_key="((sentry.mitlearn_auth_token))",  # noqa: S106  # pragma: allowlist secret
             rootfs_asset_path="app/frontends/main/.next",
         ),
@@ -247,6 +264,7 @@ pipeline_params = {
     ),
     "learn-ai": AppPipelineParams(
         app_name="learn-ai",
+        build_target="production",
         refresh_stack=False,
         static_frontend=StaticFrontendConfig(
             path="frontend-demo", environments=LEARN_AI_FRONTEND_ENVIRONMENTS
@@ -510,31 +528,47 @@ def _define_registry_image_resources_legacy(
     return docker_ci_image, docker_rc_image, ecr_ci_image, ecr_rc_image
 
 
-def _sentry_js_sourcemaps_upload_step(
+SOURCEMAPS_UPLOAD_TASK_NAME = "upload-sentry-sourcemaps"
+
+
+def _sourcemaps_upload_fragment(
+    app_name: str,
     sentry_config: SentrySourcemapsConfig,
-    release_var: str | None = None,
-) -> TryStep:
-    """Upload injected source maps to Sentry from the built image's rootfs.
+    image_resource: Resource,
+    image_build_job: str,
+    release_version_file: str,
+    extra_gets: list[GetStep],
+) -> PipelineFragment:
+    """Build the job that uploads a pushed release image's source maps to Sentry.
 
-    Runs after the image build. Sentry ties errors to source maps by Debug ID (not
-    release name); this step expects those already injected in the build output.
+    The job triggers on ``image_resource`` once ``image_build_job`` has pushed
+    it. The registry-image ``get`` unpacks that image's root filesystem into
+    ``<image_resource>/rootfs``, so the maps uploaded are the ones inside the
+    image that deploys. Reading them here rather than out of the build task's
+    output is what lets the build use ``OUTPUT_OCI``: oci-build-task ignores
+    ``UNPACK_ROOTFS`` for OCI output. For a multi-platform image the ``get``
+    unpacks the variant matching the worker's OS and architecture.
 
-    Wrapped in a ``try`` so a failed upload never blocks the release.
+    No deploy job lists this one in ``passed``, so a failed upload cannot hold
+    a release. Running the upload inside the build job under a ``try`` looks
+    like the simpler way to get that, but a ``try`` turns a failing upload into
+    a green build, and nothing else reports that stack traces have stopped
+    symbolicating. Here a failure is a red job plus a Slack alert, and the
+    release goes on regardless.
+
+    Sentry ties errors to source maps by Debug ID; ``--release`` only groups
+    the artifact bundle under the release in the Sentry UI. The version comes
+    from ``release_version_file``, read from one of the job's inputs.
     """
-    upload_args = [
-        "sourcemaps",
-        "upload",
-        "--org",
-        sentry_config.org,
-        "--project",
-        sentry_config.project,
-    ]
-    if release_var:
-        upload_args.extend(["--release", release_var])
-    upload_args.append(f"image/rootfs/{sentry_config.rootfs_asset_path}")
-
+    slack_resource = slack_notification(
+        name=Identifier(f"slack-alert-{app_name}-sourcemaps"),
+        url="((eks.slack_url))",
+    )
+    rootfs_asset_dir = f"{image_resource.name}/rootfs/{sentry_config.rootfs_asset_path}"
     upload_task = TaskStep(
-        task=Identifier("upload-sentry-sourcemaps"),
+        task=Identifier(SOURCEMAPS_UPLOAD_TASK_NAME),
+        # Sentry's API does fail transiently; a slug or token problem fails all
+        # three times and the job goes red.
         attempts=3,
         # sentry-cli auto-reads the SENTRY_AUTH_TOKEN param; Concourse redacts it.
         config=TaskConfig(
@@ -551,12 +585,71 @@ def _sentry_js_sourcemaps_upload_step(
                     "digest": "sha256:dd7ad57b7d1609d5dc76705bb9a2b2a7009ea0a1e74089202df8c20cfd8389c4"  # pragma: allowlist secret
                 },
             ),
-            inputs=[Input(name=Identifier("image"))],
+            inputs=[Input(name=image_resource.name)],
             params={"SENTRY_AUTH_TOKEN": sentry_config.auth_token_vault_key},
-            run=Command(path="sentry-cli", args=upload_args),
+            run=Command(
+                path="sentry-cli",
+                args=[
+                    "sourcemaps",
+                    "upload",
+                    "--org",
+                    sentry_config.org,
+                    "--project",
+                    sentry_config.project,
+                    "--release",
+                    "((.:release_version))",
+                    rootfs_asset_dir,
+                ],
+            ),
         ),
     )
-    return TryStep(try_=upload_task)
+    alert_body = (
+        f"The {app_name} release image was pushed, but its source maps were not"
+        f" uploaded to Sentry project {sentry_config.project}. Stack traces for"
+        " this release stay minified until the upload job is rerun. The release"
+        " itself is not blocked."
+    )
+    job = Job(
+        name=Identifier(f"upload-{app_name}-sourcemaps"),
+        build_log_retention={"builds": 10},
+        plan=[
+            # Every pushed image, not only the newest: a deploy job can select
+            # image A while image B lands before this job schedules, and A
+            # would then deploy with no maps and no alert. A job that has never
+            # run starts at the newest passed build (Concourse's group resolver
+            # falls through to the latest path when the job has no prior
+            # build), so adding this job replays no history.
+            GetStep(
+                get=image_resource.name,
+                trigger=True,
+                version="every",
+                passed=[image_build_job],
+                params={"format": "rootfs"},
+            ),
+            *extra_gets,
+            LoadVarStep(
+                load_var="release_version", file=release_version_file, reveal=True
+            ),
+            upload_task,
+        ],
+        on_failure=notification(
+            resource=slack_resource,
+            title=f"{app_name} source maps did not reach Sentry",
+            body=alert_body,
+            alert_type="failed",
+        ),
+        on_error=notification(
+            resource=slack_resource,
+            title=f"{app_name} source map upload errored",
+            body=alert_body,
+            alert_type="errored",
+        ),
+    )
+    return PipelineFragment(
+        resource_types=[slack_notification_resource()],
+        resources=[slack_resource],
+        jobs=[job],
+    )
 
 
 def _build_image_job_legacy(
@@ -569,7 +662,6 @@ def _build_image_job_legacy(
     build_target: str | None = None,
     django_settings_dir: str = "main",
     repo_version_file: str | None = None,
-    sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
     """Generate an image build job for a specific branch type (main or rc)."""
     job_name = f"build-{app_name}-image-from-{branch_type}"
@@ -591,15 +683,8 @@ def _build_image_job_legacy(
     # (Docker-legacy) output format has no field to declare a layer as
     # anything but gzip, so a layer carried through unchanged from a
     # zstd-compressed base gets silently mislabeled as gzip -- which is what
-    # broke the original learn-ai canary build. Skipped when
-    # sentry_sourcemaps is set (mit-learn-nextjs only): oci-build-task's
-    # OCI-output loader (loadOciImages) never checks UNPACK_ROOTFS, unlike
-    # the legacy loader the sourcemap upload step depends on -- and
-    # mit-learn-nextjs doesn't build FROM mitodl/ol-python-base anyway
-    # (it's a Node/Next.js image), so it was never at risk from DHI's zstd
-    # layers in the first place.
-    if sentry_sourcemaps is None:
-        additional_build_params["OUTPUT_OCI"] = "true"
+    # broke the original learn-ai canary build.
+    additional_build_params["OUTPUT_OCI"] = "true"
     if branch_type == "release_candidate":
         plan.extend(
             [
@@ -637,18 +722,6 @@ def _build_image_job_legacy(
         )
         version_args = {"BUILD_ARG_RELEASE_VERSION": f"((.:{version_var}))"}
 
-    # Skip the main build: its image only serves CI. QA and Production both run the
-    # RC image, so the RC upload already covers production.
-    sourcemap_build_params: dict[str, str] = {}
-    sourcemap_upload_step: TryStep | None = None
-    if sentry_sourcemaps is not None and branch_type != "main":
-        # UNPACK_ROOTFS lets the upload step read the maps out of the built image.
-        sourcemap_build_params = {"UNPACK_ROOTFS": "true"}
-        # Tag the artifacts with this build's version (== runtime NEXT_PUBLIC_VERSION).
-        sourcemap_upload_step = _sentry_js_sourcemaps_upload_step(
-            sentry_sourcemaps, release_var=f"((.:{version_var}))"
-        )
-
     plan.extend(
         [
             LoadVarStep(
@@ -668,7 +741,6 @@ def _build_image_job_legacy(
                     "BUILD_ARG_GIT_SHA": "((.:git_ref))",
                     **version_args,
                     **additional_build_params,
-                    **sourcemap_build_params,
                 },
                 build_args=[],
             ),
@@ -676,9 +748,9 @@ def _build_image_job_legacy(
     )
 
     put_params: dict[str, Any] = {
-        # Directory, not image.tar, whenever OUTPUT_OCI was set above --
-        # matches oci-build-task's documented output shape for that flag.
-        "image": "image/image" if sentry_sourcemaps is None else "image/image.tar",
+        # A directory, not image.tar: oci-build-task's documented output shape
+        # for OUTPUT_OCI.
+        "image": "image/image",
         "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
     }
     if branch_type != "main":
@@ -688,9 +760,6 @@ def _build_image_job_legacy(
     plan.extend(_ensure_ecr_repository_step(ecr_registry_image_resource))
     plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
     plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
-
-    if sourcemap_upload_step is not None:
-        plan.append(sourcemap_upload_step)
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
@@ -743,7 +812,6 @@ def _build_legacy_app_pipeline(
         build_target=pipeline_parameters.build_target,
         django_settings_dir=pipeline_parameters.settings_dir or "main",
         repo_version_file=pipeline_parameters.version_file,
-        sentry_sourcemaps=pipeline_parameters.sentry_sourcemaps,
     )
     rc_image_build_job = _build_image_job_legacy(
         app_name=app_name,
@@ -755,8 +823,22 @@ def _build_legacy_app_pipeline(
         build_target=pipeline_parameters.build_target,
         django_settings_dir=pipeline_parameters.settings_dir or "main",
         repo_version_file=pipeline_parameters.version_file,
-        sentry_sourcemaps=pipeline_parameters.sentry_sourcemaps,
     )
+    # QA and Production both run the RC image, so uploading its maps covers
+    # them; the main-branch image only serves CI. The RC image is pushed with
+    # its version as the tag, which the get writes to ``<resource>/tag``.
+    sourcemaps_fragments: list[PipelineFragment] = []
+    if pipeline_parameters.sentry_sourcemaps is not None:
+        sourcemaps_fragments.append(
+            _sourcemaps_upload_fragment(
+                app_name=app_name,
+                sentry_config=pipeline_parameters.sentry_sourcemaps,
+                image_resource=app_rc_image,
+                image_build_job=rc_image_build_job.name,
+                release_version_file=f"{app_rc_image.name}/tag",
+                extra_gets=[],
+            )
+        )
 
     ci_post_steps: list[GetStep | PutStep | TaskStep] = []
     if fastly_ci is not None:
@@ -896,6 +978,7 @@ def _build_legacy_app_pipeline(
         qa_and_production_fragment,
         main_branch_container_fragement,
         release_candidate_container_fragment,
+        *sourcemaps_fragments,
     )
     return combined_fragment.to_pipeline()
 
@@ -963,13 +1046,15 @@ ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
 # Bumping a tag resets the same histories, once, on each pipeline's next check
 # after k8s-apps-meta regenerates them, even when the image itself is
 # unchanged: the type's source is what changed. Introducing these pins was
-# such a bump. So bump deliberately, and afterwards re-run the QA job of every
-# app with an open release issue. The release bot reports an approved issue
-# that Production has not taken.
+# such a bump. So bump deliberately, and afterwards check that each app with an
+# open release issue still lists its release resource as an input of its latest
+# QA build; where it does not, start a new QA build (fly rerun-build reuses the
+# old input versions, which may no longer exist). The release bot reports an
+# approved issue that Production has not taken.
 RELEASE_RESOURCE_TYPE_TAGS = {
-    "release": "eaa392681a2c2be5ea93abe1f3144844f0e65415",  # pragma: allowlist secret
+    "release": "0269465f5d737f5b661afdff845168c785c0833f",  # pragma: allowlist secret
     "github-issues": "9ab0f9739aa61b39071be0022dcaec1bc8f0688c",  # pragma: allowlist secret
-    "github-deployments": "0bc607fd2912156998d379155a2acc8f8249d00a",  # pragma: allowlist secret
+    "github-deployments": "efb28bc297f104f4bc8d63e33d07b114f710e2b3",  # pragma: allowlist secret
 }
 
 
@@ -1326,9 +1411,12 @@ def _assert_gate_names_deploy_task(
     github_repo: str,
     release_gate: Resource,
     version_input: Resource,
-    infra_input: Identifier,
+    infra_input: Identifier | None,
 ) -> TaskStep:
     """Fail the job unless the closed gate issue names what it deploys.
+
+    *infra_input* None is a tag-only release, which deploys no
+    ol-infrastructure code: the issue then approves the version alone.
 
     Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
     <version>``, and requires ``<version>`` to equal the contents of
@@ -1356,7 +1444,7 @@ def _assert_gate_names_deploy_task(
             inputs=[
                 Input(name=release_gate.name),
                 Input(name=version_input.name),
-                Input(name=infra_input),
+                *([Input(name=infra_input)] if infra_input else []),
             ],
             # Concourse hands a failed task's outputs to its on_failure hook.
             outputs=[Output(name=Identifier(GATE_REFUSAL_DIR))],
@@ -1365,7 +1453,9 @@ def _assert_gate_names_deploy_task(
                 "REFUSAL_DIR": GATE_REFUSAL_DIR,
                 "GATE_FILE": f"{release_gate.name}/gh_issue.json",
                 "VERSION_FILE": f"{version_input.name}/version",
-                "INFRA_REF_FILE": f"{infra_input}/.git/ref",
+                **(
+                    {"INFRA_REF_FILE": f"{infra_input}/.git/ref"} if infra_input else {}
+                ),
                 "GITHUB_REPOSITORY": github_repo,
                 "GITHUB_APP_ID": GITHUB_APP_ID,
                 "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
@@ -1412,14 +1502,32 @@ def _classify_promotion_task(
     app_name: str,
     release_res: Resource,
     current_release: Identifier,
-    pulumi_resource: Resource,
-    pulumi_code: Resource,
+    pulumi_resource: Resource | None,
+    pulumi_code: Resource | None,
 ) -> TaskStep:
     """Compose the release issue's title and body from the Production preview.
 
     *pulumi_code* is the ol-infrastructure checkout the preview ran from; its
-    commit goes into the body for the Production job to check.
+    commit goes into the body for the Production job to check. Both are None
+    for a tag-only release, which has no preview: the body is the checklist.
     """
+    preview_inputs: list[Input] = []
+    preview_params: dict[str, str] = {}
+    if pulumi_resource is not None and pulumi_code is not None:
+        preview_inputs = [
+            Input(name=pulumi_resource.name),
+            Input(name=pulumi_code.name),
+        ]
+        preview_params = {
+            "PREVIEW_SUMMARY_FILE": (
+                f"{pulumi_resource.name}/{PREVIEW_SUMMARY_FILENAME}"
+            ),
+            "NO_CHANGES_MARKER_FILE": (
+                f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
+            ),
+            "INFRA_REF_FILE": f"{pulumi_code.name}/.git/ref",
+            "INFRA_REPO_URL": pulumi_code.source["uri"],
+        }
     return TaskStep(
         task=Identifier(CLASSIFY_TASK_NAME),
         config=TaskConfig(
@@ -1428,8 +1536,7 @@ def _classify_promotion_task(
             inputs=[
                 Input(name=release_res.name),
                 Input(name=current_release),
-                Input(name=pulumi_resource.name),
-                Input(name=pulumi_code.name),
+                *preview_inputs,
             ],
             outputs=[Output(name=Identifier(PROMOTION_DIR))],
             params={
@@ -1438,14 +1545,7 @@ def _classify_promotion_task(
                 "PRODUCTION_VERSION_FILE": f"{current_release}/production_version",
                 "PRODUCTION_STATE_FILE": f"{current_release}/production_state",
                 "CHECKLIST_FILE": f"{release_res.name}/checklist.md",
-                "PREVIEW_SUMMARY_FILE": (
-                    f"{pulumi_resource.name}/{PREVIEW_SUMMARY_FILENAME}"
-                ),
-                "NO_CHANGES_MARKER_FILE": (
-                    f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
-                ),
-                "INFRA_REF_FILE": f"{pulumi_code.name}/.git/ref",
-                "INFRA_REPO_URL": pulumi_code.source["uri"],
+                **preview_params,
                 "OUTPUT_DIR": PROMOTION_DIR,
             },
             run=Command(path="python3", args=["-c", _CLASSIFY_SCRIPT]),
@@ -1541,7 +1641,6 @@ def _build_release_image_job(
     dockerhub_registry_image_resource: Resource,
     ecr_registry_image_resource: Resource,
     build_target: str | None = None,
-    sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
     """Generate the release image build job for an app.
 
@@ -1565,17 +1664,12 @@ def _build_release_image_job(
         additional_build_params = {"TARGET": build_target}
     # OUTPUT_OCI keeps zstd layers inherited from the DHI-hardened base
     # labeled as zstd; see _build_image_job_legacy and
-    # mitodl/ol-infrastructure#5714. Skipped when uploading source maps,
-    # because oci-build-task's OCI output ignores UNPACK_ROOTFS.
-    if sentry_sourcemaps is None:
-        additional_build_params["OUTPUT_OCI"] = "true"
-
-    # UNPACK_ROOTFS lets the upload step read the maps out of the built image.
-    sourcemap_build_params = {"UNPACK_ROOTFS": "true"} if sentry_sourcemaps else {}
+    # mitodl/ol-infrastructure#5714.
+    additional_build_params["OUTPUT_OCI"] = "true"
 
     put_params: dict[str, Any] = {
-        # Directory, not image.tar, whenever OUTPUT_OCI was set above.
-        "image": "image/image" if sentry_sourcemaps is None else "image/image.tar",
+        # A directory, not image.tar: oci-build-task's output shape for OUTPUT_OCI.
+        "image": "image/image",
         # Use the version file as additional_tags so the calver tag is pushed
         # without triggering the registry-image resource's semver validation
         # (which rejects 4-part calver strings like 2026.6.15.1).
@@ -1619,10 +1713,12 @@ def _build_release_image_job(
             file=f"{release_res.name}/version",
             reveal=True,
         ),
-        # The commit a hotfix cherry-picks onto production, or empty for a
-        # normal release. The release resource's check sets it while a
-        # `hotfix/<sha>` request tag is pending, which is how `/doof hotfix`
-        # gets a SHA to a job whose trigger carries no parameters.
+        # The commits a hotfix cherry-picks onto production, one SHA or
+        # several separated by whitespace, or empty for a normal release. The
+        # release resource's check sets it while `hotfix/<sha>` request tags
+        # are pending, which is how `/doof hotfix` gets SHAs to a job whose
+        # trigger carries no parameters. `commit_hash` takes the whole string,
+        # so the number of commits does not change this plan.
         LoadVarStep(
             load_var="hotfix",
             file=f"{release_res.name}/hotfix",
@@ -1642,7 +1738,7 @@ def _build_release_image_job(
             },
         ),
         # Build from the cut release, not from main_repo. A hotfix is
-        # production plus one commit, which main_repo does not hold, and
+        # production plus its commits, which main_repo does not hold, and
         # Concourse does not document a put writing back to its inputs, so the
         # put's checkout is not something later steps can rely on. For a normal
         # release, releases/<version> is the tree main_repo holds after
@@ -1650,7 +1746,7 @@ def _build_release_image_job(
         # which case the branch is what was actually tagged.
         _checkout_release_task(main_repo, release_source),
         # The commit the version tag points at: the pre-bump HEAD for a normal
-        # release, the cherry-picked commit for a hotfix.
+        # release, the last cherry-picked commit for a hotfix.
         LoadVarStep(
             load_var="git_ref",
             file=f"{release_source}/.git/release_ref",
@@ -1669,7 +1765,6 @@ def _build_release_image_job(
                 "BUILD_ARG_RELEASE_VERSION": "((.:release_version))",
                 "PROGRESS": "plain",
                 **additional_build_params,
-                **sourcemap_build_params,
             },
             build_args=[],
         ),
@@ -1677,14 +1772,6 @@ def _build_release_image_job(
         PutStep(put=dockerhub_registry_image_resource.name, params=put_params),
         PutStep(put=ecr_registry_image_resource.name, params=put_params),
     ]
-
-    if sentry_sourcemaps:
-        # Tag the artifacts with the release being built.
-        plan.append(
-            _sentry_js_sourcemaps_upload_step(
-                sentry_sourcemaps, release_var="((.:release_version))"
-            )
-        )
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
@@ -1694,6 +1781,7 @@ def _build_abandon_release_job(
     main_repo: Resource,
     release_res: Resource,
     release_issue: Resource,
+    serial_groups: list[str] | None = None,
 ) -> Job:
     """Generate a manually-triggered job that abandons an in-flight release.
 
@@ -1709,10 +1797,14 @@ def _build_abandon_release_job(
     would deploy a version whose branch and tag are gone.  The issue step runs
     only after the release put succeeds, so a refused abandon (a version that
     is not in flight) leaves its issue alone.
+
+    *serial_groups* puts the job in the release's serial group, as the
+    tag-only pipeline does; see _build_tag_release_pipeline.
     """
     return Job(
         name=Identifier(f"abandon-{app_name}-release"),
         build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
         plan=[
             GetStep(get=release_res.name, trigger=False),
             GetStep(get=main_repo.name, trigger=False),
@@ -1803,8 +1895,27 @@ def _build_release_resource_app_pipeline(
         dockerhub_registry_image_resource=docker_rc_image,
         ecr_registry_image_resource=app_rc_image,
         build_target=pipeline_parameters.build_target,
-        sentry_sourcemaps=pipeline_parameters.sentry_sourcemaps,
     )
+    # The version comes from the release resource at the build that pushed the
+    # image, the same way the QA deploy job reads it.
+    sourcemaps_fragments: list[PipelineFragment] = []
+    if pipeline_parameters.sentry_sourcemaps is not None:
+        sourcemaps_fragments.append(
+            _sourcemaps_upload_fragment(
+                app_name=app_name,
+                sentry_config=pipeline_parameters.sentry_sourcemaps,
+                image_resource=app_rc_image,
+                image_build_job=release_image_build_job.name,
+                release_version_file=f"{release_res.name}/version",
+                extra_gets=[
+                    GetStep(
+                        get=release_res.name,
+                        trigger=False,
+                        passed=[release_image_build_job.name],
+                    )
+                ],
+            )
+        )
     abandon_release_job = _build_abandon_release_job(
         app_name=app_name,
         main_repo=main_repo,
@@ -2173,6 +2284,7 @@ def _build_release_resource_app_pipeline(
         qa_and_production_fragment,
         main_branch_container_fragement,
         release_container_fragment,
+        *sourcemaps_fragments,
     ]
     if pipeline_parameters.static_frontend is not None:
         fragments.append(
@@ -2192,6 +2304,275 @@ def _build_release_resource_app_pipeline(
     )
 
 
+# ============================================================================
+# Tag-only release pipeline: a release that deploys nothing itself
+# ============================================================================
+# The repository's consumers check it out at a tag (ocw-hugo-themes and
+# ocw-hugo-projects, read by ocw-studio's site pipelines). RC consumers track
+# the newest release tag, which `action: create` pushes; Production consumers
+# track the newest `production/<version>` tag, which only the Production job
+# writes, after the gate issue is closed. Opt in with
+# AppRegistration.release_kind="tag" in bridge.settings.apps.
+
+_PROMOTE_TAG_SCRIPT = (Path(__file__).parent / "scripts" / "promote_tag.py").read_text()
+PROMOTE_TAG_TASK_NAME = "promote-tag"
+CHECK_PROMOTE_TAG_TASK_NAME = "check-promote-tag"
+
+
+def _promote_tag_task(
+    github_repo: str, release_res: Resource, *, check_only: bool = False
+) -> TaskStep:
+    """Create the release's ``production/<version>`` tag at its release tag.
+
+    Retried: re-running finds the tag already at the commit and changes
+    nothing. With *check_only* the task runs the script's checks (the release
+    tag is there, no newer version has a Production tag, and this version's
+    tag is absent or already at the commit) and creates nothing. See the
+    script's docstring.
+    """
+    params = {
+        "VERSION_FILE": f"{release_res.name}/version",
+        "TAG_PREFIX": PRODUCTION_TAG_PREFIX,
+        "GITHUB_REPOSITORY": github_repo,
+        "GITHUB_APP_ID": GITHUB_APP_ID,
+        "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+        "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+    }
+    if check_only:
+        params["CHECK_ONLY"] = "true"
+    return TaskStep(
+        task=Identifier(
+            CHECK_PROMOTE_TAG_TASK_NAME if check_only else PROMOTE_TAG_TASK_NAME
+        ),
+        attempts=3,
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=release_res.name)],
+            params=params,
+            run=Command(path="python3", args=["-c", _PROMOTE_TAG_SCRIPT]),
+        ),
+    )
+
+
+def _build_tag_release_pipeline(app_name: str) -> Pipeline:
+    """Generate the release pipeline for a tag-only app.
+
+    Four jobs, with the names ``bridge.settings.apps.release_job_names`` gives
+    the release bot:
+
+    - ``cut-<app>-release`` bumps the version and cuts the release, which
+      pushes the release tag. Like ``build-<app>-release-image``, nothing
+      schedules it: the bot checks the release resource and triggers it, a
+      hotfix included (see ``_build_release_image_job``).
+    - ``deploy-<app>-rc`` records the RC GitHub Deployment and opens the
+      checklist gate issue. RC consumers pick the tag up themselves.
+    - ``promote-<app>-production`` runs when the gate issue is closed, checks
+      the issue names the version and was opened by the release App, creates
+      the ``production/<version>`` tag, records the Production Deployment, and
+      merges the release branch back.
+    - ``abandon-<app>-release`` is the k8s apps' abandon job.
+
+    All four jobs share a serial group. A promotion never finishes a release
+    while the RC job is reading what Production runs, and a cut (which
+    supersedes the in-flight release) or an abandon never deletes the release
+    tag between promote-tag reading it and creating the Production tag. Those
+    two keep a release's tag only once its Production Deployment has
+    succeeded, and that is recorded after the tag is created.
+
+    The Production job refuses a version older than the newest Production
+    tag before it starts the Production Deployment, so re-running an old
+    build cannot report that version as live while consumers run the newer
+    tag.
+
+    Before the first release the repository needs what the k8s apps have: a
+    ``[tool.bumpversion]`` table in ``pyproject.toml`` (bump_version_task reads
+    that file, even in an npm repository) naming the files to bump, such as a
+    ``VERSION`` file. Without it the cut job fails at bump-version and nothing
+    is tagged.
+    """
+    jobs = app_release_job_names(app_name)
+    github_repo = app_github_repo(app_name)
+    repo_main_branch = app_repo_main_branch(app_name)
+    main_repo = git_repo(
+        name=Identifier(f"{app_name}-{repo_main_branch}"),
+        uri=f"https://github.com/{github_repo}",
+        branch=repo_main_branch,
+    )
+    (
+        release_res,
+        release_gate,
+        release_issue,
+        deployment_rc,
+        deployment_prod,
+    ) = _define_release_resources(
+        app_name=app_name,
+        github_repo=github_repo,
+        repo_main_branch=repo_main_branch,
+        generated_changelog=app_release_changelog(app_name),
+    )
+    cut_job_name = jobs["release"]
+    rc_job_name = jobs["qa"]
+    serial_groups = [f"{app_name}-release"]
+    release_current = Identifier(f"{app_name}-release-current")
+    version_var = LoadVarStep(
+        load_var="version", file=f"{release_res.name}/version", reveal=True
+    )
+
+    cut_job = Job(
+        name=Identifier(cut_job_name),
+        build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
+        plan=[
+            # Not `trigger: true`, for the reasons in _build_release_image_job.
+            GetStep(get=release_res.name, trigger=False),
+            GetStep(get=main_repo.name, trigger=False),
+            LoadVarStep(
+                load_var="hotfix", file=f"{release_res.name}/hotfix", reveal=True
+            ),
+            bump_version_task(
+                version_file=f"{release_res.name}/version",
+                repository=str(main_repo.name),
+            ),
+            PutStep(
+                put=release_res.name,
+                params={
+                    "action": "create",
+                    "repo_dir": str(main_repo.name),
+                    "version_file": f"{release_res.name}/version",
+                    "commit_hash": "((.:hotfix))",
+                },
+            ),
+        ],
+    )
+    rc_job = Job(
+        name=Identifier(rc_job_name),
+        build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
+        plan=[
+            GetStep(get=release_res.name, trigger=True, passed=[cut_job_name]),
+            version_var,
+            # The implicit get after this put makes deployment.json available
+            # to the finish put; see _build_release_resource_app_pipeline.
+            PutStep(
+                put=deployment_rc.name,
+                params={"action": "start", "ref": "((.:version))"},
+            ),
+            # What Production runs has to be current; see _cache_bust_task and
+            # the release_current get in _build_release_resource_app_pipeline.
+            _cache_bust_task(),
+            LoadVarStep(
+                load_var="cache_bust", file=f"{CACHE_BUST_DIR}/value", reveal=True
+            ),
+            GetStep(
+                get=release_current,
+                resource=release_res.name,
+                passed=[cut_job_name],
+                params={"cache_bust": "((.:cache_bust))"},
+            ),
+            _classify_promotion_task(
+                app_name, release_res, release_current, None, None
+            ),
+            LoadVarStep(
+                load_var="promotion_title",
+                file=f"{PROMOTION_DIR}/title",
+                reveal=True,
+            ),
+            LoadVarStep(
+                load_var="release_tag",
+                file=f"{PROMOTION_DIR}/release_tag",
+                reveal=True,
+            ),
+            PutStep(
+                put=release_issue.name,
+                params={
+                    "body_file": f"{PROMOTION_DIR}/body.md",
+                    "labels": [RELEASE_LABEL],
+                    "title_template": "((.:promotion_title))",
+                    "skip_if_file": f"{PROMOTION_DIR}/skip",
+                    "skip_if_tag_missing": "((.:release_tag))",
+                    "carry_checks_unless_labeled": ABANDONED_LABELS,
+                },
+            ),
+            PutStep(
+                put=deployment_rc.name,
+                params={
+                    "action": "finish",
+                    "deployment_file": f"{deployment_rc.name}/deployment.json",
+                    "state": "success",
+                },
+            ),
+            _supersede_gate_issues_task(app_name, github_repo, release_issue),
+        ],
+    )
+    production_job = Job(
+        name=Identifier(jobs["production"]),
+        build_log_retention={"builds": 10},
+        serial_groups=serial_groups,
+        plan=[
+            GetStep(get=release_res.name, trigger=False, passed=[rc_job_name]),
+            version_var,
+            GetStep(get=release_gate.name, trigger=True, version="every"),
+            _assert_gate_names_deploy_task(
+                app_name, github_repo, release_gate, release_res, None
+            ),
+            # main_repo is needed by the action=finish put.
+            GetStep(get=main_repo.name, trigger=False, passed=[cut_job_name]),
+            # Before the Deployment starts, so a refused version records none.
+            _promote_tag_task(github_repo, release_res, check_only=True),
+            PutStep(
+                put=deployment_prod.name,
+                params={"action": "start", "ref": "((.:version))"},
+            ),
+            _promote_tag_task(github_repo, release_res),
+            PutStep(
+                put=deployment_prod.name,
+                params={
+                    "action": "finish",
+                    "deployment_file": f"{deployment_prod.name}/deployment.json",
+                    "state": "success",
+                    "comment_on_issue_file": f"{release_gate.name}/gh_issue.json",
+                },
+            ),
+            # Not in a `try`; see the finish put in
+            # _build_release_resource_app_pipeline.
+            PutStep(
+                put=release_res.name,
+                params={
+                    "action": "finish",
+                    "repo_dir": str(main_repo.name),
+                    "version_file": f"{release_res.name}/version",
+                },
+            ),
+        ],
+    )
+    abandon_job = _build_abandon_release_job(
+        app_name=app_name,
+        main_repo=main_repo,
+        release_res=release_res,
+        release_issue=release_issue,
+        serial_groups=serial_groups,
+    )
+    return _pin_release_resource_types(
+        Pipeline(
+            resource_types=[
+                release_resource_type(),
+                github_deployments_resource(),
+                github_issues_resource(),
+            ],
+            resources=[
+                main_repo,
+                release_res,
+                release_gate,
+                release_issue,
+                deployment_rc,
+                deployment_prod,
+            ],
+            jobs=[cut_job, rc_job, production_job, abandon_job],
+        )
+    )
+
+
 def build_app_pipeline(app_name: str) -> Pipeline:
     """Generate the full Concourse pipeline for a given application.
 
@@ -2203,6 +2584,8 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     a per-app flag duplicated across the two would let a pipeline be migrated
     while the bot still refuses to drive it.
     """
+    if app_release_kind(app_name) == "tag":
+        return _build_tag_release_pipeline(app_name)
     pipeline_parameters = pipeline_params.get(app_name) or AppPipelineParams(
         app_name=app_name
     )

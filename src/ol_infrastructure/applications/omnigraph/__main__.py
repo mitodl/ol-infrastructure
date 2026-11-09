@@ -68,6 +68,8 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     CLUSTER_CONFIGMAP_NAME,
     DEFAULT_PER_ACTOR_BYTES_MAX,
     DEFAULT_PER_ACTOR_INFLIGHT_MAX,
+    DEFAULT_SERVER_MEMORY_LIMIT,
+    DEFAULT_SERVER_MEMORY_REQUEST,
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
@@ -208,6 +210,15 @@ WITHHELD_GRAPHS: list[str] = omnigraph_config.get_object("withheld_graphs", [])
 # withheld graph. Unset leaves the Deployment spec as it is.
 BOOT_BUDGET_SECONDS: int | None = omnigraph_config.get_int("boot_budget_seconds")
 
+# The server container's memory request and limit. See
+# DEFAULT_SERVER_MEMORY_LIMIT in data_tier.py for why Production differs.
+SERVER_MEMORY_REQUEST: str = (
+    omnigraph_config.get("server_memory_request") or DEFAULT_SERVER_MEMORY_REQUEST
+)
+SERVER_MEMORY_LIMIT: str = (
+    omnigraph_config.get("server_memory_limit") or DEFAULT_SERVER_MEMORY_LIMIT
+)
+
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
 # run; unset (the steady state) means no migration Job exists at all. See the
@@ -285,11 +296,34 @@ if MIGRATE_FROM_IMAGE and MIGRATE_TO_PREFIX == STORAGE_PREFIX:
 STORAGE_ROLLBACK_FROM: str = validate_storage_prefix(
     omnigraph_config.get("storage_rollback_from"), key="storage_rollback_from"
 )
+_this_stack = make_stack_reference(projects.OMNIGRAPH, stack_info.name)
 DEPLOYED_STORAGE_PREFIX: str | None = optional_stack_output_value(
-    make_stack_reference(projects.OMNIGRAPH, stack_info.name), "storage_prefix"
+    _this_stack, "storage_prefix"
 )
 validate_storage_prefix_progression(
     DEPLOYED_STORAGE_PREFIX, STORAGE_PREFIX, STORAGE_ROLLBACK_FROM
+)
+# ── Nor may it be handed to an image that can't open what was written to it.
+# An in-place upgrade (0.13 -> 0.14) raises the format a root holds without
+# touching storage_prefix or internal_schema_version, so this stack tracks the
+# highest format it has deployed onto each root itself. See
+# next_written_internal_schema; it runs in create_data_tier once the image's
+# label has been read, and create_data_tier exports the result
+# (written_internal_schema) before it registers the server Deployment.
+DEPLOYED_WRITTEN_INTERNAL_SCHEMA: dict[str, float] | None = optional_stack_output_value(
+    _this_stack, "written_internal_schema"
+)
+STORAGE_RESTORED_TO_FORMAT: int | None = omnigraph_config.get_int(
+    "storage_restored_to_format"
+)
+# ── Nor may the server move to an HTTP contract the running witan can't speak.
+# The witan stack reads this stack's omnigraph_server_addr, so the reference
+# runs both ways; each reads the other's last completed deploy. A reference to
+# a stack that doesn't exist fails the program, so a new environment needs
+# `pulumi stack init` for the witan stack before this stack's first deploy
+# (see the runbook). See image_schema.check_http_api_contract.
+DEPLOYED_WITAN_HTTP_API_CONTRACTS: list[str] | None = optional_stack_output_value(
+    make_stack_reference(projects.WITAN, stack_info.name), "witan_http_api_contracts"
 )
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
@@ -1112,6 +1146,11 @@ data_tier = create_data_tier(
     # resolved the image reference. See validate_image_internal_schema.
     internal_schema_version=INTERNAL_SCHEMA_VERSION,
     migrate_to_prefix=MIGRATE_TO_PREFIX,
+    deployed_written_internal_schema=DEPLOYED_WRITTEN_INTERNAL_SCHEMA,
+    storage_restored_to_format=STORAGE_RESTORED_TO_FORMAT,
+    deployed_witan_http_api_contracts=DEPLOYED_WITAN_HTTP_API_CONTRACTS,
+    server_memory_request=SERVER_MEMORY_REQUEST,
+    server_memory_limit=SERVER_MEMORY_LIMIT,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,

@@ -22,6 +22,26 @@ class AppConfig:
     # override gets the refusal, which says what is wrong, rather than an
     # opaque Concourse 404.
     release_workflow: bool = False
+    # The jobs the bot triggers or links to, from
+    # bridge.settings.apps.release_job_names. Unset means the k8s app names,
+    # so a hand-written repos_config override that predates them still works.
+    release_job: str | None = None
+    qa_job: str | None = None
+    production_job: str | None = None
+    abandon_job: str | None = None
+
+
+_K8S_JOB_NAMES = {
+    "release_job": "build-{app}-release-image",
+    "qa_job": "deploy-ol-application-{app}-qa",
+    "production_job": "deploy-ol-application-{app}-production",
+    "abandon_job": "abandon-{app}-release",
+}
+
+
+def job_name(app_name: str, cfg: AppConfig, role: str) -> str:
+    """Return *cfg*'s job for *role* (``release_job`` and so on)."""
+    return getattr(cfg, role) or _K8S_JOB_NAMES[role].format(app=app_name)
 
 
 def release_workflow_apps(repos: dict[str, AppConfig]) -> dict[str, AppConfig]:

@@ -54,6 +54,8 @@ from collections.abc import Callable
 from pulumi import Input, ResourceOptions
 from pulumiverse_grafana import alerting
 
+from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
+
 _NON_PROD_CLUSTERS = ".*-(ci|qa)"
 _PROD_CLUSTERS = ".*-(production)"
 _QA_CLUSTERS = ".*-(qa)"
@@ -65,15 +67,22 @@ _KEEPER_JOB = 'namespace="clickhouse", job="clickhouse-keeper-metrics"'
 # The backup CronJob runs daily (applications/clickhouse, clickhouse-backup).
 # 26h is one missed run plus two hours of slack.
 _BACKUP_STALE_SECONDS = 26 * 3600
+# A server restarted mid-backup waits for the BACKUP before exiting, so a backup
+# that outgrows the pod's grace period gets the replica SIGKILLed instead.
+# Job wall time overstates the BACKUP by its 30s poll interval and pod startup
+# (371s vs 336s on 2026-11-03), which errs toward warning early.
+_BACKUP_DURATION_WARN_SECONDS = int(CLICKHOUSE_TERMINATION_GRACE_SECONDS * 0.8)
 
 
 def _server_down(clusters: str) -> str:
     # The exporter records a fetch error per host per query type; system.metrics
     # is the first query it makes, so an error there means the host did not
-    # answer at all.
+    # answer at all. Exporter 0.27.4 renamed the label value from
+    # "system.metrics" to "system_metrics". The regex matches both because each
+    # data cluster's operator upgrades at its own gate, apart from this stack.
     return (
         f"max by ({_BY_HOST}) (chi_clickhouse_metric_fetch_errors"
-        f'{{cluster=~"{clusters}", fetch_type="system.metrics"}}) > 0'
+        f'{{cluster=~"{clusters}", fetch_type=~"system[._]metrics"}}) > 0'
     )
 
 
@@ -158,6 +167,18 @@ def _backup_stale(clusters: str) -> str:
         "(kube_cronjob_status_last_successful_time"
         f'{{cluster=~"{clusters}", namespace="clickhouse", '
         f'cronjob="clickhouse-backup"}} > 0)) > {_BACKUP_STALE_SECONDS}'
+    )
+
+
+def _backup_near_grace_period() -> str:
+    # kube-state-metrics keeps a series per retained Job, so this is the
+    # longest of the runs the CronJob's history still holds.
+    selector = 'namespace="clickhouse", job_name=~"clickhouse-backup-.*"'
+    return (
+        "max by (cluster, namespace) (\n"
+        f"  kube_job_status_completion_time{{{selector}}}\n"
+        f"  - kube_job_status_start_time{{{selector}}}\n"
+        f") > {_BACKUP_DURATION_WARN_SECONDS}"
     )
 
 
@@ -431,6 +452,15 @@ def create(
                 _replica_not_ready,
                 "15m",
                 "ClickHouse StatefulSet {{ $labels.statefulset }} in cluster {{ $labels.cluster }} has had a pod not Ready for 15 minutes. chi-* is a server replica and chk-* a Keeper member; check the pod for Pending (PVC, scheduling) or a crash loop.",
+                rd,
+            ),
+            # Appended rather than grouped with the backup rules: rules are
+            # matched by position, so an insert rewrites every rule after it.
+            _warning(
+                "ClickHouseBackupNearGracePeriod",
+                _backup_near_grace_period(),
+                "5m",
+                f"A clickhouse-backup Job in cluster {{{{ $labels.cluster }}}} ran for {{{{ $values.B.Value | humanizeDuration }}}}, past 80% of the server pods' {CLICKHOUSE_TERMINATION_GRACE_SECONDS}s grace period. A replica restarted during the backup would be killed before it finishes. Raise CLICKHOUSE_TERMINATION_GRACE_SECONDS in bridge/lib/magic_numbers.py.",
                 rd,
             ),
         ],

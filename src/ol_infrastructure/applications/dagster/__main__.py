@@ -24,6 +24,7 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
+    StackReference,
     export,
 )
 from pulumi.config import get_config
@@ -153,6 +154,29 @@ xpro_stack = (
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
+
+
+def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[str]:
+    """Pick the database host a data_loading dlt source reads.
+
+    Production reads the application's read replica so bulk extracts never load
+    the primary. The replica only exists where stack_defaults gives one
+    (production), so other environments read the primary. A production app stack
+    that does not export ``rds_replica_host`` yet falls back to the primary, so
+    this stack can apply before the app stacks that add the export.
+
+    :param app_stack: The application's stack reference.
+    :param output_name: The application stack's export holding its RDS hosts.
+
+    :returns: The host for the matching ``<NAME>_DB_HOST`` variable.
+    :rtype: Output[str]
+    """
+    hosts = app_stack.require_output(output_name)
+    if stack_info.env_suffix != "production":
+        return hosts["rds_host"]
+    return hosts.apply(lambda out: out.get("rds_replica_host", out["rds_host"]))
+
+
 # The ml code location traces its LLM calls to the Production Opik from every
 # environment dagster-ml has an Opik client in (lib/opik.py); on the Dev stack
 # OPIK_URL_OVERRIDE stays unset and the ml code's tracing is a no-op.
@@ -566,21 +590,48 @@ edxorg_courses_bucket = OLBucket(
 # mitx-etl-* buckets, laid out as {deployment}/{YYYYMMDD}/. Every night is a full
 # re-export, so drops expire instead of accumulating the way they do in the
 # legacy buckets, none of which expires anything (54-87 TB each as of 2026-08-30).
+#
+# Course tarballs are not part of a drop. Each exported version is copied once
+# to courses/{deployment}/{course_id}/{sha256}.xml.tar.gz and every night's
+# manifest points at the newest one, so they must outlive the drops. A lifecycle
+# filter can't exclude a prefix, hence one expiry rule per deployment prefix.
+IRX_EXPORT_DEPLOYMENTS = ("mitx", "mitxonline", "xpro")
 irx_export_bucket = OLBucket(
     "irx-export",
     config=S3BucketConfig(
         bucket_name=irx_export_bucket_name,
         versioning_enabled=False,
         server_side_encryption_enabled=True,
-        # Objects expire at 90 days, which is when tiering would first move them.
+        # Drops expire at 90 days, which is when tiering would first move them.
+        # courses/ tiers through its own rule below.
         intelligent_tiering_enabled=False,
         lifecycle_rules=[
+            *(
+                s3.BucketLifecycleConfigurationRuleArgs(
+                    id=f"expire-{deployment}-nightly-drops",
+                    status="Enabled",
+                    filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                        prefix=f"{deployment}/"
+                    ),
+                    expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(
+                        days=90
+                    ),
+                )
+                for deployment in IRX_EXPORT_DEPLOYMENTS
+            ),
+            # Only the newest version of a course is in a manifest, so older
+            # copies go cold. Same 90 days as the landing zone they're copied from.
             s3.BucketLifecycleConfigurationRuleArgs(
-                id="expire-nightly-drops",
+                id="tier-course-exports",
                 status="Enabled",
-                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
-                expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(days=90),
-            )
+                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix="courses/"),
+                transitions=[
+                    s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                        days=90,
+                        storage_class="INTELLIGENT_TIERING",
+                    )
+                ],
+            ),
         ],
         tags=aws_config.tags,
     ),
@@ -2989,7 +3040,7 @@ for location in code_locations:
         deployment["env"].append(
             {
                 "name": "KEYCLOAK_DB_HOST",
-                "value": keycloak_stack.require_output("keycloak")["rds_host"],
+                "value": data_loading_db_host(keycloak_stack, "keycloak"),
             }
         )
 
@@ -2997,7 +3048,7 @@ for location in code_locations:
         deployment["env"].append(
             {
                 "name": "MITXONLINE_APP_DB_HOST",
-                "value": mitxonline_stack.require_output("mitxonline")["rds_host"],
+                "value": data_loading_db_host(mitxonline_stack, "mitxonline"),
             }
         )
 
@@ -3005,7 +3056,7 @@ for location in code_locations:
         deployment["env"].append(
             {
                 "name": "XPRO_APP_DB_HOST",
-                "value": xpro_stack.require_output("xpro")["rds_host"],
+                "value": data_loading_db_host(xpro_stack, "xpro"),
             }
         )
 

@@ -57,6 +57,7 @@ from ol_infrastructure.components.aws.auto_scale_group import (
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib import telemetry_archive
 from ol_infrastructure.lib.aws.ec2_helper import DiskTypes, InstanceTypes
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.ol_types import AWSBase
@@ -413,6 +414,9 @@ def cloud_init_user_data(  # noqa: PLR0913
     vault_creds = read_yaml_secrets(  # noqa: F841
         Path(f"pulumi/vault.{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
     )
+    # The telemetry archive (ADR-0014) gets a copy of the host logs through a
+    # Vector sink file written beside the image's templates. None in CI.
+    archive = telemetry_archive.push_target(stack_info.env_suffix)
     cloud_config_contents = {
         "write_files": [
             {
@@ -486,9 +490,15 @@ def cloud_init_user_data(  # noqa: PLR0913
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
                     """
-                ),
+                )
+                + (telemetry_archive.ec2_vector_env_lines(archive) if archive else ""),
                 "owner": "root:root",
             },
+            *(
+                [telemetry_archive.ec2_vector_sink_file("vault", archive)]
+                if archive
+                else []
+            ),
             # TODO: Move TLS key and cert injection to Packer build so that private key  # noqa: FIX002, TD002
             # information isn't being passed as userdata (TMM 2021-08-06)
             {
