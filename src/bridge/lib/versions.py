@@ -198,7 +198,7 @@ VALKEY_VERSION = "7.2.15-alpine"
 # renovate: datasource=docker depName=mailpit packageName=axllent/mailpit
 MAILPIT_VERSION = "v1.33.0"
 # renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
-LITELLM_VERSION = "v1.106.6"
+LITELLM_VERSION = "v1.108.3"
 # Keep this on a plain release tag. Renovate never proposes an update from a
 # prerelease pin (a -rc.N suffix only matches the same suffix), and the same
 # rule keeps it from proposing the -preview.N tags RustFS also publishes.
