@@ -582,6 +582,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         additional_watched_paths=[
             "src/ol_infrastructure/providers/",
             "src/ol_infrastructure/substructure/keycloak/openmetadata_provisioner.py",
+            "src/ol_infrastructure/substructure/keycloak/ol_data_platform.py",
         ],
         stages=["QA", "Production"],
         topology="preview-gated",
