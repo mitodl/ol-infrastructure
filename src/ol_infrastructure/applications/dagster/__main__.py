@@ -3786,6 +3786,16 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
     ),
 )
 
+# Run and step workers are Job pods, and Jobs have no scale subresource, so a
+# budget with maxUnavailable can't count its expected pods: the disruption
+# controller reports SyncFailed and emits CalculateExpectedPodCountFailed on
+# every sync (18,021 events from the run worker budget by 2026-11-09, though
+# evictions still failed closed). An integer minAvailable is the form
+# Kubernetes supports for pods without a scalable controller; it counts the
+# matching pods directly. Set above any number that can run at once, it keeps
+# disruptionsAllowed at 0: no worker is ever evicted.
+DAGSTER_WORKER_PDB_MIN_AVAILABLE = 10_000
+
 # Pod Disruption Budget for run workers
 dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
     f"dagster-run-worker-pdb-{stack_info.env_suffix}",
@@ -3795,7 +3805,7 @@ dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
         labels=k8s_global_labels.model_dump(),
     ),
     spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
-        max_unavailable=0,
+        min_available=DAGSTER_WORKER_PDB_MIN_AVAILABLE,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "app.kubernetes.io/component": "run_worker",
@@ -3818,7 +3828,7 @@ dagster_step_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
         labels=k8s_global_labels.model_dump(),
     ),
     spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
-        max_unavailable=0,
+        min_available=DAGSTER_WORKER_PDB_MIN_AVAILABLE,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "app.kubernetes.io/component": "step_worker",
