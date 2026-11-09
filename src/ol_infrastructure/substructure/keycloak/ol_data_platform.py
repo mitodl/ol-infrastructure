@@ -1117,8 +1117,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-data-platform-lightdash-redirect-uris"
