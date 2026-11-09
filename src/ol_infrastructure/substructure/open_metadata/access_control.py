@@ -10,10 +10,11 @@ substructure/keycloak ol_data_platform.py OPEN_METADATA_ROLE_BY_REALM_ROLE):
 ol-platform-admin and ol-data-engineer -> DataEngineer, ol-researcher ->
 DataContributor, the two analyst roles and every other user -> DataConsumer.
 No realm role maps to Admin; admins come from initialAdmins.  The claim
-replaces the roles a user holds, so roles assigned to a person in the UI do
-not survive their next login.  On top of their own roles every user inherits
-DataConsumer and OrganizationPolicy from the Organization team, and a team's
-members inherit its defaultRoles.
+replaces the roles a user holds at login, and the team-keycloak-sync job
+applies the same mapping every hour, so roles assigned in the UI to anyone but
+an admin or a user with no Keycloak account do not survive the next run.  On
+top of their own roles every user inherits DataConsumer and OrganizationPolicy
+from the Organization team, and a team's members inherit its defaultRoles.
 
 DataEngineer and DataContributor are the custom roles the claim names.  They
 grant only what DataConsumer does not: DataConsumer already lets everyone

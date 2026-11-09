@@ -44,10 +44,11 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
 # ol-open_metadata-client, sent in the `roles` claim that OpenMetadata reads at
 # login (authorizer useRolesFromProvider). Each name must be an OpenMetadata
 # Role, and the claim replaces the roles the user had. The custom roles are
-# defined in substructure/open_metadata's access_control.py. No realm role
-# maps to "Admin": it would set isAdmin, and OpenMetadata never clears isAdmin
-# when it leaves the claim, so Keycloak could grant admin but not take it back.
-# Admins come from initialAdmins in applications/open_metadata, and
+# defined in substructure/open_metadata's access_control.py. The claim is read
+# only at login, so the team-keycloak-sync job there also resets every user's
+# roles to this mapping each hour. No realm role maps to "Admin": that job
+# clears isAdmin on anyone outside adminPrincipals, so admins come only from
+# initialAdmins in applications/open_metadata, and
 # ol-platform-admin gets DataEngineer (stewardship comes from the data-platform
 # team). ol-instructor is left out. That is not no access: instructors can
 # still log in, and like every user they hold DataConsumer through the realm's
@@ -59,6 +60,12 @@ OPEN_METADATA_ROLE_BY_REALM_ROLE = {
     "ol-data-analyst": "DataConsumer",
     "ol-business-analyst": "DataConsumer",
 }
+# The OpenMetadata role every user holds through the realm's default roles, and
+# the default composite that carries it (Keycloak names it
+# default-roles-<realm>). The role reconciler in substructure/open_metadata reads
+# effective realm roles, so it maps this composite like the roles above.
+OPEN_METADATA_DEFAULT_ROLE = "DataConsumer"
+REALM_DEFAULT_ROLES = "default-roles-ol-data-platform"
 # The composites of default-roles-<realm> in a realm Keycloak creates.
 KEYCLOAK_STOCK_DEFAULT_ROLES = (
     "offline_access",
@@ -535,7 +542,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             Output.concat(
                 ol_data_platform_openmetadata_client.client_id,
                 "/",
-                ol_data_platform_openmetadata_client_role_refs["DataConsumer"].name,
+                ol_data_platform_openmetadata_client_role_refs[
+                    OPEN_METADATA_DEFAULT_ROLE
+                ].name,
             ),
         ],
         opts=resource_options,

@@ -18,6 +18,11 @@ path "secret-operations/sso/superset" {
 path "secret-openmetadata/data/keycloak-team-sync" {
   capabilities = ["read"]
 }
+# The provisioner's Keycloak client, an OpenMetadata admin, for the same job's
+# role reconciliation
+path "secret-openmetadata/data/pulumi-provisioner" {
+  capabilities = ["read"]
+}
 # Connector credentials for OpenMetadata ingestion pipelines
 path "secret-openmetadata/data/connectors" {
   capabilities = ["read"]

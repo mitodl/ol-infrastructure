@@ -58,7 +58,9 @@ def create_openmetadata_team_sync_resources(
     # manage-users is the one realm-management role that allows creating
     # groups and changing membership, and in Keycloak 26 it also covers
     # viewing users and groups, so view-users and query-groups would add
-    # nothing. It is realm-wide: it can edit any user in the realm.
+    # nothing. It is realm-wide: it can edit any user in the realm. The same
+    # job's role half reads each user's effective realm roles, which needs only
+    # view on the user, so this covers it too.
     realm_management_client = keycloak.openid.get_client(
         realm_id=REALM_NAME,
         client_id="realm-management",
