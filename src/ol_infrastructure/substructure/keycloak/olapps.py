@@ -1597,7 +1597,11 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 org_alias="SLB",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                resource_options=resource_options,
+                # Imported from an org created outside Pulumi with alias "SLB";
+                # Keycloak refuses to change an org's alias once set.
+                resource_options=resource_options.merge(
+                    ResourceOptions(ignore_changes=["alias"])
+                ),
             ),
         )
         onboard_saml_org(
