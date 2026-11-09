@@ -1123,10 +1123,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            implicit_flow_enabled=False,
             service_accounts_enabled=False,
-            direct_access_grants_enabled=False,
             valid_redirect_uris=ol_data_platform_label_studio_redirect_uris,
+            **MANAGED_CLIENT_ARGS,
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
         vault.generic.Secret(
