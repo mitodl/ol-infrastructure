@@ -23,25 +23,36 @@ give them now, and clears ``isAdmin`` on anyone outside the server's
 composites of; the stack passes that mapping in ``OM_ROLE_BY_REALM_ROLE``
 (OPEN_METADATA_ROLE_BY_REALM_ROLE plus the realm's default role, from
 substructure/keycloak ol_data_platform.py). Like the login, a role OpenMetadata
-does not have is dropped. A client role assigned straight to a user in Keycloak,
-rather than through a realm role, reaches the claim but not this mapping.
+does not have is dropped.
+
+A client role of ``ol-open_metadata-client`` assigned to a user directly, or
+through a composite made by hand, reaches the claim but not this mapping, so
+this takes it away each hour and the user's next login gives it back. Reading
+the effective client roles instead would match the claim exactly, but Keycloak
+26.7.4 requires view on the client for that (ClientRoleMappingsResource
+getCompositeClientRoleMappings), and view-clients also returns every client's
+secret (ClientResource.getClientSecret), which this job's credentials should not
+reach. Grant ``ol-open_metadata-client`` roles through the realm roles.
 
 Users in ``adminPrincipals`` are left alone: login makes them admins again, and
 an admin's roles grant nothing their admin flag does not. A user with no
 Keycloak account is reported and keeps their roles, though a stray ``isAdmin``
-is still cleared. When a user's roles shrink, their personal access tokens are
-revoked. OpenMetadata 2.0.7 authorizes such a token with the roles stored on
-the user (JwtFilter.getUserRolesFromClaims ignores the roles in a token it
-issued), so this ends the API access the user set up under their old roles
-rather than closing a way back to them. ``OM_ROLES_DRY_RUN`` true logs each of
-these changes without making it.
+is still cleared. ``OM_ROLES_DRY_RUN`` true logs each change without making it.
+
+Personal access tokens are left alone. Each one carries a snapshot of the roles
+its user had, but OpenMetadata 2.0.7 neither syncs roles from a token it issued
+(JwtFilter.getUserRolesFromClaims) nor authorizes with them: it reads the user
+it has stored (SubjectContext). Once this resets a user's roles, their tokens
+carry only the new ones, so revoking them would close no way back.
 
 The team half reads OpenMetadata as the ingestion bot. The role half needs an
-admin, since roles, ``isAdmin`` and another user's tokens are admin-only, and
+admin, since another user's roles and ``isAdmin`` are admin-only, and
 authenticates as the Keycloak service account that ``initialAdmins`` names
 (``OM_ADMIN_CLIENT_ID``), which substructure/open_metadata provisions with.
+Those credentials come from a secret the application stack creates, and the job
+starts without it, so a missing secret fails only the role half.
 
-OpenMetadata users are matched to Keycloak users by email. Any API error stops
+OpenMetadata users are matched to Keycloak users by email. Any error stops
 that half with a non-zero exit before its remaining writes; the other half
 still runs.
 
@@ -169,11 +180,6 @@ class UserChange:
     user: OpenMetadataUser
     roles: frozenset[str] | None
     clear_admin: bool
-
-    @property
-    def removed_roles(self) -> frozenset[str]:
-        """The roles the user loses, whose loss revokes their tokens."""
-        return frozenset() if self.roles is None else self.user.roles - self.roles
 
 
 @dataclass(frozen=True)
@@ -304,12 +310,6 @@ class RoleTarget(Protocol):
 
     def patch_user(self, user_id: str, operations: list[dict[str, Any]]) -> None:
         """Apply a JSON Patch to a user."""
-
-    def personal_access_token_count(self, user_name: str) -> int:
-        """Return how many personal access tokens a user holds."""
-
-    def revoke_personal_access_tokens(self, user_name: str) -> None:
-        """Revoke every personal access token a user holds."""
 
 
 def sync(teams: Sequence[str], source: TeamSource, target: GroupTarget) -> SyncPlan:
@@ -444,17 +444,6 @@ def _apply_user(
         target.patch_user(user.id, operations)
     _log(f"{tag}user {user.name}: {verb} {', '.join(described)}")
 
-    if change.removed_roles:
-        tokens = target.personal_access_token_count(user.name)
-        if tokens:
-            if not dry_run:
-                target.revoke_personal_access_tokens(user.name)
-            action = "would revoke" if dry_run else "revoked"
-            _log(
-                f"{tag}user {user.name}: {action} {tokens} personal access "
-                f"token(s), as they lost {_names(change.removed_roles)}"
-            )
-
 
 def _names(roles: frozenset[str]) -> str:
     return "[" + ", ".join(sorted(roles)) + "]"
@@ -559,18 +548,6 @@ class OpenMetadata:
             headers={"Content-Type": JSON_PATCH_CONTENT_TYPE},
         )
 
-    def personal_access_token_count(self, user_name: str) -> int:
-        tokens = self._get("/v1/users/security/token", {"username": user_name})
-        return len(tokens["data"])
-
-    def revoke_personal_access_tokens(self, user_name: str) -> None:
-        self._request(
-            "PUT",
-            "/v1/users/security/token/revoke",
-            params={"username": user_name, "removeAll": "true"},
-            json={},
-        )
-
 
 class Keycloak:
     """Manages the children of one group in a Keycloak realm, and reads users."""
@@ -669,10 +646,26 @@ class Keycloak:
         self._request("DELETE", f"/users/{user_id}/groups/{group_id}")
 
 
+def _admin_credentials() -> tuple[str, str]:
+    """Return the OpenMetadata admin's Keycloak client id and secret.
+
+    :raises SyncError: If either is unset, which the optional secret references
+        leave them when the om-provisioner secret does not exist.
+    """
+    try:
+        return os.environ["OM_ADMIN_CLIENT_ID"], os.environ["OM_ADMIN_CLIENT_SECRET"]
+    except KeyError as exc:
+        msg = (
+            f"{exc.args[0]} is unset: the om-provisioner secret, which the"
+            " open_metadata application stack creates, is missing"
+        )
+        raise SyncError(msg) from exc
+
+
 def main() -> None:
     """Mirror every declared team, then reconcile every user's roles.
 
-    Exits non-zero if either half hits an API error.
+    Exits non-zero if either half fails.
     """
     server_url = os.environ["OM_SERVER_URL"]
     realm_url = os.environ["KEYCLOAK_REALM_URL"]
@@ -698,15 +691,10 @@ def main() -> None:
         unmatched = sum(len(group.unmatched) for group in plan.groups)
         _log(f"\nTeam sync complete. {unmatched} member(s) skipped with no account.\n")
 
-    dry_run = json.loads(os.environ["OM_ROLES_DRY_RUN"])
     try:
+        dry_run = json.loads(os.environ["OM_ROLES_DRY_RUN"])
         admin = OpenMetadata(
-            server_url,
-            client_credentials_token(
-                realm_url,
-                os.environ["OM_ADMIN_CLIENT_ID"],
-                os.environ["OM_ADMIN_CLIENT_SECRET"],
-            ),
+            server_url, client_credentials_token(realm_url, *_admin_credentials())
         )
         roles = reconcile_roles(
             keycloak,
@@ -714,8 +702,10 @@ def main() -> None:
             json.loads(os.environ["OM_ROLE_BY_REALM_ROLE"]),
             dry_run=dry_run,
         )
-    except (SyncError, requests.RequestException) as exc:
-        print(f"[fail] role reconcile: {exc}", file=sys.stderr)  # noqa: T201
+    except Exception as exc:  # noqa: BLE001
+        print(  # noqa: T201
+            f"[fail] role reconcile: {type(exc).__name__}: {exc}", file=sys.stderr
+        )
         failed = True
     else:
         _log(

@@ -46,7 +46,10 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
 # Role, and the claim replaces the roles the user had. The custom roles are
 # defined in substructure/open_metadata's access_control.py. The claim is read
 # only at login, so the team-keycloak-sync job there also resets every user's
-# roles to this mapping each hour. No realm role maps to "Admin": that job
+# roles to this mapping each hour. It reads realm roles (client roles would need
+# view-clients, which exposes every client secret), so a client role of
+# ol-open_metadata-client granted outside these composites is taken away each
+# hour until the next login. No realm role maps to "Admin": that job
 # clears isAdmin on anyone outside adminPrincipals, so admins come only from
 # initialAdmins in applications/open_metadata, and
 # ol-platform-admin gets DataEngineer (stewardship comes from the data-platform

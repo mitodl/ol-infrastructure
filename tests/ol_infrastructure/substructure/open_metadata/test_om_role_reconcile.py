@@ -1,9 +1,10 @@
 """Each OpenMetadata user must end up with the roles a login would give them now.
 
 OpenMetadata applies the Keycloak `roles` claim only at login, so the job has
-to take away what a user's realm roles no longer grant, clear a stray isAdmin,
-and revoke the tokens of anyone it demotes. Admin principals, bots and users
-with no Keycloak account keep their roles, and a dry run writes nothing.
+to take away what a user's realm roles no longer grant and clear a stray
+isAdmin. Admin principals, bots and users with no Keycloak account keep their
+roles, a dry run writes nothing, and a failure in the role half never stops the
+team half.
 """
 
 import json
@@ -12,6 +13,9 @@ from typing import Any
 import pytest
 import requests
 
+from ol_infrastructure.substructure.open_metadata.scripts import (
+    om_team_keycloak_sync,
+)
 from ol_infrastructure.substructure.open_metadata.scripts.om_team_keycloak_sync import (
     OpenMetadata,
     OpenMetadataUser,
@@ -49,11 +53,9 @@ class FakeOpenMetadata:
     def __init__(
         self,
         users: list[OpenMetadataUser],
-        tokens: dict[str, int] | None = None,
         admin_principals: frozenset[str] = ADMINS,
     ) -> None:
         self.users = {user.id: user for user in users}
-        self.tokens = tokens or {}
         self._admin_principals = admin_principals
         self.writes: list[tuple[str, ...]] = []
 
@@ -83,13 +85,6 @@ class FakeOpenMetadata:
                 )
         self.users[user_id] = user
 
-    def personal_access_token_count(self, user_name: str) -> int:
-        return self.tokens.get(user_name, 0)
-
-    def revoke_personal_access_tokens(self, user_name: str) -> None:
-        self.writes.append(("revoke", user_name))
-        self.tokens[user_name] = 0
-
     def roles_of(self, name: str) -> frozenset[str]:
         return next(user.roles for user in self.users.values() if user.name == name)
 
@@ -108,21 +103,19 @@ def _reconcile(om: FakeOpenMetadata, keycloak: FakeKeycloak, *, dry_run=False):
     return reconcile_roles(keycloak, om, ROLE_BY_REALM_ROLE, dry_run=dry_run)
 
 
-def test_a_demoted_user_loses_the_role_and_their_tokens():
-    om = FakeOpenMetadata(
-        [_user("alice", "DataConsumer", "DataEngineer")], tokens={"alice": 2}
-    )
+def test_a_demoted_user_loses_the_role():
+    om = FakeOpenMetadata([_user("alice", "DataConsumer", "DataEngineer")])
     # alice no longer holds ol-data-engineer.
     keycloak = FakeKeycloak({"alice@mit.edu": {"default-roles-ol-data-platform"}})
 
     _reconcile(om, keycloak)
 
-    assert om.writes == [("roles", "alice", "DataConsumer"), ("revoke", "alice")]
+    assert om.writes == [("roles", "alice", "DataConsumer")]
     assert om.roles_of("alice") == {"DataConsumer"}
 
 
-def test_a_user_who_only_gains_roles_keeps_their_tokens():
-    om = FakeOpenMetadata([_user("bob")], tokens={"bob": 1})
+def test_a_user_gains_the_roles_a_login_would_give():
+    om = FakeOpenMetadata([_user("bob")])
     keycloak = FakeKeycloak(
         {"bob@mit.edu": {"default-roles-ol-data-platform", "ol-platform-admin"}}
     )
@@ -132,19 +125,8 @@ def test_a_user_who_only_gains_roles_keeps_their_tokens():
     assert om.writes == [("roles", "bob", "DataConsumer", "DataEngineer")]
 
 
-def test_a_shrink_with_no_tokens_sends_no_revoke():
-    om = FakeOpenMetadata([_user("alice", "DataConsumer", "DataEngineer")])
-    keycloak = FakeKeycloak({"alice@mit.edu": {"default-roles-ol-data-platform"}})
-
-    _reconcile(om, keycloak)
-
-    assert om.writes == [("roles", "alice", "DataConsumer")]
-
-
 def test_a_user_already_in_line_gets_no_writes():
-    om = FakeOpenMetadata(
-        [_user("carol", "DataConsumer", "DataContributor")], tokens={"carol": 1}
-    )
+    om = FakeOpenMetadata([_user("carol", "DataConsumer", "DataContributor")])
     keycloak = FakeKeycloak(
         {"carol@mit.edu": {"default-roles-ol-data-platform", "ol-researcher"}}
     )
@@ -157,8 +139,7 @@ def test_a_user_already_in_line_gets_no_writes():
 
 def test_a_second_run_writes_nothing():
     om = FakeOpenMetadata(
-        [_user("alice", "DataEngineer"), _user("dave", is_admin=True)],
-        tokens={"alice": 1},
+        [_user("alice", "DataEngineer"), _user("dave", is_admin=True)]
     )
     keycloak = FakeKeycloak(
         {
@@ -184,9 +165,7 @@ def test_a_stray_is_admin_is_cleared():
 
 
 def test_admin_principals_are_left_alone():
-    om = FakeOpenMetadata(
-        [_user("admin", "DataSteward", is_admin=True)], tokens={"admin": 3}
-    )
+    om = FakeOpenMetadata([_user("admin", "DataSteward", is_admin=True)])
     # Nothing in Keycloak grants DataSteward.
     keycloak = FakeKeycloak({"admin@mit.edu": {"default-roles-ol-data-platform"}})
 
@@ -197,9 +176,7 @@ def test_admin_principals_are_left_alone():
 
 
 def test_a_user_with_no_keycloak_account_keeps_roles_but_not_admin(capsys):
-    om = FakeOpenMetadata(
-        [_user("erin", "DataEngineer", is_admin=True)], tokens={"erin": 1}
-    )
+    om = FakeOpenMetadata([_user("erin", "DataEngineer", is_admin=True)])
 
     plan = _reconcile(om, FakeKeycloak({}))
 
@@ -228,8 +205,7 @@ def test_a_role_openmetadata_lacks_is_dropped_like_at_login(capsys):
 
 def test_a_dry_run_writes_nothing_but_logs_each_change(capsys):
     om = FakeOpenMetadata(
-        [_user("alice", "DataEngineer"), _user("dave", is_admin=True)],
-        tokens={"alice": 2},
+        [_user("alice", "DataEngineer"), _user("dave", is_admin=True)]
     )
     keycloak = FakeKeycloak(
         {
@@ -244,7 +220,6 @@ def test_a_dry_run_writes_nothing_but_logs_each_change(capsys):
     assert len(plan.changes) == 2
     out = capsys.readouterr().out
     assert "alice: would set roles [DataEngineer] -> [DataConsumer]" in out
-    assert "alice: would revoke 2 personal access token(s)" in out
     assert "dave: would set roles [] -> [DataConsumer], isAdmin true -> false" in out
 
 
@@ -311,21 +286,70 @@ def test_human_users_asks_the_server_to_leave_out_bots(monkeypatch):
     assert kwargs["params"]["fields"] == "roles"
 
 
-def test_revoke_removes_every_personal_access_token_of_the_user(monkeypatch):
-    # UserResource.revokePersonalAccessToken in OpenMetadata 2.0.7: an admin
-    # names the user in ?username= and removeAll=true ignores the body's ids.
-    client, calls = _recording_client(monkeypatch, {"data": []})
+MAIN_ENV = {
+    "OM_SERVER_URL": "http://openmetadata:8585/api",
+    "OM_BOT_JWT_TOKEN": "bot-token",
+    "OM_TEAMS": '["analytics"]',
+    "OM_ROLES_DRY_RUN": "false",
+    "OM_ROLE_BY_REALM_ROLE": json.dumps(ROLE_BY_REALM_ROLE),
+    "KEYCLOAK_REALM_URL": "https://sso/realms/r",
+    "KEYCLOAK_ADMIN_URL": "https://sso/admin/realms/r",
+    "KEYCLOAK_CLIENT_ID": "team-sync",
+    "KEYCLOAK_CLIENT_SECRET": "team-sync-secret",  # pragma: allowlist secret
+    "KEYCLOAK_PARENT_GROUP_ID": "parent",
+    "OM_ADMIN_CLIENT_ID": "provisioner",
+    "OM_ADMIN_CLIENT_SECRET": "provisioner-secret",  # pragma: allowlist secret
+}
 
-    client.revoke_personal_access_tokens("alice")
 
-    assert calls == [
-        (
-            "PUT",
-            "http://openmetadata:8585/api/v1/users/security/token/revoke",
-            {
-                "params": {"username": "alice", "removeAll": "true"},
-                "json": {},
-                "timeout": 30,
-            },
-        )
-    ]
+@pytest.fixture
+def main_env(monkeypatch) -> list[str]:
+    """Run main() against stand-ins, recording which halves ran."""
+    for name, value in MAIN_ENV.items():
+        monkeypatch.setenv(name, value)
+    ran: list[str] = []
+    module = om_team_keycloak_sync
+    monkeypatch.setattr(module, "Keycloak", lambda **_kwargs: object())
+    monkeypatch.setattr(module, "client_credentials_token", lambda *_args: "token")
+
+    def sync(*_args):
+        ran.append("teams")
+        return module.SyncPlan(groups=(), delete=())
+
+    monkeypatch.setattr(module, "sync", sync)
+    return ran
+
+
+def test_a_missing_provisioner_secret_fails_only_the_role_half(
+    monkeypatch, main_env, capsys
+):
+    # The secret references are optional, so the variables are simply unset.
+    monkeypatch.delenv("OM_ADMIN_CLIENT_ID")
+    monkeypatch.delenv("OM_ADMIN_CLIENT_SECRET")
+
+    with pytest.raises(SystemExit) as exit_info:
+        om_team_keycloak_sync.main()
+
+    assert exit_info.value.code == 1
+    assert main_env == ["teams"]
+    err = capsys.readouterr().err
+    assert "[fail] role reconcile: SyncError: OM_ADMIN_CLIENT_ID is unset" in err
+    assert "om-provisioner" in err
+
+
+def test_an_unexpected_error_in_the_role_half_is_reported_not_raised(
+    monkeypatch, main_env, capsys
+):
+    # What frozenset(None) raises if adminPrincipals comes back null.
+    def reconcile_roles(*_args, **_kwargs):
+        msg = "'NoneType' object is not iterable"
+        raise TypeError(msg)
+
+    monkeypatch.setattr(om_team_keycloak_sync, "reconcile_roles", reconcile_roles)
+
+    with pytest.raises(SystemExit) as exit_info:
+        om_team_keycloak_sync.main()
+
+    assert exit_info.value.code == 1
+    assert main_env == ["teams"]
+    assert "[fail] role reconcile: TypeError" in capsys.readouterr().err

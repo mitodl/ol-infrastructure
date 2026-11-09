@@ -132,8 +132,8 @@ open_metadata_service_account_name = "openmetadata"
 # but 2.0.7 does not sync from them (JwtFilter.getUserRolesFromClaims) and
 # authorizes with the roles stored on the user. The team-keycloak-sync CronOMJob
 # in substructure/open_metadata resets those stored roles to the mapping every
-# hour, clears isAdmin on anyone outside adminPrincipals, and revokes the
-# personal access tokens of anyone whose roles shrink.
+# hour and clears isAdmin on anyone outside adminPrincipals, after which a
+# user's tokens carry only what they now hold.
 #
 # To demote an admin: remove them from initialAdmins below and from
 # adminPrincipals in the authorizerConfiguration row. That job then clears their
@@ -544,8 +544,8 @@ OLVaultK8SSecret(
 )
 
 # The provisioner's Keycloak client, whose service account is in initialAdmins,
-# for the role half of the same job: setting another user's roles or isAdmin and
-# revoking their tokens are admin-only. The ingestion service account that runs
+# for the role half of the same job: setting another user's roles or isAdmin is
+# admin-only. The ingestion service account that runs
 # the job can already read this namespace's secrets, the server's database
 # credentials among them, so this grants it nothing it could not do already.
 OLVaultK8SSecret(
