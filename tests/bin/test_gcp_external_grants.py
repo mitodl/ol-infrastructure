@@ -239,6 +239,32 @@ def test_a_partner_issued_key_does_not_vouch_for_its_project(grants, monkeypatch
     assert run.classify_project("ol-data-platform") is False
 
 
+def test_probe_partner_project_keeps_an_ad_hoc_partner_key_from_vouching(
+    grants, monkeypatch, tmp_path
+):
+    """`probe` has no manifest, so the partner flag has to come from the caller."""
+    monkeypatch.setattr(
+        grants,
+        "_project_parent",
+        lambda project_id, _cache: PARENTS.get(project_id, ""),
+    )
+    owners = []
+
+    def record_owner(_key, owner):
+        owners.append(owner)
+        return {"grants": [], "errors": {}}
+
+    monkeypatch.setattr(grants, "_probe_one", record_owner)
+    monkeypatch.setattr(grants, "_emit", lambda *_args, **_kwargs: None)
+    key_file = tmp_path / "partner.json"
+    key_file.write_text(json.dumps({**SA_KEY, "project_id": "global-alumni-365215"}))
+
+    grants.probe(key_file=[key_file], partner_project=["global-alumni-365215"])
+
+    (owner,) = owners
+    assert owner.classify_project("global-alumni-365215") is True
+
+
 def test_partner_entries_in_the_manifest_are_the_airbyte_partner_keys(grants):
     """A partner key missing this flag silently vouches for the partner's project."""
     partners = {entry["sops"] for entry in grants.ESTATE if "partner" in entry}

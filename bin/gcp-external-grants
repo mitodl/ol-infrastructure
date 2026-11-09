@@ -1063,6 +1063,12 @@ def probe(
         list[str] | None,
         cyclopts.Parameter(help="Project id(s) to force-classify as OL-owned."),
     ] = None,
+    partner_project: Annotated[
+        list[str] | None,
+        cyclopts.Parameter(
+            help="Project id(s) a partner issued a probed credential from."
+        ),
+    ] = None,
 ) -> None:
     """Enumerate external product grants for each supplied credential."""
     keys: list[dict[str, Any]] = []
@@ -1099,8 +1105,14 @@ def probe(
         )
         raise SystemExit(2)
 
+    # Same split probe-all makes from the manifest's `partner` flag, so a
+    # partner's key does not vouch for the partner's project.
+    partners = set(partner_project or ())
     owner = _ownership_for_run(
-        keys, tuple(owned_parent or ()), tuple(owned_project or ())
+        [key for key in keys if key.get("project_id") not in partners],
+        tuple(owned_parent or ()),
+        tuple(owned_project or ()),
+        [{"project_id": project_id} for project_id in partners],
     )
     _print_ownership_basis(owner)
     results = [_probe_one(key, owner) for key in keys] + [
