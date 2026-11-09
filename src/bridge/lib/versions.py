@@ -138,7 +138,7 @@ LOKI_CHART_VERSION = "7.5.0"
 # renovate: datasource=helm depName=mimir-distributed packageName=mimir-distributed registryUrl=https://grafana.github.io/helm-charts
 MIMIR_DISTRIBUTED_CHART_VERSION = "6.2.2"
 # renovate: datasource=docker depName=pdc-agent packageName=grafana/pdc-agent
-PDC_AGENT_VERSION = "0.0.67"
+PDC_AGENT_VERSION = "0.0.68"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.9.0"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
