@@ -7,6 +7,8 @@ declare local var.from_dictionary BOOL;
 declare local var.mode STRING;
 declare local var.target_query STRING;
 declare local var.learn STRING;
+declare local var.course STRING;
+declare local var.course_path STRING;
 
 # Send public v3 course URLs to their canonical Learn host
 set var.location = table.lookup(course_v3_redirects, req.http.host, "");
@@ -82,8 +84,15 @@ if (!var.from_dictionary) {
 set var.location = "";
 if (table.lookup_bool(learn_course_redirects, req.http.host, false)) {
   set var.learn = table.lookup(course_v3_redirects, req.http.host);
-  if (var.path ~ "^/courses/([^/]+)/((pages|resources|download|external-resources|video_galleries|lists)/.*|[^/]+\.[a-zA-Z0-9]+)?$") {
-    set var.location = var.learn + "/courses/o/" + re.group.1 + "/" + re.group.2;
+  # The outer group around the optional part always takes part in the match, so
+  # a course home page reads it as "" rather than an unset group.
+  if (var.path ~ "^/courses/([^/]+)/(((pages|resources|download|external-resources|video_galleries|lists)/.*|[^/]+\.[a-zA-Z0-9]+)?)$") {
+    set var.course = re.group.1;
+    set var.course_path = re.group.2;
+    # A department index page is not a course
+    if (!table.lookup_bool(departments, var.course, false)) {
+      set var.location = var.learn + "/courses/o/" + var.course + "/" + var.course_path;
+    }
   }
 }
 if (var.location == "" && (var.from_dictionary || var.path != req.url.path)) {
