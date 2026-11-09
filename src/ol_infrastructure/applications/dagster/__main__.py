@@ -3301,6 +3301,30 @@ dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
     ),
 )
 
+# Lakehouse dbt steps, which ol-data-platform's lakehouse/lib/executor.py runs in
+# their own pods. A dbt step pod that is preempted fails the step, and
+# run_retries re-runs the whole dbt selection (30-40 minutes on Trino, replacing
+# every table it builds). At dagster-run's -100 any ordinary pod can preempt it;
+# at 0 it ranks with ordinary pods, so only higher-priority ones can. Still
+# preemption_policy Never, so it queues for capacity like a run worker and
+# never evicts anything, the daemon included. Step pods naming a class that
+# doesn't exist are rejected, so this has to be applied before the code
+# location that references it deploys.
+dagster_dbt_step_priority_class = kubernetes.scheduling.v1.PriorityClass(
+    f"dagster-dbt-step-priority-class-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-dbt-step",
+        labels=k8s_global_labels.model_dump(),
+    ),
+    value=0,
+    preemption_policy="Never",
+    global_default=False,
+    description=(
+        "Dagster dbt step pods: not preemptible by ordinary pods, and never "
+        "preempt anything themselves."
+    ),
+)
+
 # How many runs the QueuedRunCoordinator will have in flight at once.
 #
 # This has to be sized against the environment's PgBouncer connection budget,
@@ -3775,6 +3799,29 @@ dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "app.kubernetes.io/component": "run_worker",
+            },
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[dagster_helm_release, dagster_user_code_release]),
+)
+
+# Step pods, launched by k8s_job_executor (lakehouse), carry
+# app.kubernetes.io/component: step_worker, so the run worker budget above does
+# not cover them and a drain evicts a step mid-run. The run worker that launched
+# it survives, but the step fails; for a dbt step that means run_retries
+# re-runs the whole selection. Same budget as run workers.
+dagster_step_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+    f"dagster-step-worker-pdb-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-step-worker-pdb",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+        max_unavailable=0,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "app.kubernetes.io/component": "step_worker",
             },
         ),
     ),
