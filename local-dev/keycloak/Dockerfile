@@ -29,9 +29,12 @@ RUN apt-get update \
 WORKDIR /theme
 # Dependencies first so a source-only change reuses the installed node_modules
 # layer. The checkout vendors its own Yarn under .yarn/releases (yarnPath in
-# .yarnrc.yml), so the image's stock yarn just hands off to it.
+# .yarnrc.yml). Node 26 images ship neither yarn nor corepack, so put that
+# release on PATH as `yarn`. The glob fails the build if the checkout ever
+# vendors more than one release.
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/ .yarn/
+RUN ln -s /theme/.yarn/releases/yarn-*.cjs /usr/local/bin/yarn
 RUN --mount=type=cache,target=/root/.yarn/berry/cache \
     yarn install --immutable --mode=skip-build
 # The project's postinstall (keycloakify sync-extensions) was skipped above
