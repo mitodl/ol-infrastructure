@@ -119,6 +119,7 @@ PIPELINE_ORDER: dict[str, dict[str, list[str]]] = {
             "ol-superset-deploy",
             "ol-data-contracts-sync",
             "ol-data-metrics-sync",
+            "ol-data-glossary-sync",
             "ol-analytics-api-pipeline",
             "pulumi-jupyterhub",
             "pulumi-jupyterhub-data",
