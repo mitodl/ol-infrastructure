@@ -107,7 +107,7 @@ CLICKHOUSE_OPERATOR_VERSION = "release-0.27.4"
 # between versions less than a year or two LTS lines apart. Stacks still on the
 # previous line pin clickhouse:version and set clickhouse:compatibility.
 # renovate: datasource=docker depName=altinity/clickhouse-server packageName=altinity/clickhouse-server
-CLICKHOUSE_SERVER_VERSION = "25.8.33.10002.altinitystable"
+CLICKHOUSE_SERVER_VERSION = "25.8.33.10003.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.8-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
