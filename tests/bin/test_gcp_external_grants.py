@@ -256,6 +256,7 @@ def test_probe_partner_project_keeps_an_ad_hoc_partner_key_from_vouching(
 
     monkeypatch.setattr(grants, "_probe_one", record_owner)
     monkeypatch.setattr(grants, "_emit", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(grants, "_require_gcloud_auth", lambda: None)
     key_file = tmp_path / "partner.json"
     key_file.write_text(json.dumps({**SA_KEY, "project_id": "global-alumni-365215"}))
 
@@ -263,6 +264,32 @@ def test_probe_partner_project_keeps_an_ad_hoc_partner_key_from_vouching(
 
     (owner,) = owners
     assert owner.classify_project("global-alumni-365215") is True
+
+
+@pytest.mark.parametrize("command", ["probe", "probe_all"])
+def test_broken_gcloud_auth_stops_the_run_before_classifying(
+    grants, monkeypatch, tmp_path, command
+):
+    """Every describe would fail, reading every unpinned project as third party."""
+
+    def expired():
+        message = "gcloud could not mint a token: Reauthentication failed."
+        raise grants.ProbeError(message)
+
+    monkeypatch.setattr(grants, "_gcloud_token", expired)
+    monkeypatch.setattr(
+        grants,
+        "_ownership_for_run",
+        lambda *_args: pytest.fail("classified with broken gcloud auth"),
+    )
+    key_file = tmp_path / "sa.json"
+    key_file.write_text(json.dumps(SA_KEY))
+    kwargs = {"key_file": [key_file]} if command == "probe" else {}
+
+    with pytest.raises(SystemExit) as exit_info:
+        getattr(grants, command)(**kwargs)
+
+    assert exit_info.value.code == 2
 
 
 def test_partner_entries_in_the_manifest_are_the_airbyte_partner_keys(grants):

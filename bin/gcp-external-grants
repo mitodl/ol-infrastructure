@@ -423,6 +423,20 @@ def _project_parent(project_id: str, cache: dict[str, str]) -> str:
     return parent
 
 
+def _require_gcloud_auth() -> None:
+    """Exit 2 when gcloud cannot authenticate.
+
+    Parentage comes from `gcloud projects describe`. With expired or missing
+    gcloud auth every describe fails, every project resolves to UNKNOWN_PARENT,
+    and every project not pinned or vouched for is reported as third party.
+    """
+    try:
+        _gcloud_token()
+    except ProbeError as error:
+        print(f"gcloud is needed to resolve project parents: {error}", file=sys.stderr)
+        raise SystemExit(2) from error
+
+
 class Ownership:
     """Decides whether a resource belongs to OL, from the project HIERARCHY.
 
@@ -1109,6 +1123,7 @@ def probe(
             file=sys.stderr,
         )
         raise SystemExit(2)
+    _require_gcloud_auth()
 
     # Same split probe-all makes from the manifest's `partner` flag, so a
     # partner's key does not vouch for the partner's project.
@@ -1193,6 +1208,7 @@ def probe_all(
     are labelled by the `client_email` that answered rather than by the name
     the manifest guessed.
     """
+    _require_gcloud_auth()
     vault_addr = os.environ.get("VAULT_ADDR", "(VAULT_ADDR unset)")
     print(f"# Vault: {vault_addr}", file=sys.stderr)
     print(f"# {len(ESTATE)} credentials queued\n", file=sys.stderr)
