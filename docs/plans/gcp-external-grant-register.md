@@ -72,7 +72,7 @@ What it asks per credential:
 | `shared_drives` | `drive.drives.list` | Shared Drives the credential is a member of, and at what level |
 | `shared_files` | `drive.files.list?q=sharedWithMe` | Individual files/folders shared with it, and who owns them |
 | `analytics` | `analyticsadmin.accountSummaries.list` | GA4 accounts/properties it can read |
-| `bigquery` | `bigquery.projects.list` | **Every project it holds BigQuery access in, including third parties' own projects** |
+| `bigquery` | `bigquery.projects.list` | **Every project it holds a project-level role in, including third parties' own projects** (not dataset-only grants) |
 | `youtube` | `youtube.channels.list?mine=true` | Channels it is authorised against |
 
 Effective access is read from each item's `capabilities`, not `permissions.list`.
@@ -85,7 +85,10 @@ where the answer matters most; **unconfirmed** — do not repeat it as fact.)
 
 The BigQuery probe is the one that earns the tool. `bigquery.projects.list` returns
 projects the *caller* can reach, so a third party's grant into their own project —
-otherwise discoverable only by asking them — shows up directly.
+otherwise discoverable only by asking them — shows up directly. It only returns
+projects where the caller holds a project-level role, so a grant on a single dataset
+in someone else's project does not surface that project; confirm those against the
+consumer's configuration, as for GCS.
 
 ### Verification performed, 2026-08-24
 

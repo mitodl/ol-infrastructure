@@ -22,7 +22,7 @@ What it asks, per credential:
   drive.files.list         -- individual files/folders shared with it, including
                               items resident in Shared Drives it can reach
   analyticsadmin           -- GA4 account/property summaries it can read
-  bigquery.projects.list   -- EVERY project it holds BigQuery access in,
+  bigquery.projects.list   -- every project it holds a project-level role in,
                               including projects owned by third parties. This is
                               the one that finds grants nobody on this side
                               issued and nobody on this side can re-issue.
@@ -47,6 +47,10 @@ CAVEATS, which decide how the output may be used:
   * GCS IS NOT COVERED. There is no cross-project "list buckets I can read" API.
     A bucket grant is invisible here and has to be confirmed against the
     consumer's own configuration.
+  * DATASET-ONLY BIGQUERY GRANTS ARE NOT COVERED. `projects.list` returns only
+    projects where the caller holds a project-level role, so access granted on a
+    single dataset (or table) in someone else's project does not surface the
+    project. Like GCS, confirm those against the consumer's configuration.
   * QUOTA IS NOT A GRANT. A granted quota increase attaches to the PROJECT and
     does not follow a consumer anywhere. It will never appear in this output and
     must not be conflated with the grants that do. See `gcp-credential-usage
@@ -717,10 +721,11 @@ def _probe_analytics(token: str, owner: Ownership) -> list[dict[str, Any]]:  # n
 
 
 def _probe_bigquery(token: str, owner: Ownership) -> list[dict[str, Any]]:
-    """Every project the credential holds BigQuery access in, ours or not.
+    """Every project the credential holds a project-level role in, ours or not.
 
     This is the probe that earns the tool: a third party's grant into their own
-    project is otherwise discoverable only by asking them.
+    project is otherwise discoverable only by asking them. A grant on a single
+    dataset does not list its project, so those are not found here.
     """
     grants: list[dict[str, Any]] = []
     page: str | None = None
