@@ -32,18 +32,35 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VCL_TESTS_DIR = REPO_ROOT.joinpath("tests", "vcl")
 
-# Release assets are pinned by checksum, so a version bump means updating the
-# digests too (``gh api repos/ysugimoto/falco/releases/tags/<tag>`` lists them).
-FALCO_VERSION = "v2.3.0"
-FALCO_SHA256 = {
-    # pragma: allowlist nextline secret
-    "darwin-amd64": "e62caa67731876e288a92edc44acbd4d718992e8b0c5b85ebdf9f7f432ce05a8",
-    # pragma: allowlist nextline secret
-    "darwin-arm64": "bddb89e465cb65d463986040c5d083c7d8eacaa4785655bfb8622c85e8cd0a8f",
-    # pragma: allowlist nextline secret
-    "linux-amd64": "9888d04cd63a6b1058ecf228997f7ee6a18480394bfa9e5e00c8d8f46d03d19f",
-    # pragma: allowlist nextline secret
-    "linux-arm64": "b559fb0772fc280337b03c7b9d9221a0bd89c274c7d917f4c0832e1578d05dfa",
+# Platform -> (release tag, sha256 of falco-<platform>.tar.gz). Renovate updates
+# the tag and digest together: the github-release-attachments datasource hashes
+# the same-named asset in the new release. Keep the comment, tag and digest in
+# this layout, which the falco manager in renovate.json5 matches.
+FALCO_RELEASES = {
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "darwin-amd64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "e62caa67731876e288a92edc44acbd4d718992e8b0c5b85ebdf9f7f432ce05a8",
+    ),
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "darwin-arm64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "bddb89e465cb65d463986040c5d083c7d8eacaa4785655bfb8622c85e8cd0a8f",
+    ),
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "linux-amd64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "9888d04cd63a6b1058ecf228997f7ee6a18480394bfa9e5e00c8d8f46d03d19f",
+    ),
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "linux-arm64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "b559fb0772fc280337b03c7b9d9221a0bd89c274c7d917f4c0832e1578d05dfa",
+    ),
 }
 DOWNLOAD_TIMEOUT_SECONDS = 120
 
@@ -189,9 +206,10 @@ def _platform() -> str:
     return f"{system}-{machine}"
 
 
-def _cache_dir() -> Path:
+def _cache_dir(version: str, digest: str) -> Path:
+    # Keyed by the digest too, so a re-pinned asset is downloaded again
     base = os.environ.get("XDG_CACHE_HOME") or Path.home().joinpath(".cache")
-    return Path(base).joinpath("ol-infrastructure", "falco", FALCO_VERSION)
+    return Path(base).joinpath("ol-infrastructure", "falco", f"{version}-{digest}")
 
 
 def _absolute_executable(command: str | Path) -> Path:
@@ -220,21 +238,21 @@ def ensure_falco() -> Path:
     """
     if override := os.environ.get("FALCO_BIN"):
         return _absolute_executable(override)
-    binary = _cache_dir().joinpath("falco")
+    platform_name = _platform()
+    version, expected = FALCO_RELEASES[platform_name]
+    binary = _cache_dir(version, expected).joinpath("falco")
     if binary.exists():
         return binary
 
-    platform_name = _platform()
-    expected = FALCO_SHA256[platform_name]
     url = (
         "https://github.com/ysugimoto/falco/releases/download/"
-        f"{FALCO_VERSION}/falco-{platform_name}.tar.gz"
+        f"{version}/falco-{platform_name}.tar.gz"
     )
     with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:  # noqa: S310
         archive = response.read()
     actual = hashlib.sha256(archive).hexdigest()
     if actual != expected:
-        msg = f"falco {FALCO_VERSION} {platform_name}: sha256 {actual} != {expected}"
+        msg = f"falco {version} {platform_name}: sha256 {actual} != {expected}"
         raise RuntimeError(msg)
 
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
