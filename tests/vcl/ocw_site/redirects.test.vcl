@@ -34,7 +34,8 @@ sub test_dictionary_keeps_query {
   set req.http.host = "ocw.mit.edu";
   set req.url = "/courses/this-course-at-mit/?utm_source=x";
   testing.call_subroutine("vcl_recv");
-  assert.error(307, "https://ocw.mit.edu/search/?f=Instructor%20Insights&s=-runs.best_start_date&utm_source=x");
+  // A long string, so %20 is compared as written rather than decoded
+  assert.error(307, {"https://ocw.mit.edu/search/?f=Instructor%20Insights&s=-runs.best_start_date&utm_source=x"});
 }
 
 // @scope: recv
