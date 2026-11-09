@@ -8,9 +8,8 @@ from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 # Publishes the business glossary declared in ol-data-platform's glossary/ to
 # production OpenMetadata, which the om_server_config Job in the open_metadata
-# substructure stack did until the glossary moved there. `ol-dbt glossary sync`
-# takes the same flags as `ol-dbt metrics sync`, so this passes the same
-# manifest and service.
+# substructure stack did until the glossary moved there. The glossary binds no
+# dbt models, so the build skips the manifest download the other two syncs do.
 #
 # The glossary's reviewers are the data-platform team and glossary-sync-bot is
 # not in it, so a term the sync creates or changes waits In Review for that
@@ -30,11 +29,10 @@ sync_pipeline = ol_dbt_openmetadata_sync_pipeline(
     task_name="ol-dbt-glossary-sync",
     sync_command=f"""\
 uv run --frozen --package ol-dbt-cli ol-dbt glossary sync \\
-    --service "Starburst Galaxy" \\
-    --manifest /tmp/manifest.json \\
     --glossary-dir {watched_checkout("glossary")}
 """,
     bot_credentials="openmetadata_glossary_bot",
+    download_manifest=False,
 )
 
 if __name__ == "__main__":
