@@ -818,12 +818,16 @@ Decided by the project owner since:
    - Per-app counts: a model call extension, `ol_memory_ext.model_calls.EmbeddingMeter`, adds
      to `ol_memory_embedding_calls_total`, `ol_memory_embedding_texts_total` and
      `ol_memory_embedding_estimated_input_tokens_total` on Hindsight's `/metrics`, labelled
-     `app`, `operation`, `model` and `success`. Tokens are characters / 4, since LiteLLM
-     reports none for this provider. No text, bank, learner or document id is recorded.
+     `app`, `operation`, `model` and `success`. Tokens are characters / 4: Hindsight's
+     LiteLLM SDK embeddings backend never reports provider input tokens, so a call's
+     `input_tokens` is 0 whatever LiteLLM returns. No text, bank, learner or document id is
+     recorded.
    - The app on a retain is the document id's `<app>.` prefix. On a recall it is the app the
-     validator passed for the request, which holds only while Hindsight embeds the query in
-     the request's context (a unit test covers it; QA has not shown it yet). Otherwise it is
-     `unknown`.
+     validator passed for the request. That relies on Hindsight awaiting `validate_recall`
+     inline before it embeds the query, and the embedding (run under `asyncio.gather`)
+     inheriting the request's context, which holds in the 1.2.0 source
+     (`memory_engine.py` ~9496 and ~9945). Only the QA `/metrics` check will confirm it.
+     Otherwise the app is `unknown`.
    - Not covered: no §4 attribution beyond the app (no `use_case`, no user), no Opik trace,
      and no budget count.
    - Gated per stack by `hindsight:embeddings_metering`: on in QA, off in Production until QA

@@ -6,6 +6,11 @@
 #   "pytest>=8",
 #   "pytest-asyncio>=0.24",
 # ]
+#
+# [tool.uv]
+# # 1.2.0 is the deployed image's version and is inside the repo's 7-day
+# # exclude-newer window until 2026-11-10.
+# exclude-newer-package = { hindsight-api-slim = "2026-11-04T00:00:00Z" }
 # ///
 """Unit tests for ol_memory_ext.model_calls.EmbeddingMeter.
 
@@ -169,7 +174,7 @@ def test_record_never_raises(meter, monkeypatch, caplog):
         raise ValueError(LEARNER_TEXT)
 
     monkeypatch.setattr(model_calls, "_app", fail)
-    caplog.set_level("DEBUG", logger="ol_memory_ext.model_calls")
+    caplog.set_level("WARNING", logger="ol_memory_ext.model_calls")
     meter.record(_call())
     assert "ValueError" in caplog.text
     assert LEARNER_TEXT not in caplog.text

@@ -7,8 +7,10 @@ three counters on the OpenTelemetry meter Hindsight serves at /metrics:
 - ``ol_memory.embedding.calls``: calls made;
 - ``ol_memory.embedding.texts``: texts sent;
 - ``ol_memory.embedding.estimated_input_tokens``: input characters / 4. Bedrock
-  bills Cohere Embed v4 by input token and LiteLLM reports none for it, so this
-  is an estimate; the dollar figure comes from Cost Explorer.
+  bills Cohere Embed v4 by input token, but Hindsight's LiteLLM SDK embeddings
+  backend never reports provider input tokens, so ``input_tokens`` is 0 whatever
+  LiteLLM returns. This is an estimate; the dollar figure comes from Cost
+  Explorer.
 
 Each is labelled with ``app``, ``operation`` (retain, recall, ...), ``model`` and
 ``success``. The app is the prefix of the call's document id, which the
@@ -76,8 +78,9 @@ class EmbeddingMeter(ModelCallExtension):
     def record(self, call: ModelCall) -> None:
         """Add one finished call to the counters.
 
-        Runs on the call path, so it only adds. A failure is logged and dropped:
-        metering must never fail a learner's retain or recall. The log line names
+        Runs on the call path, so it only adds. A failure is logged at WARNING,
+        where the deployed log level shows it, and dropped: metering must never
+        fail a learner's retain or recall. The log line names
         the exception type alone, since a message could quote the input.
         """
         try:
@@ -95,4 +98,4 @@ class EmbeddingMeter(ModelCallExtension):
                 math.ceil(_input_chars(call.input) / CHARS_PER_TOKEN), attributes
             )
         except Exception as exc:  # noqa: BLE001
-            logger.debug("embedding metering failed: %s", type(exc).__name__)
+            logger.warning("embedding metering failed: %s", type(exc).__name__)
