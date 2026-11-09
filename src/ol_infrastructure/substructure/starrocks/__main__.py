@@ -56,6 +56,12 @@ from ol_infrastructure.lib.pulumi_helper import (
     require_stack_output_value,
 )
 from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.substructure.starrocks.gravitino_catalog import (
+    CREDENTIAL_PLACEHOLDER,
+    GravitinoCatalog,
+    catalog_name,
+    governance_grants_sql,
+)
 from ol_infrastructure.substructure.starrocks.group_sync_job import (
     GROUP_PROVIDER_ADMIN_ROLE,
     create_group_sync_job,
@@ -330,6 +336,10 @@ _mysql_env: dict[str, pulumi.Input[str]] = {
 
 enable_data_lake = starrocks_config.get_bool("enable_data_lake_integration") or False
 oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
+gravitino_catalog_enabled = (
+    starrocks_config.get_bool("gravitino_catalog_enabled") or False
+)
+aws_region = starrocks_config.get("aws_region") or "us-east-1"
 
 # --- Iceberg catalogs -------------------------------------------------------
 # Each instance registers its own lake's catalog, and production also registers
@@ -373,7 +383,6 @@ _ICEBERG_CATALOG_ROLES = ("readonly", "app", "admin", *GOVERNANCE_ROLES)
 _catalog_mutable_props = {"aws.s3.use_aws_sdk_default_behavior": "true"}
 _iceberg_roles_sql = ""
 if enable_data_lake:
-    aws_region = starrocks_config.get("aws_region") or "us-east-1"
     _catalog_conn_props = (
         f'    "aws.glue.use_instance_profile" = "false",\n'
         f'    "aws.glue.region" = "{aws_region}",\n'
@@ -644,6 +653,106 @@ roles_setup_cmd = command.local.Command(
     triggers=[hashlib.sha256(_roles_sql.encode()).hexdigest()],
     opts=ResourceOptions(depends_on=_role_deps),
 )
+
+# --- Gravitino Iceberg REST catalog -----------------------------------------
+# The catalog people query through with their own identity; see
+# gravitino_catalog.py. It registers this environment's Gravitino catalog only.
+#
+# Same create/alter split as the Glue catalogs above, with one difference: the
+# CREATE has to carry the bootstrap credential, since it cannot initialize
+# without one. Its trigger hashes the SQL with a placeholder in the credential's
+# place, so a rotated secret changes only STARROCKS_SQL. That runs `update`
+# rather than a replacement: CREATE IF NOT EXISTS does nothing, and the
+# properties Command, whose SQL also changed, sets the new credential with
+# ALTER CATALOG. The catalog and its grants stay. StarRocks builds the new
+# connector before swapping it in, so a bad credential fails the ALTER and
+# leaves the old one serving.
+#
+# Unlike the Glue catalogs' grants, these re-run whenever the catalog is
+# re-created (its hash is in their trigger), and they are additive: narrowing
+# data_lake_access does not revoke what was granted here.
+if gravitino_catalog_enabled:
+    _gravitino = make_stack_reference(
+        pulumi_projects.GRAVITINO_APP, stack_info.name
+    ).require_output("gravitino")
+    _gravitino_client = vault_get_secret_output(
+        path="secret-operations/sso/gravitino-catalog",
+        with_lease_start_time=False,
+        opts=InvokeOptions(provider=_vault_provider),
+    )
+    _gravitino_catalog: pulumi.Output[GravitinoCatalog] = pulumi.Output.all(
+        _gravitino, _gravitino_client.data
+    ).apply(
+        lambda args: GravitinoCatalog(
+            name=catalog_name(stack_info.env_suffix),
+            uri=args[0]["iceberg_rest_uri"],
+            warehouse=args[0]["catalog"],
+            oauth2_server_uri=f"{args[1]['url']}/protocol/openid-connect/token",
+            aws_region=aws_region,
+        )
+    )
+    _bootstrap_credential: pulumi.Output[str] = pulumi.Output.secret(
+        _gravitino_client.data.apply(lambda d: f"{d['client_id']}:{d['client_secret']}")
+    )
+    _gravitino_create_hash = _gravitino_catalog.apply(
+        lambda c: hashlib.sha256(
+            c.create_sql(CREDENTIAL_PLACEHOLDER).encode()
+        ).hexdigest()
+    )
+    gravitino_catalog_setup = command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-gravitino-catalog-setup",
+        create=_exec_sql,
+        update=_exec_sql,
+        delete=_exec_delete_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": pulumi.Output.all(
+                _gravitino_catalog, _bootstrap_credential
+            ).apply(lambda args: args[0].create_sql(args[1])),
+            "STARROCKS_DELETE_SQL": (
+                f"DROP CATALOG IF EXISTS {catalog_name(stack_info.env_suffix)};"
+            ),
+        },
+        triggers=_gravitino_create_hash.apply(lambda h: [h]),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[starrocks_db_connection],
+        ),
+    )
+    command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-gravitino-catalog-properties",
+        create=_exec_sql,
+        update=_exec_sql,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": pulumi.Output.all(
+                _gravitino_catalog, _bootstrap_credential
+            ).apply(lambda args: args[0].alter_sql(args[1])),
+        },
+        triggers=pulumi.Output.all(_gravitino_catalog, _gravitino_create_hash).apply(
+            lambda args: [
+                hashlib.sha256(
+                    args[0].alter_sql(CREDENTIAL_PLACEHOLDER).encode()
+                ).hexdigest(),
+                args[1],
+            ]
+        ),
+        opts=ResourceOptions(depends_on=[gravitino_catalog_setup]),
+    )
+    _gravitino_grants_sql = governance_grants_sql(
+        catalog_name(stack_info.env_suffix), stack_info.env_suffix
+    )
+    # No delete step: dropping the catalog drops its grants.
+    command.local.Command(
+        f"starrocks-{stack_info.env_suffix}-gravitino-catalog-grants",
+        create=_exec_sql,
+        update=_exec_sql,
+        environment={**_mysql_env, "STARROCKS_SQL": _gravitino_grants_sql},
+        triggers=_gravitino_create_hash.apply(
+            lambda h: [hashlib.sha256(_gravitino_grants_sql.encode()).hexdigest(), h]
+        ),
+        opts=ResourceOptions(depends_on=[gravitino_catalog_setup, roles_setup_cmd]),
+    )
 
 # --- b2b_analytics database ---------------------------------------------
 # Dedicated database (default_catalog) backing the B2B self-serve analytics
@@ -991,10 +1100,10 @@ if oidc_enabled:
     # iceberg.catalog.security = JWT is proven to work (StarRocks 4.1.3 against
     # Lakekeeper v0.13.1, 2026-08-07: Lakekeeper's audit log showed two distinct
     # end-user subjects on list_namespaces/create_namespace). It is inert for
-    # this catalog, which is iceberg.catalog.type = glue and has no per-session
-    # token path at all.
+    # the Glue catalogs, which have no per-session token path at all; the
+    # Gravitino catalog (gravitino_catalog.py) is the one it serves.
     #
-    # Two caveats for whoever wires up the REST catalog:
+    # Two caveats that shape that catalog:
     #   - security = JWT supplies no credential of its own, which breaks two
     #     different things. Both are cured by pairing it with
     #     iceberg.catalog.oauth2.credential as a bootstrap:
@@ -1010,8 +1119,8 @@ if oidc_enabled:
     #         RESTSessionCatalog is initialized without an OAuth2 auth manager
     #         and the per-session token buildContext() produces is dropped.
     #         Requests then fail at namespace resolution with "missing bearer
-    #         token". This is StarRocks#75792; the fix is #75811, open and
-    #         unreviewed since 2026-07-03.
+    #         token". This is StarRocks#75792; the fix is #75811, still open
+    #         and unmerged on 2026-11-09, so 4.1.7 does not have it.
     #   - The FE metadata cache bypasses the catalog, so catalog-side authz is
     #     not consulted on cached reads. StarRocks GRANTs stay the query-time
     #     filter.
