@@ -38,6 +38,23 @@ repos:
     - types-requests
     files: ^local-dev/apps/[^/]+/pulumi/__main__\.py$
     require_serial: true
+    # Lints each Fastly service's VCL, rendered from the snippets its stack
+    # deploys, and runs tests/vcl/<service>/*.test.vcl. Downloads the pinned
+    # falco release on first use; see src/ol_infrastructure/lib/falco.py.
+  - id: falco-vcl
+    name: falco (Fastly VCL lint and tests)
+    entry: python bin/falco-vcl
+    language: python
+    additional_dependencies:
+    - cyclopts==5.3.3
+    files: |
+      (?x)(
+        \.vcl$|
+        ^src/ol_infrastructure/applications/[^/]+/(vcl\.py|redirect_dict\.json)$|
+        ^src/ol_infrastructure/lib/falco\.py$|
+        ^bin/falco-vcl$
+      )
+    pass_filenames: false
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:

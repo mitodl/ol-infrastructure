@@ -74,7 +74,9 @@ def _snippet_calls(tree):
                 if isinstance(func, ast.Attribute)
                 else getattr(func, "id", "")
             )
-            if called in {"ServiceVclSnippetArgs", "vcl_snippet"}:
+            # VclSnippet holds a name that later reaches vcl_snippet() as a
+            # variable, so the literal is only visible here.
+            if called in {"ServiceVclSnippetArgs", "vcl_snippet", "VclSnippet"}:
                 yield called, node
 
 
