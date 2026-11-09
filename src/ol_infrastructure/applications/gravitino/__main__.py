@@ -13,6 +13,7 @@ the grant reconciler CronJob this stack deploys
 holding the management API's client certificate.
 """
 
+import base64
 import hashlib
 import json
 from pathlib import Path
@@ -392,7 +393,13 @@ ca_certificate = kubernetes.apiextensions.CustomResource(
     f"gravitino-ca-certificate-{stack_info.env_suffix}",
     api_version="cert-manager.io/v1",
     kind="Certificate",
-    metadata={"name": "gravitino-ca", "namespace": NAMESPACE, "labels": k8s_labels},
+    metadata={
+        "name": "gravitino-ca",
+        "namespace": NAMESPACE,
+        "labels": k8s_labels,
+        # The CA Secret is read back below, so it has to exist before that read.
+        "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+    },
     spec={
         "isCA": True,
         "commonName": f"gravitino-ca-{stack_info.env_suffix}",
@@ -417,6 +424,18 @@ ca_issuer = kubernetes.apiextensions.CustomResource(
     metadata={"name": "gravitino-ca", "namespace": NAMESPACE, "labels": k8s_labels},
     spec={"ca": {"secretName": CA_SECRET_NAME}},
     opts=ResourceOptions(depends_on=[ca_certificate]),
+)
+# StarRocks has to trust this CA for the Iceberg REST port, and with no
+# trust-manager on the data clusters only its certificate crosses namespaces, as
+# a stack output (the ClickHouse CA reaches Opik the same way). The read also
+# brings back the CA key, which stays a secret output encrypted in this state.
+# The id waits on the Certificate so a first preview defers the read.
+ca_secret = kubernetes.core.v1.Secret.get(
+    f"gravitino-ca-secret-{stack_info.env_suffix}",
+    ca_certificate.id.apply(lambda _: f"{NAMESPACE}/{CA_SECRET_NAME}"),
+)
+ca_certificate_pem = Output.unsecret(
+    ca_secret.data.apply(lambda data: base64.b64decode(data["ca.crt"]).decode())
 )
 
 keystore_password_secret = kubernetes.core.v1.Secret(
@@ -971,6 +990,7 @@ export(
         "catalog": CATALOG,
         "namespace": NAMESPACE,
         "ca_secret_name": CA_SECRET_NAME,
+        "ca_certificate_pem": ca_certificate_pem,
         "reconcile_client_tls_secret_name": CLIENT_TLS_SECRET_NAME,
         "pod_role_arn": gravitino_auth_binding.irsa_role.arn,
         "vending_role_arn": gravitino_vending_role.role.arn,

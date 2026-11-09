@@ -587,6 +587,62 @@ if starrocks_config.get_bool("oidc_enabled"):
         {"name": _oidc_group_cm_name, "mountPath": "/opt/starrocks/fe/conf/groups"}
     ]
 
+# The FE's Iceberg REST client verifies Gravitino's certificate against the JVM
+# default trust store, and that certificate comes from a CA local to the
+# gravitino namespace. javax.net.ssl.trustStore replaces the default store
+# rather than adding to it, and the FE still needs the public CAs for AWS and
+# Keycloak, so the entrypoint imports the Gravitino CA into a copy of the JDK's
+# cacerts before starting the FE. The copy is made at container start, so a new
+# CA reaches the FE only when its pods restart.
+gravitino_catalog_enabled = (
+    starrocks_config.get_bool("gravitino_catalog_enabled") or False
+)
+FE_TRUST_STORE_DIR = "/opt/starrocks/truststore"
+FE_TRUST_STORE_PATH = f"{FE_TRUST_STORE_DIR}/cacerts"
+GRAVITINO_CA_MOUNT_PATH = "/etc/starrocks/gravitino-ca"
+# The JDK's published default for cacerts, not a credential.
+JDK_TRUST_STORE_PASSWORD = "changeit"  # pragma: allowlist secret  # noqa: S105
+fe_trust_store_jvm_opts = ""
+gravitino_ca_configmap: kubernetes.core.v1.ConfigMap | None = None
+if gravitino_catalog_enabled:
+    gravitino_stack = make_stack_reference(projects.GRAVITINO, stack_info.name)
+    _gravitino_ca_cm_name = f"{stack_info.env_prefix}-starrocks-gravitino-ca"
+    gravitino_ca_configmap = kubernetes.core.v1.ConfigMap(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-gravitino-ca-cm",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=_gravitino_ca_cm_name,
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        data={
+            "ca.crt": gravitino_stack.require_output("gravitino")["ca_certificate_pem"]
+        },
+    )
+    _fe_trust_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
+    _fe_trust_spec["configMaps"] = [
+        *_fe_trust_spec.get("configMaps", []),
+        {"name": _gravitino_ca_cm_name, "mountPath": GRAVITINO_CA_MOUNT_PATH},
+    ]
+    _fe_trust_spec["emptyDirs"] = [
+        {"name": "fe-truststore", "mountPath": FE_TRUST_STORE_DIR}
+    ]
+    _fe_trust_spec["entrypoint"] = {
+        "script": (
+            "#!/bin/bash\n"
+            "set -euo pipefail\n"
+            f'cp "$JAVA_HOME/lib/security/cacerts" {FE_TRUST_STORE_PATH}\n'
+            '"$JAVA_HOME/bin/keytool" -importcert -noprompt -alias gravitino-ca'
+            f" -file {GRAVITINO_CA_MOUNT_PATH}/ca.crt"
+            f" -keystore {FE_TRUST_STORE_PATH}"
+            f" -storepass {JDK_TRUST_STORE_PASSWORD}\n"
+            'exec /opt/starrocks/fe_entrypoint.sh "$FE_SERVICE_NAME"\n'
+        )
+    }
+    fe_trust_store_jvm_opts = (
+        f" -Djavax.net.ssl.trustStore={FE_TRUST_STORE_PATH}"
+        f" -Djavax.net.ssl.trustStorePassword={JDK_TRUST_STORE_PASSWORD}"
+    )
+
 if starrocks_config.get_bool("use_be"):
     # Shared-nothing configuration
     be_config = starrocks_config.get_object("be_config") or {}
@@ -814,7 +870,7 @@ _FE_CONFIG_BASE = (
     # keeping CPU available for query planning and Thrift RPC handling.
     # -Xms=Xmx pre-allocates heap at startup to avoid resize churn during init.
     f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true'
-    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m"
+    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m{fe_trust_store_jvm_opts}"
     ' -XX:+UseZGC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
@@ -1062,6 +1118,7 @@ starrocks_release = kubernetes.helm.v3.Release(
             starrocks_root_password_secret,
             starrocks_auth_binding,
             *([ssl_keystore_password_secret] if ssl_keystore_password_secret else []),
+            *([gravitino_ca_configmap] if gravitino_ca_configmap else []),
         ],
     ),
 )
