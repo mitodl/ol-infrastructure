@@ -8,6 +8,8 @@ may be granted more than SELECT.
 
 import re
 
+import pytest
+
 from ol_infrastructure.lib.data_lake_access import (
     GOVERNANCE_LAYER_ACCESS,
     layer_database,
@@ -47,10 +49,12 @@ def test_placeholder_sql_does_not_depend_on_the_credential() -> None:
     )
 
 
-def test_credential_is_escaped_for_a_double_quoted_literal() -> None:
-    sql = CATALOG.alter_sql('id:se"cr\\et')
-
-    assert f'"{CREDENTIAL_PROPERTY}" = "id:se\\"cr\\\\et"' in sql
+@pytest.mark.parametrize("credential", ['id:se"cret', "id:se\\cret", "id:sé", "id:\n"])
+def test_credential_starrocks_would_unescape_differently_is_refused(
+    credential: str,
+) -> None:
+    with pytest.raises(ValueError, match="printable ASCII"):
+        CATALOG.alter_sql(credential)
 
 
 def test_vended_credentials_without_the_irsa_fallback() -> None:

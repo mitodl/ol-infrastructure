@@ -14,7 +14,7 @@ The property names are the 4.1.7 FE's (``IcebergRESTCatalog`` and
 handing the rest to Iceberg's ``RESTSessionCatalog``.
 """
 
-import json
+import re
 from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,10 +43,17 @@ def catalog_name(env_suffix: str) -> str:
     return f"ol_governed_lake_{env_suffix}"
 
 
+_SAFE_LITERAL = re.compile(r"[ -~]*")
+
+
 def _literal(value: str) -> str:
-    # json.dumps()[1:-1] escapes quotes and backslashes for a SQL double-quoted
-    # literal, should a rotated client secret contain either.
-    return json.dumps(value)[1:-1]
+    # StarRocks unescapes only a few backslash sequences (AstBuilder
+    # escapeBackSlash), so an escaped non-ASCII or control character would
+    # arrive altered. Refuse those, and '"' and '\', instead of escaping them.
+    if not _SAFE_LITERAL.fullmatch(value) or '"' in value or "\\" in value:
+        msg = "catalog property values must be printable ASCII without '\"' or '\\'"
+        raise ValueError(msg)
+    return value
 
 
 def _properties_sql(properties: Mapping[str, str]) -> str:
@@ -78,6 +85,13 @@ class GravitinoCatalog(BaseModel):
         also drops every user's token (StarRocks#75792). The credential needs no
         Gravitino grants, and must hold none: StarRocks commits an INSERT through
         this catalog as the credential, not as the user.
+
+        StarRocks 4.1.7 does not redact this property: CREATE and ALTER CATALOG
+        write it in plaintext to fe.audit.log (SqlCredentialRedactor covers only
+        PrintableMap.SENSITIVE_KEY), and CatalogMgr logs the raw config to
+        fe.log on every ALTER that changes something, on each FE. Those files
+        stay on the FE log volume (no AuditLoader, not shipped to Loki). That is
+        tolerable only because the credential holds no Gravitino grants.
 
         :param credential: ``<client_id>:<client_secret>`` of the
             ol-gravitino-catalog Keycloak client, or ``CREDENTIAL_PLACEHOLDER``.
@@ -134,6 +148,14 @@ def governance_grants_sql(catalog: str, env_suffix: str) -> str:
     here, and readonly / app / admin get nothing. Scope comes from
     ``data_lake_access``, the same mapping Gravitino's grants are built from;
     a role it gives nothing gets no USAGE either.
+
+    SELECT-only does not hold for roles that also hold the built-in
+    ``db_admin`` (ol_platform_admin, ol_data_engineer): it carries every
+    privilege on every catalog, external ones included, and cannot be revoked
+    per catalog. A write by one of them is planned, writes data files with the
+    BE's own S3 access, and then fails at commit because the bootstrap
+    principal holds no Gravitino grants, leaving orphan files. Both roles
+    already write through the Glue catalog, so this is no new access.
 
     A per-database grant on an external catalog stores the database name
     without resolving it, so these need no call to Gravitino, which the admin
