@@ -1,5 +1,7 @@
 """Run the falco VCL suites and guard how their main VCL is rendered."""
 
+from pathlib import Path
+
 import pytest
 
 from ol_infrastructure.lib.falco import (
@@ -7,6 +9,7 @@ from ol_infrastructure.lib.falco import (
     VCL_TESTS_DIR,
     VclSnippet,
     VclSuite,
+    ensure_falco,
     load_suite,
     render_main_vcl,
     run_suite,
@@ -19,6 +22,18 @@ def test_suite_lints_and_passes(name: str):
     results = run_suite(load_suite(name))
     failures = [f"falco {r.command}:\n{r.output}" for r in results if not r.ok]
     assert not failures, "\n".join(failures)
+
+
+def test_relative_falco_bin_is_resolved_before_the_cwd_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    binary = tmp_path.joinpath("tools", "falco")
+    binary.parent.mkdir()
+    binary.write_text("#!/bin/sh\n")
+    binary.chmod(0o755)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FALCO_BIN", "./tools/falco")
+    assert ensure_falco() == binary.resolve()
 
 
 def test_every_test_directory_has_a_suite():
@@ -47,11 +62,28 @@ def test_init_snippets_and_dictionaries_are_top_level():
     suite = VclSuite(
         name="tables",
         snippets=[VclSnippet(name="t", type="init", content="table t { }")],
-        dictionaries={"redirects": {'/a"b': "301|keep|/c"}},
+        dictionaries={"redirects": {"/a": '301|keep|/c?d="e%20f"'}},
     )
     vcl = render_main_vcl(suite)
     assert vcl.index("table t { }") < vcl.index("sub vcl_recv")
-    assert 'table redirects {\n  "/a\\"b": "301|keep|/c",\n}' in vcl
+    # A long string keeps quotes and %-escapes as written, like Fastly dictionaries
+    assert 'table redirects {\n  "/a": {"301|keep|/c?d="e%20f""},\n}' in vcl
+
+
+@pytest.mark.parametrize(
+    ("items", "match"),
+    [
+        ({"k": 'a"}b'}, "long string"),
+        ({"/a%20b": "v"}, "string literal"),
+        ({'/a"b': "v"}, "string literal"),
+    ],
+)
+def test_dictionary_entries_vcl_cannot_hold_are_rejected(
+    items: dict[str, str], match: str
+):
+    suite = VclSuite(name="bad", snippets=[], dictionaries={"d": items})
+    with pytest.raises(ValueError, match=match):
+        render_main_vcl(suite)
 
 
 def test_unknown_snippet_type_is_rejected():
