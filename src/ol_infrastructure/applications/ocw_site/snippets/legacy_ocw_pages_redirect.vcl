@@ -2,6 +2,7 @@ declare local var.path STRING;
 declare local var.course STRING;
 declare local var.section STRING;
 declare local var.page STRING;
+declare local var.base STRING;
 
 # Pre-2021 course URLs put sections and video pages straight under the course:
 #   /courses/<course>/<section>/         -> /courses/<course>/pages/<section>/
@@ -18,10 +19,16 @@ if (beresp.status == 404) {
     # The targets live under pages/ and resources/, so a 404 there is final.
     # Anything else would redirect to itself or bounce between the two.
     if (var.section != "pages" && var.section != "resources") {
-      if (var.page == "") {
-        error 301 "https://" + req.http.host + "/courses/" + var.course + "/pages/" + var.section + "/";
+      # Hosts that send courses to Learn get the Learn URL in this one hop
+      if (table.lookup_bool(learn_course_redirects, req.http.host, false)) {
+        set var.base = table.lookup(course_v3_redirects, req.http.host) + "/courses/o/" + var.course;
+      } else {
+        set var.base = "https://" + req.http.host + "/courses/" + var.course;
       }
-      error 301 "https://" + req.http.host + "/courses/" + var.course + "/resources/" + var.page + "/";
+      if (var.page == "") {
+        error 301 var.base + "/pages/" + var.section + "/";
+      }
+      error 301 var.base + "/resources/" + var.page + "/";
     }
   }
   error 901 "Fastly Internal"; # Let the synthetic 404 take over
