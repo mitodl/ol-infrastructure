@@ -49,7 +49,9 @@ def test_placeholder_sql_does_not_depend_on_the_credential() -> None:
     )
 
 
-@pytest.mark.parametrize("credential", ['id:se"cret', "id:se\\cret", "id:sé", "id:\n"])
+@pytest.mark.parametrize(
+    "credential", ['id:se"cret', "id:se\\cret", "id:sé", "id:\n", ""]
+)
 def test_credential_starrocks_would_unescape_differently_is_refused(
     credential: str,
 ) -> None:

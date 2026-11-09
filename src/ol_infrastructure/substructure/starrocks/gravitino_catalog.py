@@ -43,7 +43,7 @@ def catalog_name(env_suffix: str) -> str:
     return f"ol_governed_lake_{env_suffix}"
 
 
-_SAFE_LITERAL = re.compile(r"[ -~]*")
+_SAFE_LITERAL = re.compile(r"[ -~]+")
 
 
 def _literal(value: str) -> str:
@@ -86,12 +86,15 @@ class GravitinoCatalog(BaseModel):
         Gravitino grants, and must hold none: StarRocks commits an INSERT through
         this catalog as the credential, not as the user.
 
-        StarRocks 4.1.7 does not redact this property: CREATE and ALTER CATALOG
-        write it in plaintext to fe.audit.log (SqlCredentialRedactor covers only
-        PrintableMap.SENSITIVE_KEY), and CatalogMgr logs the raw config to
-        fe.log on every ALTER that changes something, on each FE. Those files
-        stay on the FE log volume (no AuditLoader, not shipped to Loki). That is
-        tolerable only because the credential holds no Gravitino grants.
+        StarRocks 4.1.7 does not redact this property: SqlCredentialRedactor's
+        key set, seeded from PrintableMap.SENSITIVE_KEY, does not include it.
+        CREATE and ALTER CATALOG write it in plaintext to fe.audit.log, a
+        failed one also to fe.log, and CatalogMgr logs the raw config to fe.log
+        on every ALTER that changes something, on each FE. The FE sets no
+        LOG_CONSOLE and there is no AuditLoader, so those files stay on the FE
+        log volume rather than in Loki. That is tolerable only because the
+        credential holds no Gravitino grants. Upstream: StarRocks#82691 (fix
+        #82692) for the audit log, #78519 for the CatalogMgr log line.
 
         :param credential: ``<client_id>:<client_secret>`` of the
             ol-gravitino-catalog Keycloak client, or ``CREDENTIAL_PLACEHOLDER``.
@@ -155,7 +158,10 @@ def governance_grants_sql(catalog: str, env_suffix: str) -> str:
     per catalog. A write by one of them is planned, writes data files with the
     BE's own S3 access, and then fails at commit because the bootstrap
     principal holds no Gravitino grants, leaving orphan files. Both roles
-    already write through the Glue catalog, so this is no new access.
+    already write through the Glue catalog, so this is no new data access.
+    db_admin also lets them DROP this catalog, which drops every grant on it
+    and is not re-created until a trigger changes, or ALTER its URI or token
+    endpoint, which redirects the credential and every user's token.
 
     A per-database grant on an external catalog stores the database name
     without resolving it, so these need no call to Gravitino, which the admin
