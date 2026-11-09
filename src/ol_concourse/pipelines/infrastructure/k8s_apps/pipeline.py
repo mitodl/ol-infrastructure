@@ -885,18 +885,18 @@ def _build_legacy_app_pipeline(
         else PipelineFragment(resource_types=[], resources=[], jobs=[])
     )
 
-    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {}
+    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep | TryStep]] = {
+        0: [],
+        1: [_release_marker_task(app_name, ol_infra_repo)],
+    }
     if fastly_qa is not None and fastly_prod is not None:
         purge_params = _fastly_purge_params(pipeline_parameters.fastly_purge_scope)
-        qa_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        qa_purge_steps.append(
+        additional_post_steps[0].append(
             PutStep(put=fastly_qa.name, params=purge_params, no_get=True)
         )
-        prod_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        prod_purge_steps.append(
+        additional_post_steps[1].append(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
-        additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
 
     qa_and_production_fragment = pulumi_jobs_chain(
         refresh_stack=pipeline_parameters.refresh_stack,
@@ -918,6 +918,7 @@ def _build_legacy_app_pipeline(
                 load_var="image_tag", file=f"{app_rc_image.name}/tag", reveal=True
             ),
         ],
+        custom_dependencies={1: [_release_marker_start_task()]},
         additional_env_vars={
             f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
@@ -1498,6 +1499,78 @@ def _cache_bust_task() -> TaskStep:
     )
 
 
+_RELEASE_MARKER_SCRIPT = (
+    Path(__file__).parent / "scripts" / "grafana_release_marker.py"
+).read_text()
+RELEASE_MARKER_START_TASK_NAME = "release-marker-start"
+RELEASE_MARKER_TASK_NAME = "grafana-release-marker"
+RELEASE_MARKER_DIR = "release-marker"
+# Written to Vault by the grafana-alerting Production stack (release_markers.py).
+GRAFANA_ANNOTATIONS_URL = "((grafana_annotations.url))"
+GRAFANA_ANNOTATIONS_TOKEN = "((grafana_annotations.token))"  # noqa: S105
+
+
+def _release_marker_start_task() -> TryStep:
+    """Record when the Production rollout starts, for the release marker.
+
+    The last dependency of the Production job, so the time is taken just
+    before the Pulumi step that rolls the pods. Wrapped in a ``try`` so that
+    failing to pull the task image cannot block a deploy; the marker step then
+    finds no start time and fails inside its own ``try``.
+    """
+    return TryStep(
+        try_=TaskStep(
+            task=Identifier(RELEASE_MARKER_START_TASK_NAME),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=TASK_IMAGE,
+                outputs=[Output(name=Identifier(RELEASE_MARKER_DIR))],
+                params={"OUTPUT_DIR": RELEASE_MARKER_DIR},
+                run=Command(
+                    path="sh",
+                    args=["-euc", 'date +%s > "$OUTPUT_DIR/started_at"'],
+                ),
+            ),
+        )
+    )
+
+
+def _release_marker_task(app_name: str, ol_infra_repo: Resource) -> TryStep:
+    """Mark a Production release on Grafana dashboards. See the script's docstring.
+
+    The first Production post-step: Pulumi has waited for the rollout, so the
+    marker spans it, and a later post-step that fails (the release finish, the
+    Fastly purge) cannot cost a live release its marker. Wrapped in a ``try``
+    because the release has shipped by the time this runs, and a red
+    Production job would read as a failed deploy.
+    """
+    return TryStep(
+        try_=TaskStep(
+            task=Identifier(RELEASE_MARKER_TASK_NAME),
+            attempts=3,
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=TASK_IMAGE,
+                inputs=[
+                    Input(name=Identifier(RELEASE_MARKER_DIR)),
+                    Input(name=ol_infra_repo.name),
+                ],
+                params={
+                    "APP_NAME": app_name,
+                    "ENVIRONMENT": "production",
+                    "VERSION": "((.:image_tag))",
+                    "STARTED_AT_FILE": f"{RELEASE_MARKER_DIR}/started_at",
+                    "INFRA_REF_FILE": f"{ol_infra_repo.name}/.git/ref",
+                    "INFRA_REPO_URL": ol_infra_repo.source["uri"],
+                    "GRAFANA_URL": GRAFANA_ANNOTATIONS_URL,
+                    "GRAFANA_TOKEN": GRAFANA_ANNOTATIONS_TOKEN,
+                },
+                run=Command(path="python3", args=["-c", _RELEASE_MARKER_SCRIPT]),
+            ),
+        )
+    )
+
+
 def _classify_promotion_task(
     app_name: str,
     release_res: Resource,
@@ -2068,6 +2141,7 @@ def _build_release_resource_app_pipeline(
         ),
     ]
     prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
+        _release_marker_task(app_name, ol_infra_repo),
         # Mark the Production GitHub Deployment as successful, and say so on the
         # release issue. Closing that issue authorizes the promotion; it does
         # not show the release is live, and a closed issue is easy to misread as
@@ -2222,6 +2296,7 @@ def _build_release_resource_app_pipeline(
                     put=deployment_prod.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
                 ),
+                _release_marker_start_task(),
             ],
         },
         additional_env_vars={

@@ -7,6 +7,8 @@ Bootstraps the Grafana provider and delegates to submodules:
                   QA and Production only)
   dashboards    — Grafana dashboards (all stacks)
   pingdom_checks — Pingdom uptime checks via dynamic provider (production stack only)
+  release_markers — service account the k8s app Production deploy jobs use to
+                    post release annotations (production stack only)
 
 See AGENTS.md in this directory for a full description of the architecture.
 """
@@ -23,8 +25,10 @@ from ol_infrastructure.infrastructure.grafana_alerting import (
     log_rules,
     metric_rules,
     pingdom_checks,
+    release_markers,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.vault import setup_vault_provider
 
 stack_info = parse_stack()
 is_production = stack_info.env_suffix == "production"
@@ -52,3 +56,5 @@ if is_production:
         api_token=Output.secret(grafana_secrets["pingdom_api_token"]),
         integration_ids=grafana_secrets.get("pingdom_integration_ids", []),
     )
+    setup_vault_provider(stack_info)
+    release_markers.create(grafana_secrets["grafana_url"], resource_opts)
