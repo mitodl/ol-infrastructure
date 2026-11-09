@@ -34,6 +34,9 @@ PIPELINE_CONFIGS = {
         "client_repo_uri": "git@github.com:mitodl/mit-learn-api-clients",
         "client_repo_branch": "main",
         "client_repo_subpath": "mit-learn-api-axios",
+        # The frontend pins a `next` prerelease as soon as the backend change it
+        # needs merges, rather than waiting for that change to reach `release`.
+        "prerelease_branch": "main",
     },
     "mitxonline": {
         "source_repo_name": "mitxonline",
