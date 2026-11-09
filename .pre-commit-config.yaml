@@ -118,6 +118,12 @@ repos:
     # the keyword detector's hits on `dest_secret_name` can't be allowlisted inline.
     - --exclude-files
     - tests/ol_infrastructure/applications/mitxonline/fixtures/vso_secrets_main\.json
+    # Written by `bin/gcp-credential-usage snapshot`. Trips the hex-entropy
+    # detector on service-account key ids and reCAPTCHA name digests, which are
+    # identifiers. The command reads only list endpoints, which return no key
+    # material, so the file cannot contain a credential by construction.
+    - --exclude-files
+    - src/ol_infrastructure/infrastructure/gcp/legacy-credential-baseline.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
   rev: "v0.17.1"
