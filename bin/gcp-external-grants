@@ -108,10 +108,12 @@ SCOPES = (
     "https://www.googleapis.com/auth/youtube.readonly",
 )
 
-# Email domains OL controls, matched on the domain and its subdomains. A share
-# from outside them is a grant we cannot re-issue on our own timeline -- the
-# distinction the migration plan turns on. Service-account addresses are NOT
-# covered by this: see _is_third_party_email.
+# Email domains counted as internal, matched on the domain and its subdomains. A
+# share from outside them is a grant we cannot re-issue on our own timeline --
+# the distinction the migration plan turns on. This is broader than OL: another
+# MIT department sharing from an @mit.edu address also counts as internal, and
+# the domain can't tell it apart from OL staff, so those grants need a manual
+# look. Service-account addresses are NOT covered by this: see classify_email.
 OWNED_DOMAINS = ("mit.edu",)
 
 
