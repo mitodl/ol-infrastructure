@@ -8,12 +8,3 @@ unset resp.http.server;
 # Remove unnecessary headers that add weight
 unset resp.http.via;
 unset resp.http.x-timer;
-
-# Handle repeat 404
-declare local var.same_url STRING;
-set var.same_url = "https://" req.http.host req.url;
-
-if(var.same_url == resp.http.location && req.proto != "HTTP/1.1") {
-  set resp.status = 404;
-  return(restart);
-}
