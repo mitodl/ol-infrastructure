@@ -43,6 +43,17 @@ change to either belongs in both places.
 
 Tear down with `docker compose -f scripts/hindsight/compose.yaml down -v`.
 
+## Unit tests for the embedding meter
+
+`test_model_calls.py` checks `ol_memory_ext.model_calls.EmbeddingMeter` against
+the Hindsight package (pinned to the deployed version in its script header),
+with no containers: the counters and labels as `/metrics` renders them, that no
+text or id reaches them, and that a failure never raises.
+
+```shell
+uv run --script scripts/hindsight/test_model_calls.py
+```
+
 ## Checking a deployed environment
 
 `qa_check.py` runs the learner path against the deployed QA service with a real

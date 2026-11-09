@@ -15,6 +15,7 @@ config:
   hindsight:db_instance_size: db.t4g.small
   hindsight:db_password:
     secure: v1:Ep+LTdZKB58zndUE:MEOpl0FUzJ1kIBWRp9Oa8TnEk8+EoGNwYS/LLHex7g9qOFUye5bEZOl4u1AgvmBuflQIjqEHpa4=
+  hindsight:embeddings_metering: "true"
   hindsight:general_scope: ol-memory-general
   hindsight:keycloak_audience: ol-memory-client
   hindsight:keycloak_issuer: https://sso-qa.ol.mit.edu/realms/olapps
