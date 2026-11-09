@@ -139,6 +139,36 @@ spec:
       servicePort: 8046
     plugin_config_name: ocwstudio-site-plugins
 ---
+# Live course sites on the MIT Learn host, at /courses/o/<course-id>/, which
+# is where Learn's OCW product pages link (mit-learn#3263). Production serves
+# these from Fastly; the sitehost's :8047 listener reproduces that rewrite and
+# explains how it differs.
+#
+# It lives here rather than with the Next.js route so it only exists when
+# ocw-studio is in enabled_apps. The ApisixTls for the host is the one in the
+# mit-learn namespace. Priority 10 beats the Next.js catch-all on the same
+# host, which is priority 0.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: ocwstudio-learn-courses-route
+  namespace: ocw-studio
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: learn-courses
+    priority: 10
+    match:
+      hosts:
+      - learn.mit.test
+      paths:
+      - "/courses/o/*"
+      - "/static_shared/*"
+    backends:
+    - serviceName: ocwstudio-sitehost
+      servicePort: 8047
+    plugin_config_name: ocwstudio-shared-plugins
+---
 # Concourse web UI. Studio links build pages here and embeds them, so the
 # hostname has to match CONCOURSE_EXTERNAL_URL in concourse.yaml.
 apiVersion: apisix.apache.org/v2

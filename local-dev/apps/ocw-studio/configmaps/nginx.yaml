@@ -132,3 +132,70 @@ data:
             proxy_pass http://rustfs/$bucket$uri$is_args$args;
         }
     }
+
+    # Published live course sites as MIT Learn serves them, under
+    # learn.mit.test/courses/o/<course-id>/. APISIX sends /courses/o/* and
+    # /static_shared/* on the Learn host here (ocwstudio-learn-courses-route).
+    #
+    # Production does this in Fastly (the "Route OCW courses to S3" snippet in
+    # src/ol_infrastructure/applications/mit_learn/__main__.py): it maps
+    # /courses/o/ to /ocw-course-v3/courses/ in the OCW bucket, appends
+    # index.html to extensionless paths, and drops the query string and
+    # cookies. Those builds come from the ocw-course-v3 extra theme, whose
+    # Hugo baseURL is /courses/o/<id> (OCW_EXTRA_THEMES_BASE_URLS), so their
+    # internal links already point back under /courses/o.
+    #
+    # Local dev cannot build that way. ocw-course-v3 is already the default
+    # theme here (OCW_DEFAULT_COURSE_THEME), and ocw-studio names an extra
+    # theme pipeline with no suffix when it equals the default, so listing it
+    # in OCW_EXTRA_COURSE_THEMES would overwrite every site's main pipeline.
+    # Instead this reads the default build at /courses/<id>/ and rewrites its
+    # root-relative /courses/ links to /courses/o/ on the way out. Without
+    # that, every internal link would land on Next.js's /courses/[readable_id]
+    # page and 404.
+    server {
+        listen 8047;
+        absolute_redirect off;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        # Production strips cookies before the bucket fetch; the Learn session
+        # cookies are no use to the object store either.
+        proxy_set_header Cookie "";
+        proxy_set_header Authorization "";
+        # sub_filter can only edit an uncompressed body.
+        proxy_set_header Accept-Encoding "";
+        # Answer a missing key with nginx's plain 404 rather than the object
+        # store's XML error document. Production goes further and serves
+        # Learn's /not-found page (snippets/ocw_404_deliver.vcl).
+        proxy_intercept_errors on;
+        error_page 403 404 = @not_found;
+        location @not_found {
+            return 404;
+        }
+
+        location /static_shared/ {
+            proxy_pass http://rustfs/ocw-content-live-local$uri;
+        }
+
+        location /courses/o/ {
+            # Course pages reference the shared theme assets both at the root
+            # and nested under the course path; both live at /static_shared/.
+            rewrite ^/courses/o/.*/static_shared/(.*)$ /static_shared/$1 break;
+            rewrite ^/courses/o/(.*)$ /courses/$1;
+            # Fastly's `req.url !~ "\.[^/]+$"`: a last path segment with no
+            # dot is a page, so serve its index.html, with or without the
+            # trailing slash. No redirect, same as production.
+            rewrite ^((?:.*/)?[^./]+)/?$ $1/index.html break;
+            # Not appending $args drops the query string, as production does.
+            proxy_pass http://rustfs/ocw-content-live-local$uri;
+
+            sub_filter_once off;
+            sub_filter '"/courses/' '"/courses/o/';
+            sub_filter "'/courses/" "'/courses/o/";
+        }
+
+        location / {
+            return 404;
+        }
+    }

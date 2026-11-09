@@ -85,6 +85,7 @@ k8s_resource(
     objects=[
         'ocwstudio-sitehost-conf:configmap',
         'ocwstudio-sites-route:apisixroute',
+        'ocwstudio-learn-courses-route:apisixroute',
     ],
     labels=['ocw-studio'],
     resource_deps=['local-infra-core'],

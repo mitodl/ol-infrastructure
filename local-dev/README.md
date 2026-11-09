@@ -1032,6 +1032,7 @@ serves published sites out of the buckets.
 | `live.ocw.mit.test` | the publish bucket — what "Publish live" writes |
 | `test.ocw.mit.test` | the test bucket the pipeline's smoke-test step reads |
 | `concourse.ocw.mit.test` | the Concourse UI (log in as `test` / `test`) |
+| `learn.mit.test/courses/o/<course-id>/` | live course sites as MIT Learn serves them, where its OCW product pages link |
 
 Re-run `./local-dev/scripts/setup.sh` after enabling it: those hostnames need
 `/etc/hosts` entries and the TLS cert needs a `*.ocw.<domain>` wildcard, neither of
