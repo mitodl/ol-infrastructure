@@ -1346,6 +1346,9 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     attr: {"attribute.name.format": "ATTRIBUTE_FORMAT_BASIC"}
                     for attr in ("email", "fullName")
                 },
+                # UKM asked for a signing certificate in our SP metadata;
+                # Keycloak publishes one only when it signs AuthnRequests.
+                want_authn_requests_signed=True,
             ),
             org=OrgConfig(
                 org_domains=[
