@@ -280,7 +280,7 @@
   "/courses/biology": "307|discard|/search/?d=Biology&s=department_course_numbers.sort_coursenum",
   "/courses/brain-and-cognitive-sciences": "307|discard|/search/?d=Brain%20and%20Cognitive%20Sciences&s=department_course_numbers.sort_coursenum",
   "/courses/brain-and-cognitive-sciences/9-70-social-psychology-spring-2009": "307|discard|/courses/9-70-social-psychology-spring-2013/",
-  "/courses/chemical-engineering": "307|discard|//search/?d=Chemical%20Engineering&s=department_course_numbers.sort_coursenum",
+  "/courses/chemical-engineering": "307|discard|/search/?d=Chemical%20Engineering&s=department_course_numbers.sort_coursenum",
   "/courses/chemical-engineering/10-01-ethics-for-engineers-spring-2020": "307|keep|/courses/10-01-ethics-for-engineers-artificial-intelligence-spring-2020/",
   "/courses/chemistry": "307|discard|/search/?d=Chemistry&s=department_course_numbers.sort_coursenum",
   "/courses/chemistry/5-72-statistical-mechanics-spring-2012": "307|keep|/courses/5-72-non-equilibrium-statistical-mechanics-spring-2012/",
