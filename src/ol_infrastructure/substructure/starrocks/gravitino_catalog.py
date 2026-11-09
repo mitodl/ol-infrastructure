@@ -124,11 +124,17 @@ class GravitinoCatalog(BaseModel):
         ALTER CATALOG swaps the connector in place and keeps the catalog, and
         with it every grant on it, where a changed CREATE would drop it.
 
-        Vended credentials are on (the 4.1.7 default, set to say so), and
-        ``aws.s3.use_aws_sdk_default_behavior`` is deliberately absent: with it,
-        a table Gravitino failed to vend for would still be read with the
-        StarRocks pods' IRSA role, hiding the failure. ``aws.s3.region`` only supplies
-        the region when the vended credential does not.
+        Vended credentials are on (the 4.1.7 default, set to say so). They do
+        not fail closed: for a table response with no credential, 4.1.7 falls
+        back to the /v1/config credentials and then to the catalog's own S3
+        settings (IcebergUtil.getVendedCloudConfiguration), and with none set
+        IcebergAwsClientFactory uses the AWS default chain, which is the
+        StarRocks pods' IRSA role. No 4.1.7 property refuses that. Gravitino has
+        already authorized the loadTable by then, so the fallback reads a table
+        the user may read; what it hides is a vending failure. Check vending in
+        CloudTrail (``gravitino_irsa_session_<user>`` on the reads), not by
+        expecting a failed read. ``aws.s3.region`` only supplies the region when
+        the vended credential does not.
 
         :param credential: As for ``create_sql``.
 

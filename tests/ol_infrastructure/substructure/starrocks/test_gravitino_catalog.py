@@ -59,7 +59,7 @@ def test_credential_starrocks_would_unescape_differently_is_refused(
         CATALOG.alter_sql(credential)
 
 
-def test_vended_credentials_without_the_irsa_fallback() -> None:
+def test_vended_credentials_on_and_no_catalog_s3_credentials() -> None:
     sql = CATALOG.create_sql("c") + CATALOG.alter_sql("c")
 
     assert '"iceberg.catalog.vended-credentials-enabled" = "true"' in sql
