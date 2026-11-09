@@ -1567,6 +1567,38 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
+                idp_alias="SLB",
+                idp_display_name="SLB",
+                org_saml_metadata_url="https://login.microsoftonline.com/41ff26dc-250f-4b13-8981-739be8610c21/federationmetadata/2007-06/federationmetadata.xml?appid=2315aa57-e3f2-40ab-8ac9-2b2fb03b9f70",
+                org_saml_metadata_xml=_saved_idp_metadata("slb_metadata.xml"),
+                principal_type="SUBJECT",
+                login_hint=False,
+                name_id_format=NameIdFormat.email,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                # Claim names as SLB submitted them; fullName is left unmapped
+                # because they listed the UPN for it.
+                attribute_name_map={
+                    "email": "user.givenname",
+                    "firstName": "user.userprincipalname",
+                    "lastName": "user.surname",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=False,
+            ),
+            org=OrgConfig(
+                org_domains=["slb.com"],
+                org_name="SLB",
+                org_alias="SLB",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
                 idp_alias="UCV",
                 idp_display_name="Universidad Cesar Vallejo",
                 org_saml_metadata_xml=_saved_idp_metadata("ucv_metadata.xml"),
