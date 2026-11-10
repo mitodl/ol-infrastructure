@@ -135,7 +135,8 @@ summary, flashcard, and OCR prompts).
 - C: split by label. Anyone admitted may create versions and move non-production labels in
   the UI. Only CI moves `production`, from a merged pull request that names the prompt and
   the version number to promote. The repository holds a pointer, not the text, so the
-  embedded fallback (§3) has to be exported at build time.
+  embedded fallback (§3) has to be exported at build time. (Amended 2026-11-10: the pointer
+  pull request commits the exported text instead; see §2.3 item 6.)
 
 ### 2.3 Decision
 
