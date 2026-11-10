@@ -1548,9 +1548,15 @@ export(
 # reference it via StackReference to prime the Vault database connection.
 export("root_password_secret", starrocks_config.require_secret("root_password"))
 
-# substructure/starrocks turns on the group-level query queue only when this is
-# false, so it cannot be applied ahead of the FE restart that switches to v1.
-export("fe_enable_query_queue_v2", FE_ENABLE_QUERY_QUEUE_V2)
+# substructure/starrocks turns the query queues on only when this is false, so it
+# cannot be applied before this stack. The Helm release does not wait for the FE
+# roll, so this says what fe.conf asks for, not what the running FEs use: check
+# every FE has rolled before applying the substructure. Without
+# _needs_fe_config the chart's own fe.conf applies, which leaves v2 on.
+export(
+    "fe_enable_query_queue_v2",
+    FE_ENABLE_QUERY_QUEUE_V2 if _needs_fe_config else True,
+)
 
 if shared_data_bucket is not None:
     export(

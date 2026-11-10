@@ -13,14 +13,16 @@ config:
   starrocks:oidc_enabled: "false"
   # The FE runs query queue v1 (enable_query_queue_v2 = false in the
   # applications stack's fe.conf), which queues each resource group against its
-  # own concurrency_limit. SELECTs and loads (INSERT) both go through the queue,
-  # so batch's INSERTs wait for a slot rather than being rejected by the CN.
+  # own concurrency_limit. SELECTs, loads (INSERT) and statistics jobs all go
+  # through the queue, so batch's INSERTs wait for a slot rather than being
+  # rejected by the CN.
   # There is no global cap: interactive, with no concurrency_limit, never waits
   # behind batch, and its exclusive cores isolate its CPU. See
   # resource_groups.py.
   starrocks:query_queue:
     enable_query_queue_select: true
     enable_query_queue_load: true
+    enable_query_queue_statistic: true
     enable_group_level_query_queue: true
     query_queue_concurrency_limit: 0
     query_queue_pending_timeout_second: 300

@@ -150,10 +150,19 @@ class ResourceGroup(BaseModel):
         return f"DROP RESOURCE GROUP IF EXISTS {self.name};"
 
 
+# The variables that put statements through the FE queue. All of them assume v1.
+_QUEUE_SWITCHES = (
+    "enable_query_queue_select",
+    "enable_query_queue_load",
+    "enable_query_queue_statistic",
+    "enable_group_level_query_queue",
+)
+
 # GlobalVariable.java defaults on branch-4.1, restored when the settings are deleted.
 _QUERY_QUEUE_DEFAULTS: dict[str, bool | int] = {
     "enable_query_queue_select": False,
     "enable_query_queue_load": False,
+    "enable_query_queue_statistic": False,
     "enable_group_level_query_queue": False,
     "query_queue_concurrency_limit": 0,
     "query_queue_pending_timeout_second": 300,
@@ -181,10 +190,14 @@ class QueryQueueSettings(BaseModel):
     # Which statements go through the FE queue at all. A query that skips it
     # also skips the group-level queue below, so the CN enforces its group's
     # concurrency_limit by rejecting it ("Exceed concurrency limit") instead of
-    # queueing it. Batch takes INSERTs, so a concurrency_limit on batch needs
-    # the load queue on as well as the SELECT queue.
+    # queueing it. Batch takes every INSERT, including the statistics
+    # collector's INSERTs into _statistics_ (run as root, so only the type
+    # classifier matches), and the FE checks a statistics job against the
+    # statistic switch before the load one. A concurrency_limit on batch
+    # therefore needs all three on.
     enable_query_queue_select: bool
     enable_query_queue_load: bool
+    enable_query_queue_statistic: bool
     # On, the FE holds a query while its group is at concurrency_limit, and the
     # CN skips its own check. Only the v1 queue (DefaultSlotSelectionStrategy)
     # reads group limits. Measured on 4.1.6 with concurrency_limit = 1: v1
@@ -213,15 +226,7 @@ class QueryQueueSettings(BaseModel):
         :rtype: str
         :raises ValueError: if a queue is on while the FE runs query queue v2
         """
-        queues_on = [
-            name
-            for name in (
-                "enable_query_queue_select",
-                "enable_query_queue_load",
-                "enable_group_level_query_queue",
-            )
-            if getattr(self, name)
-        ]
+        queues_on = [name for name in _QUEUE_SWITCHES if getattr(self, name)]
         if fe_query_queue_v2 and queues_on:
             msg = (
                 f"{', '.join(queues_on)} assume query queue v1, but the FE runs v2;"
