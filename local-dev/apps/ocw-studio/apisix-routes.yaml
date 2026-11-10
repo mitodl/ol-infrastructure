@@ -141,8 +141,7 @@ spec:
 ---
 # Live course sites on the MIT Learn host, at /courses/o/<course-id>/, which
 # is where Learn's OCW product pages link (mit-learn#3263). Production routes
-# these in Fastly; the sitehost's :8047 listener does the routing locally, and
-# its comment says where it differs.
+# these in Fastly; the sitehost's :8047 listener does the same locally.
 #
 # It lives here rather than with the Next.js route so it only exists when
 # ocw-studio is in enabled_apps. The ApisixTls for the host is the one in the

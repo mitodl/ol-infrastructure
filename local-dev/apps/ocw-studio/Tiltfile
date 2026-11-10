@@ -41,13 +41,26 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
+# The extra course theme that MIT Learn serves at /courses/o. Studio publishes
+# it under <theme>/courses/ (app-env.yaml), and the sitehost's :8047 listener
+# reads it from there, so both take the slug from here.
+#
+# It is pinned to ocw-course-v3 only because production's Fastly VCL hardcodes
+# that path ("Route OCW courses to S3" in
+# src/ol_infrastructure/applications/mit_learn/__main__.py, since #4463)
+# instead of taking it from ocw-studio's OCW_EXTRA_COURSE_THEMES. That literal
+# made the choice; nothing else here requires this slug. Keep the two in step
+# until the VCL reads it from configuration.
+OCW_LEARN_THEME = 'ocw-course-v3'
+
 k8s_yaml_local([
     'configmaps/app-env.yaml',
     'configmaps/nginx.yaml',
     'secrets.yaml',
     'deployment.yaml',
     'apisix-routes.yaml',
-], local_overrides='configmaps/app-env.local.yaml')
+], local_overrides='configmaps/app-env.local.yaml',
+   substitutions={'__OCW_LEARN_THEME__': OCW_LEARN_THEME})
 
 # Concourse is applied on its own, deliberately. k8s_yaml_local stamps every
 # Deployment in a call with a fingerprint of every ConfigMap and Secret in that

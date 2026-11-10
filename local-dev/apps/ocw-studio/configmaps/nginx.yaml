@@ -133,66 +133,64 @@ data:
         }
     }
 
-    # Published live course sites on the MIT Learn host, under
+    # Published live course sites on the MIT Learn host, at
     # learn.mit.test/courses/o/<course-id>/. APISIX sends /courses/o/* and
     # /static_shared/* on that host here (ocwstudio-learn-courses-route).
     #
-    # In production Fastly does this routing (the "Route OCW courses to S3"
-    # snippet in src/ol_infrastructure/applications/mit_learn/__main__.py).
-    # Like it, this listener maps the request onto a bucket key, appends
-    # index.html to directory URLs because the bucket has no directory index,
-    # and drops the query string and cookies.
+    # This is the local stand-in for Fastly's "Route OCW courses to S3" and
+    # "Serve Learn 404 page for OCW requests" snippets
+    # (src/ol_infrastructure/applications/mit_learn/). Studio publishes the
+    # __OCW_LEARN_THEME__ extra theme to __OCW_LEARN_THEME__/courses/<id>/,
+    # built with a /courses/o/<id> base URL (app-env.yaml), so the pages are
+    # served exactly as published:
+    # - /courses/o/ maps onto __OCW_LEARN_THEME__/courses/ in the live bucket
+    # - a URL whose last segment has no extension gets index.html, since the
+    #   bucket has no directory index
+    # - the query string and cookies are dropped
+    # - /static_shared/ is the theme assets build at the bucket root
+    # - a missing course page gets MIT Learn's own 404 page
     #
-    # Unlike production, it maps /courses/o/<id>/ onto the live bucket's
-    # courses/<id>/ and rewrites "/courses/ links in the HTML to "/courses/o/.
-    # Those pages are published for /courses/<id>, not /courses/o/<id>, so
-    # without the rewrite their links would land on Next.js. Fastly never
-    # rewrites response bodies, so this is a local-only stopgap. It can hide
-    # link bugs that production would show, and it doubles links that are
-    # already under /courses/o/.
+    # The theme slug is filled in by the ocw-studio Tiltfile, which explains
+    # why it is fixed to the one the production VCL hardcodes.
     server {
         listen 8047;
         absolute_redirect off;
+        # Resolve the Next.js service per request, so this pod still starts
+        # when mit-learn isn't enabled. The address is filled in from
+        # /etc/resolv.conf at startup (NGINX_ENTRYPOINT_LOCAL_RESOLVERS).
+        resolver ${NGINX_LOCAL_RESOLVERS} valid=30s;
 
         proxy_http_version 1.1;
         proxy_set_header Connection "";
-        # Production strips cookies before the bucket fetch; the Learn session
-        # cookies are no use to the object store either.
         proxy_set_header Cookie "";
         proxy_set_header Authorization "";
-        # sub_filter can only edit an uncompressed body.
-        proxy_set_header Accept-Encoding "";
-        # Answer a missing key with nginx's plain 404 rather than the object
-        # store's XML error document. Production goes further and serves
-        # Learn's /not-found page (snippets/ocw_404_deliver.vcl).
-        proxy_intercept_errors on;
-        error_page 403 404 = @not_found;
-        location @not_found {
-            return 404;
-        }
 
         location /static_shared/ {
             proxy_pass http://rustfs/ocw-content-live-local$uri;
         }
 
         location /courses/o/ {
-            # Course pages reference the shared theme assets both at the root
-            # and nested under the course path; both live at /static_shared/.
-            rewrite ^/courses/o/.*/static_shared/(.*)$ /static_shared/$1 break;
-            # Fastly's `req.url !~ "\.[^/]+$"`: a last path segment with no
-            # dot is a page, so serve its index.html, with or without the
-            # trailing slash. No redirect, same as production. This one runs
-            # first, against the /courses/o/ form, so that both rewrites can
-            # end in `break`; a rewrite without it would send the changed URI
-            # back through location matching, into `location /`.
-            rewrite ^/courses/o/((?:.*/)?[^./]+)/?$ /courses/$1/index.html break;
-            rewrite ^/courses/o/(.*)$ /courses/$1 break;
-            # Not appending $args drops the query string, as production does.
-            proxy_pass http://rustfs/ocw-content-live-local$uri;
+            proxy_intercept_errors on;
+            error_page 403 404 = @learn_not_found;
 
-            sub_filter_once off;
-            sub_filter '"/courses/' '"/courses/o/';
-            sub_filter "'/courses/" "'/courses/o/";
+            # Both rewrites end in `break`: without it nginx would send the
+            # changed URI back through location matching, into `location /`.
+            rewrite ^/courses/o/((?:.*/)?[^./]+)/?$ /__OCW_LEARN_THEME__/courses/$1/index.html break;
+            rewrite ^/courses/o/(.*)$ /__OCW_LEARN_THEME__/courses/$1 break;
+            # Not appending $args drops the query string.
+            proxy_pass http://rustfs/ocw-content-live-local$uri;
+        }
+
+        # Learn renders the page; the status stays 404. The Next.js router
+        # headers are cleared so it returns HTML, not RSC component data.
+        location @learn_not_found {
+            set $learn_frontend mitlearn-nextjs.mit-learn.svc.cluster.local:3000;
+            proxy_set_header Host $http_host;
+            proxy_set_header RSC "";
+            proxy_set_header Next-Router-State-Tree "";
+            proxy_set_header Next-Router-Prefetch "";
+            proxy_set_header Next-Router-Segment-Prefetch "";
+            proxy_pass http://$learn_frontend/not-found;
         }
 
         location / {

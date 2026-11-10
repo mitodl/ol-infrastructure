@@ -1034,6 +1034,17 @@ serves published sites out of the buckets.
 | `concourse.ocw.mit.test` | the Concourse UI (log in as `test` / `test`) |
 | `learn.mit.test/courses/o/<course-id>/` | live course sites as MIT Learn serves them, where its OCW product pages link |
 
+Course themes are set up as in production. Sites use the `ocw-course-v2` starter, and
+every live publish also builds the `ocw-course-v3` extra theme for `/courses/o`, which is
+what the `learn.mit.test` path serves. If your local Studio sites still use the
+`ocw-course-v3` starter from before this was set up, move them to `ocw-course-v2` once
+(both starters have the same config), then rebuild their pipelines and republish:
+
+```
+kubectl -n ocw-studio exec deploy/ocwstudio-webapp -c app -- python manage.py shell -c "from websites.models import Website, WebsiteStarter; Website.objects.filter(starter__slug='ocw-course-v3').update(starter=WebsiteStarter.objects.get(slug='ocw-course-v2'))"
+kubectl -n ocw-studio exec deploy/ocwstudio-webapp -c app -- python manage.py backpopulate_pipelines --filter <site-name>
+```
+
 Re-run `./local-dev/scripts/setup.sh` after enabling it: those hostnames need
 `/etc/hosts` entries and the TLS cert needs a `*.ocw.<domain>` wildcard, neither of
 which an existing setup has.
