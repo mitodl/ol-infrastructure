@@ -23,6 +23,12 @@ path "secret-operations/sso/mitlearn" {
 path "secret-operations/sso/mitlearn-admin" {
   capabilities = ["read"]
 }
+# ol-mitlearn-memory-client, which exchanges a learner's session token for one
+# the memory service (Hindsight) accepts. Written by the keycloak substructure
+# (ol_memory.py) in the environments that enable it.
+path "secret-operations/sso/mitlearn-memory" {
+  capabilities = ["read"]
+}
 # mit-learn's Production Keycloak client for this environment, which ol-llm
 # authenticates to Opik with.
 path "secret-opik/sdk-mit-learn" {
