@@ -444,6 +444,23 @@ def test_session_cookie_name_survives_plugin_rendering():
     assert plugin["config"]["unauth_action"] == "pass"
 
 
+def test_oidc_timeout_is_left_to_the_plugin_by_default():
+    oidc = oidc_resources("test-oidc-default-timeout")
+
+    assert (
+        "timeout"
+        not in oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"]
+    )
+
+
+def test_oidc_timeout_reaches_the_plugin_config():
+    oidc = oidc_resources("test-oidc-timeout", oidc_timeout=10)
+
+    plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+
+    assert plugin["config"]["timeout"] == 10
+
+
 def test_default_plugin_config_does_not_validate_bearer_tokens():
     """Mitxonline and mit_learn rely on these defaults.  Any of these options
     makes the plugin 401 the Open edX-issued bearer tokens mitxonline accepts
