@@ -702,9 +702,6 @@ ol_analytics_api_oidc_resources = OLApisixOIDCResources(
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{ol_analytics_api_domain}/",
         oidc_use_session_secret=True,
-        # The learner-records tenant's bearer_token() falls back to
-        # X-Access-Token when a request has no Authorization header.
-        oidc_set_access_token_header=True,
         credentials=OLApisixOIDCVaultCredentials(
             mount="secret-operations",
             mount_type="kv-v1",
@@ -801,6 +798,10 @@ _learner_records_bearer_plugin["config"].update(
         "claim_validator": {
             "audience": {"required": True, "match_with_client_id": True}
         },
+        # bearer_token() falls back to X-Access-Token when a request has no
+        # Authorization header.  The plugin clears an inbound X-Access-Token
+        # and only puts the verified token back with this on.
+        "set_access_token_header": True,
     }
 )
 
