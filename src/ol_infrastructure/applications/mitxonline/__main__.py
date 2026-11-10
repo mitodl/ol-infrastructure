@@ -10,6 +10,7 @@ import json
 import mimetypes
 import textwrap
 from pathlib import Path
+from typing import Literal
 
 import pulumi_fastly as fastly
 import pulumi_vault as vault
@@ -63,6 +64,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -571,18 +573,18 @@ redis_cache = OLAmazonCache(
     ),
 )
 
-# Create Kubernetes secrets using the dedicated function
-# The function returns the names of the secrets and the Pulumi resource objects
-secret_names, secret_resources = create_mitxonline_k8s_secrets(
-    stack_info=stack_info,
-    mitxonline_namespace=mitxonline_namespace,
-    k8s_global_labels=k8s_app_labels,
-    vault_k8s_resources=vault_k8s_resources,
-    db_config=mitxonline_vault_backend,  # Pass the Vault DB backend config
-    rds_endpoint=rds_endpoint,
-    openedx_environment=openedx_environment,
-    redis_password=redis_config.require("password"),
-    redis_cache=redis_cache,
+# Read-only StarRocks credentials for the migrate_edx_data command, minted from
+# Vault's database-starrocks mount. Only a stack whose `mitxonline:vars` sets
+# STARROCKS_HOST mints them: the edX migration tables exist only in the
+# production lake, and minting for a stack with no host would rotate a StarRocks
+# user for nothing. Pods read them through envFrom at start, so the secret names
+# every Deployment as a VSO restart target: when Vault replaces the user at the
+# lease's six-month max TTL and drops the old one, VSO rolls the pods onto the
+# new credentials.
+starrocks_vault_mount = (
+    "database-starrocks"
+    if mitxonline_config.require_object("vars").get("STARROCKS_HOST")
+    else None
 )
 
 # Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
@@ -611,6 +613,38 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 # there would OOMKill. That is acceptable only because the cap does not trip: QA
 # peaked at 628MiB over the same week.
 mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1000Mi"
+mitxonline_sizing = definition.MitxonlineSizing(
+    web=definition.WorkloadResources(
+        requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
+        limits={"memory": mitxonline_web_memory_limit},
+    )
+)
+mitxonline_celery_topology: Literal["per-queue", "merged"] = "per-queue"
+# Off in CI and QA, where nothing needs it.
+mitxonline_dev_shell = mitxonline_config.get_bool("dev_shell_enabled") or False
+
+# Create Kubernetes secrets using the dedicated function
+# The function returns the names of the secrets and the Pulumi resource objects
+secret_names, optional_secret_names, secret_resources = create_mitxonline_k8s_secrets(
+    stack_info=stack_info,
+    mitxonline_namespace=mitxonline_namespace,
+    k8s_global_labels=k8s_app_labels,
+    vault_k8s_resources=vault_k8s_resources,
+    db_config=mitxonline_vault_backend,  # Pass the Vault DB backend config
+    rds_endpoint=rds_endpoint,
+    openedx_environment=openedx_environment,
+    redis_password=redis_config.require("password"),
+    redis_cache=redis_cache,
+    starrocks_mount=starrocks_vault_mount,
+    starrocks_restart_targets=[
+        OLVaultRestartTarget(kind="Deployment", name=name)
+        for name in definition.deployment_names(
+            mitxonline_sizing,
+            celery_topology=mitxonline_celery_topology,
+            dev_shell=mitxonline_dev_shell,
+        )
+    ],
+)
 
 # Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
 # CPU trigger as a backstop, matching edxapp and mit-learn. CPU alone is a poor
@@ -686,6 +720,7 @@ bindings = definition.MitxonlineBindings(
     k8s_labels=k8s_app_labels,
     # Use the secret names returned by create_mitxonline_k8s_secrets
     secret_names=secret_names,
+    optional_secret_names=optional_secret_names,
     **docker_image_config_kwargs("MITXONLINE"),
     cluster=definition.ClusterCapabilities(
         security_group_id=mitxonline_app_security_group.id,
@@ -693,15 +728,10 @@ bindings = definition.MitxonlineBindings(
         vault_auth_name=vault_k8s_resources.auth_name,
     ),
     min_replicas=mitxonline_config.get_int("min_replicas") or 2,
-    sizing=definition.MitxonlineSizing(
-        web=definition.WorkloadResources(
-            requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
-            limits={"memory": mitxonline_web_memory_limit},
-        )
-    ),
+    sizing=mitxonline_sizing,
     granian_worker_startup_rss=mitxonline_config.get_int("granian_worker_startup_rss"),
-    # Off in CI and QA, where nothing needs it.
-    dev_shell=mitxonline_config.get_bool("dev_shell_enabled") or False,
+    dev_shell=mitxonline_dev_shell,
+    celery_topology=mitxonline_celery_topology,
     slack_channel=slack_channel,
     celery_redis=OLApplicationK8sCeleryRedisConfig(
         host=redis_cache.address,

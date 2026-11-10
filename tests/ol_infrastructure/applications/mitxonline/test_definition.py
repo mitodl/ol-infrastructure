@@ -191,6 +191,27 @@ def test_deployed_bindings_keep_the_eks_wiring():
     assert config.vault_k8s_resource_auth_name == "mitxonline-auth"
 
 
+@pytest.mark.parametrize(
+    "bindings",
+    [_local_bindings(), _deployed_bindings(dev_shell=True)],
+    ids=["merged", "per-queue-with-dev-shell"],
+)
+def test_deployment_names_are_the_deployments_the_component_creates(bindings):
+    """The deployed program names these as restart targets before the
+    component exists, so they have to be the ones it goes on to create.
+    """
+    app = OLApplicationK8s(definition.application_config(bindings))
+
+    assert (
+        definition.deployment_names(
+            bindings.sizing,
+            celery_topology=bindings.celery_topology,
+            dev_shell=bindings.dev_shell,
+        )
+        == app.all_deployment_names
+    )
+
+
 def test_bindings_reject_a_misspelled_field():
     with pytest.raises(ValidationError, match="dev_shell_enabled"):
         _local_bindings(dev_shell_enabled=True)

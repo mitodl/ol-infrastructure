@@ -454,6 +454,7 @@ def _deployed_env_names():
         database_mount="postgres-mitxonline",
         database_host="db.example:5432",
         openedx_environment="mitxonline-qa",
+        starrocks_mount=None,
     )
     return [name for secret in secrets for name in secret.templates]
 

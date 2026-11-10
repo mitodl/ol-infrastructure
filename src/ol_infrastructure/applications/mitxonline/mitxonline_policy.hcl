@@ -43,6 +43,15 @@ path "secret-digital-credentials/data/signing-service" {
   capabilities = ["read"]
 }
 
+# Read-only StarRocks credentials for the migrate_edx_data command. Which
+# stacks mint them is decided by STARROCKS_HOST in __main__.py, not here.
+path "database-starrocks/creds/readonly" {
+  capabilities = ["read"]
+}
+path "database-starrocks/creds/readonly/*" {
+  capabilities = ["read"]
+}
+
 # vault-secrets-operator is a little more particular about
 # managing its own leases, give it the permissions it needs
 # for dynamic secret renwals / revocation without giving
@@ -50,13 +59,13 @@ path "secret-digital-credentials/data/signing-service" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitxonline/creds/app/*"]
+    lease_id = ["postgres-mitxonline/creds/app/*", "database-starrocks/creds/readonly/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitxonline/creds/app/*"]
+    lease_id = ["postgres-mitxonline/creds/app/*", "database-starrocks/creds/readonly/*"]
   }
 }
 

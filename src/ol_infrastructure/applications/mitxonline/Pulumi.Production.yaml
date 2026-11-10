@@ -69,6 +69,10 @@ config:
     SENTRY_PROFILES_SAMPLE_RATE: "0.1"
     SENTRY_TRACES_SAMPLE_RATE: "0.001"
     SESSION_COOKIE_NAME: "session_mitxonline"
+    # Read by migrate_edx_data. Setting it is what mints the StarRocks credentials
+    # (see __main__.py), so only production, whose lake has the tables, sets it.
+    STARROCKS_HOST: "mysql.lakehouse.starrocks.ol.mit.edu"
+    STARROCKS_PORT: "9030"
     UWSGI_ENABLE_THREADS: "1"
     UWSGI_THREADS: "25"
     MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"

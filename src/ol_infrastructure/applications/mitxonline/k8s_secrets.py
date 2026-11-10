@@ -9,12 +9,16 @@ import pulumi_kubernetes as kubernetes
 from pulumi import ResourceOptions
 
 from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
-from ol_infrastructure.applications.mitxonline.vault_secrets import vault_secrets
+from ol_infrastructure.applications.mitxonline.vault_secrets import (
+    STARROCKS_SECRET,
+    vault_secrets,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SSecret,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.secret_env import vault_k8s_secrets
@@ -30,7 +34,9 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
     openedx_environment: str,
     redis_password: str,
     redis_cache: OLAmazonCache,
-) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
+    starrocks_mount: str | None,
+    starrocks_restart_targets: list[OLVaultRestartTarget],
+) -> tuple[list[str], list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """Create all Kubernetes secrets required by the MITx Online application.
 
     :param stack_info: Information about the current Pulumi stack.
@@ -42,13 +48,23 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
     :param openedx_environment: The full Open edX environment name (e.g. "mitxonline-qa").
     :param redis_password: The Redis auth token.
     :param redis_cache: The app's Redis cache.
-    :returns: The Secrets' names, in the order pods list them under ``envFrom``,
-        and the resources creating them.
+    :param starrocks_mount: The Vault StarRocks database engine's mount, or None
+        to mint no StarRocks credentials.
+    :param starrocks_restart_targets: The Deployments that read the StarRocks
+        credentials, for VSO to roll when Vault replaces the StarRocks user.
+        Pods read them through ``envFrom``, so a pod left running would keep a
+        user Vault has dropped. The Postgres and static secrets get none.
+    :returns: The names of the Secrets pods require, in the order pods list
+        them under ``envFrom``; the names of those pods mount as optional (the
+        StarRocks credentials, which only the migrate_edx_data command reads, so
+        a Vault or StarRocks failure cannot hold up a rollout); and the
+        resources creating them all.
     """
     secrets = vault_secrets(
         database_mount=db_config.db_mount.path,
         database_host=rds_endpoint,
         openedx_environment=openedx_environment,
+        starrocks_mount=starrocks_mount,
     )
     resource_prefix = f"ol-mitxonline-{stack_info.env_suffix}"
     vaultauth = vault_k8s_resources.auth_name
@@ -58,6 +74,9 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
         namespace=mitxonline_namespace,
         labels=k8s_global_labels,
         vaultauth=vaultauth,
+        restart_targets={STARROCKS_SECRET: starrocks_restart_targets}
+        if starrocks_mount
+        else None,
     )
 
     redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
@@ -93,4 +112,11 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
         (redis_creds_secret_name, redis_creds),
         *static,
     ]
-    return [name for name, _ in created], [resource for _, resource in created]
+    optional = {
+        secret.secret_name for secret in secrets if secret.name == STARROCKS_SECRET
+    }
+    return (
+        [name for name, _ in created if name not in optional],
+        [name for name, _ in created if name in optional],
+        [resource for _, resource in created],
+    )

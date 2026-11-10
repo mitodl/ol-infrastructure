@@ -218,7 +218,8 @@ if unmounted:
     msg = f"secrets.yaml supplied_by names Secrets no workload mounts: {unmounted}"
     raise ValueError(msg)
 secret_data = local_secret_data(
-    secret_env_names(),
+    # No StarRocks locally: the edX migration tables exist only in production.
+    secret_env_names(starrocks_mount=None),
     local_secrets["values"],
     local_secrets["unset"],
     supplied_elsewhere=local_secrets["supplied_by"],
