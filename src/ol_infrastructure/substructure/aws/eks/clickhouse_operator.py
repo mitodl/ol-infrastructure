@@ -104,14 +104,14 @@ def _prepare_operator_deployment(objs: list[dict[str, Any]]) -> None:
     The CRDs, the config ConfigMaps and the ClickHouseOperatorConfiguration go
     in first, so a new operator never starts against old CRDs or config. The
     ConfigGroup's own heuristics only order CRDs before custom resources, not
-    before a Deployment. A rolling update with no surge narrows the overlap
-    between the old and new operator to the old pod's shutdown, but doesn't
-    prevent it: a terminating pod doesn't count against maxUnavailable, so the
-    new pod can start while the old one is still inside its grace period (the
-    bundle sets none, so the default 30s). The operator has no leader election,
-    so both can reconcile during that window. It stays type RollingUpdate
-    because a server-side apply cannot drop the defaulted rollingUpdate block
-    that type Recreate forbids.
+    before a Deployment. The operator has no leader election, so two operator
+    pods running at once would both reconcile every CHI and CHK. Type Recreate
+    waits until the old pod has terminated before creating the new one; a
+    rolling update, even with no surge, can start the new pod while the old one
+    is still inside its grace period, because a terminating pod doesn't count
+    against maxUnavailable. The server-side apply can drop rollingUpdate (which
+    Recreate forbids) because this program's field manager owns both of its
+    fields, from when it set maxSurge 0 and maxUnavailable 1.
 
     The CRDs stay in this ConfigGroup: a child's URN is
     ``<group name>:<namespace>/<name>``, so moving them to another group would
@@ -127,10 +127,7 @@ def _prepare_operator_deployment(objs: list[dict[str, Any]]) -> None:
         for obj in objs
         if obj["kind"] in _OPERATOR_PREREQUISITE_KINDS
     )
-    deployment["spec"]["strategy"] = {
-        "type": "RollingUpdate",
-        "rollingUpdate": {"maxSurge": 0, "maxUnavailable": 1},
-    }
+    deployment["spec"]["strategy"] = {"type": "Recreate"}
 
 
 def setup_clickhouse_operator(
