@@ -101,6 +101,7 @@ config:
   edxapp:enable_xqueue: "true"
   edxapp:xqueue_domain: unused-placeholder
   edxapp:enable_auto_language_selection: "true"
+  edxapp:enable_azure_openai: "true"
   edxapp:autoscaling_lms_requests_threshold: "20"
   edxapp:autoscaling_lms_cpu_threshold: "70"
   edxapp:autoscaling_cms_requests_threshold: "20"
