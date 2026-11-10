@@ -105,11 +105,15 @@ def _prepare_operator_deployment(objs: list[dict[str, Any]]) -> None:
     in first, so a new operator never starts against old CRDs or config. The
     ConfigGroup's own heuristics only order CRDs before custom resources, not
     before a Deployment. The operator has no leader election, so two operator
-    pods running at once would both reconcile every CHI and CHK. Type Recreate
-    waits until the old pod has terminated before creating the new one; a
-    rolling update, even with no surge, can start the new pod while the old one
-    is still inside its grace period, because a terminating pod doesn't count
-    against maxUnavailable. The server-side apply can drop rollingUpdate (which
+    pods running at once would both reconcile every CHI and CHK. During a
+    rollout, type Recreate waits until the old pod has terminated before
+    creating the new one; a rolling update, even with maxSurge 0, can start the
+    new pod while the old one is still inside its grace period, because the
+    surge check counts ReplicaSet replicas and the old ReplicaSet is already
+    scaled to 0. Recreate does not cover an eviction or a pod deletion (a node
+    drain, Karpenter consolidation): the ReplicaSet replaces the pod as soon as
+    it starts terminating, so the two can still overlap for up to the 30s
+    default grace period. The server-side apply can drop rollingUpdate (which
     Recreate forbids) because this program's field manager owns both of its
     fields, from when it set maxSurge 0 and maxUnavailable 1.
 
