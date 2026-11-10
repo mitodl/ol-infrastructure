@@ -43,7 +43,6 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRoleConfig,
 )
 from ol_infrastructure.components.services.apisix import (
-    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
@@ -2538,85 +2537,20 @@ def create_k8s_resources(  # noqa: C901
         ),
     )
 
-    lms_hosts = [
-        edxapp_config.require("backend_lms_domain"),
-        edxapp_config.require_object("domains")["lms"],
-    ]
-    studio_hosts = [
-        edxapp_config.require("backend_studio_domain"),
-        edxapp_config.require_object("domains")["studio"],
-    ]
-    # MIT Learn's logout interstitial frames the LMS /logout page, which in turn
-    # frames each IDA in IDA_LOGOUT_URI_LIST (studio among them), so the logout
-    # fans out without the browser leaving Learn (hq#12763).  The app sends
-    # X-Frame-Options: ALLOW-FROM, which no current browser implements, so
-    # whether it allows that framing is up to each browser.  These routes drop it
-    # for /logout only and state the policy as frame-ancestors, which browsers
-    # do implement.  frame-ancestors is checked against every ancestor, so
-    # studio names the LMS (its parent) and Learn (above the LMS).
-    lms_logout_routes: list[OLApisixRouteConfig] = []
-    cms_logout_routes: list[OLApisixRouteConfig] = []
-    if edxapp_config.get_bool("mit_learn_frames_logout"):
-        mit_learn_origin = f"https://{edxapp_config.require('mit_learn_api_domain')}"
-        lms_origin = f"https://{edxapp_config.require_object('domains')['lms']}"
-
-        def logout_framing_plugin(*frame_ancestors: str) -> OLApisixPluginConfig:
-            return OLApisixPluginConfig(
-                name="response-rewrite",
-                secretRef=None,
-                config={
-                    "headers": {
-                        "remove": ["X-Frame-Options"],
-                        "set": {
-                            "Content-Security-Policy": " ".join(
-                                ["frame-ancestors", "'self'", *frame_ancestors]
-                            )
-                        },
-                    }
-                },
-            )
-
-        lms_logout_routes.append(
-            OLApisixRouteConfig(
-                route_name="lms-logout",
-                priority=10,
-                plugins=[logout_framing_plugin(mit_learn_origin)],
-                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
-                hosts=lms_hosts,
-                paths=["/logout", "/logout/"],
-                timeout_connect="600s",
-                timeout_read="600s",
-                timeout_send="600s",
-                backend_service_name=lms_webapp_deployment_name,
-                backend_service_port="http",
-            )
-        )
-        cms_logout_routes.append(
-            OLApisixRouteConfig(
-                route_name="cms-logout",
-                priority=10,
-                plugins=[logout_framing_plugin(lms_origin, mit_learn_origin)],
-                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
-                hosts=studio_hosts,
-                paths=["/logout", "/logout/"],
-                backend_service_name=cms_webapp_deployment_name,
-                backend_service_port="http",
-                backend_resolve_granularity="endpoint",
-            )
-        )
-
     lms_apisixroute = OLApisixRoute(
         name=f"ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}",
         k8s_namespace=namespace,
         k8s_labels=k8s_global_labels,
         route_configs=[
-            *lms_logout_routes,
             OLApisixRouteConfig(
                 route_name="lms-default",
                 priority=0,
                 plugins=[],
                 shared_plugin_config_name=edxapp_shared_plugins.resource_name,
-                hosts=lms_hosts,
+                hosts=[
+                    edxapp_config.require("backend_lms_domain"),
+                    edxapp_config.require_object("domains")["lms"],
+                ],
                 paths=["/*"],
                 timeout_connect="600s",
                 timeout_read="600s",
@@ -2632,13 +2566,15 @@ def create_k8s_resources(  # noqa: C901
         k8s_namespace=namespace,
         k8s_labels=k8s_global_labels,
         route_configs=[
-            *cms_logout_routes,
             OLApisixRouteConfig(
                 route_name="cms-default",
                 priority=0,
                 plugins=[],
                 shared_plugin_config_name=edxapp_shared_plugins.resource_name,
-                hosts=studio_hosts,
+                hosts=[
+                    edxapp_config.require("backend_studio_domain"),
+                    edxapp_config.require_object("domains")["studio"],
+                ],
                 paths=["/*"],
                 backend_service_name=cms_webapp_deployment_name,
                 backend_service_port="http",

@@ -355,10 +355,7 @@ def test_routes_follow_the_bound_hostnames():
     ]
 
 
-def test_frame_ancestors_header_names_openedx_and_mit_learn():
-    """Learn's logout interstitial frames Open edX's, which frames ours, and
-    frame-ancestors is checked against every ancestor in that chain.
-    """
+def test_frame_ancestors_header_names_the_bound_openedx_host():
     direct, _ = _route_groups(_deployed_bindings())
     rewrites = [
         plugin
@@ -367,7 +364,7 @@ def test_frame_ancestors_header_names_openedx_and_mit_learn():
     ]
 
     assert rewrites[0].config["headers"]["set"]["Content-Security-Policy"] == (
-        f"frame-ancestors 'self' {OPENEDX_BASE_URL} https://api.learn.mit.test"
+        f"frame-ancestors 'self' {OPENEDX_BASE_URL}"
     )
 
 

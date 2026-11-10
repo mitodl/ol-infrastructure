@@ -560,22 +560,13 @@ def shared_plugins(bindings: MitxonlineBindings) -> list[OLApisixPluginConfig]:
 
 
 def _frame_ancestors_plugin(bindings: MitxonlineBindings) -> OLApisixPluginConfig:
-    # Open edX's logout interstitial frames our /logout?no_redirect=1, and MIT
-    # Learn's logout interstitial frames Open edX's (hq#12763), so the chain is
-    # Learn -> Open edX -> MITx Online.  frame-ancestors is checked against every
-    # ancestor, not only the parent: without Learn's host here the middle frame
-    # loads and ours is refused, a logout that looks done but leaves this
-    # session alive.
     openedx_base_url = environment_variables(bindings)["OPENEDX_API_BASE_URL"]
     return OLApisixPluginConfig(
         name="response-rewrite",
         config={
             "headers": {
                 "set": {
-                    "Content-Security-Policy": (
-                        f"frame-ancestors 'self' {openedx_base_url} "
-                        f"https://{bindings.hostnames.learn_api}"
-                    )
+                    "Content-Security-Policy": f"frame-ancestors 'self' {openedx_base_url}"
                 }
             }
         },
