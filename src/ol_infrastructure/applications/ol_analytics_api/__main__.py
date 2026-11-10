@@ -702,6 +702,9 @@ ol_analytics_api_oidc_resources = OLApisixOIDCResources(
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{ol_analytics_api_domain}/",
         oidc_use_session_secret=True,
+        # The learner-records tenant's bearer_token() falls back to
+        # X-Access-Token when a request has no Authorization header.
+        oidc_set_access_token_header=True,
         credentials=OLApisixOIDCVaultCredentials(
             mount="secret-operations",
             mount_type="kv-v1",

@@ -412,6 +412,9 @@ def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCC
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
+        # ApisixRemoteUserOrgBackend reads auth_time from X-ID-Token so
+        # reconcile_user_orgs can skip org data older than the session.
+        oidc_set_id_token_header=True,
         **settings,
     )
 
@@ -504,6 +507,8 @@ def prefixed_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
         credentials=_oidc_credentials(bindings),
+        # See _oidc_config.
+        set_id_token_header=True,
     )
 
 

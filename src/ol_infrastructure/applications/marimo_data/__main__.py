@@ -197,6 +197,11 @@ marimo_oidc = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        # The per-notebook routes are created out of band and a published
+        # notebook can read any request header, so nothing here says which of
+        # these a notebook relies on.  Keep forwarding all three.
+        oidc_set_access_token_header=True,
+        oidc_set_id_token_header=True,
         credentials=OLApisixOIDCVaultCredentials(
             mount="secret-operations",
             path="sso/marimo",
