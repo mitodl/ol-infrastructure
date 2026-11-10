@@ -145,7 +145,10 @@ class SimplePulumiParams(BaseModel):
                            an audit record. Defaults to False -- under
                            preview-gated the gate issue is what authorises the
                            deploy, so the record issue is pure noise unless a
-                           pipeline specifically wants an audit trail.
+                           pipeline specifically wants an audit trail. Must be
+                           True on a pipeline whose stack another entry names
+                           as its prior_stage_stack: that record issue is the
+                           cross-environment trigger.
         description: One or two sentences on what this app is and what the
                      pipeline deploys. Rendered as the pipeline's info-page
                      description once concourse/concourse#9661 ships in a
@@ -743,6 +746,9 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         category="data-platform",
         stages=["QA"],
         topology="preview-gated",
+        # starrocks-substructure (prod Concourse) triggers on this pipeline's
+        # "lakehouse.QA deployed." issue being closed.
+        record_deployments=True,
     ),
     "starrocks-substructure-ci": SimplePulumiParams(
         app_name="starrocks_substructure",
@@ -982,6 +988,47 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         build=BuildConfig(dockerfile_path="./reporter/Dockerfile"),
     ),
 }
+
+
+def _stack_names(params: SimplePulumiParams) -> set[str]:
+    """Return the stack names a pipeline deploys, without reading the filesystem."""
+    scopes = params.deployment_groups or (
+        [params.stack_prefix] if params.stack_prefix else [""]
+    )
+    return {
+        f"{scope}.{stage}" if scope else stage
+        for scope in scopes
+        for stage in params.stages
+    }
+
+
+def _validate_prior_stage_producers(params_map: dict[str, SimplePulumiParams]) -> None:
+    """Fail if a prior_stage_stack has no pipeline posting its "deployed." issue.
+
+    The consuming pipeline only triggers once that issue is closed, so a missing
+    producer leaves its first stage waiting forever with no error.
+    """
+    for name, consumer in params_map.items():
+        if not consumer.prior_stage_stack:
+            continue
+        producers = [
+            producer_name
+            for producer_name, producer in params_map.items()
+            if producer.pulumi_project_name == consumer.pulumi_project_name
+            and consumer.prior_stage_stack in _stack_names(producer)
+            and (producer.topology == "deploy-chained" or producer.record_deployments)
+        ]
+        if not producers:
+            msg = (
+                f"{name}: prior_stage_stack {consumer.prior_stage_stack} has no "
+                f"{consumer.pulumi_project_name} pipeline posting its "
+                '"deployed." issue; set record_deployments=True on the '
+                "pipeline that deploys that stack."
+            )
+            raise ValueError(msg)
+
+
+_validate_prior_stage_producers(pipeline_params)
 
 
 def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
