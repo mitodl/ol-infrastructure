@@ -42,14 +42,41 @@ def course_v3_redirects_table(course_v3_redirects: dict[str, str]) -> str:
     return "table course_v3_redirects {\n" + entries + "\n}"
 
 
+def learn_course_redirects_table(
+    domains: list[str], course_v3_redirects: dict[str, str]
+) -> str:
+    """Render the set of hosts whose course URLs redirect to Learn.
+
+    The Learn origin for each host comes from ``course_v3_redirects``, so a host
+    can only be listed once it has one.
+
+    :param domains: Hostnames whose ``/courses/`` URLs move to Learn.
+    :param course_v3_redirects: Hostname -> Learn origin.
+    :returns: A VCL BOOL table declaration.
+    :rtype: str
+    :raises ValueError: If a domain has no Learn origin.
+    """
+    missing = sorted(set(domains) - set(course_v3_redirects))
+    if missing:
+        msg = (
+            f"No course_v3_redirects origin for Learn course redirect hosts: {missing}"
+        )
+        raise ValueError(msg)
+    entries = "\n".join(f"  {json.dumps(domain)}: true," for domain in domains)
+    return "table learn_course_redirects BOOL {\n" + entries + "\n}"
+
+
 def ocw_site_snippets(
     *,
     course_v3_redirects: dict[str, str],
+    learn_course_redirect_domains: list[str],
     image_optimization: bool,
 ) -> list[VclSnippet]:
     """Build the snippets for one OCW Fastly service.
 
-    :param course_v3_redirects: Hostname -> origin for this service's domains.
+    :param course_v3_redirects: Hostname -> Learn origin for this service's domains.
+    :param learn_course_redirect_domains: This service's hosts whose course URLs
+        redirect to Learn.
     :param image_optimization: Whether Fastly Image Optimization is enabled.
     :returns: The snippets, in the order the service declares them.
     :rtype: list[VclSnippet]
@@ -76,6 +103,13 @@ def ocw_site_snippets(
             name="Course v3 redirect origins",
             type="init",
             content=course_v3_redirects_table(course_v3_redirects),
+        ),
+        VclSnippet(
+            name="Learn course redirect hosts",
+            type="init",
+            content=learn_course_redirects_table(
+                learn_course_redirect_domains, course_v3_redirects
+            ),
         ),
         VclSnippet(
             name="Redirects",
@@ -133,7 +167,10 @@ def ocw_site_snippets(
 
 
 def vcl_suite() -> VclSuite:
-    """Build the falco suite for the production live service's VCL.
+    """Build the falco suite for the live service's VCL.
+
+    The hosts mirror the Production and QA live services: production hosts
+    without Learn course redirects and the QA host with them.
 
     :returns: The suite ``tests/vcl/ocw_site/`` runs against.
     :rtype: VclSuite
@@ -144,7 +181,9 @@ def vcl_suite() -> VclSuite:
             course_v3_redirects={
                 "ocw.mit.edu": "https://learn.mit.edu",
                 "www.ocw.mit.edu": "https://learn.mit.edu",
+                "live-qa.ocw.mit.edu": "https://rc.learn.mit.edu",
             },
+            learn_course_redirect_domains=["live-qa.ocw.mit.edu"],
             image_optimization=True,
         ),
         dictionaries={"redirects": redirect_dictionary()},

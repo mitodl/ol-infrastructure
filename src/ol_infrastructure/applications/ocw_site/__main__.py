@@ -882,6 +882,11 @@ s3_bucket_iam_policy = iam.Policy(
 #################
 site_domains = ocw_site_config.get_object("domains") or {"draft": [], "live": []}
 course_v3_redirects = ocw_site_config.get_object("course_v3_redirects") or {}
+# Hosts whose /courses/ URLs redirect to the same course on Learn. Each needs a
+# course_v3_redirects origin.
+learn_course_redirect_domains = (
+    ocw_site_config.get_object("learn_course_redirect_domains") or []
+)
 fastly_shielding_enabled = ocw_site_config.get_bool("enable_fastly_shielding") or False
 fastly_image_optimization_enabled = (
     ocw_site_config.get_bool("enable_fastly_image_optimization") or False
@@ -1079,6 +1084,11 @@ for purpose in ("draft", "live", "test"):
                     for domain, origin in course_v3_redirects.items()
                     if domain in site_domains[purpose]
                 },
+                learn_course_redirect_domains=[
+                    domain
+                    for domain in learn_course_redirect_domains
+                    if domain in site_domains[purpose]
+                ],
                 image_optimization=fastly_image_optimization_enabled,
             )
         ],
