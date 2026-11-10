@@ -79,23 +79,62 @@ def test_resource_group_needs_a_classifier() -> None:
         )
 
 
-def test_query_queue_sql_sets_and_resets_every_variable() -> None:
-    settings = QueryQueueSettings(
-        enable_query_queue_select=True,
-        enable_group_level_query_queue=True,
-        query_queue_concurrency_limit=0,
-        query_queue_pending_timeout_second=120,
-    )
+def _queue_settings(**overrides: bool | int) -> QueryQueueSettings:
+    values: dict[str, bool | int] = {
+        "enable_query_queue_select": True,
+        "enable_query_queue_load": True,
+        "enable_group_level_query_queue": True,
+        "query_queue_concurrency_limit": 0,
+        "query_queue_pending_timeout_second": 120,
+    }
+    return QueryQueueSettings.model_validate(values | overrides)
 
-    assert settings.set_sql() == (
+
+def test_query_queue_sql_sets_and_resets_every_variable() -> None:
+    assert _queue_settings().set_sql(fe_query_queue_v2=False) == (
         "SET GLOBAL enable_query_queue_select = true;\n"
+        "SET GLOBAL enable_query_queue_load = true;\n"
         "SET GLOBAL enable_group_level_query_queue = true;\n"
         "SET GLOBAL query_queue_concurrency_limit = 0;\n"
         "SET GLOBAL query_queue_pending_timeout_second = 120;"
     )
     assert QueryQueueSettings.reset_sql() == (
         "SET GLOBAL enable_query_queue_select = false;\n"
+        "SET GLOBAL enable_query_queue_load = false;\n"
         "SET GLOBAL enable_group_level_query_queue = false;\n"
         "SET GLOBAL query_queue_concurrency_limit = 0;\n"
         "SET GLOBAL query_queue_pending_timeout_second = 300;"
     )
+
+
+@pytest.mark.parametrize(
+    "queue",
+    [
+        "enable_query_queue_select",
+        "enable_query_queue_load",
+        "enable_group_level_query_queue",
+    ],
+)
+def test_query_queue_refuses_v2_fe(queue: str) -> None:
+    queues_off = dict.fromkeys(
+        (
+            "enable_query_queue_select",
+            "enable_query_queue_load",
+            "enable_group_level_query_queue",
+        ),
+        False,
+    )
+    settings = _queue_settings(**(queues_off | {queue: True}))
+
+    with pytest.raises(ValueError, match="query queue v1"):
+        settings.set_sql(fe_query_queue_v2=True)
+
+
+def test_query_queue_off_is_allowed_on_v2_fe() -> None:
+    settings = _queue_settings(
+        enable_query_queue_select=False,
+        enable_query_queue_load=False,
+        enable_group_level_query_queue=False,
+    )
+
+    assert "= false" in settings.set_sql(fe_query_queue_v2=True)

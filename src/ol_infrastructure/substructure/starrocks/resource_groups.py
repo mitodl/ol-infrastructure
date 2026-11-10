@@ -153,6 +153,7 @@ class ResourceGroup(BaseModel):
 # GlobalVariable.java defaults on branch-4.1, restored when the settings are deleted.
 _QUERY_QUEUE_DEFAULTS: dict[str, bool | int] = {
     "enable_query_queue_select": False,
+    "enable_query_queue_load": False,
     "enable_group_level_query_queue": False,
     "query_queue_concurrency_limit": 0,
     "query_queue_pending_timeout_second": 300,
@@ -165,30 +166,34 @@ class QueryQueueSettings(BaseModel):
     These are SET GLOBAL variables, which the FE persists in its edit log.
     ``ALTER WAREHOUSE`` would be the per-warehouse equivalent, but it hits the
     OSS multi-warehouse stub.
+
+    They assume the FE runs query queue v1 (``enable_query_queue_v2 = false``
+    in fe.conf, set by applications/starrocks). Under v2, the 4.1 default,
+    every group draws from one cluster-wide slot pool of CN count x CN cores:
+    measured on 4.1.6 with one 4-core BE, an interactive SELECT behind four
+    batch SELECTs waited 11.6s with the SELECT queue on and ran in its normal
+    3s with it off. v2 also has no group-level limit, so with the group-level
+    queue on a group's concurrency_limit was enforced nowhere.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    # Under query queue v2 (the 4.1 FE default) this admits SELECTs against one
-    # cluster-wide slot pool, CN count x CN cores (the CPU limit) at the default
-    # concurrency level, whatever query_queue_concurrency_limit says. Batch and
-    # interactive draw from the same pool. Measured on 4.1.6 with one 4-core BE:
-    # with this on, an interactive SELECT behind four batch SELECTs waited
-    # 11.6s; with it off it ran in its normal 3s on the exclusive core.
+    # Which statements go through the FE queue at all. A query that skips it
+    # also skips the group-level queue below, so the CN enforces its group's
+    # concurrency_limit by rejecting it ("Exceed concurrency limit") instead of
+    # queueing it. Batch takes INSERTs, so a concurrency_limit on batch needs
+    # the load queue on as well as the SELECT queue.
     enable_query_queue_select: bool
-    # With this off, the CN enforces a group's concurrency_limit by rejecting
-    # the query ("Exceed concurrency limit"). With it on, the CN skips that check
-    # and leaves it to the FE queue, but only the v1 queue
-    # (DefaultSlotSelectionStrategy) knows about groups. 4.1 defaults the FE to
-    # enable_query_queue_v2 = true, whose SlotSelectionStrategyV2 has no
-    # group-level limit, so turning this on there leaves concurrency_limit
-    # enforced nowhere. Measured on 4.1.6 with concurrency_limit = 1: v2 ran two
-    # queries side by side, v1 queued the second, and with this off the CN
-    # rejected it.
+    enable_query_queue_load: bool
+    # On, the FE holds a query while its group is at concurrency_limit, and the
+    # CN skips its own check. Only the v1 queue (DefaultSlotSelectionStrategy)
+    # reads group limits. Measured on 4.1.6 with concurrency_limit = 1: v1
+    # queued the second query, v2 ran both side by side, and with this off the
+    # CN rejected the second.
     enable_group_level_query_queue: bool
-    # 0 is unlimited. A positive value caps SELECTs across every group at once
-    # (in both queue versions), so batch SELECTs holding the slots would queue
-    # interactive ones behind them.
+    # 0 is unlimited. A positive value caps queries across every group at once,
+    # so batch queries holding the slots would queue interactive ones behind
+    # them.
     query_queue_concurrency_limit: int = Field(ge=0)
     query_queue_pending_timeout_second: int = Field(gt=0)
 
@@ -199,12 +204,30 @@ class QueryQueueSettings(BaseModel):
             for name, value in values.items()
         )
 
-    def set_sql(self) -> str:
+    def set_sql(self, *, fe_query_queue_v2: bool) -> str:
         """Render the SET GLOBAL statements for these settings.
 
+        :param fe_query_queue_v2: the FE's enable_query_queue_v2, as the
+            applications stack exports it
         :returns: one SET GLOBAL statement per variable
         :rtype: str
+        :raises ValueError: if a queue is on while the FE runs query queue v2
         """
+        queues_on = [
+            name
+            for name in (
+                "enable_query_queue_select",
+                "enable_query_queue_load",
+                "enable_group_level_query_queue",
+            )
+            if getattr(self, name)
+        ]
+        if fe_query_queue_v2 and queues_on:
+            msg = (
+                f"{', '.join(queues_on)} assume query queue v1, but the FE runs v2;"
+                " apply applications/starrocks first"
+            )
+            raise ValueError(msg)
         return self._set_sql(self.model_dump())
 
     @classmethod
