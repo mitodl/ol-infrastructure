@@ -140,6 +140,27 @@ def e2e_target(deployment_name: str, stage: str) -> E2ETarget | None:
     )
 
 
+def stage_deploy_job(job_names: list[str], deployment_name: str, stage: str) -> str:
+    """Return the deploy job of ``deployment_name``'s ``stage`` among ``job_names``.
+
+    :raises ValueError: when no job, or more than one, deploys that stage, naming
+        the stage and the candidates rather than failing on an unpack.
+    """
+    suffix = f"-{deployment_name}-{stage}".lower()
+    matches = [
+        name
+        for name in job_names
+        if name.startswith("deploy-") and name.endswith(suffix)
+    ]
+    if len(matches) != 1:
+        msg = (
+            f"Expected one deploy job for {deployment_name} {stage} (a name "
+            f"starting 'deploy-' and ending {suffix!r}), found {matches or 'none'}."
+        )
+        raise ValueError(msg)
+    return matches[0]
+
+
 def _run_script(target: E2ETarget) -> str:
     """Build the task script: wait for the stage, then run the pinned suite."""
     test_args = [f"--retries={target.retries}"]
@@ -149,8 +170,9 @@ def _run_script(target: E2ETarget) -> str:
         [
             "set -euo pipefail",
             # The deploy job returns once Pulumi has seen the rollout through,
-            # but a nightly run can land during an outage: give both apps up to
-            # 10 minutes to answer before reporting every test as failed.
+            # but a nightly run can land during an outage: give each app up to
+            # 10 minutes to answer (so up to 20 when both are down) before
+            # reporting every test as failed.
             'for url in "$LMS_BASE_URL/heartbeat" "$CMS_BASE_URL/heartbeat"; do',
             "  curl -fsS -o /dev/null --retry 40 --retry-delay 15"
             ' --retry-all-errors "$url"',

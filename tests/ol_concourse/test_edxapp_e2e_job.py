@@ -16,6 +16,7 @@ from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from ol_concourse.pipelines.open_edx.edx_platform_v3.e2e import (
     E2E_SUITE_REF,
     E2E_TARGETS,
+    stage_deploy_job,
 )
 from ol_concourse.pipelines.open_edx.edx_platform_v3.pipeline import (
     build_edx_pipeline,
@@ -118,3 +119,20 @@ def test_nothing_is_uploaded(pipeline, target):
 def test_job_is_in_its_release_group(pipeline, target):
     groups = [group for group in pipeline["groups"] if target.job_name in group["jobs"]]
     assert len(groups) == 1
+
+
+@pytest.mark.parametrize(
+    "job_names",
+    [
+        ["deploy-ol-infrastructure-edxapp-application.mitxonline-mitxonline-ci"],
+        [
+            "deploy-ol-infrastructure-edxapp-application.mitxonline-mitxonline-qa",
+            "deploy-other-project.mitxonline-mitxonline-qa",
+        ],
+    ],
+    ids=["no-match", "two-matches"],
+)
+def test_names_the_stage_when_its_deploy_job_is_ambiguous(job_names):
+    """A target whose stage maps to no deploy job, or to several, says which."""
+    with pytest.raises(ValueError, match=r"mitxonline.*QA"):
+        stage_deploy_job(job_names, "mitxonline", "QA")

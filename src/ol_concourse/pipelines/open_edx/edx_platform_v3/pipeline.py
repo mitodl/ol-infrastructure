@@ -34,6 +34,7 @@ from ol_concourse.pipelines.jobs import pulumi_jobs_chain
 from ol_concourse.pipelines.open_edx.edx_platform_v3.e2e import (
     e2e_fragment,
     e2e_target,
+    stage_deploy_job,
 )
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
@@ -274,13 +275,11 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                 target = e2e_target(deployment_name, stage)
                 if target is None:
                     continue
-                stack_suffix = f"-{deployment_name}-{stage}".lower()
-                (deploy_job,) = [
-                    job.name
-                    for job in pulumi_fragments[-1].jobs
-                    if job.name.startswith("deploy-")
-                    and job.name.endswith(stack_suffix)
-                ]
+                deploy_job = stage_deploy_job(
+                    [job.name for job in pulumi_fragments[-1].jobs],
+                    deployment_name,
+                    stage,
+                )
                 e2e_fragments.append(
                     e2e_fragment(
                         target,
