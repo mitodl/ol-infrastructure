@@ -1120,12 +1120,15 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         "ol-data-platform-marimo-app-client-default-scopes",
         realm_id=ol_data_platform_realm.id,
         client_id=ol_data_platform_marimo_app_client.id,
+        # No "roles": its audience resolver would add every client the viewer
+        # holds roles in to aud (ol-superset-client among them), and author code
+        # in an app can read these tokens. role_keys below comes from a direct
+        # client mapper and needs no scope.
         default_scopes=[
             "acr",
             "basic",
             "email",
             "profile",
-            "roles",
             "web-origins",
         ],
         opts=resource_options,
