@@ -1747,6 +1747,14 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The default burst of 25 rejected one browser's 27 near-simultaneous
+        # requests on 2026-11-07, most likely several tabs (search pages with a
+        # resource drawer open cost 5-7 API calls each) restored at once. Those
+        # were the only gateway 429s in Production in the five days after
+        # #6837. The sustained rate stays at 50 r/s; only the instantaneous
+        # slack grows. Only the browser variant enables limit-req, so this
+        # changes nothing on the Fastly-fronted routes.
+        rate_limit_burst=100,
         # The same list Django gets as CORS_ALLOWED_ORIGINS above.  The gateway
         # answers CORS preflights itself, so an origin missing here is blocked
         # on every preflighted request whatever django-cors-headers allows.
