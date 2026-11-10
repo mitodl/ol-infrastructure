@@ -1663,10 +1663,12 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
 # User-Agent strings observed on api.learn.mit.edu, 2026-09-21. The crawlers all
 # send the site's own Origin, so the Origin match alone does not separate them
 # from a browser -- which is the whole reason the User-Agent clause exists.
-MIT_LEARN_SSR_UA = "axios/1.12.2"
-# What mit-learn sets once its SSR layer names itself; the bare form is sent
-# when NEXT_PUBLIC_VERSION is unset.
-MIT_LEARN_SSR_EXPLICIT_UAS = ["mit-learn-ssr/v0.61.2", "mit-learn-ssr"]
+# What the mit-learn SSR layer sends (mitodl/mit-learn#4061); the bare form is
+# sent when NEXT_PUBLIC_VERSION is unset.
+MIT_LEARN_SSR_UAS = ["mit-learn-ssr/v0.61.2", "mit-learn-ssr"]
+# The SSR layer's User-Agent before #4061. Any caller still sending it is not
+# the SSR layer, so it stays on the rate-limited routes.
+STOCK_AXIOS_UA = "axios/1.12.2"
 BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -1709,9 +1711,7 @@ def test_browser_traffic_match_exprs_requires_the_site_origin():
     assert not re.search(origin["value"], "https://learn.mit.edu.evil.com")
 
 
-@pytest.mark.parametrize(
-    "ssr_user_agent", [MIT_LEARN_SSR_UA, *MIT_LEARN_SSR_EXPLICIT_UAS]
-)
+@pytest.mark.parametrize("ssr_user_agent", MIT_LEARN_SSR_UAS)
 def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client(
     ssr_user_agent,
 ):
@@ -1727,11 +1727,13 @@ def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client(
     )
 
 
-@pytest.mark.parametrize("user_agent", [BROWSER_UA, *CRAWLER_UAS])
+@pytest.mark.parametrize("user_agent", [BROWSER_UA, *CRAWLER_UAS, STOCK_AXIOS_UA])
 def test_browser_traffic_match_exprs_keeps_browsers_and_crawlers_in(user_agent):
     """A crawler is a single actor sending our Origin, which is exactly what a
     per-client-IP limit is for. Excluding every non-browser would exempt them,
-    so the clause names the first-party client instead.
+    so the clause names the first-party client instead. Stock axios is in that
+    set: the SSR layer names itself, so excusing the library default would
+    exempt any integrator that happens to use axios.
     """
     user_agent_expr = expr_for_header(browser_exprs(), "User-Agent")
     assert not re.search(user_agent_expr["value"], user_agent)
@@ -1746,9 +1748,8 @@ def test_browser_traffic_match_exprs_ua_regex_is_anchored():
     """
     assert FIRST_PARTY_SERVICE_CLIENT_UA_REGEX.startswith("^")
     user_agent = expr_for_header(browser_exprs(), "User-Agent")
-    assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {MIT_LEARN_SSR_UA}")
-    for explicit_ua in MIT_LEARN_SSR_EXPLICIT_UAS:
-        assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {explicit_ua}")
+    for ssr_ua in MIT_LEARN_SSR_UAS:
+        assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {ssr_ua}")
     assert not re.search(user_agent["value"], "mit-learn-ssr-lookalike/1.0")
 
 
