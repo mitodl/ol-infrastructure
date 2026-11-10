@@ -624,7 +624,10 @@ graph.
 2. Deploy the omnigraph stack. The plan gate logs
    `this apply deletes allow-listed graphs: [...]`, then the server's boot apply
    deletes `<storage_root>/graphs/<id>.omni/`. The bucket keeps the deleted
-   objects as noncurrent versions for 30 days.
+   objects as noncurrent versions for 30 days. Start it at least the boot
+   budget ahead of the 03:20 window: the booting pod holds the
+   `omnigraph-unlock` Lease, so the window skips that night's optimize and cleanup
+   (see [The delete outlasts the startup probe](#the-delete-outlasts-the-startup-probe)).
 3. Deploy the witan stack. Its CI indexer reads `managed_repos` from the
    omnigraph stack's output, and the two pipelines are not ordered, so until
    witan deploys the indexer keeps indexing the retired repo into a graph that
@@ -632,7 +635,9 @@ graph.
 4. In a follow-up change, remove the allow-list entry and
    `boot_budget_seconds` if step 1 set it. Preview refuses an allow-list entry
    for a graph that is declared, so a leftover entry also fails the deploy that
-   re-adds the repo.
+   re-adds the repo. Do not merge it before step 2's deploy has run: Concourse
+   can skip an intermediate commit, and a deploy of this change alone leaves the
+   graph undeclared and not allow-listed, so the plan gate refuses it.
 
 `council` and `code-bridge` are not managed repos, so neither is retired this
 way. `withheld_graphs` can drop `code-bridge` for a rebuild (see
