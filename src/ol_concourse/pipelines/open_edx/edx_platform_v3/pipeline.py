@@ -31,6 +31,10 @@ from bridge.settings.openedx.types import (
 )
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.open_edx.edx_platform_v3.e2e import (
+    e2e_fragment,
+    e2e_target,
+)
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
@@ -47,6 +51,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
 
     container_fragments = []
     pulumi_fragments = []
+    e2e_fragments = []
     group_configs = []
 
     for release_name in release_names:
@@ -263,8 +268,31 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
             )
             job_names.extend([job.name for job in pulumi_fragments[-1].jobs])
 
+            # Non-blocking end-to-end tests after a stage's deploy (see e2e.py).
+            # Nothing takes `passed` from them, so the chain above is unchanged.
+            for stage in deployment.envs_by_release(release_name):
+                target = e2e_target(deployment_name, stage)
+                if target is None:
+                    continue
+                stack_suffix = f"-{deployment_name}-{stage}".lower()
+                (deploy_job,) = [
+                    job.name
+                    for job in pulumi_fragments[-1].jobs
+                    if job.name.startswith("deploy-")
+                    and job.name.endswith(stack_suffix)
+                ]
+                e2e_fragments.append(
+                    e2e_fragment(
+                        target,
+                        deploy_job=deploy_job,
+                        image=edx_registry_image_resource,
+                        pulumi_code=edx_pulumi_code,
+                    )
+                )
+                job_names.append(target.job_name)
+
         combined_fragments = PipelineFragment.combine_fragments(
-            *container_fragments, *pulumi_fragments
+            *container_fragments, *pulumi_fragments, *e2e_fragments
         )
         group_config = GroupConfig(
             name=f"{release_name}",
