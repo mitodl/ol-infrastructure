@@ -1313,6 +1313,22 @@ if stack_info.name == "Production":
         opts=ResourceOptions(depends_on=[starrocks_release]),
     )
 
+# Stable name for the FE MySQL endpoint, published by external-dns from the
+# annotation on the NLB Service below.  Consumers outside this stack need a name
+# they can put in configuration, and the NLB's own AWS hostname is not that:
+# it is regenerated whenever the Service is recreated, which would silently
+# cut off every client still holding the old one.
+#
+# A stack reference would be the usual way to share this, but it is not
+# available here -- this stack already references applications.mit_learn for
+# the NLB's security group, so mit_learn referencing it back would close a
+# cycle.
+fe_mysql_domain = f"mysql.{starrocks_config.require('domain')}"
+
+# The FE serves this certificate on the MySQL port, so it names fe_mysql_domain
+# too: a client dialing the NLB can then verify the hostname, not only the
+# chain. The FE reads its keystore once at startup, so a reissued certificate
+# is served only after the FE pods restart.
 cert_manager_certificate = OLCertManagerCert(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-cert",
     cert_config=OLCertManagerCertConfig(
@@ -1321,7 +1337,7 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_labels=k8s_app_labels.model_dump(),
         create_apisixtls_resource=True,
         dest_secret_name=starrocks_tls_secret_name,
-        dns_names=[starrocks_config.require("domain")],
+        dns_names=[starrocks_config.require("domain"), fe_mysql_domain],
         pkcs12_keystore_password_secret_name=ssl_keystore_password_secret_name,
     ),
     opts=ResourceOptions(
@@ -1420,18 +1436,6 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 # with enableNetworkPolicy false), and the FE pods carry no pod security group.
 FE_MYSQL_PORT = 9030
 
-# Stable name for the FE MySQL endpoint, published by external-dns from the
-# annotation on the Service below.  Consumers outside this stack need a name
-# they can put in configuration, and the NLB's own AWS hostname is not that:
-# it is regenerated whenever the Service is recreated, which would silently
-# cut off every client still holding the old one.
-#
-# A stack reference would be the usual way to share this, but it is not
-# available here -- this stack already references applications.mit_learn for
-# the security group above, so mit_learn referencing it back would close a
-# cycle.
-fe_mysql_domain = f"mysql.{starrocks_config.require('domain')}"
-
 fe_mysql_nlb_security_group = ec2.SecurityGroup(
     f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb-security-group",
     name=f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb",
@@ -1518,9 +1522,9 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
 export("fe_mysql_domain", fe_mysql_domain)
 
 # In-cluster endpoint for consumers on the data cluster. The FE certificate is
-# issued for starrocks:domain, not for the Service name, so a client that
-# verifies TLS needs both values. CI runs with ssl_enabled false, so no CI
-# client can use TLS whatever this says.
+# issued for starrocks:domain and fe_mysql_domain, not for the Service name, so
+# a client that verifies TLS needs both values. CI runs with ssl_enabled false,
+# so no CI client can use TLS whatever this says.
 export("fe_mysql_internal_host", f"{fe_service_name}.{namespace}.svc.cluster.local")
 export("fe_tls_server_name", starrocks_config.require("domain"))
 
