@@ -18,6 +18,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SSecret,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.secret_env import vault_k8s_secrets
@@ -34,6 +35,7 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
     redis_password: str,
     redis_cache: OLAmazonCache,
     starrocks_mount: str | None,
+    starrocks_restart_targets: list[OLVaultRestartTarget],
 ) -> tuple[list[str], list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """Create all Kubernetes secrets required by the MITx Online application.
 
@@ -48,6 +50,10 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
     :param redis_cache: The app's Redis cache.
     :param starrocks_mount: The Vault StarRocks database engine's mount, or None
         to mint no StarRocks credentials.
+    :param starrocks_restart_targets: The Deployments that read the StarRocks
+        credentials, for VSO to roll when Vault replaces the StarRocks user.
+        Pods read them through ``envFrom``, so a pod left running would keep a
+        user Vault has dropped. The Postgres and static secrets get none.
     :returns: The names of the Secrets pods require, in the order pods list
         them under ``envFrom``; the names of those pods mount as optional (the
         StarRocks credentials, which only the migrate_edx_data command reads, so
@@ -68,6 +74,9 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
         namespace=mitxonline_namespace,
         labels=k8s_global_labels,
         vaultauth=vaultauth,
+        restart_targets={STARROCKS_SECRET: starrocks_restart_targets}
+        if starrocks_mount
+        else None,
     )
 
     redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
@@ -103,7 +112,9 @@ def create_mitxonline_k8s_secrets(  # noqa: PLR0913
         (redis_creds_secret_name, redis_creds),
         *static,
     ]
-    optional = {f"{STARROCKS_SECRET}-dynamic-secret"}
+    optional = {
+        secret.secret_name for secret in secrets if secret.name == STARROCKS_SECRET
+    }
     return (
         [name for name, _ in created if name not in optional],
         [name for name, _ in created if name in optional],

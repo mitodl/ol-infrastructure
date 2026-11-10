@@ -16,7 +16,10 @@ from unittest import mock
 import pulumi
 import pulumi_vault as vault
 
-from ol_infrastructure.components.services.vault import OLVaultK8SSecret
+from ol_infrastructure.components.services.vault import (
+    OLVaultK8SSecret,
+    OLVaultRestartTarget,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.secret_env import vso_template
 
@@ -26,6 +29,7 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 FIXTURE = Path(__file__).parent / "fixtures" / "vso_secrets_main.json"
+DEPLOYMENTS = ["mitxonline-app", "mitxonline-celery-beat"]
 
 
 class _Mocks(pulumi.runtime.Mocks):
@@ -95,6 +99,10 @@ def capture(module: ModuleType, starrocks_mount: str | None = None) -> dict[str,
                 redis_password="redis-password",  # pragma: allowlist secret
                 redis_cache=cache,
                 starrocks_mount=starrocks_mount,
+                starrocks_restart_targets=[
+                    OLVaultRestartTarget(kind="Deployment", name=name)
+                    for name in DEPLOYMENTS
+                ],
             )
         result["env_from_secret_names"] = names
         result["optional_env_from_secret_names"] = optional_names
@@ -120,7 +128,8 @@ def test_the_vso_resources_match_main_before_the_description():
 
 def test_starrocks_credentials_are_an_optional_dynamic_secret():
     """With a StarRocks mount, the read-only credentials are one more dynamic
-    secret, which pods mount as optional so it cannot hold up a rollout.
+    secret, which pods mount as optional so it cannot hold up a rollout, and
+    whose rotation restarts the Deployments, which read it through envFrom.
     """
     from ol_infrastructure.applications.mitxonline import (  # noqa: PLC0415
         k8s_secrets,
@@ -144,3 +153,11 @@ def test_starrocks_credentials_are_an_optional_dynamic_secret():
         ["STARROCKS_USER", vso_template(("username",))],
         ["STARROCKS_PASSWORD", vso_template(("password",))],
     ]
+    assert starrocks["restart_targets"] == [
+        {"kind": "Deployment", "name": name} for name in DEPLOYMENTS
+    ]
+    assert [
+        config["resource_name"]
+        for config in captured["vso_secrets"]
+        if config["restart_targets"]
+    ] == [starrocks["resource_name"]]

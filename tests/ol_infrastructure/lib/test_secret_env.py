@@ -1,11 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
+from ol_infrastructure.components.services.vault import OLVaultRestartTarget
+from ol_infrastructure.lib import secret_env
 from ol_infrastructure.lib.secret_env import (
     Template,
     VaultSecret,
     env_names,
     local_secret_data,
+    vault_k8s_secrets,
     vso_template,
 )
 
@@ -96,3 +99,51 @@ def test_an_empty_section_counts_as_no_entries():
 def test_unquoted_yaml_values_are_refused():
     with pytest.raises(ValueError, match=r"must be strings \(quote them\): A, 7$"):
         local_secret_data(["A", "B"], {"A": 443}, ["B", 7])
+
+
+def _vso_configs(monkeypatch, secrets, **kwargs):
+    """Return the config each VSO resource would be created with, by secret name."""
+    monkeypatch.setattr(
+        secret_env,
+        "OLVaultK8SSecret",
+        lambda name, resource_config, opts: resource_config,  # noqa: ARG005
+    )
+    created = vault_k8s_secrets(
+        secrets,
+        resource_prefix="ol-app-qa",
+        namespace="app",
+        labels={},
+        vaultauth="app",
+        **kwargs,
+    )
+    return dict(created)
+
+
+def test_restart_targets_reach_only_the_secret_they_name(monkeypatch):
+    targets = [OLVaultRestartTarget(kind="Deployment", name="app-app")]
+    configs = _vso_configs(
+        monkeypatch,
+        [_secret("one", A=("a",)), _secret("two", B=("b",))],
+        restart_targets={"two": targets},
+    )
+
+    assert configs["one-static-secret"].restart_targets is None
+    assert configs["two-static-secret"].restart_targets == targets
+
+
+def test_without_restart_targets_no_secret_gets_any(monkeypatch):
+    configs = _vso_configs(monkeypatch, [_secret("one", A=("a",))])
+
+    assert configs["one-static-secret"].restart_targets is None
+
+
+def test_restart_targets_for_a_secret_not_described_are_refused(monkeypatch):
+    """A misspelled name would otherwise leave the secret it meant without any."""
+    with pytest.raises(ValueError, match=r"not described: tow$"):
+        _vso_configs(
+            monkeypatch,
+            [_secret("two", B=("b",))],
+            restart_targets={
+                "tow": [OLVaultRestartTarget(kind="Deployment", name="app-app")]
+            },
+        )
