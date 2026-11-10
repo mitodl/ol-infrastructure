@@ -26,8 +26,11 @@ config:
     limits:
       cpu: 500m
       memory: 512Mi
-  # Mid-upgrade to 25.8 (CLICKHOUSE_SERVER_VERSION): keep writing parts 24.8
-  # replicas can read until every replica runs 25.8.
+  # Held on 25.8 while QA canaries 26.3 (CLICKHOUSE_SERVER_VERSION). Drop this
+  # pin and set compatibility to '25.8' in the change that moves Production.
+  clickhouse:version: 25.8.33.10003.altinitystable
+  # Left from the 24.8 -> 25.8 roll; every replica has run 25.8 since
+  # 2026-10-21.
   clickhouse:compatibility: '24.8'
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production

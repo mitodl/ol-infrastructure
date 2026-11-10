@@ -181,8 +181,8 @@ so we run the equivalent statements ourselves (step 7).
 
 ### Before the window
 
-1. The 26.3 server upgrade is done. The upstream cutover scripts and runbook
-   were verified against ClickHouse 26.3, and we run 24.8.
+1. Production must run 26.3. The upstream cutover scripts and runbook were
+   verified against ClickHouse 26.3.
 2. `tiered_replicated` is present on every replica:
    ```sql
    SELECT hostName(), policy_name, volume_name, disks
@@ -472,7 +472,7 @@ upgrade goes to QA first.
      with the `applications/clickhouse` QA stack. Production stays on the old
      version by setting `clickhouse:version` in `Pulumi.Production.yaml` until
      the canary passes. In every stack that rolls, set `clickhouse:compatibility`
-     to the version being upgraded from (e.g. `'24.8'`), so an upgraded replica
+     to the version being upgraded from (e.g. `'25.8'` for 25.8 -> 26.3), so an upgraded replica
      writes parts the others can still read, and remove it in a later change
      once every replica runs the new version. A target more than a year or two
      LTS lines newer needs an intermediate version first.
@@ -521,6 +521,12 @@ upgrade goes to QA first.
    - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
      reports `zk_server_state leader` with `zk_synced_followers 2`, the others
      `follower`.
+   - The first upgraded replica took the compatibility value before the next
+     one restarts: `getSetting('compatibility')` returns the old line, and for
+     25.8 -> 26.3 `system.merge_tree_settings` shows
+     `string_serialization_version = single_stream` and
+     `propagate_types_serialization_versions_to_nested_types = 0` (26.3's own
+     defaults are `with_size_stream` and `1`).
 4. Opik smoke check on QA. Opik runs its Liquibase migrations (against
    replica 0) only in the `backend-migrations` init container, and a
    ClickHouse upgrade does not restart Opik, so restart it first:
