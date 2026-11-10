@@ -200,6 +200,7 @@ class MitxonlineBindings(BaseModel):
     carry ``OPENEDX_API_BASE_URL``, which the routes read for a response header."""
     k8s_labels: dict[str, str]
     secret_names: list[str]
+    optional_secret_names: list[str] = Field(default_factory=list)
     oidc_secret_name: str | None = None
     """A Secret in the namespace holding the gateway's OIDC client credentials,
     for clusters without Vault (``cluster.vault_auth_name`` unset). It stands in
@@ -295,6 +296,7 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         application_min_replicas=bindings.min_replicas,
         k8s_global_labels=bindings.k8s_labels,
         env_from_secret_names=bindings.secret_names,
+        optional_env_from_secret_names=bindings.optional_secret_names,
         application_security_group_id=cluster.security_group_id,
         application_security_group_name=cluster.security_group_name,
         application_image_repository=bindings.image_repository,

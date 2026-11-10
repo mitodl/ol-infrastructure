@@ -9,12 +9,15 @@ from pulumi import Output
 
 from ol_infrastructure.lib.secret_env import Template, VaultSecret, env_names
 
+STARROCKS_SECRET = "starrocks-mitxonline"  # noqa: S105  # pragma: allowlist secret
+
 
 def vault_secrets(
     *,
     database_mount: str | Output[str],
     database_host: str,
     openedx_environment: str,
+    starrocks_mount: str | None,
 ) -> list[VaultSecret]:
     """Describe every Vault path the app reads and the variables it supplies.
 
@@ -22,7 +25,25 @@ def vault_secrets(
     :param database_host: ``host:port`` of the app's database.
     :param openedx_environment: e.g. ``mitxonline-qa``; prefixes the
         registration token's path.
+    :param starrocks_mount: The Vault StarRocks database engine's mount, or None
+        for a stack that does not read the warehouse.
     """
+    starrocks = (
+        [
+            VaultSecret(
+                name=STARROCKS_SECRET,
+                kind="dynamic",
+                mount=starrocks_mount,
+                path="creds/readonly",
+                env={
+                    "STARROCKS_USER": ("username",),
+                    "STARROCKS_PASSWORD": ("password",),
+                },
+            )
+        ]
+        if starrocks_mount
+        else []
+    )
     return [
         VaultSecret(
             name="aws-mitxonline",
@@ -45,6 +66,7 @@ def vault_secrets(
                 ),
             },
         ),
+        *starrocks,
         VaultSecret(
             name="mitxonline-collected",
             kind="static",
@@ -241,14 +263,18 @@ def vault_secrets(
     ]
 
 
-def secret_env_names() -> list[str]:
+def secret_env_names(*, starrocks_mount: str | None) -> list[str]:
     """Return the variables ``vault_secrets`` writes.
 
-    The arguments only reach mounts, paths and template text, so empty ones
-    yield the same names. That holds while no secret depends on an argument;
-    once one is conditional (mit_learn's StarRocks credentials exist only when
-    a mount is set), the argument that decides it has to come from the caller.
+    The other arguments only reach mounts, paths and template text, so empty
+    ones yield the same names. ``starrocks_mount`` decides whether the StarRocks
+    credentials exist, so it comes from the caller.
     """
     return env_names(
-        vault_secrets(database_mount="", database_host="", openedx_environment="")
+        vault_secrets(
+            database_mount="",
+            database_host="",
+            openedx_environment="",
+            starrocks_mount=starrocks_mount,
+        )
     )

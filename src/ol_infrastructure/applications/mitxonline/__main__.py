@@ -571,9 +571,22 @@ redis_cache = OLAmazonCache(
     ),
 )
 
+# Read-only StarRocks credentials for the migrate_edx_data command, minted from
+# Vault's database-starrocks mount. Only a stack whose `mitxonline:vars` sets
+# STARROCKS_HOST mints them: the edX migration tables exist only in the
+# production lake, and minting for a stack with no host would rotate a StarRocks
+# user for nothing. Pods read them through envFrom at start, and nothing restarts
+# a pod when Vault replaces the user at the lease's six-month max TTL, so a pod
+# older than that replacement holds a dropped user until the next rollout.
+starrocks_vault_mount = (
+    "database-starrocks"
+    if mitxonline_config.require_object("vars").get("STARROCKS_HOST")
+    else None
+)
+
 # Create Kubernetes secrets using the dedicated function
 # The function returns the names of the secrets and the Pulumi resource objects
-secret_names, secret_resources = create_mitxonline_k8s_secrets(
+secret_names, optional_secret_names, secret_resources = create_mitxonline_k8s_secrets(
     stack_info=stack_info,
     mitxonline_namespace=mitxonline_namespace,
     k8s_global_labels=k8s_app_labels,
@@ -583,6 +596,7 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
     openedx_environment=openedx_environment,
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
+    starrocks_mount=starrocks_vault_mount,
 )
 
 # Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
@@ -686,6 +700,7 @@ bindings = definition.MitxonlineBindings(
     k8s_labels=k8s_app_labels,
     # Use the secret names returned by create_mitxonline_k8s_secrets
     secret_names=secret_names,
+    optional_secret_names=optional_secret_names,
     **docker_image_config_kwargs("MITXONLINE"),
     cluster=definition.ClusterCapabilities(
         security_group_id=mitxonline_app_security_group.id,
