@@ -1660,14 +1660,15 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
 
 # ─── Browser traffic match exprs ────────────────────────────────────────────────
 
-# User-Agent strings observed on api.learn.mit.edu, 2026-09-21. The crawlers all
-# send the site's own Origin, so the Origin match alone does not separate them
-# from a browser -- which is the whole reason the User-Agent clause exists.
 # What the mit-learn SSR layer sends (mitodl/mit-learn#4061); the bare form is
 # sent when NEXT_PUBLIC_VERSION is unset.
 MIT_LEARN_SSR_UAS = ["mit-learn-ssr/v0.61.2", "mit-learn-ssr"]
-# The SSR layer's User-Agent before #4061. Any caller still sending it is not
-# the SSR layer, so it stays on the rate-limited routes.
+
+# User-Agent strings observed on api.learn.mit.edu, 2026-09-21. The crawlers all
+# send the site's own Origin, so the Origin match alone does not separate them
+# from a browser -- which is the whole reason the User-Agent clause exists.
+# STOCK_AXIOS_UA was the SSR layer's before #4061. Any caller still sending it
+# is not the SSR layer, so it stays on the rate-limited routes.
 STOCK_AXIOS_UA = "axios/1.12.2"
 BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

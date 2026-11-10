@@ -2238,7 +2238,7 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
 # Why this host needs the User-Agent clause, not just the Origin match: the
 # Next.js SSR layer reaches api.learn as `mit-learn-ssr/<version>`
 # (frontends/main/src/bootstrap/api.ts) from four AWS egress addresses, and on
-# 2026-09-21 the busiest of them sustained 371-676 req/min -- 11.3 req/s
+# 2026-09-21 (when it still sent `axios/1.12.2`) the busiest of them sustained 371-676 req/min -- 11.3 req/s
 # against the 50 req/s per-IP bucket the browser-* routes carry. Without the
 # clause it would miss these routes only because Node axios sends no Origin
 # header, which is an accident of the HTTP client rather than a decision.
