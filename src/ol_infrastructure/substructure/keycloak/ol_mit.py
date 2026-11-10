@@ -38,7 +38,6 @@ def create_ol_mit_realm(  # noqa: PLR0913
     mit_email_username: str,
     mit_email_host: str,
     mit_ldap_bind_password: str,
-    session_secret: str,
     fetch_realm_public_key_partial,
 ):
     """Create the OL MIT realm for MIT-internal applications.
@@ -711,7 +710,6 @@ def create_ol_mit_realm(  # noqa: PLR0913
             server_url=keycloak_url,
             client_id=ol_mit_ovs_client.client_id,
             client_secret=ol_mit_ovs_client.client_secret,
-            secret=session_secret,
             realm_id=ol_mit_ovs_client.realm_id,
             realm_name="ol-mit",
             realm_public_key=ol_mit_ovs_client.realm_id.apply(
@@ -772,7 +770,6 @@ def create_ol_mit_realm(  # noqa: PLR0913
             server_url=keycloak_url,
             client_id=ol_mit_ocw_studio_client.client_id,
             client_secret=ol_mit_ocw_studio_client.client_secret,
-            secret=session_secret,
             realm_id=ol_mit_ocw_studio_client.realm_id,
             realm_name="ol-mit",
             realm_public_key=ol_mit_ocw_studio_client.realm_id.apply(
