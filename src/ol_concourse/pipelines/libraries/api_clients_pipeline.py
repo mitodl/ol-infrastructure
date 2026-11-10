@@ -93,7 +93,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         npm ``next`` dist-tag whenever a spec change lands on this branch of the
         source repo, so a consumer can pin a client for an API that has merged
         but not yet been released. The version
-        (``<CalVer date>-dev.<unix time>.g<sha7>``) exists only on npm: nothing
+        (``<CalVer date>.0-dev.<unix time>.g<sha7>``) exists only on npm: nothing
         is committed to the client repo, and ``latest`` stays on the stable
         channel above.
 

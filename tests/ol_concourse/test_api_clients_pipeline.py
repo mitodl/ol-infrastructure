@@ -150,7 +150,7 @@ def test_a_prerelease_commits_nothing_and_publishes_under_next(variant):
         assert "yarn npm publish --access public --tag next" in script
         # A prerelease version, never a plain one that could pass for stable.
         assert 'yarn version "$version"' in script
-        assert '-dev.$(date -u +%s).g${SOURCE_SHA:0:7}"' in script
+        assert '$(date -u +%Y.%-m%d).0-dev.$(date -u +%s).g${SOURCE_SHA:0:7}"' in script
         assert publish["config"]["params"]["SOURCE_SHA"] == (
             f"((.:{_prerelease_source(variant)}-git-rev))"
         )
