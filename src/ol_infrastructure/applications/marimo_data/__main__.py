@@ -17,24 +17,28 @@ their own ``ApisixRoute`` resources that reference the shared OIDC config
 (``marimo_oidc``) and shared plugin config (``marimo_shared_plugins``) from
 this stack.
 
-Published apps have no user session, so they can't use the per-user login the
-JupyterHub notebooks use.  They query StarRocks with a Vault dynamic credential
-from ``database-starrocks/creds/readonly`` instead, which VSO syncs into the
-``marimo-published-starrocks-creds`` Secret as ``STARROCKS_USER`` and
-``STARROCKS_PASSWORD`` (the names ``bin/starrocks-auth --output env`` uses in
-ol-data-platform).  The FE is reached in-cluster at the ``fe_mysql_internal_host``
-output of the ``applications/starrocks`` stack, port 9030.
+Published apps query the warehouse as the viewer; there is no shared warehouse
+credential.  The openid-connect plugin logs the viewer in through
+``ol-marimo-app-client`` and forwards their access token upstream in
+``X-Access-Token`` (the plugin's default), refreshing it from the session's
+refresh token once it is within ``oidc_access_token_expires_leeway`` of expiry.
+marimo gives notebook code the headers of the request behind each kernel command
+through ``mo.app_meta().request``: the WebSocket upgrade when the page loads, then
+the POST behind each UI interaction.  Notebook code logs in to StarRocks with
+that token (``authentication_openid_connect_client`` over TLS to the
+``fe_mysql_internal_host`` output of ``applications/starrocks``, port 9030), and
+StarRocks forwards it to Gravitino for the governed lake catalog.
 
-Mount that Secret as a volume and read it at connect time; don't inject it with
-``envFrom``.  The operator creates bare Pods, which VSO's rolloutRestartTargets
-can't restart, so env vars would go stale when VSO rotates the lease, while a
-mounted Secret volume picks up the new files.  Published pods run as the
-``marimo-published`` ServiceAccount below, which has no IRSA role and no token.
+So a per-notebook route has to leave ``X-Access-Token`` in place while it strips
+the other identity headers and ``Cookie``.  Notebook code should read the token
+in the cell that queries and connect there.  A connection opened at page load
+keeps that token after it expires, which StarRocks only checks at login but
+Gravitino checks on every catalog call.  A module-level cache is shared by every
+viewer of the app, because marimo runs each session as a thread in one process.
 
-Every viewer of a published app queries as the same Vault-issued user, so the
-``readonly`` role's grants (SELECT on every table and materialized view) are the
-ceiling on what any published app can show to any authenticated ol-data-platform
-realm user.
+Author code in an app can read each viewer's access token, which is the cost of
+querying as the viewer.  Published pods run as the ``marimo-published``
+ServiceAccount below, which has no IRSA role and no token.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.
@@ -45,6 +49,7 @@ import pulumi_vault as vault
 from pulumi import Config, ResourceOptions
 
 from ol_infrastructure.components.services.apisix import (
+    FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixOIDCVaultCredentials,
@@ -56,10 +61,8 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
-    OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
-    OLVaultK8SSecret,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
@@ -104,36 +107,16 @@ application_labels = k8s_global_labels | {
 
 apps_domain = marimo_data_config.require("apps_domain")
 
-# Vault policy for the marimo namespace.  sso/marimo holds the ol-marimo-client
-# credentials that ol-apisix-marimo-data-oidc-secrets syncs for the gated
-# routes.  creds/readonly is the published apps' StarRocks credential.  The
-# lease grants let VSO renew it and revoke it when its VaultDynamicSecret is
-# deleted.  Revoke is limited to these leases; renew on any lease already comes
-# from Vault's default policy.
-starrocks_vault_mount_path = "database-starrocks"
-starrocks_creds_path = "creds/readonly"
-marimo_vault_policy_hcl = f"""
-path "secret-operations/data/sso/marimo" {{
+# Vault policy for the marimo namespace.  sso/marimo-app holds the
+# ol-marimo-app-client credentials that ol-apisix-marimo-data-oidc-secrets syncs
+# for the gated routes.
+marimo_vault_policy_hcl = """
+path "secret-operations/data/sso/marimo-app" {
   capabilities = ["read"]
-}}
-path "secret-operations/sso/marimo" {{
+}
+path "secret-operations/sso/marimo-app" {
   capabilities = ["read"]
-}}
-path "{starrocks_vault_mount_path}/{starrocks_creds_path}" {{
-  capabilities = ["read"]
-}}
-path "sys/leases/renew" {{
-  capabilities = ["update"]
-  allowed_parameters = {{
-    lease_id = ["{starrocks_vault_mount_path}/{starrocks_creds_path}/*"]
-  }}
-}}
-path "sys/leases/revoke" {{
-  capabilities = ["update"]
-  allowed_parameters = {{
-    lease_id = ["{starrocks_vault_mount_path}/{starrocks_creds_path}/*"]
-  }}
-}}
+}
 """
 
 marimo_vault_policy = vault.Policy(
@@ -149,7 +132,7 @@ marimo_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
     # Only the VSO ServiceAccount OLVaultK8SResources creates. Published
     # notebooks run author code in this namespace, and with "*" any pod that
     # mounts a ServiceAccount token could log in and read the OIDC client
-    # secret and mint StarRocks credentials.
+    # secret.
     bound_service_account_names=["marimo-data-vault"],
     bound_service_account_namespaces=[marimo_namespace],
     token_policies=[marimo_vault_policy.name],
@@ -183,47 +166,25 @@ marimo_published_service_account = kubernetes.core.v1.ServiceAccount(
     automount_service_account_token=False,
 )
 
-# StarRocks credential for published apps.  See the module docstring for why it
-# has to be mounted as a file, not injected as env vars.
-marimo_published_starrocks_creds = OLVaultK8SSecret(
-    f"marimo-published-starrocks-creds-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SDynamicSecretConfig(
-        name="marimo-published-starrocks-creds",
-        namespace=marimo_namespace,
-        labels=k8s_global_labels,
-        dest_secret_labels=k8s_global_labels,
-        dest_secret_name="marimo-published-starrocks-creds",  # pragma: allowlist secret  # noqa: S106
-        mount=starrocks_vault_mount_path,
-        path=starrocks_creds_path,
-        exclude_raw=True,
-        templates={
-            "STARROCKS_USER": '{{ get .Secrets "username" }}',
-            "STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',  # pragma: allowlist secret  # noqa: E501
-        },
-        vaultauth=marimo_vault_k8s_resources.auth_name,
-        revoke_on_delete=True,
-    ),
-    opts=ResourceOptions(
-        delete_before_replace=True, depends_on=[marimo_vault_k8s_resources]
-    ),
-)
-
 # APISIX OIDC resources for the published-apps gateway (apps_domain).
 # Published apps require authentication; all authenticated ol-data-platform
-# realm users can view any published app (per v1 scope decision).
+# realm users can view any published app (per v1 scope decision).  What each
+# viewer can see in one is their own StarRocks and Gravitino grants.
 marimo_oidc = OLApisixOIDCResources(
     f"ol-k8s-apisix-marimo-data-olapisixoidcresources-{stack_info.env_suffix}",
     oidc_config=OLApisixOIDCConfig(
         application_name="marimo-data",
         k8s_labels=application_labels,
         k8s_namespace=marimo_namespace,
+        # Apps log in to StarRocks with the forwarded token.
+        oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
         oidc_logout_path="/logout/oidc",
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         credentials=OLApisixOIDCVaultCredentials(
             mount="secret-operations",
-            path="sso/marimo",
+            path="sso/marimo-app",
             vaultauth=marimo_vault_k8s_resources.auth_name,
         ),
     ),
