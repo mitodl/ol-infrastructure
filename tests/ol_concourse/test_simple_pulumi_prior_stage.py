@@ -39,6 +39,15 @@ def test_starrocks_qa_posts_the_issue_production_waits_on() -> None:
     assert title in posted
 
 
+@pytest.mark.parametrize("app_name", sorted(pipeline_params))
+def test_every_pipeline_builds(app_name: str) -> None:
+    """record_deployments defaults to False, which deploy-chained chains reject.
+
+    That made starrocks-substructure-ci fail to generate after #5669.
+    """
+    build_simple_pulumi_pipeline(app_name)
+
+
 def test_prior_stage_without_record_is_rejected() -> None:
     params = dict(pipeline_params)
     params["starrocks-substructure-qa"] = params[

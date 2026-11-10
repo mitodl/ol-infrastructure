@@ -1125,6 +1125,12 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 f"{docker_image_resource.name}/tag"
             )
 
+    # deploy-chained always posts the "deployed." issue (it is that topology's
+    # promotion gate) and the library rejects record_deployments=False for it.
+    record_deployments = (
+        params.topology == "deploy-chained" or params.record_deployments
+    )
+
     # Build cross-environment GitHub issue gate if this pipeline continues a chain
     # that started in a different Concourse environment.  The prior stage's deployment
     # posts a GitHub issue on success; this pipeline watches for it to be closed before
@@ -1226,7 +1232,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     custom_dependencies=cross_env_custom_deps or None,
                     topology=params.topology,
                     auto_deploy_stages=params.auto_deploy_stages,
-                    record_deployments=params.record_deployments,
+                    record_deployments=record_deployments,
                 )
 
                 # Collect resources and jobs
@@ -1261,7 +1267,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 custom_dependencies=cross_env_custom_deps or None,
                 topology=params.topology,
                 auto_deploy_stages=params.auto_deploy_stages,
-                record_deployments=params.record_deployments,
+                record_deployments=record_deployments,
             )
 
             all_pipeline_resources = [
@@ -1299,7 +1305,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             custom_dependencies=cross_env_custom_deps or None,
             topology=params.topology,
             auto_deploy_stages=params.auto_deploy_stages,
-            record_deployments=params.record_deployments,
+            record_deployments=record_deployments,
         )
 
         all_pipeline_resources = [
