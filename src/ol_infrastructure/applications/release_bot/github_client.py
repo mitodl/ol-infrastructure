@@ -775,15 +775,25 @@ async def request_hotfix(repo_slug: str, sha: str) -> None:
     await asyncio.to_thread(_request_hotfix_sync, repo_slug, sha)
 
 
-def _cancel_hotfix_requests_sync(repo_slug: str) -> list[str]:
+def _cancel_hotfix_requests_sync(
+    repo_slug: str, only: list[str] | None = None
+) -> list[str]:
     repo = _get_client().get_repo(repo_slug)
     cancelled = []
     for ref in _hotfix_refs(repo):
+        if only is not None and _hotfix_sha(ref) not in only:
+            continue
         ref.delete()
         cancelled.append(_hotfix_sha(ref))
     return cancelled
 
 
-async def cancel_hotfix_requests(repo_slug: str) -> list[str]:
-    """Delete every pending hotfix request and return the SHAs cancelled."""
-    return await asyncio.to_thread(_cancel_hotfix_requests_sync, repo_slug)
+async def cancel_hotfix_requests(
+    repo_slug: str, only: list[str] | None = None
+) -> list[str]:
+    """Delete pending hotfix requests and return the SHAs cancelled.
+
+    Every pending request, or just those for the full SHAs in *only*, which is
+    how a request that failed part way is taken back without touching others.
+    """
+    return await asyncio.to_thread(_cancel_hotfix_requests_sync, repo_slug, only)

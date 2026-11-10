@@ -74,8 +74,12 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/celery_monitoring/": ["heroku/"],
     "applications/clickhouse/": [],
     "applications/codejail/": [],
-    "applications/concourse/": ["concourse/", "vector/"],
-    "applications/dagster/": ["mitlearn/secrets.*.yaml", "ol_data/"],
+    "applications/concourse/": ["concourse/", "observability_archive/", "vector/"],
+    "applications/dagster/": [
+        "concourse/operations.production.yaml",
+        "mitlearn/secrets.*.yaml",
+        "ol_data/",
+    ],
     "applications/digital_credentials/": ["digital_credentials/"],
     "applications/ecs_test/": [],
     "applications/edx_notes/": ["edx_notes/"],
@@ -128,6 +132,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/open_discussions/": ["heroku/"],
     "applications/open_metadata/": ["open_metadata/"],
     "applications/opik/": [],
+    "applications/paypal_adapter/": ["paypal_adapter/"],
     "applications/release_bot/": ["concourse/", "release_bot/"],
     "applications/starburst/": [],
     "applications/starrocks/": [],
@@ -163,7 +168,11 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     # consul.<env>.yaml's basic_auth_password is baked into the server cloud-init
     # userdata, so it is content-bearing here (unlike the provider-auth reads in
     # substructure/consul and applications/concourse via lib.consul).
-    "infrastructure/consul/": ["pulumi/consul.*.yaml", "vector/"],
+    "infrastructure/consul/": [
+        "observability_archive/",
+        "pulumi/consul.*.yaml",
+        "vector/",
+    ],
     "infrastructure/gcp/": ["gcp/"],
     "infrastructure/grafana_alerting/": ["grafana_cloud/"],
     "infrastructure/grafana_cloud/": [],
@@ -171,14 +180,18 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "infrastructure/monitoring/": [],
     "infrastructure/qdrant_cloud/": ["qdrant_cloud/"],
     "infrastructure/sentry/": ["sentry/"],
-    "infrastructure/vault/": ["vector/"],
-    "infrastructure/vector_log_proxy/": ["fastly.yaml", "vector/"],
+    "infrastructure/vault/": ["observability_archive/", "vector/"],
+    "infrastructure/vector_log_proxy/": [
+        "fastly.yaml",
+        "observability_archive/",
+        "vector/",
+    ],
     # ---- saas/ ------------------------------------------------------------
     "saas/github/organization/": [],
     "saas/github/repositories/": [],
     "saas/rootly/": ["rootly/"],
     # ---- substructure/ ----------------------------------------------------
-    "substructure/aws/eks/": ["alloy/"],
+    "substructure/aws/eks/": ["alloy/", "observability_archive/"],
     "substructure/consul/": [],
     "substructure/keycloak/": [],
     "substructure/open_metadata/": ["open_metadata/"],

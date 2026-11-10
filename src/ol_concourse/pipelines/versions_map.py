@@ -84,6 +84,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/mit_learn_nextjs/": [],
     "applications/mitxonline/": ["NGINX_VERSION"],
     "applications/observability_archive/": [
+        "LOKI_CHART_VERSION",
         "PDC_AGENT_VERSION",
         "TRAEFIK_CHART_VERSION",
     ],
@@ -95,6 +96,11 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/open_discussions/": [],
     "applications/open_metadata/": ["OPEN_METADATA_VERSION"],
     "applications/opik/": ["OPIK_CHART_VERSION"],
+    "applications/paypal_adapter/": [
+        "NGINX_VERSION",
+        "PAYPAL_ADAPTER_IMAGE_DIGEST",
+        "PAYPAL_ADAPTER_VERSION",
+    ],
     "applications/release_bot/": [],
     "applications/starburst/": [],
     "applications/starrocks/": [

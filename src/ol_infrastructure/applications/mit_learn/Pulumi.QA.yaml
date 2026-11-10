@@ -4,14 +4,22 @@ encryptedkey: AQICAHg42pDDDGBhpaX14TdtzcK1hbiMYTHsYRH4k5GL5RFpIwEi8MniqKSK7PJ7AI
 config:
 
   mitlearn:api_domain: "api.rc.learn.mit.edu"
+  # The worker's VPA replaces the request with its recommendation (here its 1Gi
+  # floor) and keeps this limit:request ratio, so the ratio is what sets the
+  # pod's limit, not these numbers. At 4800Mi:4800Mi the pod ran at 1Gi and
+  # generate_credential_metadata_for_resource OOMKilled it in a redelivery
+  # loop (2026-11-09). Production's default worker runs the same task under a
+  # 2Gi limit and peaked at ~1.5Gi over the week before; 2.4:1 gives QA ~2.4Gi
+  # at the floor.
   mitlearn:celery_default_resource_requests:
     cpu: "200m"
-    memory: "4800Mi"
+    memory: "1280Mi"
   mitlearn:celery_default_resource_limits:
-    memory: "4800Mi"
+    memory: "3072Mi"
   mitlearn:db_instance_size: db.t4g.large
   mitlearn:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
+  mitlearn:enable_azure_openai: true
   mitlearn:fastly_anycast_ips: []
   mitlearn:fastly_domain: "d.sni.global.fastly.net"
   mitlearn:frontend_domain: "rc.learn.mit.edu"
@@ -51,6 +59,7 @@ config:
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:support_url: "support.qa.learn.mit.edu"
   mitlearn:enable_fastly_shielding: true
+  mitlearn:enable_memory: true
   mitlearn:use_granian: true
   mitlearn:webapp_endpoint_routing: true
   mitlearn:vars:

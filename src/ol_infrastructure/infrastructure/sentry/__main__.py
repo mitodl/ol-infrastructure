@@ -5024,6 +5024,47 @@ key_witan = sentry.SentryKey(
 
 export_dsn("witan_sentry_dsn", key_witan)
 
+# Hand-authored addition, see IMPORT_SUMMARY.md. Fires on the first event of a
+# new issue, or a regression, in production only. Existing unresolved issues
+# are neither, so they do not fire on the first day. The default rule Sentry
+# created with the project ("Send a notification for high priority issues")
+# is not managed here: it covers every environment and does not fire on
+# regressions. It also emails issue owners, falling back to active members, so
+# until it is narrowed or disabled in Sentry, devops gets two emails for each
+# new high-priority production issue.
+#
+# Email rather than Rootly, because Rootly pages on-call for every new issue.
+issue_alert_witan_new_or_regressed_production = sentry.SentryIssueAlert(
+    "issue_alert_witan_new_or_regressed_production",
+    organization=ORGANIZATION,
+    project=project_witan.slug,
+    name="witan: new or regressed issue in production",
+    environment="production",
+    action_match="any",
+    filter_match="all",
+    frequency=30,
+    conditions=cast(
+        Any,
+        [
+            {"id": "sentry.rules.conditions.first_seen_event.FirstSeenEventCondition"},
+            {"id": "sentry.rules.conditions.regression_event.RegressionEventCondition"},
+        ],
+    ),
+    filters=cast(Any, []),
+    actions=cast(
+        Any,
+        [
+            {
+                "id": "sentry.mail.actions.NotifyEmailAction",
+                "targetType": "Team",
+                "targetIdentifier": team_devops.internal_id,
+                "fallthroughType": "ActiveMembers",
+            }
+        ],
+    ),
+    opts=sentry_issue_alert_opts,
+)
+
 # Hand-added stack outputs (not produced by bin/import-sentry-config) exposing
 # each project's DSN so consuming stacks can read it via
 # sentry_stack.require_output(...) instead of a hard-coded/SOPS/Vault secret.

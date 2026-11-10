@@ -27,6 +27,7 @@ from ol_infrastructure.components.aws.auto_scale_group import (
     TagSpecification,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib import telemetry_archive
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -53,6 +54,9 @@ def cloud_init_userdata(
     grafana_credentials = read_yaml_secrets(
         Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
     )
+    # The telemetry archive (ADR-0014) gets a copy of the host logs through a
+    # Vector sink file written beside the image's templates. None in CI.
+    archive = telemetry_archive.push_target(stack_info.env_suffix)
     cloud_config_contents = {
         "write_files": [
             {
@@ -101,9 +105,15 @@ def cloud_init_userdata(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
                     """
-                ),
+                )
+                + (telemetry_archive.ec2_vector_env_lines(archive) if archive else ""),
                 "owner": "root:root",
             },
+            *(
+                [telemetry_archive.ec2_vector_sink_file("consul", archive)]
+                if archive
+                else []
+            ),
         ]
     }
 

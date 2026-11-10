@@ -68,6 +68,8 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     CLUSTER_CONFIGMAP_NAME,
     DEFAULT_PER_ACTOR_BYTES_MAX,
     DEFAULT_PER_ACTOR_INFLIGHT_MAX,
+    DEFAULT_SERVER_MEMORY_LIMIT,
+    DEFAULT_SERVER_MEMORY_REQUEST,
     OMNIGRAPH_SERVER_SERVICE_NAME,
     create_data_tier,
     omnigraph_server_addr,
@@ -207,6 +209,15 @@ WITHHELD_GRAPHS: list[str] = omnigraph_config.get_object("withheld_graphs", [])
 # in the boot apply at about 1,000 objects a minute, and clear it with the
 # withheld graph. Unset leaves the Deployment spec as it is.
 BOOT_BUDGET_SECONDS: int | None = omnigraph_config.get_int("boot_budget_seconds")
+
+# The server container's memory request and limit. See
+# DEFAULT_SERVER_MEMORY_LIMIT in data_tier.py for why Production differs.
+SERVER_MEMORY_REQUEST: str = (
+    omnigraph_config.get("server_memory_request") or DEFAULT_SERVER_MEMORY_REQUEST
+)
+SERVER_MEMORY_LIMIT: str = (
+    omnigraph_config.get("server_memory_limit") or DEFAULT_SERVER_MEMORY_LIMIT
+)
 
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
@@ -1153,6 +1164,8 @@ data_tier = create_data_tier(
     deployed_written_internal_schema=DEPLOYED_WRITTEN_INTERNAL_SCHEMA,
     storage_restored_to_format=STORAGE_RESTORED_TO_FORMAT,
     deployed_witan_http_api_contracts=DEPLOYED_WITAN_HTTP_API_CONTRACTS,
+    server_memory_request=SERVER_MEMORY_REQUEST,
+    server_memory_limit=SERVER_MEMORY_LIMIT,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,

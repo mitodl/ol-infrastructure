@@ -162,8 +162,8 @@ def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[
     Production reads the application's read replica so bulk extracts never load
     the primary. The replica only exists where stack_defaults gives one
     (production), so other environments read the primary. A production app stack
-    that does not export ``rds_replica_host`` yet falls back to the primary, so
-    this stack can apply before the app stacks that add the export.
+    that stops exporting ``rds_replica_host`` fails this lookup rather than
+    silently sending the loader back to the primary.
 
     :param app_stack: The application's stack reference.
     :param output_name: The application stack's export holding its RDS hosts.
@@ -171,10 +171,10 @@ def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[
     :returns: The host for the matching ``<NAME>_DB_HOST`` variable.
     :rtype: Output[str]
     """
-    hosts = app_stack.require_output(output_name)
-    if stack_info.env_suffix != "production":
-        return hosts["rds_host"]
-    return hosts.apply(lambda out: out.get("rds_replica_host", out["rds_host"]))
+    host_key = (
+        "rds_replica_host" if stack_info.env_suffix == "production" else "rds_host"
+    )
+    return app_stack.require_output(output_name)[host_key]
 
 
 # The ml code location traces its LLM calls to the Production Opik from every
@@ -590,21 +590,48 @@ edxorg_courses_bucket = OLBucket(
 # mitx-etl-* buckets, laid out as {deployment}/{YYYYMMDD}/. Every night is a full
 # re-export, so drops expire instead of accumulating the way they do in the
 # legacy buckets, none of which expires anything (54-87 TB each as of 2026-08-30).
+#
+# Course tarballs are not part of a drop. Each exported version is copied once
+# to courses/{deployment}/{course_id}/{sha256}.xml.tar.gz and every night's
+# manifest points at the newest one, so they must outlive the drops. A lifecycle
+# filter can't exclude a prefix, hence one expiry rule per deployment prefix.
+IRX_EXPORT_DEPLOYMENTS = ("mitx", "mitxonline", "xpro")
 irx_export_bucket = OLBucket(
     "irx-export",
     config=S3BucketConfig(
         bucket_name=irx_export_bucket_name,
         versioning_enabled=False,
         server_side_encryption_enabled=True,
-        # Objects expire at 90 days, which is when tiering would first move them.
+        # Drops expire at 90 days, which is when tiering would first move them.
+        # courses/ tiers through its own rule below.
         intelligent_tiering_enabled=False,
         lifecycle_rules=[
+            *(
+                s3.BucketLifecycleConfigurationRuleArgs(
+                    id=f"expire-{deployment}-nightly-drops",
+                    status="Enabled",
+                    filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                        prefix=f"{deployment}/"
+                    ),
+                    expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(
+                        days=90
+                    ),
+                )
+                for deployment in IRX_EXPORT_DEPLOYMENTS
+            ),
+            # Only the newest version of a course is in a manifest, so older
+            # copies go cold. Same 90 days as the landing zone they're copied from.
             s3.BucketLifecycleConfigurationRuleArgs(
-                id="expire-nightly-drops",
+                id="tier-course-exports",
                 status="Enabled",
-                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
-                expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(days=90),
-            )
+                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix="courses/"),
+                transitions=[
+                    s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                        days=90,
+                        storage_class="INTELLIGENT_TIERING",
+                    )
+                ],
+            ),
         ],
         tags=aws_config.tags,
     ),
@@ -1058,6 +1085,33 @@ if stack_info.env_suffix in ("qa", "production"):
                 "developer_key": read_yaml_secrets(
                     Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml")
                 )["youtube_developer_key"]
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+# The Google Ads API credentials for the data_loading Google Ads dlt source.
+# Copied from the google_ads_optimization Concourse pipeline's secret so the
+# source pulls from the same manager account (the service account's access to it
+# is granted in Google Ads, not GCP). Production only: that pipeline uses this
+# credential to apply bid changes, so it can write to the live ad accounts, and
+# QA Vault is readable by every QA code location and by QA Concourse. Same
+# reasoning as the GitHub App above.
+if stack_info.env_suffix == "production":
+    google_ads_secrets = read_yaml_secrets(
+        Path("concourse/operations.production.yaml")
+    )["pipelines"]["main/google_ads_optimization"]
+    vault.generic.Secret(
+        f"dagster-google-ads-{stack_info.env_suffix}",
+        path="secret-data/pipelines/google_ads",
+        data_json=json.dumps(
+            {
+                key: google_ads_secrets[key]
+                for key in (
+                    "google_ads_json",
+                    "google_developer_token",
+                    "google_manager_account",
+                )
             }
         ),
         opts=ResourceOptions(delete_before_replace=True),
@@ -3274,6 +3328,30 @@ dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
     ),
 )
 
+# Lakehouse dbt steps, which ol-data-platform's lakehouse/lib/executor.py runs in
+# their own pods. A dbt step pod that is preempted fails the step, and
+# run_retries re-runs the whole dbt selection (30-40 minutes on Trino, replacing
+# every table it builds). At dagster-run's -100 any ordinary pod can preempt it;
+# at 0 it ranks with ordinary pods, so only higher-priority ones can. Still
+# preemption_policy Never, so it queues for capacity like a run worker and
+# never evicts anything, the daemon included. Step pods naming a class that
+# doesn't exist are rejected, so this has to be applied before the code
+# location that references it deploys.
+dagster_dbt_step_priority_class = kubernetes.scheduling.v1.PriorityClass(
+    f"dagster-dbt-step-priority-class-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-dbt-step",
+        labels=k8s_global_labels.model_dump(),
+    ),
+    value=0,
+    preemption_policy="Never",
+    global_default=False,
+    description=(
+        "Dagster dbt step pods: not preemptible by ordinary pods, and never "
+        "preempt anything themselves."
+    ),
+)
+
 # How many runs the QueuedRunCoordinator will have in flight at once.
 #
 # This has to be sized against the environment's PgBouncer connection budget,
@@ -3735,6 +3813,16 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
     ),
 )
 
+# Run and step workers are Job pods, and Jobs have no scale subresource, so a
+# budget with maxUnavailable can't count its expected pods: the disruption
+# controller reports SyncFailed and emits CalculateExpectedPodCountFailed on
+# every sync (18,021 events from the run worker budget by 2026-11-09, though
+# evictions still failed closed). An integer minAvailable is the form
+# Kubernetes supports for pods without a scalable controller; it counts the
+# matching pods directly. Set above any number that can run at once, it keeps
+# disruptionsAllowed at 0: no worker is ever evicted.
+DAGSTER_WORKER_PDB_MIN_AVAILABLE = 10_000
+
 # Pod Disruption Budget for run workers
 dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
     f"dagster-run-worker-pdb-{stack_info.env_suffix}",
@@ -3744,10 +3832,33 @@ dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
         labels=k8s_global_labels.model_dump(),
     ),
     spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
-        max_unavailable=0,
+        min_available=DAGSTER_WORKER_PDB_MIN_AVAILABLE,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "app.kubernetes.io/component": "run_worker",
+            },
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[dagster_helm_release, dagster_user_code_release]),
+)
+
+# Step pods, launched by k8s_job_executor (lakehouse), carry
+# app.kubernetes.io/component: step_worker, so the run worker budget above does
+# not cover them and a drain evicts a step mid-run. The run worker that launched
+# it survives, but the step fails; for a dbt step that means run_retries
+# re-runs the whole selection. Same budget as run workers.
+dagster_step_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+    f"dagster-step-worker-pdb-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-step-worker-pdb",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+        min_available=DAGSTER_WORKER_PDB_MIN_AVAILABLE,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "app.kubernetes.io/component": "step_worker",
             },
         ),
     ),

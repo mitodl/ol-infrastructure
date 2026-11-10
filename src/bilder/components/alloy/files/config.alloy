@@ -115,11 +115,26 @@ otelcol.processor.transform "add_resource_attributes_as_metric_attributes" {
 // Logs stop 1
 otelcol.processor.batch "grafana_cloud_otel" {
   output {
-    logs = [otelcol.exporter.loki.grafana_cloud_loki.input]
+    // Logs fan out to Grafana Cloud and to the telemetry archive (ADR-0014).
+    // The archive sink is a module so the image stays environment-agnostic:
+    // archive.alloy as shipped discards, and cloud-init replaces it on hosts
+    // whose environment has an archive. The batch processor's fan-out does
+    // not wait on one consumer for the other, and the archive exporter's
+    // queue is non-blocking, so a stalled archive never delays Cloud.
+    logs = [
+      otelcol.exporter.loki.grafana_cloud_loki.input,
+      archive.log_sink.default.input,
+    ]
     traces = [otelcol.exporter.otlp.grafana_cloud_tempo.input]
     metrics = [otelcol.exporter.prometheus.grafana_cloud_mimir.input]
   }
 }
+
+import.file "archive" {
+  filename = "/etc/alloy/archive.alloy"
+}
+
+archive.log_sink "default" { }
 
 otelcol.exporter.loki "grafana_cloud_loki" {
   forward_to = [loki.write.grafana_cloud_loki.receiver]

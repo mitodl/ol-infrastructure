@@ -17,9 +17,6 @@ has_projects: true
 merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: odl-video-service
-protected_release_branches:
-- release
-- release-candidate
 required_status_checks:
 - prek
 squash_merge_commit_message: COMMIT_MESSAGES

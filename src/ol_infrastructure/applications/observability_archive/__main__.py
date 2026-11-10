@@ -1,9 +1,10 @@
 """Self-hosted telemetry archive on the operations EKS cluster (ADR-0014).
 
-Phase 0 builds what Loki and Mimir share: the S3 buckets and IRSA roles, the
+Phase 0 built what Loki and Mimir share: the S3 buckets and IRSA roles, the
 internal write endpoint, and the Private Data Source Connect agent through which
-Grafana Cloud reads the archive. The Loki and Mimir releases follow in later
-phases. See docs/plans/telemetry-archive-implementation-plan.md.
+Grafana Cloud reads the archive. Phase 1 adds Loki, its push routes and its
+Cloud datasource. Mimir follows in Phase 2. See
+docs/plans/telemetry-archive-implementation-plan.md.
 """
 
 import json
@@ -15,7 +16,9 @@ from pulumi_aws import get_caller_identity
 
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.observability_archive import (
+    datasources,
     ingress,
+    loki,
     pdc,
     storage,
 )
@@ -36,6 +39,11 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
+from ol_infrastructure.lib.telemetry_archive import (
+    ARCHIVE_DOMAINS,
+    LOKI_PUSH_PATH,
+    OTLP_LOGS_PATH,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 if Config("vault_server").get("env_namespace"):
@@ -51,7 +59,9 @@ APPLICATION_NAME = "observability-archive"
 VAULT_MOUNT_PATH = "secret-observability-archive"
 PUSH_AUTH_SECRET_NAME = "telemetry-archive-push-auth"  # noqa: S105  # pragma: allowlist secret
 
-archive_domain = archive_config.require("domain")
+# Shared with every writer through lib/telemetry_archive.py, so the endpoint
+# the collectors ship to is the one this stack builds.
+archive_domain = ARCHIVE_DOMAINS[stack_info.env_suffix]
 retention_days = archive_config.require_int("retention_days")
 
 aws_config = AWSBase(
@@ -207,6 +217,37 @@ archive_ingress = ingress.build(
 )
 
 ##################################
+#        Loki (Phase 1)          #
+##################################
+
+loki_storage = archive_storage["loki"]
+loki_release = loki.build(
+    stack_info=stack_info,
+    aws_config=aws_config,
+    k8s_global_labels=k8s_global_labels,
+    namespace=NAMESPACE,
+    cluster_name=cluster_stack.require_output("cluster_name"),
+    bucket_name=loki_storage.bucket_name,
+    irsa_role_arn=loki_storage.irsa_role.role.arn,
+    service_account=loki_storage.service_account,
+    retention_days=retention_days,
+    node_selector=ARCHIVE_NODE_SELECTOR,
+    tolerations=ARCHIVE_TOLERATIONS,
+    depends_on=[loki_storage.bucket, loki_storage.irsa_role],
+)
+ingress.push_route(
+    name="loki-push",
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_labels=k8s_labels,
+    ingress=archive_ingress,
+    paths=[LOKI_PUSH_PATH, OTLP_LOGS_PATH],
+    backend_service=loki_release.distributor_service,
+    backend_port=loki_release.http_port,
+    depends_on=[loki_release.release],
+)
+
+##################################
 #    Read path (Grafana Cloud)   #
 ##################################
 
@@ -214,7 +255,7 @@ grafana_secrets = read_yaml_secrets(
     Path(f"grafana_cloud/api.{stack_info.env_suffix}.yaml")
 )
 if "cloud_access_policy_token" in grafana_secrets:
-    pdc_network = pdc.build(
+    read_path = pdc.build(
         stack_info=stack_info,
         grafana_secrets=grafana_secrets,
         grafana_cloud_stack_slug=archive_config.require("grafana_cloud_stack_slug"),
@@ -223,7 +264,13 @@ if "cloud_access_policy_token" in grafana_secrets:
         node_selector=ARCHIVE_NODE_SELECTOR,
         tolerations=ARCHIVE_TOLERATIONS,
     )
-    export("pdc_network_id", pdc_network.pdc_network_id)
+    datasources.loki_datasource(
+        stack_info=stack_info,
+        namespace=NAMESPACE,
+        retention_days=retention_days,
+        read_path=read_path,
+    )
+    export("pdc_network_id", read_path.network.pdc_network_id)
 else:
     log.warn(
         "grafana_cloud/api.*.yaml has no cloud_access_policy_token: the PDC "
@@ -245,3 +292,5 @@ export(
     },
 )
 export("nlb_security_group_id", archive_ingress.security_group.id)
+export("loki_push_url", f"https://{archive_domain}{LOKI_PUSH_PATH}")
+export("loki_otlp_logs_url", f"https://{archive_domain}{OTLP_LOGS_PATH}")

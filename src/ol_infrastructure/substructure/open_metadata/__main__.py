@@ -5,8 +5,8 @@ metadata connector, plus the IRSA role for the ``openmetadata-ingestion``
 service account so ingestion pods can access AWS Glue, S3, and RDS IAM auth.
 
 Connector credentials are read from Kubernetes secrets managed by the
-OpenMetadata application stack (via Vault Secrets Operator). The ingestion-bot
-JWT is injected the same way.
+OpenMetadata application stack (via Vault Secrets Operator). The system bots'
+JWTs are injected the same way, from the Vault secrets this stack writes.
 
 CronOMJob pods authenticate to the OpenMetadata server API using the bot JWT
 token from the ``om-ingestion-bot`` K8s secret, and to data sources via
@@ -51,17 +51,25 @@ from ol_infrastructure.providers.openmetadata import (
     OpenMetadataConnection,
     OpenMetadataEventSubscription,
     OpenMetadataEventSubscriptionSpec,
+    OpenMetadataSystemBot,
 )
 from ol_infrastructure.providers.openmetadata.access_control import (
+    OpenMetadataOrganizationPolicies,
     OpenMetadataPolicy,
     OpenMetadataRole,
     OpenMetadataTeam,
+)
+from ol_infrastructure.substructure.keycloak.ol_data_platform import (
+    OPEN_METADATA_DEFAULT_ROLE,
+    OPEN_METADATA_ROLE_BY_REALM_ROLE,
+    REALM_DEFAULT_ROLES,
 )
 from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
     OPENMETADATA_PROVISIONER_VAULT_MOUNT,
     OPENMETADATA_PROVISIONER_VAULT_NAME,
 )
 from ol_infrastructure.substructure.open_metadata.access_control import (
+    ORGANIZATION_POLICIES,
     POLICIES,
     ROLES,
     TEAMS,
@@ -405,11 +413,13 @@ def _bot_jwt_env(bot_secret_name: str) -> dict[str, object]:
     }
 
 
-def _secret_env(secret_name: str, key: str) -> dict[str, object]:
-    return {
-        "name": key,
-        "valueFrom": {"secretKeyRef": {"name": secret_name, "key": key}},
-    }
+def _secret_env(
+    secret_name: str, key: str, *, optional: bool = False
+) -> dict[str, object]:
+    ref: dict[str, object] = {"name": secret_name, "key": key}
+    if optional:
+        ref["optional"] = True
+    return {"name": key, "valueFrom": {"secretKeyRef": ref}}
 
 
 def _plain_env(name: str, value: "str | Output[str]") -> dict[str, object]:
@@ -447,8 +457,8 @@ def _make_cronjob(  # noqa: PLR0913
     :param opts: Optional Pulumi resource options (e.g. depends_on).
     :param bot_secret_name: K8s secret that holds the OM bot JWT token.
         Defaults to ``"om-ingestion-bot"`` for metadata ingestion workflows.
-        Use ``"om-lineage-bot"``, ``"om-profiler-bot"``, or
-        ``"om-data-insight-bot"`` for other workflow types.
+        Use ``"om-lineage-bot"`` or ``"om-profiler-bot"`` for other workflow
+        types.
     :param resources: Pod resource requests/limits. Defaults to
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
@@ -1033,6 +1043,16 @@ om_roles = {
     )
     for spec in ROLES
 }
+OpenMetadataOrganizationPolicies(
+    f"om-organization-policies-{stack_info.env_suffix}",
+    connection=om_connection,
+    policies=ORGANIZATION_POLICIES,
+    opts=ResourceOptions(
+        depends_on=[
+            om_policies[name] for name in ORGANIZATION_POLICIES if name in om_policies
+        ]
+    ),
+)
 # Deleting a team would also take it off every asset it owns and the glossary
 # it reviews.
 om_teams = [
@@ -1120,8 +1140,7 @@ server_config_job = kubernetes.batch.v1.Job(
         ttl_seconds_after_finished=86400,  # auto-clean after 24 h
     ),
     opts=ResourceOptions(
-        # The glossary the Job creates is owned by a team.
-        depends_on=[ingestion_irsa_role, *om_teams],
+        depends_on=[ingestion_irsa_role],
         delete_before_replace=True,
     ),
 )
@@ -1200,6 +1219,73 @@ vault.generic.Secret(
     ),
 )
 
+# glossary-sync-bot runs ol-data-platform's `ol-dbt glossary sync`. A bot of
+# its own keeps the glossary's version history attributable to the sync and its
+# role limited to the glossary. It is not a glossary reviewer and has no team,
+# so OpenMetadata refuses it a term's move from In Review to Approved or
+# Rejected (EntityRepository.updateEntityStatus). The glossary the sync creates
+# is owned and reviewed by the data-platform team, so the bot's token reaches
+# Vault, and the pipeline can run, only once the teams exist.
+glossary_sync_bot = OpenMetadataBot(
+    f"om-glossary-sync-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="glossary-sync-bot",
+        display_name="Glossary sync",
+        description=(
+            "Publishes ol-data-platform's glossary/ files as the business glossary."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"glossary-sync-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["GlossarySyncBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[om_roles["GlossarySyncBotRole"], *om_teams]),
+)
+
+# Read by the ol-data-glossary-sync pipeline, as the metrics sync's token is.
+vault.generic.Secret(
+    f"om-glossary-sync-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-concourse/infrastructure/openmetadata_glossary_bot",
+    data_json=Output.json_dumps(
+        {"token": glossary_sync_bot.token, "server_url": om_api_url}
+    ),
+)
+
+# The bots OpenMetadata seeds that something here uses. The application stack
+# syncs each secret-openmetadata/<bot> into the om-<bot> K8s secret the Jobs
+# above read as OM_BOT_JWT_TOKEN. The other seeded bots (autoClassification-bot,
+# governance-bot, scim-bot, testsuite-bot, usage-bot) have no consumer.
+#
+# The token is read on refresh, so one regenerated in the UI reaches Vault only
+# at the next `pulumi up --refresh` of this stack, and the Jobs fail with the
+# old one until then. Regenerate a token only alongside that update.
+om_system_bots = {
+    bot_name: OpenMetadataSystemBot(
+        f"om-{bot_name}-{stack_info.env_suffix}",
+        connection=om_connection,
+        bot_name=bot_name,
+    )
+    for bot_name in ("ingestion-bot", "lineage-bot", "profiler-bot")
+}
+for bot_name, system_bot in om_system_bots.items():
+    vault.generic.Secret(
+        f"om-{bot_name}-vault-secret-{stack_info.env_suffix}",
+        path=f"secret-openmetadata/{bot_name}",
+        data_json=Output.json_dumps({"token": system_bot.token}),
+    )
+
+# The contracts sync pipeline in ol_concourse/pipelines/applications/
+# ol_data_contracts_sync.py publishes ol-data-platform's contracts/ to
+# production OpenMetadata as the ingestion bot.
+if stack_info.env_suffix == "production":
+    vault.generic.Secret(
+        f"om-concourse-contracts-bot-vault-secret-{stack_info.env_suffix}",
+        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
+        data_json=Output.json_dumps(
+            {"token": om_system_bots["ingestion-bot"].token, "server_url": om_api_url}
+        ),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Alerts
@@ -1217,9 +1303,11 @@ vault.generic.Secret(
 # supersedes a running one or the quality run cannot be triggered, neither of
 # which says the contract failed.
 #
-# OpenMetadata returns a Slack destination's endpoint unmasked to anyone with
-# ViewAll on eventsubscription, which every user holds through the default
-# policies, so the webhook URL is readable inside OpenMetadata.
+# OpenMetadata returns a Slack destination's endpoint unmasked to anyone who
+# can read the alert, so HideAlertDestinationsPolicy (access_control.py) keeps
+# alerts from every user and bot but admins and the system bots.  Any valid
+# token can still read the URL through an empty PATCH of the alert or the
+# change-event feed (GET /v1/events); see that policy's comment.
 #
 # QA and Production hold the same webhook, so both environments' contract
 # failures post to one channel.
@@ -1266,6 +1354,16 @@ OpenMetadataEventSubscription(
 # OpenMetadata's jwtTeamClaimMapping stays unset. With it set, every login would
 # add the Keycloak memberships back into OpenMetadata and undo removals made
 # there.
+#
+# The same job then resets each user's roles to what their Keycloak realm roles
+# grant at login (the mapping the keycloak stack builds the `roles` claim from),
+# and clears isAdmin outside adminPrincipals. OpenMetadata only applies the
+# claim at login, so without this a demoted user who never logs in again keeps
+# their roles. That half writes as the provisioner's service account (an
+# admin), from the om-provisioner secret that the application stack creates.
+# Its references are optional so that, until that secret exists, the pod still
+# starts and only the role half fails. open_metadata:roles_dry_run true logs
+# its changes without making them.
 
 _make_cronjob(
     name="team-keycloak-sync",
@@ -1286,6 +1384,22 @@ _make_cronjob(
                 "KEYCLOAK_PARENT_GROUP_ID",
             )
         ),
+        _plain_env(
+            "OM_ROLE_BY_REALM_ROLE",
+            json.dumps(
+                {
+                    **OPEN_METADATA_ROLE_BY_REALM_ROLE,
+                    REALM_DEFAULT_ROLES: OPEN_METADATA_DEFAULT_ROLE,
+                },
+                sort_keys=True,
+            ),
+        ),
+        _plain_env(
+            "OM_ROLES_DRY_RUN",
+            json.dumps(om_config.get_bool("roles_dry_run", default=False)),
+        ),
+        _secret_env("om-provisioner", "OM_ADMIN_CLIENT_ID", optional=True),
+        _secret_env("om-provisioner", "OM_ADMIN_CLIENT_SECRET", optional=True),
     ],
     resources={
         "requests": {"cpu": "100m", "memory": "128Mi"},

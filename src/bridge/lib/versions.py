@@ -1,7 +1,7 @@
 # renovate: datasource=docker depName=aws-cli packageName=amazon/aws-cli
-AWS_CLI_VERSION = "2.39.3"
+AWS_CLI_VERSION = "2.39.6"
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
-CONCOURSE_VERSION = "8.3.2"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
+CONCOURSE_VERSION = "8.3.3"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
 CONSUL_TEMPLATE_VERSION = "0.43.1"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
@@ -13,11 +13,11 @@ KEYCLOAK_VERSION = "26.7.4"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
 # renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
-MEILISEARCH_VERSION = "v1.56.0"
+MEILISEARCH_VERSION = "v1.56.1"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "2.0.7"
 # renovate: datasource=docker depName=openapi-generator-cli packageName=openapitools/openapi-generator-cli
-OPENAPI_GENERATOR_VERSION = "v7.26.0"
+OPENAPI_GENERATOR_VERSION = "v7.27.0"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.7.17"
 # renovate: datasource=docker depName=typesense packageName=typesense/typesense
@@ -29,11 +29,21 @@ VECTOR_VERSION = "0.40.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
-AIRBYTE_CHART_VERSION = "2.4.0"
+AIRBYTE_CHART_VERSION = "2.5.0"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.22.8"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
+# The Stripe-written PayPal adapter, run unmodified from the vendor image
+# (docs/plans/paypal-adapter-eks-deployment.md, P4). The pod pulls by digest so
+# a re-pushed tag cannot change what runs in the payment path. The distinct
+# marker routes these two lines to a dedicated Renovate manager that moves the
+# tag and digest together; the generic manager would bump only the tag. These
+# PRs never automerge: run `cosign verify` on the new digest before approving.
+# The two assignments must stay adjacent and in this order for that manager.
+# renovate-digest: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters
+PAYPAL_ADAPTER_VERSION = "2.4.2"
+PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:89ef36f0a06aa83788c1a465f95ffabd9b5b1a1e9e8e99eef57e484d67c28ba8"  # pragma: allowlist secret
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.18.2"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
@@ -43,7 +53,7 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager registryUrl=https://charts.jetstack.io
 CERT_MANAGER_CHART_VERSION = "v1.21.3"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.13.28"
+DAGSTER_CHART_VERSION = "1.13.29"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
 EBS_CSI_DRIVER_VERSION = "v1.66.0-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
@@ -75,7 +85,7 @@ KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.42.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
-OPIK_CHART_VERSION = "2.2.137"
+OPIK_CHART_VERSION = "2.2.143"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.8"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
@@ -93,15 +103,16 @@ VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf3
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
 CLICKHOUSE_OPERATOR_VERSION = "release-0.27.4"
-# 24.8 -> 26.3 goes through 25.8: upstream supports a rolling upgrade only
-# between versions less than a year or two LTS lines apart. Stacks still on the
-# previous line pin clickhouse:version and set clickhouse:compatibility.
+# Upstream supports a rolling upgrade only between versions less than a year or
+# two LTS lines apart (24.8 -> 26.3 went through 25.8). A stack held on the
+# previous line pins clickhouse:version; a stack rolling to a new line sets
+# clickhouse:compatibility to the line it is leaving.
 # renovate: datasource=docker depName=altinity/clickhouse-server packageName=altinity/clickhouse-server
-CLICKHOUSE_SERVER_VERSION = "25.8.33.10002.altinitystable"
+CLICKHOUSE_SERVER_VERSION = "26.3.60.10002.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.8-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "42.2.0"
+TRAEFIK_CHART_VERSION = "42.3.1"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.10.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
@@ -109,11 +120,11 @@ VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.6.2"
 # renovate: datasource=docker depName=nginx
 NGINX_VERSION = "1.31.8"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
-PROMETHEUS_OPERATOR_CRD_VERSION = "v0.94.2"
+PROMETHEUS_OPERATOR_CRD_VERSION = "v0.95.1"
 # renovate: datasource=github-tags depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.7.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
-JUPYTERHUB_CHART_VERSION = "4.4.4"
+JUPYTERHUB_CHART_VERSION = "4.4.5"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
 MARIMO_OPERATOR_VERSION = "v0.3.0"
 # TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
@@ -128,9 +139,9 @@ LOKI_CHART_VERSION = "7.5.0"
 # renovate: datasource=helm depName=mimir-distributed packageName=mimir-distributed registryUrl=https://grafana.github.io/helm-charts
 MIMIR_DISTRIBUTED_CHART_VERSION = "6.2.2"
 # renovate: datasource=docker depName=pdc-agent packageName=grafana/pdc-agent
-PDC_AGENT_VERSION = "0.0.67"
+PDC_AGENT_VERSION = "0.0.68"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
-NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.4"
+NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.9.0"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
 NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.20.1"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
@@ -140,7 +151,7 @@ PGBOUNCER_VERSION = "1.26.1"
 # renovate: datasource=docker depName=pgbouncer-exporter packageName=quay.io/prometheuscommunity/pgbouncer-exporter
 PGBOUNCER_EXPORTER_VERSION = "v0.12.1"
 # renovate: datasource=docker depName=sql-exporter packageName=burningalchemist/sql_exporter
-SQL_EXPORTER_VERSION = "0.24.12"
+SQL_EXPORTER_VERSION = "0.24.13"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.37"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
@@ -148,13 +159,13 @@ QDRANT_VERSION = "v1.20.0"
 # renovate: datasource=helm depName=typesense-operator packageName=typesense-operator registryUrl=https://akyriako.github.io/typesense-operator
 TYPESENSE_OPERATOR_CHART_VERSION = "0.4.2"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
-VPA_CHART_VERSION = "0.15.0"
+VPA_CHART_VERSION = "0.16.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
-TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.59.0"
+TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.63.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
-TOOLHIVE_OPERATOR_CHART_VERSION = "0.59.0"
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.63.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
-MCP_GRAFANA_VERSION = "2.1.1"
+MCP_GRAFANA_VERSION = "2.2.0"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
@@ -166,7 +177,7 @@ MCP_CONTEXT7_VERSION = "4.4.4"
 # AWS's official SigV4 proxy image, the stdio bridge to the managed AWS MCP Server
 # endpoint. Image tags track the PyPI package (mcp-proxy-for-aws) one-for-one.
 # renovate: datasource=docker depName=mcp-proxy-for-aws packageName=public.ecr.aws/mcp-proxy-for-aws/mcp-proxy-for-aws
-MCP_PROXY_FOR_AWS_VERSION = "1.7.0"
+MCP_PROXY_FOR_AWS_VERSION = "1.8.0"
 
 # Local-dev only (local-dev/infra). Deployed environments use a managed service
 # or nothing in these places; everything local-dev shares with a deployed stack
@@ -186,9 +197,9 @@ OPENSEARCH_CHART_VERSION = "3.9.0"
 # renovate: datasource=docker depName=valkey packageName=valkey/valkey
 VALKEY_VERSION = "7.2.15-alpine"
 # renovate: datasource=docker depName=mailpit packageName=axllent/mailpit
-MAILPIT_VERSION = "v1.33.0"
+MAILPIT_VERSION = "v1.33.1"
 # renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
-LITELLM_VERSION = "v1.106.6"
+LITELLM_VERSION = "v1.108.3"
 # Keep this on a plain release tag. Renovate never proposes an update from a
 # prerelease pin (a -rc.N suffix only matches the same suffix), and the same
 # rule keeps it from proposing the -preview.N tags RustFS also publishes.
@@ -202,4 +213,4 @@ ALLOY_VERSION = "v1.21.3"
 GRAFANA_VERSION = "13.3.0"
 # The -slim variant: no bundled local models. Embeddings come from Bedrock.
 # renovate: datasource=docker depName=hindsight-api packageName=ghcr.io/vectorize-io/hindsight-api
-HINDSIGHT_VERSION = "1.1.0-slim"
+HINDSIGHT_VERSION = "1.2.0-slim"

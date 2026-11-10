@@ -18,6 +18,11 @@ path "secret-operations/sso/superset" {
 path "secret-openmetadata/data/keycloak-team-sync" {
   capabilities = ["read"]
 }
+# The provisioner's Keycloak client, an OpenMetadata admin, for the same job's
+# role reconciliation
+path "secret-openmetadata/data/pulumi-provisioner" {
+  capabilities = ["read"]
+}
 # Connector credentials for OpenMetadata ingestion pipelines
 path "secret-openmetadata/data/connectors" {
   capabilities = ["read"]
@@ -25,8 +30,8 @@ path "secret-openmetadata/data/connectors" {
 path "secret-openmetadata/data/connectors/*" {
   capabilities = ["read"]
 }
-# Ingestion-bot JWT tokens for authenticating to the OpenMetadata server API.
-# One path per system bot (ingestion, lineage, profiler, data-insight).
+# System bot JWTs for authenticating to the OpenMetadata server API, written by
+# substructure/open_metadata. One path per bot the ingestion jobs use.
 path "secret-openmetadata/data/ingestion-bot" {
   capabilities = ["read"]
 }
@@ -34,9 +39,6 @@ path "secret-openmetadata/data/lineage-bot" {
   capabilities = ["read"]
 }
 path "secret-openmetadata/data/profiler-bot" {
-  capabilities = ["read"]
-}
-path "secret-openmetadata/data/data-insight-bot" {
   capabilities = ["read"]
 }
 # Read-only StarRocks credentials for the StarRocks ingestion jobs. Only QA

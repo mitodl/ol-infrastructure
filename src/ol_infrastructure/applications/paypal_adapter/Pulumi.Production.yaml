@@ -1,0 +1,9 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwEP62GVew9/lFS1oRFzFsiPAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMhuDvuzAuDJxwjYV8AgEQgDsmHPjDT9CLYITWN6e4plCGMYBQJwfBDJDsllgaXw/7IkmudeXe5dTj5zH6i+okWEq5+fci6nYzp0RElQ==
+config:
+  aws:region: us-east-1
+  paypal_adapter:k8s_domain: paypal-adapter.ol.mit.edu
+  paypal_adapter:livemode: "true"
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

@@ -1,0 +1,7 @@
+---
+name: ol-application-paypal-adapter
+runtime: python
+description: Run the Stripe-written PayPal adapter that brokers PayPal payments for
+  Stripe Checkout
+backend:
+  url: s3://mitol-pulumi-state/

@@ -806,6 +806,32 @@ Decided by the project owner since:
    long support window. The first deployment's in-cluster bge-base-en-v1.5 is English-only and
    truncates past 512 tokens, and Azure text-embedding-3 retires on 2028-02-09. Learner content
    already goes to OpenAI, so a hosted embedding provider needs no separate approval.
+6. 2026-11-09: Hindsight's own embedding calls stay outside ol-llm and are measured instead of
+   routed through the library (formerly open item 8). Every retained note and every recall
+   query still goes to Bedrock from Hindsight's in-process LiteLLM client.
+   - Dollars: Hindsight invokes a Bedrock application inference profile per environment,
+     copied from `cohere.embed-v4:0` and tagged `Application: hindsight`, through
+     `EMBEDDINGS_LITELLM_SDK_MODEL_ID`. LiteLLM still takes `bedrock/cohere.embed-v4:0` to
+     shape the request, so stored vectors don't change. Cost Explorer splits by that tag only
+     once `Application` is an active cost allocation tag in the payer account, which the
+     linked account cannot check.
+   - Per-app counts: a model call extension, `ol_memory_ext.model_calls.EmbeddingMeter`, adds
+     to `ol_memory_embedding_calls_total`, `ol_memory_embedding_texts_total` and
+     `ol_memory_embedding_estimated_input_tokens_total` on Hindsight's `/metrics`, labelled
+     `app`, `operation`, `model` and `success`. Tokens are characters / 4: Hindsight's
+     LiteLLM SDK embeddings backend never reports provider input tokens, so a call's
+     `input_tokens` is 0 whatever LiteLLM returns. No text, bank, learner or document id is
+     recorded.
+   - The app on a retain is the document id's `<app>.` prefix. On a recall it is the app the
+     validator passed for the request. That relies on Hindsight awaiting `validate_recall`
+     inline before it embeds the query, and the embedding (run under `asyncio.gather`)
+     inheriting the request's context, which holds in the 1.2.0 source
+     (`memory_engine.py` ~9496 and ~9945). Only the QA `/metrics` check will confirm it.
+     Otherwise the app is `unknown`.
+   - Not covered: no §4 attribution beyond the app (no `use_case`, no user), no Opik trace,
+     and no budget count.
+   - Gated per stack by `hindsight:embeddings_metering`: on in QA, off in Production until QA
+     shows the profile and the counters working.
 
 The design as deployed (ol-infrastructure #6423, #6424, #6492):
 
@@ -879,14 +905,14 @@ auto-consolidation off, `LLM_TRACE_ENABLED=false`, `STORE_DOCUMENT_TEXT=false`,
 `VECTOR_INDEX_MIN_ROWS=10000`, MCP off, and the file upload API off with attachments refused
 (attachment bytes sit in a table with no `bank_id`, out of the trigger's reach). Hindsight makes
 no LLM calls, so extraction stays in ol-llm under §5.3 item 1. It does embed every note and every
-recall query itself, calling Bedrock through LiteLLM in-process with the pod's IRSA role (open
-item 8). Before storage, a retain's content, context, metadata keys and values, and entity text
+recall query itself, calling Bedrock through LiteLLM in-process with the pod's IRSA role
+(decision 6). Before storage, a retain's content, context, metadata keys and values, and entity text
 are redacted with the built-in secret and card screen plus email and phone patterns. Document
 ids, entity types and timestamps are not, so a document-id key must not carry learner content.
 Names and assessment content are not pattern-matchable and stay the ol-llm gate's job (§5.3
 item 2).
 
-Where it runs. Hindsight `1.0.0-slim` on the applications EKS cluster, cluster-internal at
+Where it runs. Hindsight `1.2.0-slim` on the applications EKS cluster, cluster-internal at
 `hindsight.hindsight.svc.cluster.local` with no APISIX route, one API replica, and RDS Postgres
 18 with Vault dynamic credentials. Hindsight reads `DATABASE_URL` once, so rotation restarts the
 pod. QA came up on 2026-10-20 and Production on 2026-10-21. The Keycloak change was applied in
@@ -928,11 +954,6 @@ Still open:
 7. Hindsight fixes the vector column to the model's dimension once a bank holds data, so
    changing the embedding model means re-embedding every bank through export and import, which
    is untested.
-8. Hindsight's embedding calls carry learner content outside ol-llm. Every retained note and
-   every recall query goes to Bedrock from Hindsight's own LiteLLM client, with no §4
-   attribution, no Opik trace and no budget count, which is the gap §5.3 item 1 says the
-   library exists to close. Whether that is accepted or routed through the library is the
-   owner's call.
 
 ## 6. Call contract
 

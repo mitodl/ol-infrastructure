@@ -5,6 +5,5 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
-  observability_archive:domain: telemetry-archive.ol.mit.edu
   observability_archive:retention_days: "395"
   observability_archive:grafana_cloud_stack_slug: mitolproduction

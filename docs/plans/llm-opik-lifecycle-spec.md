@@ -135,7 +135,8 @@ summary, flashcard, and OCR prompts).
 - C: split by label. Anyone admitted may create versions and move non-production labels in
   the UI. Only CI moves `production`, from a merged pull request that names the prompt and
   the version number to promote. The repository holds a pointer, not the text, so the
-  embedded fallback (§3) has to be exported at build time.
+  embedded fallback (§3) has to be exported at build time. (Amended 2026-11-10: the pointer
+  pull request commits the exported text instead; see §2.3 item 6.)
 
 ### 2.3 Decision
 
@@ -148,7 +149,7 @@ The workflow:
    `ci` and `qa` labels.
 2. Each app repository holds a pointer file: for every prompt, the name and the version
    number that production runs. Changing production means a pull request that changes the
-   number.
+   number and commits that version's text (item 6).
 3. The pull request runs the evaluation for that version (§5) and links the experiment.
 4. On merge, a CI job moves the `production` label to the pointed version. Promotion jobs
    for a repository run one at a time, and each reads the pointer file from the default
@@ -156,15 +157,23 @@ The workflow:
    close together can finish out of order and the older job moves the label back. Only that
    job's Keycloak client is meant to move it. Opik cannot enforce that, so the drift report
    (§1.2 item 5) compares the label with the pointer and reports a mismatch.
-5. Rollback is a revert of the pointer change.
-6. The build exports the text of the pointed version into the image as the embedded default
-   (§3 item 4), so the fallback is a reviewed version.
+5. Rollback is a revert of the pointer pull request.
+6. The pull request that moves a pointer also commits the text of the pointed version, beside
+   the pointer file, as the embedded default (§3 item 4). The person moving the pointer
+   exports it (`ol-llm-prompts export`), and the pull request's check fails unless every
+   committed export is its pointed version's text. The fallback is then a reviewed version
+   whose text is in the diff, and the image build needs no access to Opik.
+
+Amended 2026-11-10: item 6 originally had the image build export the pointed version. That
+put Opik credentials and an Opik dependency in every app's build, kept the new text out of the
+pull request's diff, and left the embedded default one version behind after a promotion that
+changed only the pointer, until the next build.
 
 Two consequences:
 
-- A promotion that changes only the pointer moves the label without rebuilding the image, so
-  until the next build the embedded default is one version behind. During an Opik outage at
-  cold start the app then runs the previous production prompt, marked degraded.
+- A promotion takes effect in Opik when the label moves, and in the embedded default when the
+  image built from the merge deploys. Between the two, an Opik outage at cold start runs the
+  previous production prompt, marked degraded.
 - ol-data-platform changes from "latest version, created from code if missing" to fetching
   by label with a pointer in the repo. mit-learn's admins and learn-ai's prompt authors edit
   in Opik and promote through a pull request.
@@ -172,7 +181,8 @@ Two consequences:
 ## 3. Prompt runtime policy
 
 The rules the library's prompt helper implements. Decided 2026-10-01 as written, read with
-§2's option C: the embedded default is the pointed production version exported at build time.
+§2's option C: the embedded default is the pointed production version's text, committed with
+the pointer (§2.3 item 6, amended 2026-11-10).
 
 1. Deployed code fetches by environment label:
    `get_prompt(name, environment=<ci|qa|production>)`, with the app's project. Opik seeds
@@ -185,7 +195,7 @@ The rules the library's prompt helper implements. Decided 2026-10-01 as written,
    `config.py:391-396`). A label move reaches every process within five minutes. A warm
    entry keeps being served if a refresh fails (`prompt_cache.py:142-161`).
 4. Cold start with Opik unreachable: fall back to the embedded default, which is the text of
-   the pointed production version exported into the image at build time (§2.3), and mark the
+   the pointed production version committed beside the pointer file (§2.3), and mark the
    result degraded with reason `embedded_prompt`
    (call contract §6.7). The SDK's own failure took 11 s to surface in the local test, so the
    helper puts a 2 s deadline on a cold fetch. This applies to both profiles: a batch run

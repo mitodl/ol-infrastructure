@@ -15,6 +15,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER,
     OPEN_METADATA_SESSION_EXPIRY_SECONDS,
+    SECONDS_IN_ONE_DAY,
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
 from bridge.secrets import sops as _bridge_sops
@@ -40,6 +41,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -67,6 +69,8 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
     OPENMETADATA_PROVISIONER_USERNAME,
+    OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+    OPENMETADATA_PROVISIONER_VAULT_NAME,
 )
 
 # Resolve the bridge secrets directory once at module level using the sops
@@ -119,21 +123,22 @@ open_metadata_namespace = "open-metadata"
 open_metadata_service_account_name = "openmetadata"
 # Users' roles come from the `roles` claim that the ol-open_metadata-client
 # Keycloak client sends (substructure/keycloak ol_data_platform.py
-# OPEN_METADATA_ROLE_BY_REALM_ROLE). The claim never carries `Admin`, because
-# OpenMetadata only ever promotes from it and never clears isAdmin when it is
-# absent. Admins come only from initialAdmins below, which also names the
-# Keycloak service account that Pulumi manages bots with.
+# OPEN_METADATA_ROLE_BY_REALM_ROLE). The claim never carries `Admin`. Admins
+# come only from initialAdmins below, which also names the Keycloak service
+# account that Pulumi manages bots with.
 #
-# Tokens OpenMetadata issues itself (session JWTs, personal access tokens) carry
-# a snapshot of the user's roles, `Admin` included, and GET
-# /users/loggedInUser resyncs the user from that snapshot. An old personal
-# access token can therefore give a demoted user back a role or admin, or drop
-# a role they were given after it was issued, until they next log in. Demoting
-# anyone fully means revoking their personal access tokens.
+# OpenMetadata reads the claim only at login. The tokens it issues itself
+# (session JWTs, personal access tokens) carry a snapshot of the user's roles,
+# but 2.0.7 does not sync from them (JwtFilter.getUserRolesFromClaims) and
+# authorizes with the roles stored on the user. The team-keycloak-sync CronOMJob
+# in substructure/open_metadata resets those stored roles to the mapping every
+# hour and clears isAdmin on anyone outside adminPrincipals, after which a
+# user's tokens carry only what they now hold.
 #
 # To demote an admin: remove them from initialAdmins below and from
-# adminPrincipals in the authorizerConfiguration row, unset isAdmin on their
-# OpenMetadata user, and revoke their personal access tokens.
+# adminPrincipals in the authorizerConfiguration row. That job then clears their
+# isAdmin within the hour (or OpenMetadata does at their next login); revoke
+# their personal access tokens by hand if they should lose those too.
 open_metadata_use_roles_from_provider = True
 # CI's authenticationConfiguration row was seeded while this was still "public",
 # and public means the implicit flow, which ol-open_metadata-client no longer
@@ -538,6 +543,34 @@ OLVaultK8SSecret(
     ),
 )
 
+# The provisioner's Keycloak client, whose service account is in initialAdmins,
+# for the role half of the same job: setting another user's roles or isAdmin is
+# admin-only. The ingestion service account that runs
+# the job can already read this namespace's secrets, the server's database
+# credentials among them, so this grants it nothing it could not do already.
+OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-provisioner-secret",
+    OLVaultK8SStaticSecretConfig(
+        name="openmetadata-provisioner",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="om-provisioner",  # noqa: S106  # pragma: allowlist secret
+        labels=k8s_global_labels,
+        mount=OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+        mount_type="kv-v2",
+        path=OPENMETADATA_PROVISIONER_VAULT_NAME,
+        templates={
+            "OM_ADMIN_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OM_ADMIN_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+
 # Read-only StarRocks credentials for the StarRocks ingestion job, issued by
 # Vault's `database-starrocks` mount. The mount name is not environment
 # qualified: QA and Production each run their own Vault server. The jobs that
@@ -570,29 +603,39 @@ if stack_info.name != "CI":
     )
     connector_secrets.append(starrocks_connector_secret)
 
-# OM ships with several system bots, each with its own JWT used by a specific
-# workflow type.  All known bots are listed here (SOPS key → OM hyphenated name).
-# Any bot whose token appears in the SOPS file gets its own Vault secret and a
-# VSO-managed K8s secret (``om-<bot>``).  The K8s secret exposes a single key
-# ``OM_BOT_JWT_TOKEN`` so all ingestion scripts can use the same env-var name.
-_OM_BOTS: dict[str, str] = {
-    "ingestion_bot": "ingestion-bot",
-    "lineage_bot": "lineage-bot",
-    "profiler_bot": "profiler-bot",
-    "data_insight_bot": "data-insight-bot",
-}
+# The system bots whose JWTs the substructure stack's CronOMJobs use. That
+# stack reads each token from OpenMetadata and writes it to
+# secret-openmetadata/<bot>; this syncs it into a K8s secret (``om-<bot>``)
+# with the single key ``OM_BOT_JWT_TOKEN``, so every ingestion script reads the
+# same env var. The substructure stack has no CI stack, so neither do these.
+#
+# Only the Jobs read them, so like the Superset secret they stay out of the
+# server's envFrom and have no restart target. The server would otherwise fail
+# to start in a new environment until the substructure stack, which needs the
+# server running to read the tokens, had written them.
+_OM_BOTS = ("ingestion-bot", "lineage-bot", "profiler-bot")
 
-for _bot_key, _bot_name in _OM_BOTS.items():
-    if not open_metadata_connector_secrets.get(_bot_key):
-        continue
-    _k8s_secret_name = f"om-{_bot_name}"  # pragma: allowlist secret
+# The substructure stack owns these Vault secrets' data now. The resources stay
+# for one release so retain_on_delete reaches this stack's state; deleting them
+# without it would delete the secrets the substructure stack writes. Remove them
+# (and the SOPS keys they read) in the next release, once that is deployed.
+_retained_vault_secret_opts = ResourceOptions(
+    retain_on_delete=True, ignore_changes=["data_json"]
+)
+
+for _bot_name in _OM_BOTS if stack_info.name != "CI" else ():
     vault.generic.Secret(
         f"open-metadata-{_bot_name}-vault-secret-{stack_info.env_suffix}",
         path=f"secret-openmetadata/{_bot_name}",
-        data_json=Output.secret(json.dumps(open_metadata_connector_secrets[_bot_key])),
-        opts=ResourceOptions(
-            depends_on=[open_metadata_connector_vault_mount],
-            parent=vault_k8s_resources,
+        data_json=Output.secret(
+            json.dumps(open_metadata_connector_secrets[_bot_name.replace("-", "_")])
+        ),
+        opts=ResourceOptions.merge(
+            _retained_vault_secret_opts,
+            ResourceOptions(
+                depends_on=[open_metadata_connector_vault_mount],
+                parent=vault_k8s_resources,
+            ),
         ),
     )
     OLVaultK8SSecret(
@@ -601,13 +644,11 @@ for _bot_key, _bot_name in _OM_BOTS.items():
             name=f"openmetadata-{_bot_name}",
             namespace=open_metadata_namespace,
             dest_secret_labels=k8s_global_labels,
-            dest_secret_name=_k8s_secret_name,
+            dest_secret_name=f"om-{_bot_name}",
             labels=k8s_global_labels,
             mount="secret-openmetadata",
             mount_type="kv-v2",
             path=_bot_name,
-            restart_target_kind="Deployment",
-            restart_target_name="openmetadata",
             templates={"OM_BOT_JWT_TOKEN": '{{ get .Secrets "token" }}'},
             vaultauth=vault_k8s_resources.auth_name,
         ),
@@ -616,13 +657,9 @@ for _bot_key, _bot_name in _OM_BOTS.items():
             parent=vault_k8s_resources,
         ),
     )
-    connector_secret_names.append(_k8s_secret_name)
 
-# A copy of the ingestion bot token for the contracts sync pipeline in
-# ol_concourse/pipelines/applications/ol_data_contracts_sync.py, which
-# publishes ol-data-platform's contracts/ to production OpenMetadata. Concourse
-# shares this Vault but reads only secret-concourse/<team>/*. Dagster's token
-# is dagster-bot's, written by substructure/open_metadata.
+# Retained for one release like the bot secrets above; the substructure stack
+# writes it now.
 if stack_info.env_suffix == "production":
     vault.generic.Secret(
         f"open-metadata-concourse-contracts-bot-secret-{stack_info.env_suffix}",
@@ -635,6 +672,7 @@ if stack_info.env_suffix == "production":
                 }
             )
         ),
+        opts=_retained_vault_secret_opts,
     )
 
 # IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.
@@ -1198,6 +1236,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # after a restart and then flattens at 315-353Mi, with zero restarts in
             # either cluster. It is undersized, not leaking. The limit gives ~45%
             # headroom over the 353Mi peak; the request sits just above the plateau.
+            # The heap is a separate ceiling: the JVM takes its default 25% of
+            # the limit (128Mi), and the chart has no env passthrough to raise it.
+            # That heap ran out in QA (2026-11-03) and production (2026-10-30 and
+            # 2026-11-04) once ~1,800 OMJobs had piled up; omjob_cleanup_cron_job
+            # below keeps that count down.
             "omjobOperator": {
                 "enabled": True,
                 "image": {
@@ -1208,6 +1251,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "requests": {"cpu": "100m", "memory": "384Mi"},
                     "limits": {"cpu": "500m", "memory": "512Mi"},
                 },
+                # The heap exhaustion kills the operator's threads one by one but
+                # never the process, so the container stayed Running for a day
+                # without reconciling anything. The /health server's dispatcher
+                # thread is among the casualties, so its liveness probe turns
+                # that into a restart.
+                "healthCheck": {"enabled": True},
             },
             "envFrom": [
                 {
@@ -1241,6 +1290,131 @@ open_metadata_application = kubernetes.helm.v3.Release(
             *connector_secrets,
         ],
     ),
+)
+
+# The omjob-operator deletes an OMJob's pods after ttlSecondsAfterFinished but
+# never the OMJob, and the 2.0.7 operator ignores the CronOMJob
+# successful/failedJobsHistoryLimit fields. Each OMJob carries its CronOMJob's
+# whole pod spec, and the operator's informer cache holds all of them. About
+# 35 a day are created (since the hourly team-keycloak-sync), so 7 days keeps
+# ~250, where ~1,800 exhausted the heap. See scripts/omjob_cleanup.py.
+OMJOB_CLEANUP_NAME = "omjob-cleanup"
+OMJOB_RETENTION_DAYS = 7
+omjob_cleanup_labels = {**k8s_global_labels, "app.kubernetes.io/name": "omjob-cleanup"}
+omjob_cleanup_service_account = kubernetes.core.v1.ServiceAccount(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-service-account",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+)
+omjob_cleanup_role = kubernetes.rbac.v1.Role(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-role",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+    rules=[
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["pipelines.openmetadata.org"],
+            resources=["omjobs"],
+            verbs=["list", "delete"],
+        ),
+    ],
+)
+omjob_cleanup_role_binding = kubernetes.rbac.v1.RoleBinding(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-role-binding",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+    subjects=[
+        kubernetes.rbac.v1.SubjectArgs(
+            kind="ServiceAccount",
+            name=OMJOB_CLEANUP_NAME,
+            namespace=open_metadata_namespace,
+        )
+    ],
+    role_ref=kubernetes.rbac.v1.RoleRefArgs(
+        kind="Role",
+        name=OMJOB_CLEANUP_NAME,
+        api_group="rbac.authorization.k8s.io",
+    ),
+)
+omjob_cleanup_cron_job = kubernetes.batch.v1.CronJob(
+    f"open-metadata-{stack_info.name}-omjob-cleanup-cron-job",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=OMJOB_CLEANUP_NAME,
+        namespace=open_metadata_namespace,
+        labels=omjob_cleanup_labels,
+    ),
+    spec=kubernetes.batch.v1.CronJobSpecArgs(
+        # Clear of the 02:00-09:00 UTC ingestion runs.
+        schedule="0 12 * * *",
+        concurrency_policy="Forbid",
+        successful_jobs_history_limit=1,
+        failed_jobs_history_limit=3,
+        job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=omjob_cleanup_labels),
+            spec=kubernetes.batch.v1.JobSpecArgs(
+                # The next day's run is the retry.
+                backoff_limit=0,
+                active_deadline_seconds=1800,
+                # failed_jobs_history_limit keeps a lone failed Job forever, and
+                # the WorkloadJobFailed rules alert while it exists. Two days
+                # keeps a failure visible past the next run.
+                ttl_seconds_after_finished=2 * SECONDS_IN_ONE_DAY,
+                template=kubernetes.core.v1.PodTemplateSpecArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        labels=omjob_cleanup_labels
+                    ),
+                    spec=kubernetes.core.v1.PodSpecArgs(
+                        restart_policy="Never",
+                        service_account_name=OMJOB_CLEANUP_NAME,
+                        containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name=OMJOB_CLEANUP_NAME,
+                                image=cached_image_uri("python:3.12-slim"),
+                                command=[
+                                    "python",
+                                    "-c",
+                                    (
+                                        Path(__file__).parent
+                                        / "scripts"
+                                        / "omjob_cleanup.py"
+                                    ).read_text(),
+                                ],
+                                env=[
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="OMJOB_RETENTION_DAYS",
+                                        value=str(OMJOB_RETENTION_DAYS),
+                                    ),
+                                ],
+                                security_context=kubernetes.core.v1.SecurityContextArgs(
+                                    run_as_non_root=True,
+                                    run_as_user=1000,
+                                    run_as_group=1000,
+                                    allow_privilege_escalation=False,
+                                    read_only_root_filesystem=True,
+                                    capabilities=kubernetes.core.v1.CapabilitiesArgs(
+                                        drop=["ALL"]
+                                    ),
+                                ),
+                                resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                    requests={"cpu": "25m", "memory": "64Mi"},
+                                    limits={"cpu": "250m", "memory": "128Mi"},
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+            ),
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[omjob_cleanup_role_binding]),
 )
 
 gateway_config = OLEKSGatewayConfig(

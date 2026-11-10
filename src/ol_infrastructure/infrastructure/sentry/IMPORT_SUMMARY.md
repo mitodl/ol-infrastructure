@@ -131,7 +131,7 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   `mit-learn` unless it's renamed again live.
 - `project_witan` / `key_witan`: added by hand, same reason as
   `project_ol_analytics_api`/`project_dagster` -- the witan Sentry project
-  does not exist live yet, so `pulumi up` creates both. One project covers
+  did not exist live when it was added, so `pulumi up` created both. One project covers
   CI/QA/Production, distinguished by the SDK's `environment` tag rather than
   by separate projects. The hand-added export is `witan_sentry_dsn`, consumed
   by the witan application stack, which writes it to Vault at
@@ -140,3 +140,13 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   and `bin/import-sentry-config` is re-run, diff the regenerated
   `key_witan_default_*` block against this one before accepting it -- a
   `pulumi state rename` may be needed to converge onto the live key's id.
+- `issue_alert_witan_new_or_regressed_production`: added by hand. It emails
+  the devops team on the first event of a new witan issue, or a regression,
+  in the `production` environment. `pulumi up` creates it. It uses
+  `sentry_issue_alert_opts` like the generated rules, so later edits to its
+  conditions, filters or actions are not applied by Pulumi. To change them,
+  either drop those fields from `ignore_changes` for one `pulumi up`, or
+  `pulumi state unprotect` its URN and replace it (`protect=True` refuses the
+  delete half of a replace), or edit it in Sentry. A `bin/import-sentry-config` re-run
+  will list it as a live rule with a numeric suffix. Drop the regenerated
+  block or `pulumi state rename` onto it.

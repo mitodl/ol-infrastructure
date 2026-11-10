@@ -834,95 +834,6 @@ mitlearn_role_statements["app"] = {
     "renew": [],
     "rollback": [],
 }
-mitlearn_role_statements["reverse-etl"] = {
-    "create": [
-        # Check if the reverse_etl role exists and create it if not
-        Template(
-            """
-            DO
-            $$do$$
-            BEGIN
-               IF EXISTS (
-                  SELECT FROM pg_catalog.pg_roles
-                  WHERE  rolname = 'reverse_etl' THEN
-                      RAISE NOTICE 'Role "reverse_etl" already exists. Skipping.';
-               ELSE
-                  BEGIN   -- nested block
-                     CREATE ROLE reverse_etl;
-                  EXCEPTION
-                     WHEN duplicate_object THEN
-                        RAISE NOTICE 'Role "reverse_etl" was just created by a concurrent transaction. Skipping.';
-                  END;
-               END IF;
-            END
-            $$do$$;
-            """
-        ),
-        # Create the external schema if it doesn't exist already
-        Template("""CREATE SCHEMA IF NOT EXISTS external;"""),
-        Template(
-            """GRANT CREATE ON SCHEMA external TO reverse_etl WITH GRANT OPTION;"""
-        ),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "reverse_etl"
-            WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "reverse_etl"
-            WITH GRANT OPTION;
-            """
-        ),
-        # Set/refresh default privileges in both schemas
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA external
-            GRANT ALL PRIVILEGES ON TABLES TO "reverse_etl" WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA external
-            GRANT ALL PRIVILEGES ON SEQUENCES TO "reverse_etl" WITH GRANT OPTION;
-            """
-        ),
-        Template("""RESET ROLE;"""),
-        # Actually create the user in the 'reverse_etl' role
-        Template(
-            """
-            CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-            VALID UNTIL '{{expiration}}' IN ROLE "reverse_etl" INHERIT;
-            """
-        ),
-        # Make sure things done by the new user belong to role and not the user
-        Template("""ALTER ROLE "{{name}}" SET ROLE "reverse_etl";"""),
-    ],
-    "revoke": [
-        # Remove the user from the reverse_etl role
-        Template("""REVOKE "reverse_etl" FROM "{{name}}";"""),
-        # Put the user back into the app role but as an administrator
-        Template("""GRANT "{{name}}" TO reverse_etl WITH ADMIN OPTION;"""),
-        # Change ownership to the app role for anything that might belong to this user
-        Template("""SET ROLE reverse_etl;"""),
-        Template("""REASSIGN OWNED BY "{{name}}" TO "reverse_etl";"""),
-        Template("""RESET ROLE;"""),
-        # Take any permissions assigned directly to this user away
-        Template(
-            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";"""
-        ),
-        Template(
-            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";"""
-        ),
-        Template("""REVOKE USAGE ON SCHEMA external FROM "{{name}}";"""),
-        # Finally, drop this user from the database
-        Template("""DROP USER "{{name}}";"""),
-    ],
-    "renew": [],
-    "rollback": [],
-}
-
 mitlearn_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=mitlearn_db_config.db_name,
     mount_point=f"{mitlearn_db_config.engine}-mitlearn",
@@ -1591,13 +1502,13 @@ env_vars = {
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
     "QDRANT_SPARSE_ENCODER_V2": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
-    "OCR_PDF_MAX_PAGE_THRESHOLD": 20,
+    "OCR_PDF_MAX_PAGE_THRESHOLD": 0,
     "QDRANT_SPARSE_MODEL_V2": "qdrant/bm25",
     "QDRANT_HOST_V2": qdrant_cloud_stack.require_output("cluster_url"),
     "QDRANT_SPARSE_ENCODER": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
     "QDRANT_SPARSE_MODEL": "qdrant/bm25",
     "QDRANT_HOST": qdrant_cloud_stack.require_output("cluster_url"),
-    "OCR_MODEL": "gpt-5-nano-2025-08-07",
+    "OCR_MODEL": "gpt-6-luna",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
     "SEE_API_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/api/",
@@ -1688,6 +1599,24 @@ env_vars.update(
     }
 )
 
+# Learner memory through ol-llm's memory interface (ol_llm.memory.MemoryConfig).
+# mit-learn exchanges the learner's session token as ol-mitlearn-memory-client,
+# whose id and secret arrive as OL_LLM_MEMORY_EXCHANGE_* from k8s_secrets.py.
+# A config switch rather than always on, because the Hindsight stack and that
+# Keycloak client exist only in some environments, and a StackReference to a
+# missing stack fails the preview.
+memory_enabled = mitlearn_config.get_bool("enable_memory") or False
+if memory_enabled:
+    hindsight_stack = make_stack_reference(projects.HINDSIGHT, stack_info.name)
+    env_vars.update(
+        {
+            "OL_LLM_MEMORY_BACKEND": "hindsight",
+            "OL_LLM_MEMORY_APP": "mit-learn",
+            "OL_LLM_MEMORY_URL": hindsight_stack.require_output("hindsight")["url"],
+            "OL_LLM_MEMORY_TOKEN_URL": interpolated_vars["ACCESS_TOKEN_URL"],
+        }
+    )
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1747,6 +1676,14 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The default burst of 25 rejected one browser's 27 near-simultaneous
+        # requests on 2026-11-07, most likely several tabs (search pages with a
+        # resource drawer open cost 5-7 API calls each) restored at once. Those
+        # were the only gateway 429s in Production in the five days after
+        # #6837. The sustained rate stays at 50 r/s; only the instantaneous
+        # slack grows. Only the browser variant enables limit-req, so this
+        # changes nothing on the Fastly-fronted routes.
+        rate_limit_burst=100,
         # The same list Django gets as CORS_ALLOWED_ORIGINS above.  The gateway
         # answers CORS preflights itself, so an origin missing here is blocked
         # on every preflighted request whatever django-cors-headers allows.
@@ -1790,12 +1727,11 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         OLApisixSharedPluginsVariant(
             name="ol-mitlearn-external-service-browser-apisix-plugins",
             resource_suffix="ol-browser-shared-plugins",
-            # CI/QA soak before Production, same rollout shape as enable_gzip's
-            # own soak: the thresholds above are sized from 30d of
-            # api.learn.mit.edu traffic, not from measured Production request
-            # volume under load. Flip to unconditional True once that's
-            # confirmed; #5562 tracks the SSR-side limiter this doesn't cover.
-            enable_rate_limiting=stack_info.env_suffix != "production",
+            # Per-client-IP backstop against a single noisy source. It does not
+            # stop distributed crawlers (a few requests a minute per IP across
+            # thousands of IPs), and #5562 tracks the SSR-side limiter it
+            # doesn't cover.
+            enable_rate_limiting=True,
         ),
     ],
 )
@@ -2056,6 +1992,7 @@ secret_names, optional_secret_names, secret_resources = create_mitlearn_k8s_secr
     redis_cache=redis_cache,
     starrocks_vault_mount_path=starrocks_vault_mount_path,
     restart_targets=env_secret_restart_targets,
+    memory_enabled=memory_enabled,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -2237,12 +2174,12 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
     },
 )
 # Why this host needs the User-Agent clause, not just the Origin match: the
-# Next.js SSR layer reaches api.learn as `axios/1.12.2`
-# (frontends/api/package.json) from four AWS egress addresses, and on
-# 2026-09-21 the busiest of them sustained 371-676 req/min -- 11.3 req/s
-# against the 50 req/s per-IP bucket the browser-* routes carry. It misses
-# these routes today only because Node axios sends no Origin header, which is
-# an accident of the HTTP client rather than a decision.
+# Next.js SSR layer reaches api.learn as `mit-learn-ssr/<version>`
+# (frontends/main/src/bootstrap/api.ts) from four AWS egress addresses, and on
+# 2026-09-21 (when it still sent `axios/1.12.2`) the busiest of them sustained 371-676 req/min -- 11.3 req/s
+# against the 50 req/s per-IP bucket the browser-* routes carry. Without the
+# clause it would miss these routes only because Node axios sends no Origin
+# header, which is an accident of the HTTP client rather than a decision.
 #
 # Measured while choosing the clause: crawlers DO replay our Origin
 # (DuckDuckBot, DuckAssistBot, and an Amazon Bedrock knowledge base, the last

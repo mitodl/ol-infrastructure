@@ -184,6 +184,8 @@ def _covers(watched: set[str], secret: str) -> bool:
 def _glob_match(pattern: str, value: str) -> bool:
     """Match ``*``-separated segments, treating ``*`` as "one path-free chunk"."""
     parts = pattern.split("*")
+    if len(parts) == 1:
+        return value == pattern
     if not value.startswith(parts[0]):
         return False
     cursor = len(parts[0])

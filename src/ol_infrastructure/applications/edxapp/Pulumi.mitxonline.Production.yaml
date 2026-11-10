@@ -110,18 +110,27 @@ config:
   # LMS runs one Granian worker per pod, so every request in a pod shares one GIL.
   # Since the 2 -> 1 worker change on 2026-09-17 the GIL wait per request roughly
   # doubled (7-9ms -> 13-29ms) and upstream p95 went from 840-1020ms to 1150-1550ms
-  # at the same request rate, so LMS is sized at ~50% of the 500m cpu request.
-  # Total LMS cpu over the 12d to 2026-10-13 was p50 3.9, p95 7.2 and max 10.9
-  # cores, which at that density is 16, 29 and 44 pods, hence the ceiling of 45.
+  # at the same request rate. At ~50% of the 500m cpu request (Wed-Fri
+  # 2026-10-15..17) GIL wait per request was 11ms against 18-19ms at 70% (Wed-Fri
+  # 2026-10-08..10, similar request rate), but daily upstream p95 was no lower
+  # (1190-1280ms vs 1190-1370ms), so the target moves from ~43-50% to ~51-60%. Total LMS cpu over the 12d to 2026-10-13
+  # was p50 3.9, p95 7.2 and max 10.9 cores; that max is 36-43 pods at this
+  # density, and 45 pods covers 67.5 req/s against a 30d peak of 60 (5m rate, to
+  # 2026-11-10).
   #
   # Request rate carries that target, not cpu. An LMS request cost 0.17
-  # core-seconds at p50 and 0.20 at p95 over the 7d to 2026-10-14, so 1.25 req/s
-  # per pod is ~50% of the cpu request. The request trigger reads a 5m rate; the
-  # cpu trigger reads metrics-server's short window, and as the 50% target one
-  # 3-minute burst took LMS from 30 to 35 pods on 2026-10-14 when the 30-minute
-  # average needed 26, which the 25-minute scale-down then held. cpu goes back to
-  # 70 as a backstop, because the HPA follows whichever trigger asks for more pods.
-  edxapp:autoscaling_lms_requests_threshold: "1.25"
+  # core-seconds at p50 and 0.20 at p95 over the 7d to 2026-10-14, so 1.5 req/s
+  # per pod is ~51-60% of the cpu request. Over the 7d to 2026-11-10 it cost 0.227
+  # and 0.258, inflated by one client looping on ~4s discussion API calls since
+  # 2026-10-18. At that cost 1.5 req/s is 68-77%, so until the loop stops the cpu
+  # trigger below, not request rate, sets the pod count at most peaks.
+  #
+  # The request trigger reads a 5m rate; the cpu trigger reads metrics-server's
+  # short window, and as the 50% target one 3-minute burst took LMS from 30 to 35
+  # pods on 2026-10-14 when the 30-minute average needed 26, which the 25-minute
+  # scale-down then held. cpu stays at 70 as a backstop, because the HPA follows
+  # whichever trigger asks for more pods.
+  edxapp:autoscaling_lms_requests_threshold: "1.5"
   edxapp:autoscaling_lms_cpu_threshold: "70"
   edxapp:autoscaling_cms_requests_threshold: "20"
   edxapp:autoscaling_cms_cpu_threshold: "70"
@@ -207,6 +216,11 @@ config:
         ephemeral_storage_request: "2Gi"
         ephemeral_storage_limit: "8Gi"
       cms:
+        cpu_request: "250m"
+        memory_request: "4Gi"
+        memory_limit: "6Gi"
+      # Sized for --concurrency=2; see the GIT_CONFIG_* env in k8s_resources.py.
+      cms_export:
         cpu_request: "250m"
         memory_request: "4Gi"
         memory_limit: "6Gi"

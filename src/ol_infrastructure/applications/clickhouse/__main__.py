@@ -28,6 +28,7 @@ import pulumi_tls as tls
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
+from bridge.lib.constants import CLICKHOUSE_NAMESPACE
 from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import (
     CLICKHOUSE_KEEPER_VERSION,
@@ -111,7 +112,6 @@ k8s_labels = K8sGlobalLabels(
 )
 
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
-CLICKHOUSE_NAMESPACE = "clickhouse"
 # Declared for every cluster in infrastructure/aws/eks; must exist before a PVC
 # references it. It does NOT recover on its own once the class shows up: the CSI
 # external-resizer emits `VolumeModifyFailed  VAC "ebs-gp3-iops-3000" does not
@@ -253,10 +253,13 @@ ch_image = f"altinity/clickhouse-server:{ch_version}"
 # 25.8+). During a rolling upgrade, set it to the version being upgraded from so
 # an upgraded replica keeps writing parts the others can still read: 25.11, 26.1
 # and 26.3 change String, nested-type and index file serialization in ways older
-# servers cannot read. Altinity 25.8 changes no part format we use, so the 24.8
-# value is a precaution there; on a 25.8 replica it shows as
-# allow_part_offset_column_in_projections = 0. Remove it once every replica runs
-# the new version; it then takes effect at each replica's next restart.
+# servers cannot read. On a 26.3 replica, 25.8 shows in system.merge_tree_settings
+# as string_serialization_version = single_stream and
+# propagate_types_serialization_versions_to_nested_types = 0 (with_size_stream
+# and 1 without it). It also sets query defaults: removing a 25.8 value turns
+# async_insert on and moves deduplicate_insert from backward_compatible_choice to
+# enable (26.2). Remove it once every replica runs the new version; it then takes
+# effect at each replica's next restart.
 ch_compatibility = clickhouse_config.get("compatibility")
 keeper_image = f"clickhouse/clickhouse-keeper:{CLICKHOUSE_KEEPER_VERSION}"
 

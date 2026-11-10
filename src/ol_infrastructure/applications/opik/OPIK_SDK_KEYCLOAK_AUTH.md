@@ -41,13 +41,14 @@ refreshes a Keycloak token per request. No SDK fork or patch required.
 
 Drop this into a small shared module (e.g. `opik_keycloak_auth.py`) that each
 instrumented application imports once at startup. An application on
-[ol-llm](https://github.com/mitodl/ol-llm) 0.0.4 or later doesn't need it while tracing
-is on: `ol_llm.configure_tracing` with a `KeycloakClient` registers the same auth, and
-`import ol_llm` sets the two `OPIK_*_ENABLE` defaults below, as long as it is imported
-before opik (0.0.3 and earlier set only `OPIK_SENTRY_ENABLE`). ol-llm registers that
-auth only when tracing is enabled, so a process that runs with `OPIK_TRACK_DISABLE=true`
-or `TracingConfig(enabled=False)` and still calls the SDK directly (prompts, datasets,
-experiments) gets 401s unless it also registers the hook from this module.
+[ol-llm](https://github.com/mitodl/ol-llm) 0.0.10 or later doesn't need it:
+`ol_llm.configure_tracing` with a `KeycloakClient` (from `OPIK_KEYCLOAK_*`) registers the
+same auth whether tracing is on or off, so SDK calls the app makes itself (prompts,
+datasets, experiments) authenticate under `OPIK_TRACK_DISABLE=true` too. `import ol_llm`
+sets the two `OPIK_*_ENABLE` defaults below, as long as it is imported before opik (0.0.3
+and earlier set only `OPIK_SENTRY_ENABLE`). Releases before 0.0.10 register the auth only
+while tracing is on, so a process on one of those that runs with tracing off and calls
+the SDK directly gets 401s unless it also registers the hook from this module.
 
 ```python
 """Keycloak client-credentials auth for the Opik SDK.

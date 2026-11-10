@@ -82,6 +82,8 @@ class SamlIdpConfig(BaseModel):
     signing_certificate: str | None = None  # Override signing certificate from metadata
     want_assertions_encrypted: bool = False
     want_assertions_signed: bool | None = None  # Optional, no default
+    # Sign AuthnRequests; also publishes the realm signing cert in SP metadata
+    want_authn_requests_signed: bool | None = None
     post_binding_authn_request: bool = (
         True  # Use POST binding for auth requests by default
     )
@@ -232,6 +234,10 @@ def onboard_saml_org(  # noqa: C901
     # Only add want_assertions_signed if explicitly set
     if saml_config.want_assertions_signed is not None:
         idp_kwargs["want_assertions_signed"] = saml_config.want_assertions_signed
+    if saml_config.want_authn_requests_signed is not None:
+        idp_kwargs["want_authn_requests_signed"] = (
+            saml_config.want_authn_requests_signed
+        )
 
     if saml_config.login_hint is not None:
         idp_kwargs["login_hint"] = saml_config.login_hint
@@ -330,6 +336,10 @@ def onboard_saml_idp(saml_config: SamlIdpConfig) -> None:  # noqa: C901
 
     if saml_config.want_assertions_signed is not None:
         idp_kwargs["want_assertions_signed"] = saml_config.want_assertions_signed
+    if saml_config.want_authn_requests_signed is not None:
+        idp_kwargs["want_authn_requests_signed"] = (
+            saml_config.want_authn_requests_signed
+        )
     if saml_config.authn_context_comparison_type is not None:
         idp_kwargs["authn_context_comparison_type"] = (
             saml_config.authn_context_comparison_type

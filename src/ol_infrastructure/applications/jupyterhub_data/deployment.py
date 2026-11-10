@@ -424,7 +424,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     )
 
     # Kubernetes ServiceAccount annotated with the IRSA role ARN so that
-    # single-user pods can read S3 and Glue without long-lived credentials.
+    # single-user pods can invoke Bedrock without long-lived credentials.
     kubernetes.core.v1.ServiceAccount(
         f"jupyterhub-data-service-account-{namespace}-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(

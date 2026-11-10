@@ -2,7 +2,7 @@
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ResourceOptions
+from pulumi import Output, ResourceOptions
 
 from bridge.lib.versions import GRAFANA_K8S_MONITORING_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
@@ -13,6 +13,7 @@ from ol_infrastructure.lib.ol_types import (
     cluster_addon_labels,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+from ol_infrastructure.lib.telemetry_archive import push_target
 
 # The K8sGlobalLabels keys that alert rules join on to tier and route a
 # workload's alerts. kube-state-metrics surfaces each as a label_ol_mit_edu_*
@@ -321,6 +322,20 @@ def setup_grafana(
     grafana_vault_secrets = read_yaml_secrets(
         Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
     )
+    # The self-hosted telemetry archive (ADR-0014). Logs are dual-shipped to it
+    # over an OTLP destination of its own; environments without an archive ship
+    # to Grafana Cloud alone.
+    archive = push_target(stack_info.env_suffix)
+
+    # Every feature names its destinations (plan D11). Left implicit, the chart
+    # fans each feature out to every destination in its ecosystem, so adding a
+    # destination would change what every feature ships without a diff here.
+    metrics_destinations = ["grafana-cloud-metrics"]
+    logs_destinations = ["grafana-cloud-logs"]
+    otlp_destinations = ["gc-otlp-endpoint"]
+    if archive:
+        logs_destinations.append("archive-otlp")
+        otlp_destinations.append("archive-otlp")
 
     def _labels(component: Component, alert_tier: AlertTier) -> dict[str, str]:
         return cluster_addon_labels(
@@ -637,10 +652,63 @@ def setup_grafana(
                             },
                         },
                     },
+                    **(
+                        {
+                            # Logs only in Phase 1; metrics.enabled flips in Phase 2
+                            # and traces stay off for good (the plan's "Not
+                            # planned"). An OTLP destination rather than a second
+                            # loki one (plan D10): the chart renders an
+                            # otelcol.receiver.loki bridge in front of
+                            # otelcol.exporter.otlphttp for Loki-sourced logs, and
+                            # that exporter's sending_queue is a real non-blocking
+                            # queue. loki.write's wal and queue_config are
+                            # experimental in Alloy, so a loki destination could
+                            # only be made non-blocking by running the production
+                            # collectors at the experimental stability level.
+                            #
+                            # block_on_overflow is not set because its default is
+                            # false and the chart only renders it when true; the
+                            # rendered config carries no block_on_overflow line.
+                            # queue_size is in batches of up to 8192 records, so
+                            # 200 bounds the queue at ~1.6M records per collector.
+                            # OTLP logs go to <url>/v1/logs, Loki's native OTLP
+                            # path, and the destination's logToResource defaults
+                            # promote service_name, namespace, pod and container
+                            # to resource attributes, which Loki indexes.
+                            "archive-otlp": {
+                                "type": "otlp",
+                                "protocol": "http",
+                                "url": archive.otlp_url,
+                                "auth": {
+                                    "type": "basic",
+                                    "username": archive.username,
+                                    # Marked secret so the value is masked in
+                                    # previews and encrypted in state.
+                                    "password": Output.secret(archive.password),
+                                },
+                                "metrics": {"enabled": False},
+                                "logs": {"enabled": True},
+                                "traces": {"enabled": False},
+                                "retryOnFailure": {
+                                    "enabled": True,
+                                    "initialInterval": "5s",
+                                    "maxInterval": "30s",
+                                    "maxElapsedTime": "1m",
+                                },
+                                "sendingQueue": {
+                                    "enabled": True,
+                                    "queueSize": 200,
+                                },
+                            }
+                        }
+                        if archive
+                        else {}
+                    ),
                 },
                 "clusterMetrics": {
                     "enabled": True,
                     "collector": "alloy-metrics",
+                    "destinations": metrics_destinations,
                     # The chart's default kube-state-metrics allowlist keeps
                     # kube_job.*, kube_statefulset.* and kube_daemonset.* whole
                     # but names deployment and pod metrics one by one, and
@@ -676,23 +744,31 @@ def setup_grafana(
                 "costMetrics": {
                     "enabled": True,
                     "collector": "alloy-metrics",
+                    "destinations": metrics_destinations,
                 },
                 "annotationAutodiscovery": {
                     "enabled": True,
                     "collector": "alloy-metrics",
+                    "destinations": metrics_destinations,
                 },
                 "prometheusOperatorObjects": {
                     "enabled": True,
                     "collector": "alloy-metrics",
+                    "destinations": metrics_destinations,
                 },
                 "clusterEvents": {
                     "enabled": True,
                     "collector": "alloy-singleton",
+                    "destinations": logs_destinations,
                 },
                 # v4: podLogs renamed to podLogsViaLoki
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
+                    # The archive gets the same stream after the same stages
+                    # below (redactions and drops included), so the two
+                    # backends hold the same lines.
+                    "destinations": logs_destinations,
                     # The chart default (True) renders `tail_from_end = true`
                     # on loki.source.file, which seeks to EOF for any file with
                     # no stored position -- including every newly created
@@ -716,6 +792,10 @@ def setup_grafana(
                 "applicationObservability": {
                     "enabled": True,
                     "collector": "alloy-receiver",
+                    # archive-otlp accepts logs only, so the chart routes just
+                    # this feature's logs to it; metrics and traces keep going
+                    # to Cloud alone.
+                    "destinations": otlp_destinations,
                     "receivers": {
                         "otlp": {
                             "grpc": {
@@ -808,6 +888,7 @@ def setup_grafana(
                     # ConfigMaps in applications-production despite the Helm
                     # release values matching desired state.
                     "collector": "alloy-metrics",
+                    "destinations": metrics_destinations,
                     "dcgm-exporter": {
                         "instances": [
                             {
@@ -900,6 +981,12 @@ def setup_grafana(
                                             "otelcol_processor_tail_sampling_sampling_policy_evaluation_error_total",
                                             # Gauge -- no suffix. Already arriving.
                                             "otelcol_processor_tail_sampling_sampling_traces_on_memory",
+                                            # The archive exporter's drops
+                                            # (metric_rules/telemetry_archive.py).
+                                            # send_failed is in the default list;
+                                            # enqueue_failed, which is what a full
+                                            # non-blocking queue increments, is not.
+                                            "otelcol_exporter_enqueue_failed_log_records_total",
                                             # alloy-logs' APISix cookie histograms, from
                                             # the stage.metrics above. The default list
                                             # keeps only loki_process_dropped_lines_total.
@@ -1062,6 +1149,12 @@ def setup_grafana(
                     },
                     "alloy-singleton": {
                         "presets": ["singleton"],
+                        # Requests only, no limits: the chart ships none, and a
+                        # limit guessed here would be the first thing to OOM a
+                        # collector that has run unbounded so far. The second
+                        # exporter queue (archive-otlp) is what the request
+                        # now has to cover; measured in the QA soak.
+                        "alloy": {"resources": {"requests": {"memory": "256Mi"}}},
                     },
                     "alloy-logs": {
                         # host-storage moves Alloy's storage path off the
@@ -1076,6 +1169,9 @@ def setup_grafana(
                             "daemonset",
                             "host-storage",
                         ],
+                        # See alloy-singleton above. The pod-log collector
+                        # carries the larger archive queue of the two.
+                        "alloy": {"resources": {"requests": {"memory": "512Mi"}}},
                     },
                     "alloy-receiver": {
                         "presets": ["deployment"],

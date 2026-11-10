@@ -20,12 +20,15 @@ import pytest
 import requests
 
 from ol_infrastructure.providers.openmetadata.access_control import (
+    ORGANIZATION_TEAM,
+    OpenMetadataOrganizationPoliciesProvider,
     OpenMetadataPolicyProvider,
     OpenMetadataPolicyRule,
     OpenMetadataRoleProvider,
     OpenMetadataTeamProvider,
 )
 from ol_infrastructure.substructure.open_metadata.access_control import (
+    ORGANIZATION_POLICIES,
     POLICIES,
     ROLES,
     TEAMS,
@@ -36,7 +39,8 @@ from .fakes import FakeResponse
 SERVER = "https://om.example/api"
 TOKEN_URL = "https://keycloak.example/realms/ol/protocol/openid-connect/token"  # noqa: S105
 
-_RELATIONS = {"roles": ("policies", "policies"), "teams": ("defaultRoles", "roles")}
+# Reference fields returned only when asked for in ``fields``.
+_RELATIONS = {"roles": ["policies"], "teams": ["defaultRoles", "policies"]}
 
 
 class FakeOpenMetadata:
@@ -100,9 +104,9 @@ class FakeOpenMetadata:
         if entity is None:
             return None
         body = copy.deepcopy(entity)
-        if collection in _RELATIONS:
-            field, _ = _RELATIONS[collection]
-            if field not in params.get("fields", ""):
+        requested = params.get("fields", "").split(",")
+        for field in _RELATIONS.get(collection, []):
+            if field not in requested:
                 body.pop(field, None)
         return body
 
@@ -217,6 +221,12 @@ def _team(entity: str = "data-platform", **overrides: Any) -> dict[str, Any]:
     return _declared(TEAMS, entity, **overrides)
 
 
+def _create_role_policies(role: str = "DagsterBotRole") -> None:
+    spec = next(spec for spec in ROLES if spec.name == role)
+    for policy in spec.policies:
+        OpenMetadataPolicyProvider().create(_policy(policy))
+
+
 def _create_all() -> dict[str, Any]:
     """Create every declared entity, policies before roles before teams."""
     created = {}
@@ -321,7 +331,7 @@ def test_a_rule_changed_by_hand_is_reported_and_put_back(
 def test_a_policy_added_to_a_role_by_hand_is_put_back(
     server: FakeOpenMetadata,
 ) -> None:
-    OpenMetadataPolicyProvider().create(_policy())
+    _create_role_policies()
     provider = OpenMetadataRoleProvider()
     created = provider.create(_role())
     role = server.entities["roles"]["DagsterBotRole"]
@@ -331,7 +341,10 @@ def test_a_policy_added_to_a_role_by_hand_is_put_back(
     assert read.outs["drift"] == ["policies"]
 
     provider.update(created.id, read.outs, _role())
-    assert [ref["name"] for ref in role["policies"]] == ["DagsterBotPolicy"]
+    assert [ref["name"] for ref in role["policies"]] == [
+        "DagsterBotPolicy",
+        "HideAlertDestinationsPolicy",
+    ]
 
 
 def test_a_team_is_adopted_with_its_members_and_unmanaged_default_roles(
@@ -364,7 +377,7 @@ def test_a_team_is_adopted_with_its_members_and_unmanaged_default_roles(
 
 
 def test_declared_default_roles_are_exact(server: FakeOpenMetadata) -> None:
-    OpenMetadataPolicyProvider().create(_policy())
+    _create_role_policies()
     OpenMetadataRoleProvider().create(_role())
     provider = OpenMetadataTeamProvider()
     created = provider.create(_team())
@@ -419,7 +432,7 @@ def test_update_refuses_an_entity_not_at_the_server(server: FakeOpenMetadata) ->
 @pytest.mark.usefixtures("server")
 def test_diff() -> None:
     provider = OpenMetadataRoleProvider()
-    OpenMetadataPolicyProvider().create(_policy())
+    _create_role_policies()
     created = provider.create(_role())
     outs = created.outs
 
@@ -442,6 +455,157 @@ def test_delete_hard_deletes_and_tolerates_a_missing_entity(
 
     assert "DagsterBotPolicy" not in server.entities["policies"]
     assert ("DELETE", f"policies/{created.id}", None) in server.writes
+
+
+def _organization(server: FakeOpenMetadata, **fields: Any) -> dict[str, Any]:
+    """Add the Organization team as the server seeds it at first boot."""
+    return server.add(
+        "teams",
+        ORGANIZATION_TEAM,
+        **{
+            "teamType": "Organization",
+            "users": [],
+            "defaultRoles": [],
+            "policies": [server.ref("policies", "OrganizationPolicy")],
+            **fields,
+        },
+    )
+
+
+def _organization_props(**overrides: Any) -> dict[str, Any]:
+    return {
+        **_CONNECTION,
+        "name": ORGANIZATION_TEAM,
+        "policies": sorted(ORGANIZATION_POLICIES),
+        **overrides,
+    }
+
+
+def test_organization_policies_are_adopted_and_extended(
+    server: FakeOpenMetadata,
+) -> None:
+    server.add("policies", "OrganizationPolicy", rules=[])
+    OpenMetadataPolicyProvider().create(_policy("HideAlertDestinationsPolicy"))
+    organization = _organization(server)
+    server.writes.clear()
+    provider = OpenMetadataOrganizationPoliciesProvider()
+
+    created = provider.create(_organization_props())
+
+    assert created.id == organization["id"]
+    [(method, path, operations)] = server.writes
+    assert (method, path) == ("PATCH", f"teams/{organization['id']}")
+    assert [op["path"] for op in operations] == ["/policies"]
+    assert [ref["name"] for ref in organization["policies"]] == [
+        "HideAlertDestinationsPolicy",
+        "OrganizationPolicy",
+    ]
+    assert organization["users"] == []
+    read = provider.read(created.id, created.outs)
+    assert read.outs["drift"] == []
+    assert not provider.diff(created.id, read.outs, _organization_props()).changes
+
+
+def test_a_policy_dropped_from_organization_by_hand_is_put_back(
+    server: FakeOpenMetadata,
+) -> None:
+    server.add("policies", "OrganizationPolicy", rules=[])
+    OpenMetadataPolicyProvider().create(_policy("HideAlertDestinationsPolicy"))
+    organization = _organization(server)
+    provider = OpenMetadataOrganizationPoliciesProvider()
+    created = provider.create(_organization_props())
+    organization["policies"] = [server.ref("policies", "OrganizationPolicy")]
+
+    read = provider.read(created.id, created.outs)
+    assert read.outs["drift"] == ["policies"]
+
+    provider.update(created.id, read.outs, _organization_props())
+    assert sorted(ref["name"] for ref in organization["policies"]) == sorted(
+        ORGANIZATION_POLICIES
+    )
+
+
+def test_a_missing_organization_is_not_created(server: FakeOpenMetadata) -> None:
+    with pytest.raises(ValueError, match="creates it at boot"):
+        OpenMetadataOrganizationPoliciesProvider().create(_organization_props())
+    assert server.writes == []
+
+
+def test_read_of_a_missing_organization_drops_it(server: FakeOpenMetadata) -> None:
+    provider = OpenMetadataOrganizationPoliciesProvider()
+
+    assert provider.read(str(uuid.uuid4()), _organization_props()).id == ""
+    assert server.writes == []
+
+
+def test_every_user_keeps_organization_policy_and_loses_alert_reads() -> None:
+    # Dropping OrganizationPolicy would take owner-based edits from every user.
+    assert "OrganizationPolicy" in ORGANIZATION_POLICIES
+    assert "HideAlertDestinationsPolicy" in ORGANIZATION_POLICIES
+    hide = next(spec for spec in POLICIES if spec.name == "HideAlertDestinationsPolicy")
+    assert [(rule.effect, rule.resources, rule.operations) for rule in hide.rules] == [
+        ("deny", ["eventsubscription"], ["All"])
+    ]
+    # Bots inherit no team policies, so the bots with custom roles carry it.
+    for role in ("DagsterBotRole", "GlossarySyncBotRole", "MetricsSyncBotRole"):
+        spec = next(spec for spec in ROLES if spec.name == role)
+        assert "HideAlertDestinationsPolicy" in spec.policies
+
+
+def test_glossary_sync_bot_reaches_only_the_glossary() -> None:
+    # A term PATCH of synonyms, references or relatedTerms is authorized as
+    # EditAll, so that is the one EditAll; the glossary itself gets only the
+    # description edit the sync makes.
+    role = next(spec for spec in ROLES if spec.name == "GlossarySyncBotRole")
+    assert role.policies == ["GlossarySyncBotPolicy", "HideAlertDestinationsPolicy"]
+    policy = next(spec for spec in POLICIES if spec.name == "GlossarySyncBotPolicy")
+    assert {
+        (rule.effect, tuple(rule.resources), tuple(rule.operations))
+        for rule in policy.rules
+    } == {
+        ("allow", ("glossary",), ("Create", "EditDescription", "ViewBasic")),
+        ("allow", ("glossaryTerm",), ("Create", "EditAll", "ViewBasic")),
+        ("allow", ("team",), ("ViewBasic",)),
+    }
+
+
+def test_glossary_sync_bot_role_is_created_with_its_policies(
+    server: FakeOpenMetadata,
+) -> None:
+    _create_role_policies("GlossarySyncBotRole")
+
+    created = OpenMetadataRoleProvider().create(_role("GlossarySyncBotRole"))
+
+    assert sorted(
+        ref["name"]
+        for ref in server.entities["roles"]["GlossarySyncBotRole"]["policies"]
+    ) == ["GlossarySyncBotPolicy", "HideAlertDestinationsPolicy"]
+    assert created.outs["drift"] == []
+
+
+def test_organization_policies_refuse_a_team_of_another_type(
+    server: FakeOpenMetadata,
+) -> None:
+    server.add("policies", "OrganizationPolicy", rules=[])
+    _organization(server, teamType="Group")
+
+    with pytest.raises(ValueError, match="expected 'Organization'"):
+        OpenMetadataOrganizationPoliciesProvider().create(_organization_props())
+    assert server.writes == []
+
+
+def test_delete_leaves_organization_policies_alone(server: FakeOpenMetadata) -> None:
+    server.add("policies", "OrganizationPolicy", rules=[])
+    OpenMetadataPolicyProvider().create(_policy("HideAlertDestinationsPolicy"))
+    organization = _organization(server)
+    provider = OpenMetadataOrganizationPoliciesProvider()
+    created = provider.create(_organization_props())
+    server.writes.clear()
+
+    provider.delete(created.id, created.outs)
+
+    assert server.writes == []
+    assert len(organization["policies"]) == len(ORGANIZATION_POLICIES)
 
 
 @pytest.mark.parametrize(

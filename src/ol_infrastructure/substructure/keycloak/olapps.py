@@ -1346,6 +1346,9 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     attr: {"attribute.name.format": "ATTRIBUTE_FORMAT_BASIC"}
                     for attr in ("email", "fullName")
                 },
+                # UKM asked for a signing certificate in our SP metadata;
+                # Keycloak publishes one only when it signs AuthnRequests.
+                want_authn_requests_signed=True,
             ),
             org=OrgConfig(
                 org_domains=[
@@ -1563,6 +1566,42 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
                 resource_options=resource_options,
+            ),
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="SLB",
+                idp_display_name="SLB",
+                org_saml_metadata_url="https://login.microsoftonline.com/41ff26dc-250f-4b13-8981-739be8610c21/federationmetadata/2007-06/federationmetadata.xml?appid=2315aa57-e3f2-40ab-8ac9-2b2fb03b9f70",
+                org_saml_metadata_xml=_saved_idp_metadata("slb_metadata.xml"),
+                principal_type="SUBJECT",
+                login_hint=False,
+                name_id_format=NameIdFormat.email,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                # Claim names as SLB submitted them; fullName is left unmapped
+                # because they listed the UPN for it.
+                attribute_name_map={
+                    "email": "user.givenname",
+                    "firstName": "user.userprincipalname",
+                    "lastName": "user.surname",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=False,
+            ),
+            org=OrgConfig(
+                org_domains=["slb.com"],
+                org_name="SLB",
+                org_alias="SLB",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                # Imported from an org created outside Pulumi with alias "SLB";
+                # Keycloak refuses to change an org's alias once set.
+                resource_options=resource_options.merge(
+                    ResourceOptions(ignore_changes=["alias"])
+                ),
             ),
         )
         onboard_saml_org(
@@ -2012,6 +2051,73 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             opts=resource_options,
         )
         # BOARD INFINITY [END]
+
+        # ISFT ORG [START]
+        # Same private_key_jwt + PKCE S256 pattern as Board Infinity; their
+        # discovery doc offers only private_key_jwt for token endpoint auth.
+        isft_oidc_identity_provider = onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="ISFT",
+                idp_display_name=(
+                    "International School of Finance Technology and Science"
+                ),
+                org_oidc_metadata_url="https://sso.isft.uz/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("isft_oidc_discovery.json"),
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+                extra_config={
+                    "pkceEnabled": "true",
+                    "pkceMethod": "S256",
+                },
+            ),
+            org=OrgConfig(
+                # Unlike Board Infinity, ISFT staff sign in with their
+                # institutional @isft.uz address, so the domain routes them
+                # here and limits this IdP to asserting isft.uz emails.
+                org_domains=["isft.uz"],
+                org_name="International School of Finance Technology and Science",
+                org_alias="ISFT",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-full-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="fullName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-first-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="given_name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-last-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="family_name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        # ISFT ORG [END]
 
     # B2B Organizations [END]
 
