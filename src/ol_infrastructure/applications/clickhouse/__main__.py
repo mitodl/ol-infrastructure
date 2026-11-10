@@ -28,6 +28,7 @@ import pulumi_tls as tls
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
+from bridge.lib.constants import CLICKHOUSE_NAMESPACE
 from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import (
     CLICKHOUSE_KEEPER_VERSION,
@@ -111,7 +112,6 @@ k8s_labels = K8sGlobalLabels(
 )
 
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
-CLICKHOUSE_NAMESPACE = "clickhouse"
 # Declared for every cluster in infrastructure/aws/eks; must exist before a PVC
 # references it. It does NOT recover on its own once the class shows up: the CSI
 # external-resizer emits `VolumeModifyFailed  VAC "ebs-gp3-iops-3000" does not
