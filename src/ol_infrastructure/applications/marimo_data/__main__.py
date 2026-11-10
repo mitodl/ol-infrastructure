@@ -32,8 +32,9 @@ mounted Secret volume picks up the new files.  Published pods run as the
 ``marimo-published`` ServiceAccount below, which has no IRSA role and no token.
 
 Every viewer of a published app queries as the same Vault-issued user, so the
-``readonly`` role's grants (SELECT on every table) are the ceiling on what any
-published app can show to any authenticated ol-data-platform realm user.
+``readonly`` role's grants (SELECT on every table and materialized view) are the
+ceiling on what any published app can show to any authenticated ol-data-platform
+realm user.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.
@@ -105,9 +106,10 @@ apps_domain = marimo_data_config.require("apps_domain")
 
 # Vault policy for the marimo namespace.  sso/marimo holds the ol-marimo-client
 # credentials that ol-apisix-marimo-data-oidc-secrets syncs for the gated
-# routes.  creds/readonly is the published apps' StarRocks credential, and the
+# routes.  creds/readonly is the published apps' StarRocks credential.  The
 # lease grants let VSO renew it and revoke it when its VaultDynamicSecret is
-# deleted, without the power to touch any other lease.
+# deleted.  Revoke is limited to these leases; renew on any lease already comes
+# from Vault's default policy.
 starrocks_vault_mount_path = "database-starrocks"
 starrocks_creds_path = "creds/readonly"
 marimo_vault_policy_hcl = f"""
