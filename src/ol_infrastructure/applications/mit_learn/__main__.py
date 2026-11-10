@@ -1599,6 +1599,24 @@ env_vars.update(
     }
 )
 
+# Learner memory through ol-llm's memory interface (ol_llm.memory.MemoryConfig).
+# mit-learn exchanges the learner's session token as ol-mitlearn-memory-client,
+# whose id and secret arrive as OL_LLM_MEMORY_EXCHANGE_* from k8s_secrets.py.
+# A config switch rather than always on, because the Hindsight stack and that
+# Keycloak client exist only in some environments, and a StackReference to a
+# missing stack fails the preview.
+memory_enabled = mitlearn_config.get_bool("enable_memory") or False
+if memory_enabled:
+    hindsight_stack = make_stack_reference(projects.HINDSIGHT, stack_info.name)
+    env_vars.update(
+        {
+            "OL_LLM_MEMORY_BACKEND": "hindsight",
+            "OL_LLM_MEMORY_APP": "mit-learn",
+            "OL_LLM_MEMORY_URL": hindsight_stack.require_output("hindsight")["url"],
+            "OL_LLM_MEMORY_TOKEN_URL": interpolated_vars["ACCESS_TOKEN_URL"],
+        }
+    )
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1974,6 +1992,7 @@ secret_names, optional_secret_names, secret_resources = create_mitlearn_k8s_secr
     redis_cache=redis_cache,
     starrocks_vault_mount_path=starrocks_vault_mount_path,
     restart_targets=env_secret_restart_targets,
+    memory_enabled=memory_enabled,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s

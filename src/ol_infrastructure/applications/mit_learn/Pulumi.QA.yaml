@@ -59,6 +59,7 @@ config:
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
   mitlearn:support_url: "support.qa.learn.mit.edu"
   mitlearn:enable_fastly_shielding: true
+  mitlearn:enable_memory: true
   mitlearn:use_granian: true
   mitlearn:webapp_endpoint_routing: true
   mitlearn:vars:
