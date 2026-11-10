@@ -11,6 +11,19 @@ sub test_dictionary_redirect {
 }
 
 // @scope: recv
+// @suite: short links redirect to their target, not to a trailing-slash 404
+sub test_dictionary_short_links {
+  set req.http.host = "ocw.mit.edu";
+  set req.url = "/18-01sc";
+  testing.call_subroutine("vcl_recv");
+  assert.error(307, "https://ocw.mit.edu/courses/18-01sc-single-variable-calculus-fall-2010/");
+
+  set req.url = "/18065videos";
+  testing.call_subroutine("vcl_recv");
+  assert.error(307, "https://www.youtube.com/playlist?list=PLUl4u3cNGP63oMNUHXqIUcrkS2PivhN3k");
+}
+
+// @scope: recv
 // @suite: dictionary lookups ignore a trailing slash and index.htm
 sub test_dictionary_normalizes_path {
   set req.http.host = "ocw.mit.edu";
