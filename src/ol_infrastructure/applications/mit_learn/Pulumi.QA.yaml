@@ -100,6 +100,9 @@ config:
     XPRO_CATALOG_API_URL: "https://rc.xpro.mit.edu/api/programs/"
     XPRO_COURSES_API_URL: "https://rc.xpro.mit.edu/api/courses/"
     MITPE_API_ENABLED: "true"
+    # Logout frames this page so Open edX fans the logout out to MITx Online
+    # and studio (hq#12763).
+    OPENEDX_LOGOUT_URL: "https://courses.rc.learn.mit.edu/logout"
     OCW_ITERATOR_CHUNK_SIZE: 300
     QDRANT_CHUNK_SIZE: 8
     OCW_LIVE_BUCKET: "ocw-content-live-production"

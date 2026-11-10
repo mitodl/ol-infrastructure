@@ -83,6 +83,9 @@ config:
     MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.edu/api/v2/programs/"
     MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu" # Need to verify
     MITPE_API_ENABLED: "true"
+    # Logout frames this page so Open edX fans the logout out to MITx Online
+    # and studio (hq#12763).
+    OPENEDX_LOGOUT_URL: "https://courses.ci.learn.mit.edu/logout"
     OCW_ITERATOR_CHUNK_SIZE: 300
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-ci.ol.mit.edu/realms/olapps"
