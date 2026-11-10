@@ -70,7 +70,8 @@ def _operator_configuration() -> dict[str, Any]:
     StatefulSets, Services, ConfigMaps, Secrets, PVCs and PDBs fail with
     "unknown namespace for the cache" (Altinity/clickhouse-operator#2117). The
     CHK reconcile still completes, but discovery comes back empty, so a Keeper
-    scale-down would leave the removed host's objects behind. A literal
+    scale-down would leave the removed host's objects behind, and deleting the
+    CHK would leave its StatefulSets, ConfigMaps and Services. A literal
     namespace name gives the cache that exact key; the bundle's own ``include``
     is empty, so the merged list is this one name. A CHI or CHK created in any
     other namespace is ignored.
