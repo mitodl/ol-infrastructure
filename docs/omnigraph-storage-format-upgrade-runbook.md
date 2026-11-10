@@ -300,10 +300,10 @@ necessarily the same set:
 aws s3 ls s3://ol-data-witan-<env>/graphs/
 ```
 
-CI has a `main.omni/` in the bucket that no longer appears in cluster.yaml — a
-leftover from before the `council` rename. Undeclared stores are not served and
-not migrated by `cluster apply`; decide deliberately whether each one is dead
-(leave it, or clean it up separately) rather than discovering it mid-migration.
+Undeclared stores are not served and not migrated by `cluster apply`; decide
+deliberately whether each one is dead (leave it, or clean it up separately)
+rather than discovering it mid-migration. (CI's pre-rename `main.omni/` was one.
+As of 2026-11-10 no root in CI, QA or Production has one.)
 
 ## The shape of the migration
 
