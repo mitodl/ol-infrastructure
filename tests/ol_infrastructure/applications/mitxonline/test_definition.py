@@ -342,6 +342,7 @@ def test_routes_follow_the_bound_hostnames():
         "passauth",
         "logout-redirect",
         "reqauth",
+        "switch-session",
         "cart",
         "static-hash",
         "dnt-policy",
@@ -354,7 +355,10 @@ def test_routes_follow_the_bound_hostnames():
     ]
 
 
-def test_frame_ancestors_header_names_the_bound_openedx_host():
+def test_frame_ancestors_header_names_openedx_and_mit_learn():
+    """Learn's logout interstitial frames Open edX's, which frames ours, and
+    frame-ancestors is checked against every ancestor in that chain.
+    """
     direct, _ = _route_groups(_deployed_bindings())
     rewrites = [
         plugin
@@ -363,8 +367,28 @@ def test_frame_ancestors_header_names_the_bound_openedx_host():
     ]
 
     assert rewrites[0].config["headers"]["set"]["Content-Security-Policy"] == (
-        f"frame-ancestors 'self' {OPENEDX_BASE_URL}"
+        f"frame-ancestors 'self' {OPENEDX_BASE_URL} https://api.learn.mit.test"
     )
+
+
+def test_switch_session_expires_this_hosts_session_without_reading_it():
+    """The route drops the direct group's session cookie and must not carry
+    openid-connect, which would validate or refresh the session being dropped.
+    """
+    direct, _ = _route_groups(_deployed_bindings())
+    [switch] = [route for route in direct if route.route_name == "switch-session"]
+    plugin_names = [getattr(plugin, "name", None) for plugin in switch.plugins]
+
+    assert switch.paths == ["/switch-session", "/switch-session/"]
+    assert "openid-connect" not in plugin_names
+    [reset] = [
+        plugin
+        for plugin in switch.plugins
+        if getattr(plugin, "name", None) == "serverless-post-function"
+    ]
+    rendered = str(reset.config)
+    assert "mitxonline_apisix_session" in rendered
+    assert ".mitxonline.mit.test" in rendered
 
 
 def test_routes_refuse_bindings_without_an_openedx_host():

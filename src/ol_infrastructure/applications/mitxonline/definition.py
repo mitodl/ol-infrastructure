@@ -560,13 +560,22 @@ def shared_plugins(bindings: MitxonlineBindings) -> list[OLApisixPluginConfig]:
 
 
 def _frame_ancestors_plugin(bindings: MitxonlineBindings) -> OLApisixPluginConfig:
+    # Open edX's logout interstitial frames our /logout?no_redirect=1, and MIT
+    # Learn's logout interstitial frames Open edX's (hq#12763), so the chain is
+    # Learn -> Open edX -> MITx Online.  frame-ancestors is checked against every
+    # ancestor, not only the parent: without Learn's host here the middle frame
+    # loads and ours is refused, a logout that looks done but leaves this
+    # session alive.
     openedx_base_url = environment_variables(bindings)["OPENEDX_API_BASE_URL"]
     return OLApisixPluginConfig(
         name="response-rewrite",
         config={
             "headers": {
                 "set": {
-                    "Content-Security-Policy": f"frame-ancestors 'self' {openedx_base_url}"
+                    "Content-Security-Policy": (
+                        f"frame-ancestors 'self' {openedx_base_url} "
+                        f"https://{bindings.hostnames.learn_api}"
+                    )
                 }
             }
         },
@@ -610,11 +619,44 @@ def direct_route_configs(
     stale_session_cleanup = stale_session_cookie_cleanup_plugin(
         cookie_domains=[bindings.hostnames.api.removeprefix("api")],
     )
+    # Ends the caller's current MITx Online gateway session, for
+    # "switch-session" below.  Expiring a live cookie is the same operation as
+    # evicting a dead one, so it reuses the cleanup helper with this group's
+    # cookie name and domain; a deletion only lands on a matching (name,
+    # domain, path).
+    session_reset = stale_session_cookie_cleanup_plugin(
+        cookie_domains=[bindings.hostnames.api.removeprefix("api")],
+        stale_cookie_name=apisix_oidc_session_cookie_name(
+            "mitxonline", bindings.env_suffix
+        ),
+    )
     return [
         *route_group.route_configs(
             oidc,
             shared_plugin_config_name=shared_plugin_config_name,
             extra_plugins=[frame_ancestors, stale_session_cleanup],
+            backend_service_name=WEBAPP_SERVICE_NAME,
+            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+        ),
+        # Entry point for hand-offs from MIT Learn (hq#12763).  Learn's session
+        # and this host's are separate cookies on separate parent domains, so a
+        # browser can arrive here still carrying the session of whoever used it
+        # before Learn's was replaced.  This drops that session and Django
+        # redirects to `next`; "cart" is unauth_action="auth", so the follow-on
+        # request runs a fresh login and comes back as whoever holds the
+        # Keycloak SSO session now.
+        #
+        # No openid-connect plugin: it would validate, and possibly refresh, the
+        # session this route exists to discard.  Django validates `next`; a
+        # gateway-side redirect would make /switch-session//evil.example an open
+        # redirect.
+        OLApisixRouteConfig(
+            route_name="switch-session",
+            priority=20,
+            hosts=hosts,
+            paths=["/switch-session", "/switch-session/"],
+            plugins=[frame_ancestors, session_reset],
+            shared_plugin_config_name=shared_plugin_config_name,
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
         ),

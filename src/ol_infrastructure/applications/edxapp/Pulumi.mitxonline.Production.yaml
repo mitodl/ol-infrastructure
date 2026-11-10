@@ -70,6 +70,7 @@ config:
     studio: studio.courses.learn.mit.edu
   edxapp:mit_learn_domain: learn.mit.edu
   edxapp:mit_learn_api_domain: api.learn.mit.edu
+  edxapp:mit_learn_frames_logout: true
   edxapp:learn_ai_frontend_domain: "learn-ai.ol.mit.edu"
   edxapp:mitxonline_domain: mitxonline.mit.edu
   edxapp:enrollment_webhook_service_worker_username: login_service_user
