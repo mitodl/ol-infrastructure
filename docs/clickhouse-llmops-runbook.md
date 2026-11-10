@@ -472,7 +472,7 @@ upgrade goes to QA first.
      with the `applications/clickhouse` QA stack. Production stays on the old
      version by setting `clickhouse:version` in `Pulumi.Production.yaml` until
      the canary passes. In every stack that rolls, set `clickhouse:compatibility`
-     to the version being upgraded from (e.g. `'24.8'`), so an upgraded replica
+     to the version being upgraded from (e.g. `'25.8'` for 25.8 -> 26.3), so an upgraded replica
      writes parts the others can still read, and remove it in a later change
      once every replica runs the new version. A target more than a year or two
      LTS lines newer needs an intermediate version first.
