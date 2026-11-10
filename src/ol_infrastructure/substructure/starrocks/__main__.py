@@ -187,7 +187,8 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
 #
 # tls=skip-verify encrypts the connection but skips server certificate name
 # verification because Vault connects via the NLB's AWS hostname, which does
-# not match the cert's SAN (lakehouse[.qa].starrocks.ol.mit.edu).
+# not match the cert's SANs (lakehouse[.qa].starrocks.ol.mit.edu and its
+# mysql. name).
 ssl_enabled = starrocks_config.get_bool("ssl_enabled") or False
 _tls_param = "?tls=skip-verify" if ssl_enabled else ""
 connection_url = db_host.apply(
