@@ -1006,7 +1006,7 @@ def _validate_prior_stage_producers(params_map: dict[str, SimplePulumiParams]) -
     """Fail if a prior_stage_stack has no pipeline posting its "deployed." issue.
 
     The consuming pipeline only triggers once that issue is closed, so a missing
-    producer leaves its first stage waiting forever with no error.
+    producer leaves its first stage with nothing to trigger on and no error.
     """
     for name, consumer in params_map.items():
         if not consumer.prior_stage_stack:

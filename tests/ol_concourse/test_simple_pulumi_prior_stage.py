@@ -3,8 +3,8 @@
 A pipeline with ``prior_stage_stack`` triggers on the prior stage's
 ``[bot] Pulumi <project> <stack> deployed.`` issue being closed. #5669 turned
 ``record_deployments`` off for preview-gated pipelines, so starrocks-substructure-qa
-stopped posting that issue and the Production starrocks-substructure pipeline never
-triggered.
+stopped posting that issue (the last one is from 2026-08-28) and QA deploys no longer
+promoted to the Production starrocks-substructure pipeline.
 """
 
 import json
