@@ -381,7 +381,7 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.uv]
 constraint-dependencies = ["certifi>=2026.10.19"]  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
 exclude-newer = "7d"
-required-version = ">=0.9.17"
+required-version = ">=0.12.22,<0.14"
 
 [tool.uv.exclude-newer-package]
 ol-concourse = "0d"
