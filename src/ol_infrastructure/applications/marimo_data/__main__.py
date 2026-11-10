@@ -17,29 +17,29 @@ their own ``ApisixRoute`` resources that reference the shared OIDC config
 (``marimo_oidc``) and shared plugin config (``marimo_shared_plugins``) from
 this stack.
 
-Published apps have no user session, so the interactive Galaxy OAuth2 flow the
-JupyterHub templates use is unavailable to them -- there is nobody to click a
-login link.  They therefore need a non-interactive warehouse credential.
+Published apps have no user session, so they can't use the per-user login the
+JupyterHub notebooks use.  They query StarRocks with a Vault dynamic credential
+from ``database-starrocks/creds/readonly`` instead, which VSO syncs into the
+``marimo-published-starrocks-creds`` Secret as ``STARROCKS_USER`` and
+``STARROCKS_PASSWORD`` (the names ``bin/starrocks-auth --output env`` uses in
+ol-data-platform).  The FE is reached in-cluster at the ``fe_mysql_internal_host``
+output of the ``applications/starrocks`` stack, port 9030.
 
-``ol-marimo-app-client`` is NOT that credential.  It is a Keycloak
-service-account client, and the client-credentials flow returns a
-Keycloak-issued JWT.  Starburst Galaxy does not accept externally-issued JWTs;
-customer-JWKS JWT auth is a Starburst Enterprise feature.  Galaxy accepts a
-Galaxy username/password over HTTP Basic, or its own OAuth2 flow.  Pointing a
-published app's Trino client at these credentials produces the same
-``401 Authentication required`` the JupyterHub template hit before #5700.
+Mount that Secret as a volume and read it at connect time; don't inject it with
+``envFrom``.  The operator creates bare Pods, which VSO's rolloutRestartTargets
+can't restart, so env vars would go stale when VSO rotates the lease, while a
+mounted Secret volume picks up the new files.  Published pods run as the
+``marimo-published`` ServiceAccount below, which has no IRSA role and no token.
 
-What is needed is a GALAXY service account, in the shape OpenMetadata already
-uses -- ``login_email``/``password`` synced from Vault, see
-``applications/open_metadata/__main__.py`` and ``OM_TRINO_USERNAME`` /
-``OM_TRINO_PASSWORD``.  That account does not exist yet, and nothing consumes
-the secret below, so nothing is broken today; it breaks the moment someone
-publishes a notebook that queries the warehouse.
+Every viewer of a published app queries as the same Vault-issued user, so the
+``readonly`` role's grants (SELECT on every table) are the ceiling on what any
+published app can show to any authenticated ol-data-platform realm user.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.
 """
 
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions
 
@@ -55,10 +55,10 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.vault import (
+    OLVaultK8SDynamicSecretConfig,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
@@ -105,22 +105,33 @@ apps_domain = marimo_data_config.require("apps_domain")
 
 # Vault policy for the marimo namespace.  sso/marimo holds the ol-marimo-client
 # credentials that ol-apisix-marimo-data-oidc-secrets syncs for the gated
-# routes.  sso/marimo-app holds the ol-marimo-app-client service-account
-# credentials, which are Keycloak credentials and are not usable against
-# Galaxy -- see the module docstring.
-marimo_vault_policy_hcl = """
-path "secret-operations/data/sso/marimo" {
+# routes.  creds/readonly is the published apps' StarRocks credential, and the
+# lease grants let VSO renew it and revoke it when its VaultDynamicSecret is
+# deleted, without the power to touch any other lease.
+starrocks_vault_mount_path = "database-starrocks"
+starrocks_creds_path = "creds/readonly"
+marimo_vault_policy_hcl = f"""
+path "secret-operations/data/sso/marimo" {{
   capabilities = ["read"]
-}
-path "secret-operations/sso/marimo" {
+}}
+path "secret-operations/sso/marimo" {{
   capabilities = ["read"]
-}
-path "secret-operations/data/sso/marimo-app" {
+}}
+path "{starrocks_vault_mount_path}/{starrocks_creds_path}" {{
   capabilities = ["read"]
-}
-path "secret-operations/sso/marimo-app" {
-  capabilities = ["read"]
-}
+}}
+path "sys/leases/renew" {{
+  capabilities = ["update"]
+  allowed_parameters = {{
+    lease_id = ["{starrocks_vault_mount_path}/{starrocks_creds_path}/*"]
+  }}
+}}
+path "sys/leases/revoke" {{
+  capabilities = ["update"]
+  allowed_parameters = {{
+    lease_id = ["{starrocks_vault_mount_path}/{starrocks_creds_path}/*"]
+  }}
+}}
 """
 
 marimo_vault_policy = vault.Policy(
@@ -136,7 +147,7 @@ marimo_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
     # Only the VSO ServiceAccount OLVaultK8SResources creates. Published
     # notebooks run author code in this namespace, and with "*" any pod that
     # mounts a ServiceAccount token could log in and read the OIDC client
-    # secret above.
+    # secret and mint StarRocks credentials.
     bound_service_account_names=["marimo-data-vault"],
     bound_service_account_namespaces=[marimo_namespace],
     token_policies=[marimo_vault_policy.name],
@@ -157,31 +168,42 @@ marimo_vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-# VaultStaticSecret: syncs ol-marimo-app-client credentials for published apps.
-# Nothing mounts this secret yet.  It is not a warehouse credential; a Galaxy
-# service account is still required for that.
-marimo_app_trino_secret = OLVaultK8SSecret(
-    f"marimo-app-trino-secret-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        dest_secret_labels=k8s_global_labels,
-        dest_secret_name="marimo-app-oidc-secret",  # pragma: allowlist secret  # noqa: S106
-        exclude_raw=True,
-        excludes=[".*"],
-        includes=["client_id", "client_secret"],
-        labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        name="marimo-app-oidc-secret",
+# The identity published notebook pods run as.  It has no IRSA annotation, and
+# no token is mounted, so author code gets no AWS or Kubernetes API access
+# from it.  Never reuse the hub's IRSA ServiceAccount here.
+marimo_published_service_account = kubernetes.core.v1.ServiceAccount(
+    f"marimo-published-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="marimo-published",
         namespace=marimo_namespace,
-        path="sso/marimo-app",
-        refresh_after="1h",
+        labels=application_labels,
+    ),
+    automount_service_account_token=False,
+)
+
+# StarRocks credential for published apps.  See the module docstring for why it
+# has to be mounted as a file, not injected as env vars.
+marimo_published_starrocks_creds = OLVaultK8SSecret(
+    f"marimo-published-starrocks-creds-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SDynamicSecretConfig(
+        name="marimo-published-starrocks-creds",
+        namespace=marimo_namespace,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="marimo-published-starrocks-creds",  # pragma: allowlist secret  # noqa: S106
+        mount=starrocks_vault_mount_path,
+        path=starrocks_creds_path,
+        exclude_raw=True,
         templates={
-            "MARIMO_APP_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "MARIMO_APP_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',  # pragma: allowlist secret  # noqa: E501
+            "STARROCKS_USER": '{{ get .Secrets "username" }}',
+            "STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',  # pragma: allowlist secret  # noqa: E501
         },
         vaultauth=marimo_vault_k8s_resources.auth_name,
+        revoke_on_delete=True,
     ),
-    opts=ResourceOptions(depends_on=[marimo_vault_k8s_resources]),
+    opts=ResourceOptions(
+        delete_before_replace=True, depends_on=[marimo_vault_k8s_resources]
+    ),
 )
 
 # APISIX OIDC resources for the published-apps gateway (apps_domain).
