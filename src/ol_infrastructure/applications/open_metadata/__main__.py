@@ -69,6 +69,8 @@ from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
 from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
     OPENMETADATA_PROVISIONER_USERNAME,
+    OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+    OPENMETADATA_PROVISIONER_VAULT_NAME,
 )
 
 # Resolve the bridge secrets directory once at module level using the sops
@@ -121,21 +123,22 @@ open_metadata_namespace = "open-metadata"
 open_metadata_service_account_name = "openmetadata"
 # Users' roles come from the `roles` claim that the ol-open_metadata-client
 # Keycloak client sends (substructure/keycloak ol_data_platform.py
-# OPEN_METADATA_ROLE_BY_REALM_ROLE). The claim never carries `Admin`, because
-# OpenMetadata only ever promotes from it and never clears isAdmin when it is
-# absent. Admins come only from initialAdmins below, which also names the
-# Keycloak service account that Pulumi manages bots with.
+# OPEN_METADATA_ROLE_BY_REALM_ROLE). The claim never carries `Admin`. Admins
+# come only from initialAdmins below, which also names the Keycloak service
+# account that Pulumi manages bots with.
 #
-# Tokens OpenMetadata issues itself (session JWTs, personal access tokens) carry
-# a snapshot of the user's roles, `Admin` included, and GET
-# /users/loggedInUser resyncs the user from that snapshot. An old personal
-# access token can therefore give a demoted user back a role or admin, or drop
-# a role they were given after it was issued, until they next log in. Demoting
-# anyone fully means revoking their personal access tokens.
+# OpenMetadata reads the claim only at login. The tokens it issues itself
+# (session JWTs, personal access tokens) carry a snapshot of the user's roles,
+# but 2.0.7 does not sync from them (JwtFilter.getUserRolesFromClaims) and
+# authorizes with the roles stored on the user. The team-keycloak-sync CronOMJob
+# in substructure/open_metadata resets those stored roles to the mapping every
+# hour and clears isAdmin on anyone outside adminPrincipals, after which a
+# user's tokens carry only what they now hold.
 #
 # To demote an admin: remove them from initialAdmins below and from
-# adminPrincipals in the authorizerConfiguration row, unset isAdmin on their
-# OpenMetadata user, and revoke their personal access tokens.
+# adminPrincipals in the authorizerConfiguration row. That job then clears their
+# isAdmin within the hour (or OpenMetadata does at their next login); revoke
+# their personal access tokens by hand if they should lose those too.
 open_metadata_use_roles_from_provider = True
 # CI's authenticationConfiguration row was seeded while this was still "public",
 # and public means the implicit flow, which ol-open_metadata-client no longer
@@ -531,6 +534,34 @@ OLVaultK8SSecret(
             "KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
             "KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
             "KEYCLOAK_PARENT_GROUP_ID": '{{ get .Secrets "parent_group_id" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+
+# The provisioner's Keycloak client, whose service account is in initialAdmins,
+# for the role half of the same job: setting another user's roles or isAdmin is
+# admin-only. The ingestion service account that runs
+# the job can already read this namespace's secrets, the server's database
+# credentials among them, so this grants it nothing it could not do already.
+OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-provisioner-secret",
+    OLVaultK8SStaticSecretConfig(
+        name="openmetadata-provisioner",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="om-provisioner",  # noqa: S106  # pragma: allowlist secret
+        labels=k8s_global_labels,
+        mount=OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+        mount_type="kv-v2",
+        path=OPENMETADATA_PROVISIONER_VAULT_NAME,
+        templates={
+            "OM_ADMIN_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OM_ADMIN_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
         },
         vaultauth=vault_k8s_resources.auth_name,
     ),

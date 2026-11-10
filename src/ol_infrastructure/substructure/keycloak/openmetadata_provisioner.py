@@ -72,7 +72,8 @@ def create_openmetadata_provisioner_resources(
 
     # Filed in OpenMetadata's own kv mount, next to the team sync client: the
     # secret makes its holder an OpenMetadata admin, and application policies
-    # read secret-operations/*. No Kubernetes workload reads it; Pulumi does.
+    # read secret-operations/*. Pulumi reads it, and so does the
+    # team-keycloak-sync CronOMJob, which resets users' roles and isAdmin.
     vault.generic.Secret(
         "ol-data-platform-openmetadata-provisioner-vault-credentials",
         path=f"{OPENMETADATA_PROVISIONER_VAULT_MOUNT}/{OPENMETADATA_PROVISIONER_VAULT_NAME}",

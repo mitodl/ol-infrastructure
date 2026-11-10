@@ -59,6 +59,11 @@ from ol_infrastructure.providers.openmetadata.access_control import (
     OpenMetadataRole,
     OpenMetadataTeam,
 )
+from ol_infrastructure.substructure.keycloak.ol_data_platform import (
+    OPEN_METADATA_DEFAULT_ROLE,
+    OPEN_METADATA_ROLE_BY_REALM_ROLE,
+    REALM_DEFAULT_ROLES,
+)
 from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
     OPENMETADATA_PROVISIONER_VAULT_MOUNT,
     OPENMETADATA_PROVISIONER_VAULT_NAME,
@@ -408,11 +413,13 @@ def _bot_jwt_env(bot_secret_name: str) -> dict[str, object]:
     }
 
 
-def _secret_env(secret_name: str, key: str) -> dict[str, object]:
-    return {
-        "name": key,
-        "valueFrom": {"secretKeyRef": {"name": secret_name, "key": key}},
-    }
+def _secret_env(
+    secret_name: str, key: str, *, optional: bool = False
+) -> dict[str, object]:
+    ref: dict[str, object] = {"name": secret_name, "key": key}
+    if optional:
+        ref["optional"] = True
+    return {"name": key, "valueFrom": {"secretKeyRef": ref}}
 
 
 def _plain_env(name: str, value: "str | Output[str]") -> dict[str, object]:
@@ -1316,6 +1323,16 @@ OpenMetadataEventSubscription(
 # OpenMetadata's jwtTeamClaimMapping stays unset. With it set, every login would
 # add the Keycloak memberships back into OpenMetadata and undo removals made
 # there.
+#
+# The same job then resets each user's roles to what their Keycloak realm roles
+# grant at login (the mapping the keycloak stack builds the `roles` claim from),
+# and clears isAdmin outside adminPrincipals. OpenMetadata only applies the
+# claim at login, so without this a demoted user who never logs in again keeps
+# their roles. That half writes as the provisioner's service account (an
+# admin), from the om-provisioner secret that the application stack creates.
+# Its references are optional so that, until that secret exists, the pod still
+# starts and only the role half fails. open_metadata:roles_dry_run true logs
+# its changes without making them.
 
 _make_cronjob(
     name="team-keycloak-sync",
@@ -1336,6 +1353,22 @@ _make_cronjob(
                 "KEYCLOAK_PARENT_GROUP_ID",
             )
         ),
+        _plain_env(
+            "OM_ROLE_BY_REALM_ROLE",
+            json.dumps(
+                {
+                    **OPEN_METADATA_ROLE_BY_REALM_ROLE,
+                    REALM_DEFAULT_ROLES: OPEN_METADATA_DEFAULT_ROLE,
+                },
+                sort_keys=True,
+            ),
+        ),
+        _plain_env(
+            "OM_ROLES_DRY_RUN",
+            json.dumps(om_config.get_bool("roles_dry_run", default=False)),
+        ),
+        _secret_env("om-provisioner", "OM_ADMIN_CLIENT_ID", optional=True),
+        _secret_env("om-provisioner", "OM_ADMIN_CLIENT_SECRET", optional=True),
     ],
     resources={
         "requests": {"cpu": "100m", "memory": "128Mi"},
