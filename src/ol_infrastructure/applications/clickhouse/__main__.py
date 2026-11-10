@@ -253,10 +253,13 @@ ch_image = f"altinity/clickhouse-server:{ch_version}"
 # 25.8+). During a rolling upgrade, set it to the version being upgraded from so
 # an upgraded replica keeps writing parts the others can still read: 25.11, 26.1
 # and 26.3 change String, nested-type and index file serialization in ways older
-# servers cannot read. Altinity 25.8 changes no part format we use, so the 24.8
-# value is a precaution there; on a 25.8 replica it shows as
-# allow_part_offset_column_in_projections = 0. Remove it once every replica runs
-# the new version; it then takes effect at each replica's next restart.
+# servers cannot read. On a 26.3 replica, 25.8 shows in system.merge_tree_settings
+# as string_serialization_version = single_stream and
+# propagate_types_serialization_versions_to_nested_types = 0 (with_size_stream
+# and 1 without it). It also sets query defaults: removing a 25.8 value turns
+# async_insert on and moves deduplicate_insert from backward_compatible_choice to
+# enable (26.2). Remove it once every replica runs the new version; it then takes
+# effect at each replica's next restart.
 ch_compatibility = clickhouse_config.get("compatibility")
 keeper_image = f"clickhouse/clickhouse-keeper:{CLICKHOUSE_KEEPER_VERSION}"
 
