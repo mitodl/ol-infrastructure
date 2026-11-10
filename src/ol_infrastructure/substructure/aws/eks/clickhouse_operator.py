@@ -13,6 +13,7 @@ import pulumi_kubernetes as kubernetes
 import yaml as pyyaml
 from pulumi import Config, ResourceOptions, StackReference
 
+from bridge.lib.constants import CLICKHOUSE_NAMESPACE
 from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import CLICKHOUSE_OPERATOR_VERSION
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
@@ -63,6 +64,17 @@ def _operator_configuration() -> dict[str, Any]:
     The operator lists every ClickHouseOperatorConfiguration in its own
     namespace at startup and merges them, in name order, over the file config.
 
+    The watch is narrowed to the namespace holding every CHI and CHK. With the
+    bundle's empty ``include``, the Keeper controller's cache is keyed on the
+    all-namespaces key ``""``, and the namespaced lists of a Keeper's
+    StatefulSets, Services, ConfigMaps, Secrets, PVCs and PDBs fail with
+    "unknown namespace for the cache" (Altinity/clickhouse-operator#2117). The
+    CHK reconcile still completes, but discovery comes back empty, so a Keeper
+    scale-down would leave the removed host's objects behind. A literal
+    namespace name gives the cache that exact key; the bundle's own ``include``
+    is empty, so the merged list is this one name. A CHI or CHK created in any
+    other namespace is ignored.
+
     :returns: The ClickHouseOperatorConfiguration manifest.
     :rtype: dict[str, Any]
     """
@@ -74,11 +86,12 @@ def _operator_configuration() -> dict[str, Any]:
             "namespace": CLICKHOUSE_OPERATOR_BUNDLE_NAMESPACE,
         },
         "spec": {
+            "watch": {"namespaces": {"include": [CLICKHOUSE_NAMESPACE]}},
             "reconcile": {
                 "statefulSet": {
                     "update": {"timeout": OPERATOR_STATEFULSET_UPDATE_TIMEOUT_SECONDS}
                 }
-            }
+            },
         },
     }
 
@@ -142,7 +155,8 @@ def setup_clickhouse_operator(
 
     The operator is installed from the upstream install-bundle manifest, which
     includes CRDs (ClickHouseInstallation, ClickHouseKeeperInstallation, etc.)
-    and the operator Deployment. It watches all namespaces by default.
+    and the operator Deployment. It watches only CLICKHOUSE_NAMESPACE (see
+    ``_operator_configuration``).
 
     Skipped when ``clickhouse:enable_operator`` is not set to true in config.
 

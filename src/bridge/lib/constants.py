@@ -4,6 +4,10 @@ from ipaddress import IPv4Address
 from types import MappingProxyType
 from typing import ClassVar
 
+# Every ClickHouseInstallation and ClickHouseKeeperInstallation lives here, in
+# every data cluster; the operator watches only this namespace.
+CLICKHOUSE_NAMESPACE = "clickhouse"
+
 FASTLY_CNAME_TLS_1_2 = "d.sni.global.fastly.net"
 FASTLY_CNAME_TLS_1_3 = "j.sni.global.fastly.net"
 FASTLY_A_TLS_1_2 = [
