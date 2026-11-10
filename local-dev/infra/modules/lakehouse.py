@@ -21,7 +21,8 @@ applications/starrocks), not its security. Where local differs, and why:
   Deployed it is shared-data on an S3 storage volume, so internal tables and
   materialized views here never exercise that path.
 - The StarRocks catalog has its Iceberg metadata cache off (see
-  STARROCKS_CATALOG_SETTINGS). Deployed it is on.
+  STARROCKS_CATALOG_SETTINGS). Deployed, the Glue catalogs (ol_data_lake_<env>)
+  have it off too, but the Gravitino catalog (ol_governed_lake_<env>) keeps it on.
 """
 
 import hashlib
@@ -77,8 +78,8 @@ NATIVE_DATABASES = ("b2b_analytics", "b2b_learner_records")
 # With the metadata cache on, StarRocks answers from the snapshot it last read
 # for about half a minute after another writer commits. A dlt load from the host
 # followed at once by a dbt build then builds on the load before it, and passes.
-# The deployed catalogs keep the cache: this is a single-user lake of small
-# tables, where a catalog round trip per query costs nothing.
+# The deployed Glue catalogs turn it off too (_catalog_mutable_props in
+# substructure/starrocks/__main__.py).
 STARROCKS_CATALOG_SETTINGS = {"enable_iceberg_metadata_cache": "false"}
 
 # Gravitino's entity store and the Iceberg JDBC catalog get a database each so
