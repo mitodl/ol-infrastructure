@@ -509,17 +509,15 @@ of both fields for Open Discussions) without echoing it.
 | MITxPro RC and CI | `xpro-rc` | `src/bridge/secrets/xpro/secrets.{qa,ci}.yaml` `recaptcha.site_key`/`secret_key`, via Vault `secret-xpro/recaptcha` |
 | MIT Open Discussions Pre-Prod | `open-discussions-rc` | Vault `secret-operations/rc-apps/mit-open/recaptcha-keys` (`site_key`, `secret_key`), written by hand and shared by the CI and QA Heroku apps |
 | Learn RC (`mit-open`) | `learn-rc` | `src/bridge/secrets/mitlearn/secrets.qa.yaml` `recaptcha.site_key`/`secret_key`, read by `mit_learn` and, for the site key, `mit_learn_nextjs`. CI's values are empty. |
-| SSO CI and RC (`ol-data-platform`) | `sso-rc` | Keycloak's own database (see below) |
+| SSO CI and RC (`ol-data-platform`) | `sso-rc` | `substructure/keycloak/Pulumi.{CI,QA}.yaml` `keycloak_realm:captcha_site_key`/`captcha_secret_key` (Pulumi secrets) |
 
-Keycloak does not take its reCAPTCHA settings from this repository today.
-`keycloak_realm:captcha_site_key` and `captcha_secret_key` are still set in
-`substructure/keycloak/Pulumi.{CI,QA,Production}.yaml`, but nothing reads them
-since the realm refactor in #3452 dropped the olapps registration flow and its
-reCAPTCHA execution config. The registration pages on `sso-qa.ol.mit.edu` and
-`sso.ol.mit.edu` still render the widget, so the live settings sit in the
-olapps realm's registration flow in Keycloak. The SSO cutover is an admin
-console change unless that flow is brought back under Pulumi first, which
-should happen before the production SSO key is touched.
+The olapps realm registers through `ol-registration-flow`
+(`substructure/keycloak/registration_flow.py`), whose reCAPTCHA execution
+config is built from the stack's `captcha_site_key` and `captcha_secret_key`.
+Set both with `pulumi config set --secret`, reading the value from stdin so it
+stays out of the shell history, and apply the keycloak stack. A new site key
+replaces the execution config delete-first, so registrations fail for the few
+seconds between the delete and the create.
 
 Bootcamp's three keys (Production, RC and CI) are deletions, not migrations:
 `mitodl/bootcamp-ecommerce` was archived on 2026-08-17, the
