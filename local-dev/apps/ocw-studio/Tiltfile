@@ -35,7 +35,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
             ]),
             sync(APP_DIR, '/src'),
         ],
-        ignore=['.ruff_cache/'],
+        ignore=['.ruff_cache/', 'webpack-stats.json'],
     )
 
 k8s_yaml_local([
