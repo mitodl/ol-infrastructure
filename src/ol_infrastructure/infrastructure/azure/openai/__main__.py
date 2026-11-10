@@ -50,8 +50,8 @@ AZURE_TOKEN_EXCHANGE_AUDIENCE = "api://AzureADTokenExchange"  # noqa: S105
 # a wrong value creates successfully and fails only later at token exchange, so these
 # are asserted here rather than discovered at runtime. Kept in sync with:
 #   mitlearn    applications/mit_learn/__main__.py (mitlearn_service_account)
-#   learn-ai    applications/learn_ai/__main__.py:254
-#   mitxonline  applications/edxapp/k8s_resources.py:252
+#   learn-ai    applications/learn_ai/__main__.py (learn_ai_service_account)
+#   mitxonline  applications/edxapp/k8s_resources.py (edxapp_service_account_name)
 #   dagster-ml  applications/dagster/__main__.py (dagster_user_code_service_account)
 #
 # dagster-user-code is shared by every Dagster code location, because the
