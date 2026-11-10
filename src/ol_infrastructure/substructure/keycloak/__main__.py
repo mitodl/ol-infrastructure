@@ -7,6 +7,7 @@ from functools import partial
 import pulumi_keycloak as keycloak
 from pulumi import Config, ResourceOptions
 
+from bridge.lib.constants import gateway_session_secret
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.substructure.keycloak.ol_data_platform import (
@@ -70,7 +71,11 @@ mailgun_email_host = keycloak_realm_config.require("mailgun_email_host")
 mailgun_email_password = keycloak_realm_config.require("mailgun_email_password")
 mailgun_email_username = keycloak_realm_config.require("mailgun_email_username")
 mit_touchstone_cert = "MIIDCDCCAfCgAwIBAgIJAK/yS5ltGi7MMA0GCSqGSIb3DQEBBQUAMBYxFDASBgNVBAMTC2lkcC5taXQuZWR1MB4XDTEyMDczMDIxNTAxN1oXDTMyMDcyNTIxNTAxN1owFjEUMBIGA1UEAxMLaWRwLm1pdC5lZHUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDgC5Y2mM/VMThzTWrZ2uyv3Gw0mWU9NgQpWN1HQ/lLBxH1H6pMc5+fGpOdrvxH/Nepdg6uAJwZrclTDAHHpG/THb7K063NRtic8h9UYSqwxIWUCXI8qNijcWA2bW6PFEy4yIP611J+IzQxzD/ZiR+89ouzdjNBrPHzoaIoMwflftYnFc4L/qu4DxE/NWgANYPGEJfWUFTVpfNV1Iet60904zl+O7T79mwaQwwOMUWwk/DEQyvG6bf2uWL4aFx4laBOekrA+5rSHUXAFlhCreTnzZMkVoxSGqYlc5uZuZmpFCXZn+tNpsVYz+c4Hve3WOZwhx/7bMGCwlx7oovoQWQ5AgMBAAGjWTBXMDYGA1UdEQQvMC2CC2lkcC5taXQuZWR1hh5odHRwczovL2lkcC5taXQuZWR1L3NoaWJib2xldGgwHQYDVR0OBBYEFF5aINzhvMR+pOijYHtr3yCKsrMSMA0GCSqGSIb3DQEBBQUAA4IBAQDfVpscchXXa4Al/l9NGNwQ1shpQ8d+k+NpX2Q976jau9DhVHa42F8bfl1EeHLMFlN79aUxFZb3wvr0h5pq3a8F9aWHyKe+0R10ikVueDcAmg0V7MWthFdsyMwHPbnCdSXo2wh0GhjeIF3f3+hZZwrZ4sZqjX2RmsYnyXgS1r5mzuu4W447Q1fbC5BeZTefUhJcfHQ56ztIFtLJdRuHHnqj09CaQVMD1FtovM86vYwVMwMsgOgkN3c7tW6kXHHBHeEA31xUJsqXGTRlwMSyJTju3SFvhXI/8ZIxshTzWURBo+vf6A6QQvSvJAju4zVLZy83YB/cvAFsV3BexZ4xzuQD"  # pragma: allowlist secret # noqa: E501
-session_secret = keycloak_realm_config.require("session_secret")
+# Never written to Vault itself: each client path that a gateway reads gets a
+# key derived from it, so one namespace's key can't forge another's sessions.
+session_secret_for = partial(
+    gateway_session_secret, keycloak_realm_config.require("session_secret")
+)
 
 fetch_realm_public_key_partial = partial(
     fetch_realm_public_key,
@@ -85,7 +90,7 @@ create_ol_platform_engineering_realm(
     mit_email_password,
     mit_email_username,
     mit_email_host,
-    session_secret,
+    session_secret_for,
     fetch_realm_public_key_partial,
 )
 ol_data_platform_realm = create_ol_data_platform_realm(
@@ -97,7 +102,7 @@ ol_data_platform_realm = create_ol_data_platform_realm(
     mit_email_username,
     mit_email_host,
     mit_touchstone_cert,
-    session_secret,
+    session_secret_for,
     fetch_realm_public_key_partial,
 )
 create_openmetadata_team_sync_resources(
@@ -119,7 +124,7 @@ create_olapps_realm(
     mailgun_email_username,
     mailgun_email_host,
     mit_touchstone_cert,
-    session_secret,
+    session_secret_for,
     fetch_realm_public_key_partial,
 )
 mit_ldap_bind_password = keycloak_realm_config.require_secret(
@@ -134,7 +139,6 @@ create_ol_mit_realm(
     mit_email_username,
     mit_email_host,
     mit_ldap_bind_password,
-    session_secret,
     fetch_realm_public_key_partial,
 )
 create_scim_resources(keycloak_provider, keycloak_url)

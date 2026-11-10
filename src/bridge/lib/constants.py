@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from collections.abc import Mapping
 from dataclasses import dataclass
 from ipaddress import IPv4Address
@@ -273,3 +275,23 @@ def oidc_secret_data(
     if include_session_secret:
         data["session.secret"] = vault_fields["secret"]
     return data
+
+
+def gateway_session_secret(master: str, vault_path: str) -> str:
+    """Return the session cookie key for the gateways that read ``vault_path``.
+
+    The value lands as ``secret`` in that Keycloak client's Vault path, and
+    every openid-connect resource reading the path encrypts its session cookie
+    with it.  Deriving one per path, rather than writing ``master`` everywhere,
+    means a namespace that can read one path cannot forge a session for a
+    gateway that reads another.  HMAC is one-way, so a leaked derived value
+    does not reveal ``master`` or any sibling.  Changing ``master`` rotates
+    every path at once.
+
+    :param master: The stack's ``keycloak_realm:session_secret``.
+    :param vault_path: The full KV path, e.g. ``secret-operations/sso/opik``.
+    :returns: A 64-character hex key.
+    """
+    return hmac.new(
+        master.encode(), f"apisix-session:{vault_path}".encode(), hashlib.sha256
+    ).hexdigest()

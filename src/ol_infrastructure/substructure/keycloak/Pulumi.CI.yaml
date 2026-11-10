@@ -100,7 +100,7 @@ config:
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   keycloak_realm:session_secret:
-    secure: v1:SKlByHIh5fj/2MlA:1hzqRgIoqGowunYEVMMhdzPPBPUGucSUjlcOUDuuPL7JIg+Mpp2nGu8sHGfSMtfeAFOKNlQ6bmMF2oQ=
+    secure: v1:fSO0bVMTVptPlpVy:Sr0vDiNKaErluXKTlJFZ2Zdve2wBoE8/7CBk3iS0h826rEWlkoGa0YjTGj9opz9QGsux5E8DCgBOJ41oZotet5kiW8xL6aWiI0WqNI+QIXc=
   keycloak_realm:ol-platform-engineering-grafana-client-secret:
     secure: v1:rAIQutctJKUBe/rV:VV0DhdOXs5U+zCqXE/bOTjqe98nBvo/Kkdfnf0JJjzFwI9gxOIBXwSmwoyP2XsIi7+VVVLVzfCHVcvay
   keycloak_realm:olapps_email_tmeme: ol-learn

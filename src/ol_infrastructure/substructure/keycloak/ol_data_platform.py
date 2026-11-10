@@ -1,6 +1,7 @@
 """Keycloak realm definition for the OL Data Platform."""
 
 import json
+from collections.abc import Callable
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
@@ -87,7 +88,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     mit_email_username: str,
     mit_email_host: str,
     mit_touchstone_cert: str,
-    session_secret: str,
+    session_secret_for: Callable[[str], str],
     fetch_realm_public_key_partial,
 ):
     """Create the OL Data Platform realm and all of its resources."""
@@ -331,10 +332,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ),
             client_id=ol_data_platform_superset_client.client_id,
             client_secret=ol_data_platform_superset_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=ol_data_platform_superset_client.realm_id,
             realm_name="ol-data-platform",
             realm_public_key=ol_data_platform_superset_client.realm_id.apply(
@@ -561,10 +558,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ),
             client_id=ol_data_platform_openmetadata_client.client_id,
             client_secret=ol_data_platform_openmetadata_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=ol_data_platform_openmetadata_client.realm_id,
             realm_name="ol-data-platform",
             realm_public_key=ol_data_platform_openmetadata_client.realm_id.apply(
@@ -698,10 +691,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ),
             client_id=ol_data_platform_starrocks_client.client_id,
             client_secret=ol_data_platform_starrocks_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=ol_data_platform_starrocks_client.realm_id,
             realm_name="ol-data-platform",
             realm_public_key=ol_data_platform_starrocks_client.realm_id.apply(
@@ -1066,7 +1055,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ),
             client_id=ol_data_platform_marimo_client.client_id,
             client_secret=ol_data_platform_marimo_client.client_secret,
-            secret=session_secret,
+            secret=session_secret_for("secret-operations/sso/marimo"),
             realm_id=ol_data_platform_marimo_client.realm_id,
             realm_name="ol-data-platform",
         ).apply(json.dumps),
