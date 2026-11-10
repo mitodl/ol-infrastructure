@@ -1140,8 +1140,7 @@ server_config_job = kubernetes.batch.v1.Job(
         ttl_seconds_after_finished=86400,  # auto-clean after 24 h
     ),
     opts=ResourceOptions(
-        # The glossary the Job creates is owned by a team.
-        depends_on=[ingestion_irsa_role, *om_teams],
+        depends_on=[ingestion_irsa_role],
         delete_before_replace=True,
     ),
 )
@@ -1217,6 +1216,38 @@ vault.generic.Secret(
     path="secret-concourse/infrastructure/openmetadata_metrics_bot",
     data_json=Output.json_dumps(
         {"token": metrics_sync_bot.token, "server_url": om_api_url}
+    ),
+)
+
+# glossary-sync-bot runs ol-data-platform's `ol-dbt glossary sync`. A bot of
+# its own keeps the glossary's version history attributable to the sync and its
+# role limited to the glossary. It is not a glossary reviewer and has no team,
+# so OpenMetadata refuses it a term's move from In Review to Approved or
+# Rejected (EntityRepository.updateEntityStatus). The glossary the sync creates
+# is owned and reviewed by the data-platform team, so the bot's token reaches
+# Vault, and the pipeline can run, only once the teams exist.
+glossary_sync_bot = OpenMetadataBot(
+    f"om-glossary-sync-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="glossary-sync-bot",
+        display_name="Glossary sync",
+        description=(
+            "Publishes ol-data-platform's glossary/ files as the business glossary."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"glossary-sync-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["GlossarySyncBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[om_roles["GlossarySyncBotRole"], *om_teams]),
+)
+
+# Read by the ol-data-glossary-sync pipeline, as the metrics sync's token is.
+vault.generic.Secret(
+    f"om-glossary-sync-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-concourse/infrastructure/openmetadata_glossary_bot",
+    data_json=Output.json_dumps(
+        {"token": glossary_sync_bot.token, "server_url": om_api_url}
     ),
 )
 

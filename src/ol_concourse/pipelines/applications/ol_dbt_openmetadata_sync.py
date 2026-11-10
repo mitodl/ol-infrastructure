@@ -52,13 +52,14 @@ def watched_checkout(watched_dir: str) -> str:
     return f"../{watched_resource_name(watched_dir)}/{watched_dir}"
 
 
-def ol_dbt_openmetadata_sync_pipeline(
+def ol_dbt_openmetadata_sync_pipeline(  # noqa: PLR0913
     *,
     watched_dir: str,
     job_name: str,
     task_name: str,
     sync_command: str,
     bot_credentials: str,
+    download_manifest: bool = True,
 ) -> Pipeline:
     """Build a pipeline that runs `sync_command` when `watched_dir` changes and
     daily after the manifest upload.
@@ -68,10 +69,13 @@ def ol_dbt_openmetadata_sync_pipeline(
         sync command.
     :param job_name: The Concourse job name.
     :param task_name: The Concourse task name.
-    :param sync_command: The shell command run from the repository checkout
-        after the manifest is downloaded to /tmp/manifest.json.
+    :param sync_command: The shell command run from the repository checkout,
+        after the manifest is downloaded to /tmp/manifest.json when
+        `download_manifest` is set.
     :param bot_credentials: The Vault key under secret-concourse/infrastructure/
         holding the bot's ``server_url`` and ``token``.
+    :param download_manifest: Whether to download the manifest first, for a
+        sync that resolves dbt bindings.
     :returns: The pipeline.
     :rtype: Pipeline
     """
@@ -145,7 +149,8 @@ def ol_dbt_openmetadata_sync_pipeline(
                                     "-c",
                                     "set -euo pipefail\n"
                                     "cd ol-data-platform-repository\n"
-                                    f"{DOWNLOAD_MANIFEST}{sync_command}",
+                                    f"{DOWNLOAD_MANIFEST if download_manifest else ''}"
+                                    f"{sync_command}",
                                 ],
                             ),
                         ),

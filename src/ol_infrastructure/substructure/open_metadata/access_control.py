@@ -220,6 +220,56 @@ POLICIES: list[OpenMetadataPolicySpec] = [
             ),
         ],
     ),
+    # What ol-data-platform's `ol-dbt glossary sync` needs to do what the
+    # om_server_config Job did for the glossary: read the data-platform team to
+    # own and review a new glossary; POST the glossary and its terms (Create
+    # only: the owners, reviewers, parent and relatedTerms in a create body are
+    # not authorized separately, EntityResource.create); PATCH the glossary's
+    # description (EditDescription); and PATCH a term's description, synonyms,
+    # references and relatedTerms.  Only description maps to a narrower
+    # operation, so a term PATCH is authorized as EditAll
+    # (JsonPatchUtils.getMetadataOperation, ResourceRegistry).  Reads are also
+    # covered by DefaultBotRole's ViewAll, which every bot holds.
+    #
+    # EditAll on glossaryTerm also covers /entityStatus, which maps to no
+    # narrower operation, so no rule can grant the term edits and withhold
+    # status changes.  What keeps the bot from approving its own terms is that
+    # it is not a reviewer: OpenMetadata refuses a non-reviewer's move from In
+    # Review to Approved or Rejected (EntityRepository.updateEntityStatus).
+    # That check does not cover a term still in Draft.  DefaultBotPolicy denies
+    # EditDisplayName, so a displayName is set only on create.
+    OpenMetadataPolicySpec(
+        name="GlossarySyncBotPolicy",
+        display_name="Glossary Sync Bot Policy",
+        description=(
+            "Lets ol-dbt glossary sync create the business glossary and its "
+            "terms and keep their descriptions, synonyms, references and "
+            "related terms as declared."
+        ),
+        rules=[
+            OpenMetadataPolicyRule(
+                name="GlossarySyncBotRule-Glossary",
+                description="Read and create glossaries and edit their description.",
+                effect="allow",
+                resources=["glossary"],
+                operations=["Create", "EditDescription", "ViewBasic"],
+            ),
+            OpenMetadataPolicyRule(
+                name="GlossarySyncBotRule-Terms",
+                description="Read, create and edit glossary terms.",
+                effect="allow",
+                resources=["glossaryTerm"],
+                operations=["Create", "EditAll", "ViewBasic"],
+            ),
+            OpenMetadataPolicyRule(
+                name="GlossarySyncBotRule-Teams",
+                description="Read the team that owns and reviews the glossary.",
+                effect="allow",
+                resources=["team"],
+                operations=["ViewBasic"],
+            ),
+        ],
+    ),
 ]
 
 # These names are the values Keycloak sends in the `roles` claim, so renaming
@@ -245,7 +295,7 @@ ROLES: list[OpenMetadataRoleSpec] = [
         ),
         policies=["DataContributorPolicy"],
     ),
-    # Bots inherit no team policies, so these two, whose tokens live outside
+    # Bots inherit no team policies, so these, whose tokens live outside
     # OpenMetadata's own deployment, carry the deny themselves.
     OpenMetadataRoleSpec(
         name="DagsterBotRole",
@@ -258,6 +308,12 @@ ROLES: list[OpenMetadataRoleSpec] = [
         display_name="Metrics Sync Bot Role",
         description="Role of metrics-sync-bot.",
         policies=["HideAlertDestinationsPolicy", "MetricsSyncBotPolicy"],
+    ),
+    OpenMetadataRoleSpec(
+        name="GlossarySyncBotRole",
+        display_name="Glossary Sync Bot Role",
+        description="Role of glossary-sync-bot.",
+        policies=["GlossarySyncBotPolicy", "HideAlertDestinationsPolicy"],
     ),
 ]
 

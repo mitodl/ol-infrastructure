@@ -547,9 +547,40 @@ def test_every_user_keeps_organization_policy_and_loses_alert_reads() -> None:
         ("deny", ["eventsubscription"], ["All"])
     ]
     # Bots inherit no team policies, so the bots with custom roles carry it.
-    for role in ("DagsterBotRole", "MetricsSyncBotRole"):
+    for role in ("DagsterBotRole", "GlossarySyncBotRole", "MetricsSyncBotRole"):
         spec = next(spec for spec in ROLES if spec.name == role)
         assert "HideAlertDestinationsPolicy" in spec.policies
+
+
+def test_glossary_sync_bot_reaches_only_the_glossary() -> None:
+    # A term PATCH of synonyms, references or relatedTerms is authorized as
+    # EditAll, so that is the one EditAll; the glossary itself gets only the
+    # description edit the sync makes.
+    role = next(spec for spec in ROLES if spec.name == "GlossarySyncBotRole")
+    assert role.policies == ["GlossarySyncBotPolicy", "HideAlertDestinationsPolicy"]
+    policy = next(spec for spec in POLICIES if spec.name == "GlossarySyncBotPolicy")
+    assert {
+        (rule.effect, tuple(rule.resources), tuple(rule.operations))
+        for rule in policy.rules
+    } == {
+        ("allow", ("glossary",), ("Create", "EditDescription", "ViewBasic")),
+        ("allow", ("glossaryTerm",), ("Create", "EditAll", "ViewBasic")),
+        ("allow", ("team",), ("ViewBasic",)),
+    }
+
+
+def test_glossary_sync_bot_role_is_created_with_its_policies(
+    server: FakeOpenMetadata,
+) -> None:
+    _create_role_policies("GlossarySyncBotRole")
+
+    created = OpenMetadataRoleProvider().create(_role("GlossarySyncBotRole"))
+
+    assert sorted(
+        ref["name"]
+        for ref in server.entities["roles"]["GlossarySyncBotRole"]["policies"]
+    ) == ["GlossarySyncBotPolicy", "HideAlertDestinationsPolicy"]
+    assert created.outs["drift"] == []
 
 
 def test_organization_policies_refuse_a_team_of_another_type(
