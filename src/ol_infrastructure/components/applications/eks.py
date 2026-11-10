@@ -1,5 +1,6 @@
 """Common components for deploying applications to EKS."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +34,9 @@ class OLEKSAuthBindingConfig(BaseModel):
     namespace: str
     stack_info: StackInfo
     aws_config: AWSBase
-    iam_policy_document: dict[str, Any] | None = None
+    # An Output when the policy names a resource created in the same stack; it is
+    # linted once the Output resolves.
+    iam_policy_document: dict[str, Any] | Output[dict[str, Any]] | None = None
     vault_policy_path: Path | None = None
     vault_policy_text: str | None = None
     cluster_name: str | Output[str]
@@ -111,10 +114,12 @@ class OLEKSAuthBinding(ComponentResource):
                 f"{config.application_name}-policy-{config.stack_info.env_suffix}",
                 name=f"{config.application_name}-policy-{config.stack_info.env_suffix}",
                 path=f"/ol-data/{config.application_name}-policy-{config.stack_info.env_suffix}/",
-                policy=lint_iam_policy(
-                    config.iam_policy_document,
-                    stringify=True,
-                    parliament_config=config.parliament_config,
+                policy=Output.from_input(config.iam_policy_document).apply(
+                    lambda document: json.dumps(
+                        lint_iam_policy(
+                            document, parliament_config=config.parliament_config
+                        )
+                    )
                 ),
                 description=(
                     f"Policy for granting access for {config.application_name} to AWS"

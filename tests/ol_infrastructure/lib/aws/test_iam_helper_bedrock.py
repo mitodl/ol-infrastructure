@@ -106,3 +106,52 @@ def test_inference_profiles_must_be_literal_profile_ids(profile):
     # Region-group prefix has no model ID to derive.
     with pytest.raises(ValueError, match="Not system-defined"):
         bedrock_invoke_statements(ACCOUNT_ID, inference_profiles=[profile])
+
+
+PROFILE_ID = "exampleprofile1"
+APPLICATION_PROFILE_ARN = (
+    f"arn:aws:bedrock:us-east-1:{ACCOUNT_ID}:application-inference-profile/{PROFILE_ID}"
+)
+
+
+def test_application_profiles_are_added_to_the_vendor_scope():
+    # The vendor globs still cover the model the profile copies, which invoking
+    # through the profile also needs.
+    invoke = bedrock_invoke_statements(
+        ACCOUNT_ID,
+        vendor="cohere",
+        application_inference_profile_arns=[APPLICATION_PROFILE_ARN],
+    )[0]
+    assert invoke["Resource"] == [
+        "arn:aws:bedrock:*::foundation-model/cohere.*",
+        f"arn:aws:bedrock:*:{ACCOUNT_ID}:inference-profile/*cohere*",
+        APPLICATION_PROFILE_ARN,
+    ]
+
+
+def test_application_profiles_pass_lint_with_documented_config():
+    policy = {
+        "Version": IAM_POLICY_VERSION,
+        "Statement": bedrock_invoke_statements(
+            ACCOUNT_ID,
+            vendor="cohere",
+            application_inference_profile_arns=[APPLICATION_PROFILE_ARN],
+        ),
+    }
+    lint_iam_policy(policy, parliament_config=BEDROCK_PARLIAMENT_CONFIG)
+
+
+@pytest.mark.parametrize(
+    "arn",
+    [
+        f"arn:aws:bedrock:us-east-1:{ACCOUNT_ID}:application-inference-profile/*",
+        f"arn:aws:bedrock:*:{ACCOUNT_ID}:application-inference-profile/{PROFILE_ID}",
+        f"arn:aws:bedrock:us-east-1:{ACCOUNT_ID}:inference-profile/us.cohere.embed-v4:0",
+        PROFILE_ID,
+    ],
+)
+def test_application_profiles_must_be_literal_arns(arn):
+    with pytest.raises(ValueError, match="Not application inference profile ARNs"):
+        bedrock_invoke_statements(
+            ACCOUNT_ID, vendor="cohere", application_inference_profile_arns=[arn]
+        )

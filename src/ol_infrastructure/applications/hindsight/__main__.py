@@ -5,7 +5,9 @@ Hindsight is used for storage and retrieval only: callers produce their notes
 through ol-llm, and the server runs with no LLM provider, chunks-mode retain,
 and observations and consolidation off, so it makes no LLM calls of its own.
 Embeddings come from Cohere Embed v4 on Bedrock, called with the pod's IRSA
-role.
+role. With ``embeddings_metering`` on, they go through a tagged application
+inference profile, so Cost Explorer can attribute their spend, and
+ol_memory_ext/model_calls.py counts them per app on /metrics.
 
 Every request carries a Keycloak token for the memory service's audience. The
 OL extensions in ol_memory_ext/ enforce who may touch which bank:
@@ -25,7 +27,7 @@ from string import Template
 
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, Output, ResourceOptions, export
-from pulumi_aws import ec2, get_caller_identity
+from pulumi_aws import bedrock, bedrockfoundation, ec2, get_caller_identity
 from pydantic import SecretStr
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
@@ -90,11 +92,12 @@ DB_NAME = "hindsight"
 DB_CREDS_SECRET_NAME = "hindsight-db-creds"  # pragma: allowlist secret  # noqa: S105
 EXTENSION_PACKAGE = "ol_memory_ext"
 EXTENSION_ROOT = "/opt/ol_ext"
-EXTENSION_SOURCE = Path(__file__).parent / EXTENSION_PACKAGE / "__init__.py"
+EXTENSION_SOURCES = sorted((Path(__file__).parent / EXTENSION_PACKAGE).glob("*.py"))
 # Multilingual, with a 128K-token input. Hindsight fixes the vector column to
 # the model's dimension (1536) once a bank holds data, so changing the model
 # means re-embedding every bank.
 EMBEDDINGS_MODEL = "bedrock/cohere.embed-v4:0"
+EMBEDDINGS_METER = f"{EXTENSION_PACKAGE}.model_calls:EmbeddingMeter"
 
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"applications-{stack_info.env_suffix}"}
@@ -115,6 +118,7 @@ cluster_stack.require_output("namespaces").apply(
 
 keycloak_issuer = hindsight_config.require("keycloak_issuer")
 alert_tier = AlertTier(hindsight_config.require("alert_tier"))
+embeddings_metering = hindsight_config.require_bool("embeddings_metering")
 
 ################################
 # Database: RDS Postgres with pgvector
@@ -204,6 +208,32 @@ hindsight_db_vault_backend = OLVaultDatabaseBackend(
 )
 
 ################################
+# Embeddings cost attribution
+################################
+# Cost Explorer attributes Bedrock spend by the tags on the resource invoked, and
+# a foundation model has none. LiteLLM still takes EMBEDDINGS_MODEL to pick the
+# request shape, so the stored vectors don't change.
+embeddings_profile_arns: Output[list[str]] = Output.from_input([])
+if embeddings_metering:
+    embeddings_profile = bedrock.InferenceProfile(
+        f"hindsight-embeddings-inference-profile-{stack_info.env_suffix}",
+        name=f"hindsight-embeddings-{stack_info.env_suffix}",
+        description="Hindsight embeddings, tagged for cost attribution",
+        model_source=bedrock.InferenceProfileModelSourceArgs(
+            copy_from=bedrockfoundation.get_model(
+                model_id=EMBEDDINGS_MODEL.removeprefix("bedrock/")
+            ).model_arn
+        ),
+        tags=aws_config.merged_tags(
+            {
+                "Name": f"hindsight-embeddings-{stack_info.env_suffix}",
+                "Application": Services.hindsight,
+            }
+        ),
+    )
+    embeddings_profile_arns = embeddings_profile.arn.apply(lambda arn: [arn])
+
+################################
 # Vault and Kubernetes auth
 ################################
 hindsight_auth_binding = OLEKSAuthBinding(
@@ -216,12 +246,16 @@ hindsight_auth_binding = OLEKSAuthBinding(
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-        iam_policy_document={
-            "Version": IAM_POLICY_VERSION,
-            "Statement": bedrock_invoke_statements(
-                get_caller_identity().account_id, vendor="cohere"
-            ),
-        },
+        iam_policy_document=embeddings_profile_arns.apply(
+            lambda arns: {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": bedrock_invoke_statements(
+                    get_caller_identity().account_id,
+                    vendor="cohere",
+                    application_inference_profile_arns=arns,
+                ),
+            }
+        ),
         parliament_config=BEDROCK_PARLIAMENT_CONFIG,
         irsa_service_account_name=SERVICE_ACCOUNT_NAME,
         create_irsa_service_account=True,
@@ -259,13 +293,13 @@ hindsight_db_creds = OLVaultK8SSecret(
 ################################
 # Hindsight API
 ################################
-extension_source = EXTENSION_SOURCE.read_text()
+extension_files = {source.name: source.read_text() for source in EXTENSION_SOURCES}
 # Auto-named, so an edit to the extension yields a new ConfigMap name, which
 # changes the pod template and rolls the Deployment.
 extension_config_map = kubernetes.core.v1.ConfigMap(
     f"hindsight-ol-memory-ext-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(namespace=NAMESPACE, labels=k8s_labels),
-    data={"__init__.py": extension_source},
+    data=extension_files,
     opts=ResourceOptions(replace_on_changes=["data"], delete_before_replace=False),
 )
 
@@ -282,7 +316,7 @@ def _client_map(clients: dict[str, str]) -> str:
 
 # Everything Hindsight reads is a HINDSIGHT_API_* setting. Values that are the
 # same in every environment are here; the rest come from stack config.
-hindsight_settings = {
+hindsight_settings: dict[str, str | Output[str]] = {
     "HOST": "0.0.0.0",  # noqa: S104
     "PORT": str(API_PORT),
     "LOG_FORMAT": "json",
@@ -322,6 +356,12 @@ hindsight_settings = {
     "OPERATION_VALIDATOR_EXTENSION": f"{EXTENSION_PACKAGE}:LearnerBankValidator",
     "MEMORY_DEFENSE_EXTENSION": f"{EXTENSION_PACKAGE}:OLMemoryDefense",
 }
+if embeddings_metering:
+    hindsight_settings |= {
+        # Bedrock only: what LiteLLM invokes in place of EMBEDDINGS_MODEL.
+        "EMBEDDINGS_LITELLM_SDK_MODEL_ID": embeddings_profile.arn,
+        "MODEL_CALL_EXTENSION": EMBEDDINGS_METER,
+    }
 
 api_selector = {"app.kubernetes.io/name": API_NAME}
 api_labels = {
@@ -344,7 +384,7 @@ api_deployment = kubernetes.apps.v1.Deployment(
                 labels=api_labels,
                 annotations={
                     "ol.mit.edu/extension-hash": hashlib.sha256(
-                        extension_source.encode()
+                        "".join(extension_files.values()).encode()
                     ).hexdigest()
                 },
             ),

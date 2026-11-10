@@ -556,12 +556,18 @@ BEDROCK_PARLIAMENT_CONFIG: dict[str, Any] = {"RESOURCE_MISMATCH": {}}
 # us-gov, global, ...; AWS adds more) and then the model ID, <vendor>.<model>. No
 # * or ?, since IAM would read either as a wildcard in the resource ARN.
 _INFERENCE_PROFILE_ID = re.compile(r"[a-z-]+\.[a-z0-9-]+\.[A-Za-z0-9.:_-]+")
+# An application inference profile ARN. AWS assigns the trailing ID, so it is
+# only known once the profile exists.
+_APPLICATION_INFERENCE_PROFILE_ARN = re.compile(
+    r"arn:aws[a-z-]*:bedrock:[a-z0-9-]+:\d{12}:application-inference-profile/[a-z0-9]+"
+)
 
 
 def bedrock_invoke_statements(
     account_id: str,
     vendor: str | None = None,
     inference_profiles: Sequence[str] | None = None,
+    application_inference_profile_arns: Sequence[str] = (),
 ) -> list[dict[str, Any]]:
     """Statements that let a principal invoke Bedrock models on demand.
 
@@ -602,9 +608,16 @@ def bedrock_invoke_statements(
         matches.
     :type inference_profiles: Sequence[str] | None
 
+    :param application_inference_profile_arns: Application inference profiles
+        (tagged copies of a model or system-defined profile, for cost
+        attribution) to allow as well. Invoking one also needs the model it
+        copies, so ``vendor`` or ``inference_profiles`` must still cover that.
+    :type application_inference_profile_arns: Sequence[str]
+
     :raises ValueError: If both ``vendor`` and ``inference_profiles`` are given,
         or ``inference_profiles`` is empty or names something other than a
-        system-defined profile ID.
+        system-defined profile ID, or an application inference profile is not
+        named by its full ARN.
 
     :returns: The invoke statement.
 
@@ -634,6 +647,14 @@ def bedrock_invoke_statements(
     else:
         model_globs = [f"{vendor}.*" if vendor else "*"]
         profile_globs = [f"*{vendor}*" if vendor else "*"]
+    invalid_arns = [
+        arn
+        for arn in application_inference_profile_arns
+        if not _APPLICATION_INFERENCE_PROFILE_ARN.fullmatch(arn)
+    ]
+    if invalid_arns:
+        msg = f"Not application inference profile ARNs: {invalid_arns}"
+        raise ValueError(msg)
     return [
         {
             "Effect": "Allow",
@@ -648,6 +669,7 @@ def bedrock_invoke_statements(
             + [
                 f"arn:aws:bedrock:*:{account_id}:inference-profile/{profile_glob}"
                 for profile_glob in profile_globs
-            ],
+            ]
+            + list(application_inference_profile_arns),
         },
     ]
