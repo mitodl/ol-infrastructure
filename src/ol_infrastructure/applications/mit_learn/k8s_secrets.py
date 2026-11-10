@@ -180,8 +180,7 @@ def create_mitlearn_k8s_secrets(
 
     Returns:
         The names of the secrets pods require, the names of the secrets pods
-        mount as optional (the Opik and memory clients, which another stack
-        writes to Vault),
+        mount as optional (the Opik client, which another stack writes to Vault),
         and the secret resources.
     """
     secret_names: list[str] = []
@@ -322,12 +321,13 @@ def create_mitlearn_k8s_secrets(
         restart_targets=restart_targets,
     )
     secret_resources.append(opik_secret)
-    optional_secret_names = [opik_secret_name]
 
     # ol-mitlearn-memory-client, which ol-llm's memory interface exchanges a
     # learner's session token with (OL_LLM_MEMORY_EXCHANGE_*). The keycloak
-    # substructure writes it (ol_memory.py). Optional for the same reason as the
-    # Opik client: a missing secret should not keep pods from starting.
+    # substructure writes it (ol_memory.py). Required, unlike the Opik client:
+    # the rest of the memory settings are plain env, and MemoryConfig.from_env
+    # accepts them with no exchange pair, so a pod that started before VSO's first
+    # sync would hand raw session tokens to Hindsight and get 401 on every call.
     if memory_enabled:
         memory_secret_name, memory_secret = _create_static_secret(
             stack_info=stack_info,
@@ -343,7 +343,7 @@ def create_mitlearn_k8s_secrets(
             vaultauth=vault_k8s_resources.auth_name,
             restart_targets=restart_targets,
         )
-        optional_secret_names.append(memory_secret_name)
+        secret_names.append(memory_secret_name)
         secret_resources.append(memory_secret)
 
     # 3. Static secrets from the shared 'secret-global' KV-v1 mount
@@ -477,7 +477,7 @@ def create_mitlearn_k8s_secrets(
         redis_creds
     )  # This is different from everything else in the list but allowed per the type hints above
 
-    return secret_names, optional_secret_names, secret_resources
+    return secret_names, [opik_secret_name], secret_resources
 
 
 # OIDC secret is a little different so we do that one with its own function.
