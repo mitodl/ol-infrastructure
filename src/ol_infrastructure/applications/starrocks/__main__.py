@@ -893,6 +893,7 @@ fe_background_refresh_interval_ms: int = fe_config.get(
 fe_tablet_create_timeout_second: int = fe_config.get(
     "tablet_create_timeout_second", 300
 )
+FE_ENABLE_QUERY_QUEUE_V2 = False
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
@@ -927,6 +928,14 @@ _FE_CONFIG_BASE = (
     # refused with "Login name tmacey is not matched to user tmacey@mit.edu".
     "oauth2_principal_field = starrocks_username\n"
     "jwt_principal_field = starrocks_username\n"
+    # Query queue v1. 4.1 defaults to v2, whose SlotSelectionStrategyV2 admits
+    # every group from one cluster-wide slot pool, so a queue there holds
+    # interactive queries behind batch ones. v1 (DefaultSlotSelectionStrategy)
+    # queues each resource group against its own concurrency_limit, which is
+    # what substructure/starrocks configures. The setting is read once when the
+    # FE builds its SlotTracker and is not mutable (ADMIN SET FRONTEND CONFIG
+    # refuses it), so it lives here and takes an FE restart.
+    f"enable_query_queue_v2 = {str(FE_ENABLE_QUERY_QUEUE_V2).lower()}\n"
 )
 
 
@@ -1542,6 +1551,16 @@ export(
 # Export the root password as a secret so the substructure/starrocks stack can
 # reference it via StackReference to prime the Vault database connection.
 export("root_password_secret", starrocks_config.require_secret("root_password"))
+
+# substructure/starrocks turns the query queues on only when this is false, so it
+# cannot be applied before this stack. The Helm release does not wait for the FE
+# roll, so this says what fe.conf asks for, not what the running FEs use: check
+# every FE has rolled before applying the substructure. Without
+# _needs_fe_config the chart's own fe.conf applies, which leaves v2 on.
+export(
+    "fe_enable_query_queue_v2",
+    FE_ENABLE_QUERY_QUEUE_V2 if _needs_fe_config else True,
+)
 
 if shared_data_bucket is not None:
     export(

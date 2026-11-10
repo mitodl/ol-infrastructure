@@ -854,9 +854,10 @@ command.local.Command(
 # request. The values in stack config are sized from the request instead, so the
 # dedicated executor threads have CPU the pod is actually guaranteed.
 #
-# Unverified: that a CN enforces workgroups the same way a BE does. Reading
-# be/src on branch-4.1, the workgroup and executor code has no CN branch (only
-# the heartbeat checks is_cn()), but this needs a concurrent-load test on QA.
+# The FE runs query queue v1 (applications/starrocks fe.conf), so the queue is
+# per group: batch queues against its own concurrency_limit and interactive,
+# with none, never waits. The applications stack exports the FE's setting, and
+# the query queue SQL refuses to turn a queue on while it says v2.
 query_queue = QueryQueueSettings.model_validate(
     starrocks_config.require_object("query_queue")
 )
@@ -867,7 +868,9 @@ query_queue_cmd = command.local.Command(
     delete=_exec_delete_sql,
     environment={
         **_mysql_env,
-        "STARROCKS_SQL": query_queue.set_sql(),
+        "STARROCKS_SQL": applications_stack.require_output(
+            "fe_enable_query_queue_v2"
+        ).apply(lambda v2: query_queue.set_sql(fe_query_queue_v2=v2)),
         "STARROCKS_DELETE_SQL": QueryQueueSettings.reset_sql(),
     },
     # No triggers. A trigger change replaces a Command even when it has an
