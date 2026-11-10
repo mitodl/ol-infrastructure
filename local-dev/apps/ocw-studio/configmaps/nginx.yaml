@@ -133,26 +133,23 @@ data:
         }
     }
 
-    # Published live course sites as MIT Learn serves them, under
+    # Published live course sites on the MIT Learn host, under
     # learn.mit.test/courses/o/<course-id>/. APISIX sends /courses/o/* and
-    # /static_shared/* on the Learn host here (ocwstudio-learn-courses-route).
+    # /static_shared/* on that host here (ocwstudio-learn-courses-route).
     #
-    # Production does this in Fastly (the "Route OCW courses to S3" snippet in
-    # src/ol_infrastructure/applications/mit_learn/__main__.py): it maps
-    # /courses/o/ to /ocw-course-v3/courses/ in the OCW bucket, appends
-    # index.html to extensionless paths, and drops the query string and
-    # cookies. Those builds come from the ocw-course-v3 extra theme, whose
-    # Hugo baseURL is /courses/o/<id> (OCW_EXTRA_THEMES_BASE_URLS), so their
-    # internal links already point back under /courses/o.
+    # In production Fastly does this routing (the "Route OCW courses to S3"
+    # snippet in src/ol_infrastructure/applications/mit_learn/__main__.py).
+    # Like it, this listener maps the request onto a bucket key, appends
+    # index.html to directory URLs because the bucket has no directory index,
+    # and drops the query string and cookies.
     #
-    # Local dev cannot build that way. ocw-course-v3 is already the default
-    # theme here (OCW_DEFAULT_COURSE_THEME), and ocw-studio names an extra
-    # theme pipeline with no suffix when it equals the default, so listing it
-    # in OCW_EXTRA_COURSE_THEMES would overwrite every site's main pipeline.
-    # Instead this reads the default build at /courses/<id>/ and rewrites its
-    # root-relative /courses/ links to /courses/o/ on the way out. Without
-    # that, every internal link would land on Next.js's /courses/[readable_id]
-    # page and 404.
+    # Unlike production, it maps /courses/o/<id>/ onto the live bucket's
+    # courses/<id>/ and rewrites "/courses/ links in the HTML to "/courses/o/.
+    # Those pages are published for /courses/<id>, not /courses/o/<id>, so
+    # without the rewrite their links would land on Next.js. Fastly never
+    # rewrites response bodies, so this is a local-only stopgap. It can hide
+    # link bugs that production would show, and it doubles links that are
+    # already under /courses/o/.
     server {
         listen 8047;
         absolute_redirect off;
