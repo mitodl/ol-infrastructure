@@ -25,9 +25,12 @@ refresh token once it is within ``oidc_access_token_expires_leeway`` of expiry.
 marimo gives notebook code the headers of the request behind each kernel command
 through ``mo.app_meta().request``: the WebSocket upgrade when the page loads, then
 the POST behind each UI interaction.  Notebook code logs in to StarRocks with
-that token (``authentication_openid_connect_client`` over TLS to the
+that token (``authentication_openid_connect_client`` to the
 ``fe_mysql_internal_host`` output of ``applications/starrocks``, port 9030), and
-StarRocks forwards it to Gravitino for the governed lake catalog.
+StarRocks forwards it to Gravitino for the governed lake catalog.  The client
+plugin refuses to send a token without TLS, which the CI FE doesn't have, and
+the FE certificate is for the ``fe_tls_server_name`` output, not the Service
+name.
 
 So a per-notebook route has to leave ``X-Access-Token`` in place while it strips
 the other identity headers and ``Cookie``.  Notebook code should read the token
@@ -36,9 +39,11 @@ keeps that token after it expires, which StarRocks only checks at login but
 Gravitino checks on every catalog call.  A module-level cache is shared by every
 viewer of the app, because marimo runs each session as a thread in one process.
 
-Author code in an app can read each viewer's access token, which is the cost of
-querying as the viewer.  Published pods run as the ``marimo-published``
-ServiceAccount below, which has no IRSA role and no token.
+Author code in an app can read each viewer's access token, and with it use all
+of that viewer's StarRocks and Gravitino grants, writes included, until it
+expires.  That is the cost of querying as the viewer.  Published pods run as
+the ``marimo-published`` ServiceAccount below, which has no IRSA role and no
+token.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.

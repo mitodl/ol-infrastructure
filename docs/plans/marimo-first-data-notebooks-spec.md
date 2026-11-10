@@ -36,12 +36,12 @@ out of the latter.
 | D1 | Publishing goes through an in-cluster publisher service. Versioning goes through GitHub, from inside JupyterHub. Public access needs review and approval. |
 | D2 | One apps host per environment, one path per notebook: `apps.nb.data.ol.mit.edu/<name>/` (CI/QA: `apps.nb-ci.data.ol.mit.edu`, `apps.nb-qa.data.ol.mit.edu`). One cert, one DNS entry, and one wildcard Keycloak redirect URI (`https://<apps host>/*`) per environment, because APISIX derives `redirect_uri` from the request path. |
 | D3 | The landing page stays JupyterLab, with marimo as the default viewer for `.py`. |
-| D4 | Public notebooks query StarRocks as a new, restricted `notebook_public` role. Gated notebooks use the existing `readonly` role. |
+| D4 | Public notebooks query StarRocks as a new, restricted `notebook_public` role. Gated notebooks query as the viewer (D8). |
 | D5 | The publisher is registered as a JupyterHub service and authenticates callers with hub tokens or hub OAuth. It never reads `X-Userinfo`. |
 | D6 | The MarimoNotebook and ApisixRoute CRs are the publisher's only state. There is no database. |
 | D7 | Published apps keep marimo token auth (`auth.password`, a per-app Secret). APISIX injects the token upstream with `proxy-rewrite`, so APISIX is the only entry point for viewers. Inside the cluster, anything that holds an app's token can still reach that app's Service directly: the app itself and APISIX. The token matters because NetworkPolicy is not enforced on the data cluster (F16). |
-| D8 | Warehouse credentials reach published pods as mounted files, not env vars. |
-| D9 | Published routes never forward viewer credentials. The OIDC plugin sets `set_access_token_header`, `set_id_token_header`, and `set_userinfo_header` to `false` (F17). Turning those off only stops APISIX from adding the headers, and a client can still send its own, so `proxy-rewrite` also removes `Cookie`, `X-Access-Token`, `X-ID-Token`, and `X-Userinfo`, and overwrites `Authorization` with the app token. Notebook code must not use any of these headers for identity. |
+| D8 | Gated published apps query the warehouse as the viewer, with the viewer's Keycloak access token. There is no shared warehouse credential in a gated pod (owner decision 2026-11-10, replacing the shared `readonly` credential this row used to describe). |
+| D9 | Published routes forward the viewer's access token and nothing else of theirs. The OIDC plugin (client `ol-marimo-app-client`) keeps `set_access_token_header` on and sets `set_id_token_header` and `set_userinfo_header` to `false`. The plugin replaces a client-sent `X-Access-Token`, but not its underscore spelling, so `proxy-rewrite` removes `Cookie`, `X-ID-Token`, `X-Userinfo`, and `X_Access_Token`, and overwrites `Authorization` with the app token. Author code can read the access token (F17), which is the accepted cost of D8. |
 | D10 | Approving (pass 2) is gated on a Keycloak role, synced into JupyterHub groups (`manage_groups`, `auth_state_groups_key`). The publisher checks group membership through the hub API with its service token (F18). |
 | D11 | The first implementation pass ships Keycloak-gated apps only. The `notebook_public` role, the public route shape, and the approval workflow are deferred to pass 2. |
 | D12 | In pass 1, anyone who can log in to the hub may publish. The publisher checks only that the caller holds a valid hub token. |
@@ -50,9 +50,10 @@ D1 through D4, D11, and D12 are the owner's decisions from 2026-09-18. D5 throug
 the facts below.
 
 D12 is an accepted risk. The hub admits every `ol-data-platform` realm user (F18), and a gated
-app's author can read the app's `readonly` credential (F14). In pass 1, then, any realm user can
-obtain `readonly` by publishing an app. Revisit this if hub access widens, or before pass 2 adds
-a second credential.
+app's author can read each viewer's access token (D8, D9). In pass 1, then, any realm user can
+act as any viewer of an app they publish, with that viewer's StarRocks and Gravitino grants, for
+the token's remaining lifetime. Revisit this if hub access widens, or before pass 2 adds a
+shared credential.
 
 ## Facts this rests on
 
@@ -175,8 +176,8 @@ on one host (D2), that cookie is valid for every other app there.
 `manage_groups` or groups key, so a hub token identifies a user but carries no role. OAuthenticator
 syncs groups from `auth_state` when `manage_groups=True` and `auth_state_groups_key` is set
 (`claim_groups_key` is deprecated since 17.0). The hub already runs with `enable_auth_state`.
-Combined with F14, this means any realm user who can publish a gated app can read a 3-month
-`readonly` credential from inside it.
+Combined with D8, this means any realm user who can publish a gated app can read its viewers'
+access tokens from inside it.
 
 ## Design
 
@@ -242,14 +243,14 @@ postStart hook promises (`jupyterhub_data/deployment.py:554-574`).
 (F12), add them to `eks:apisix_domains` in `infrastructure/aws/eks/Pulumi.data.<env>.yaml`, and
 add the redirect URI to the Keycloak client behind `ol-apisix-marimo-data-oidc-secrets`. In QA,
 hand-apply one MarimoNotebook (`mode: run`, inline `content`, `auth.password` from a Secret) and a
-gated `OLApisixRoute` at `/<name>/*` with `websocket=True`, `unauth_action="auth"`, and the three
+gated `OLApisixRoute` at `/<name>/*` with `websocket=True`, `unauth_action="auth"`, and the two
 D9 header flags off. The route uses `proxy-rewrite` to inject the marimo token and strip `Cookie`
 (D7, D9). The public route shape waits for pass 2. Check each of these on the live pod:
 
 - the F7 args override serves correctly under the path prefix;
-- `mo.app_meta().request` in the gated app shows no `Authorization`, `X-Access-Token`,
-  `X-ID-Token`, `X-Userinfo`, or `Cookie` from the viewer (F17), including when the viewer sends
-  those headers themselves (D9);
+- `mo.app_meta().request` in the gated app shows the viewer's access token in `X-Access-Token`,
+  and no viewer `Authorization`, `X_Access_Token`, `X-ID-Token`, `X-Userinfo`, or `Cookie` (F17),
+  including when the viewer sends those headers themselves (D9);
 - a request to the app Service from another pod, without the token, is refused (F16);
 - `proxy-rewrite` can take the token from the per-app Secret through the plugin `secretRef`,
   rather than holding it in plaintext in the ApisixRoute;
@@ -268,14 +269,19 @@ Fall back to a pinned fork only if upstream refuses.
 operator runs `marimo run --sandbox`, so the environment is built once per pod start, from the
 image cache.
 
-**B4. Warehouse credentials.** A VSO `VaultDynamicSecret` in namespace `marimo` produces a
-Secret from the existing `readonly` Vault role (F14). The publisher mounts it as a file volume
-through `podOverrides` (D8). The operator creates bare Pods, which VSO's
-rollout-restart cannot target, while a mounted Secret volume picks up rotation on its own.
-`ol_notebook.warehouse.connect()` returns the per-user Keycloak JWT credential when running
-interactively and reads the mounted file when published. Give the notebook credential a
-short `default_ttl` (hours, not the 3-month default in F14), since VSO renews dynamic secrets
-itself. Published pods share one `marimo-published` ServiceAccount with no IRSA annotation and
+**B4. Warehouse credentials.** Gated apps log in to StarRocks as the viewer (D8). APISIX
+forwards the viewer's access token from `ol-marimo-app-client`, whose tokens carry
+`starrocks_username`, `role_keys`, and the `ol-gravitino-catalog` audience, and refreshes it
+from the session once it is within 60s of expiry. marimo exposes the headers of the request
+behind each kernel command through `mo.app_meta().request`: the WebSocket upgrade on page load,
+then the POST behind each UI interaction. `ol_notebook.warehouse.connect()` reads the token in
+the cell that queries and opens a connection there with mysql-connector-python's
+`authentication_openid_connect_client` over TLS. It never caches a connection at module level,
+because marimo runs every viewer's session as a thread in one process. A connection kept past
+the token's expiry still works for Glue-catalog tables, since StarRocks checks the token only at
+login, but Gravitino rejects its catalog calls. The design and its open questions are on
+`tk-marimo-published-apps-replace-the-ol-marimo-app--42582d`. Approved-public apps (pass 2) have
+no viewer token, so they still need a decision on the `notebook_public` credential. Published pods share one `marimo-published` ServiceAccount with no IRSA annotation and
 `automountServiceAccountToken: false`, never the hub's IRSA role (`tk-notebook-pods-share-one-irsa-role-so-direct-s3-g-293885`).
 Connectivity comes from StarRocks E7 (`tk-marimo-published-apps-replace-the-ol-marimo-app--42582d`,
 `tk-published-marimo-apps-will-401-on-galaxy-ol-mari-7a13b5`, `tk-open-fe-mysql-nlb-ingress-for-the-consumers-that-9088e0`).
@@ -294,9 +300,9 @@ under `hub.services` (D5).
   path. Reserve at least `logout`, because the shared OIDC plugin uses `/logout/oidc`
   (`marimo_data/__main__.py:179`), and an app named `logout` would capture it.
 - Renders a MarimoNotebook with `mode: run`, inline `content`, `auth.password` pointing at a
-  per-app token Secret (D7), the B3 image, the F7 args override, the F8 content hash env, the B4
-  credential volume and mount, a restricted-PSA `securityContext`, and resource caps. The
-  publisher adds only that fixed credential volume. It never accepts user-supplied `sidecars`,
+  per-app token Secret (D7), the B3 image, the F7 args override, the F8 content hash env, a
+  restricted-PSA `securityContext`, and resource caps. Gated apps get no credential volume (B4).
+  The publisher never accepts user-supplied `sidecars`,
   `mounts`, volumes, or podOverrides, and the B6 admission policy enforces the same allowlist.
   Labels hold bounded values only: an owner identifier and an access level (always `keycloak` in
   pass 1, so pass 2 can add `public` without relabeling). The unverified git remote and commit
@@ -314,12 +320,11 @@ under `hub.services` (D5).
 - a Role in `marimo` scoped to `marimonotebooks` and `apisixroutes`, plus read-only `pods`,
   `pods/log`, and `events`. On `secrets` it gets only `create`, `patch`, and `delete`, never
   `get`, `list`, or `watch`. The publisher writes each app token once, and APISIX reads it through
-  the plugin `secretRef`, so the publisher can't read any Secret in `marimo`, including the B4
-  warehouse credential. Tokens are per app, not shared: every author can read their own app's
+  the plugin `secretRef`, so the publisher can't read any Secret in `marimo`. Tokens are per app, not shared: every author can read their own app's
   token file, and a shared token would let one author reach every other app's Service directly;
 - a `ValidatingAdmissionPolicy` (GA since Kubernetes 1.30; the data clusters run 1.36) on
   `marimonotebooks` in `marimo`. It rejects any `sidecars` or `mounts`, any podOverrides volume
-  other than the app's own token Secret and the B4 credential Secret, and any ServiceAccount
+  other than the app's own token Secret, and any ServiceAccount
   other than `marimo-published`. That closes the indirect path where a compromised publisher
   renders a pod that mounts another app's Secret;
 - the `hub.services` entry and its API token. Group sync for the approver role (D10) comes

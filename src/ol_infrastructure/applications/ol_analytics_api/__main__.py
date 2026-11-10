@@ -329,8 +329,7 @@ static_secrets = OLVaultK8SSecret(
 # hand and have no SOPS file yet, so this stack leaves them alone.
 #
 # The vault-secrets-operator reads the entry at runtime and templates it into the
-# env var names the app expects, so the app never sees Vault directly.  Same
-# shape as applications/marimo_data's ol-marimo-app-client secret.
+# env var names the app expects, so the app never sees Vault directly.
 #
 # Temporary, along with the round-trip it authenticates: once org-manager status
 # is visible in the Keycloak token (mitodl/hq#10594), the app stops calling MITx
