@@ -377,10 +377,21 @@ aws_region = starrocks_config.get("aws_region") or "us-east-1"
 # CREATE DATABASE ... PROPERTIES("location" = ...) fails with a 403 on
 # getFileStatus.  aws.s3.use_aws_sdk_default_behavior names the default chain
 # explicitly so both paths use the IRSA role.
+#
+# enable_iceberg_metadata_cache=false: with the cache on, each FE keeps serving
+# the snapshot it last loaded after another engine (dlt/pyiceberg, Trino)
+# commits, for about 52-58s on QA's Glue catalog, and each FE refreshes on its
+# own. A dbt build that starts inside that window builds on the previous load and
+# its tests pass. With it off, every FE read the new snapshot on its first query.
+# The cost is planning time: EXPLAIN on QA's large raw tables went from about
+# 45 ms to 250-320 ms per query.
 _DATA_LAKE_ACCESS = query_engine_lake_access(stack_info.env_suffix)
 catalog_setups: list[command.local.Command] = []
 _ICEBERG_CATALOG_ROLES = ("readonly", "app", "admin", *GOVERNANCE_ROLES)
-_catalog_mutable_props = {"aws.s3.use_aws_sdk_default_behavior": "true"}
+_catalog_mutable_props = {
+    "aws.s3.use_aws_sdk_default_behavior": "true",
+    "enable_iceberg_metadata_cache": "false",
+}
 _iceberg_roles_sql = ""
 if enable_data_lake:
     _catalog_conn_props = (
