@@ -178,6 +178,11 @@ kubectl -n witan exec -it job/witan-bg-<...> -- /bin/sh
 kubectl -n witan delete job witan-bg-<...>
 ```
 
+Last exercised in operations-ci on 2026-11-12, on witan-council 0.47.0: a Job
+from the CronJob, `witan memory --limit 1` and `witan migrate topics` exec'd in
+its pod (both succeeded), `witan migrate schema` refusing as described below,
+then the Job deleted.
+
 **`kubectl create job --from=… -- <command>` does not work** — kubectl rejects it
 outright (`error: cannot specify --from and command`), and a Job's pod template is
 immutable once created, so there is no patching it afterwards. Exec into the idle
