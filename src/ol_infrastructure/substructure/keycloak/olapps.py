@@ -617,8 +617,9 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             # upGrad and Apply7 IdPs below also log in through direct
             # kc_idp_hint links; which client those use is unchecked.
             # mitxonline#4119 adds an IdP login_url of the same shape. Move the
-            # partners to links the gateway serves before setting it. mit-learn's
-            # AccountActionStartView sends S256 since mit-learn#4167.
+            # partners to a mit-learn redirect that sends a challenge before
+            # setting it. mit-learn's AccountActionStartView sends S256 since
+            # mit-learn#4167.
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-mitlearn-client-redirect-uris"
             ),
