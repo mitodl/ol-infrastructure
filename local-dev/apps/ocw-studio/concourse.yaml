@@ -45,6 +45,11 @@ spec:
         # Same keys.sh the compose stack ran, inlined. Regenerated on every
         # pod start: they authenticate the worker to the web in this pod only,
         # and nothing outside it ever sees them.
+        #
+        # The emptyDir outlives a restart of the pod's sandbox (e.g. a node
+        # reboot), and init containers re-run against it. ssh-keygen then
+        # stops at "Overwrite (y/n)?", exits 1, and the pod crash-loops, so
+        # clear the old keys first.
       - name: concourse-keys
         image: gotechnies/alpine-ssh:latest
         command: ["/bin/sh", "-c"]
@@ -52,6 +57,7 @@ spec:
         - |
           set -eu
           cd /concourse-keys
+          rm -f session_signing_key* tsa_host_key* worker_key* authorized_worker_keys
           for key in session_signing_key tsa_host_key worker_key; do
             ssh-keygen -t rsa -b 4096 -m PEM -f "${key}" -q -N ""
           done
