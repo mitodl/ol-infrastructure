@@ -1,12 +1,14 @@
 """The break-glass maintenance pod template: a suspended CronJob.
 
 Agent-kit ADR-0005 path (b) reserves a class of operations for an in-cluster,
-service-authenticated path: ``witan migrate schema`` / ``migrate storage`` /
-``migrate merge``, and cross-actor debugging. They are deliberately **not**
-``@mcp.tool`` — the remote MCP proxy refuses them outright — because they operate
-on the store as a whole and have no per-user identity to scope. ``migrations.py``
-runs the two idempotent backfills on every deploy; this module covers the rest,
-the ones a human decides to run.
+service-authenticated path: ``witan migrate storage`` / ``migrate merge``, and
+cross-actor debugging. (``witan migrate schema`` is not one of them: it refuses a
+served graph, whose schema changes only through the ``cluster apply`` that
+omnigraph-server's entrypoint runs on every start. See the runbook.) They are
+deliberately **not** ``@mcp.tool`` — the remote MCP proxy refuses them outright —
+because they operate on the store as a whole and have no per-user identity to
+scope. ``migrations.py`` runs the two idempotent backfills on every deploy; this
+module covers the rest, the ones a human decides to run.
 
 WHY A SUSPENDED CRONJOB AND NOT A JOB, AND NOT A RUNBOOK ``kubectl run``
 
@@ -23,7 +25,7 @@ running it. Kubernetes has a first-class verb for instantiating one on demand::
 
     kubectl -n witan create job witan-bg-$(date +%s) \\
         --from=cronjob/witan-break-glass
-    kubectl -n witan exec -it job/witan-bg-<...> -- witan migrate schema
+    kubectl -n witan exec -it job/witan-bg-<...> -- witan migrate topics
 
 The schedule is required by the API and never fires; it is set to a date that
 cannot occur (see ``NEVER_SCHEDULE``) so that a bug or a manual ``kubectl patch``
@@ -44,7 +46,7 @@ command before it is submitted::
 
     kubectl -n witan create job witan-bg-$(date +%s) --from=cronjob/witan-break-glass \\
         --dry-run=client -o json \\
-      | jq '.spec.template.spec.containers[0].command = ["witan","migrate","schema"]' \\
+      | jq '.spec.template.spec.containers[0].command = ["witan","migrate","topics"]' \\
       | kubectl -n witan create -f -
 
 Worth knowing about, but the interactive path is the one to reach for first: these
@@ -84,9 +86,9 @@ NEVER_SCHEDULE = "0 0 31 2 *"
 DEFAULT_IDLE_SECONDS = 14400
 
 # One attempt. Every operation reached through this pod is either idempotent (a
-# schema apply) or one a human is watching (a merge, a storage rebuild); an
-# automatic retry of a half-finished manual migration is the last thing anybody
-# wants at 2am.
+# topic or repo-key backfill) or one a human is watching (a merge, a storage
+# rebuild); an automatic retry of a half-finished manual migration is the last
+# thing anybody wants at 2am.
 BACKOFF_LIMIT = 0
 
 # Keep finished break-glass pods around for a week, far longer than the

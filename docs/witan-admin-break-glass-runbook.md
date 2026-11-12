@@ -1,7 +1,9 @@
 # witan admin / break-glass runbook
 
-How to run a witan schema or data migration against a deployed environment, who
-it runs as, and how an operator gets an interactive session of their own.
+How to run a witan data migration against a deployed environment, who it runs
+as, how an operator gets an interactive session of their own, and how to
+re-apply a deployed graph's schema (which is not a witan command at all; see
+[Re-applying a deployed graph's schema](#re-applying-a-deployed-graphs-schema)).
 
 Covers agent-kit ADR-0005 path (a) (`witan login` from a laptop, per-user
 identity) and path (b) (`svc-witan-admin`, in-cluster, no per-user identity).
@@ -12,8 +14,8 @@ identity) and path (b) (`svc-witan-admin`, in-cluster, no per-user identity).
 | --- | --- | --- |
 | Identity | your own `act-<sub>` | one service principal |
 | Runs from | your laptop | inside the cluster |
-| Use it for | ad hoc reads/writes, "what does the graph say" | schema apply, store merge, storage rebuild, cross-actor debugging |
-| Can it write another user's rows? | on the memory graph, yes — it is a shared graph | same, plus schema |
+| Use it for | ad hoc reads/writes, "what does the graph say" | topic and repo-key backfills, store merge, storage rebuild, cross-actor debugging |
+| Can it write another user's rows? | on the memory graph, yes — it is a shared graph | same |
 | Can it reindex / promote / delete a code-graph view? | no | no |
 
 The rule: **if the operation has a per-user identity, use (a).** Path (b) exists
@@ -164,7 +166,10 @@ kubectl -n witan create job witan-bg-$(date +%s) --from=cronjob/witan-break-glas
 kubectl -n witan get pods -l app.kubernetes.io/name=witan-break-glass
 
 # 2. Run the operation inside it.
-kubectl -n witan exec -it job/witan-bg-<...> -- witan migrate schema
+#    Confirm the identity can read first. `witan memory` takes an optional
+#    search query, so `witan memory list` searches for the word "list".
+kubectl -n witan exec -it job/witan-bg-<...> -- witan memory --limit 1
+kubectl -n witan exec -it job/witan-bg-<...> -- witan migrate topics
 
 # ...or get a shell and poke around.
 kubectl -n witan exec -it job/witan-bg-<...> -- /bin/sh
@@ -185,7 +190,7 @@ is submitted rather than after:
 ```bash
 kubectl -n witan create job witan-bg-$(date +%s) --from=cronjob/witan-break-glass \
     --dry-run=client -o json \
-  | jq '.spec.template.spec.containers[0].command = ["witan","migrate","schema"]' \
+  | jq '.spec.template.spec.containers[0].command = ["witan","migrate","topics"]' \
   | kubectl -n witan create -f -
 ```
 
@@ -201,12 +206,45 @@ Things worth knowing before you run one:
 - **`witan migrate merge` needs its source store reachable from the pod.** A
   local `.omni` directory on your laptop is not; copy it in or export/load it
   through S3 first (Lance embeds absolute paths — export and load, never `mv`).
-- **`witan migrate schema` against a cluster-managed graph duplicates what the
-  omnigraph stack's `cluster apply` already does.** Reach for it when that path
-  is unavailable — mid-upgrade, or the service is unhealthy *because* its schema
-  is stale — not as routine convergence.
+- **`witan migrate schema` does not work here, by design.** It refuses a served
+  graph. See the next section.
 - **Do not un-suspend the CronJob.** Nothing here should run on a timer; the two
   operations that should are already CronJobs in the omnigraph stack.
+
+### Re-applying a deployed graph's schema
+
+A deployed graph's schema changes only through omnigraph's `cluster apply`, which
+records it in the deployment ledger. Since 0.13 the CLI refuses `schema apply`
+against both a server and a storage root that belongs to a cluster, and witan's
+`migrate schema` refuses a served graph for the same reason. omnigraph also has a
+served `cluster apply --target <server>` that changes the schema without a
+restart, but its CLI requires an `https://` server endpoint, and the in-cluster
+address is plain HTTP, so it is not available from this pod.
+
+omnigraph-server's entrypoint runs that `cluster apply` on every start, against
+the `schema.pg` baked into its image, under the cluster lock it has just taken
+over (agent-kit `docker/omnigraph_server_entrypoint.py`). So:
+
+- **The schema the graph needs is in a newer omnigraph-server image.** Deploy
+  that image through the omnigraph stack. The rollout restarts the server, and
+  the restart applies the schema.
+- **The running image already carries the right schema, but the graph is
+  behind it** (an interrupted apply, a restored backup). Restart the server so
+  its entrypoint converges again:
+
+  ```bash
+  kubectl -n omnigraph rollout restart deployment/omnigraph-server
+  kubectl -n omnigraph rollout status deployment/omnigraph-server
+  # Expect "converging cluster catalog at …" then "cluster converged; starting server".
+  kubectl -n omnigraph logs deployment/omnigraph-server | grep converg
+  ```
+
+  The Deployment is single-replica with `strategy: Recreate`, so this is a brief
+  data-tier outage. Check `kubectl -n omnigraph get deployment omnigraph-server`
+  first. It sits at `replicas: 0` during the scheduled maintenance window
+  (`maintenance.py`, which restores the count when it finishes) and while a
+  storage migration is armed (`data_tier.py`, until cutover). A restart then
+  starts nothing; the schema converges when the server next comes back up.
 
 ### Rotating the token
 
