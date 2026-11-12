@@ -157,7 +157,10 @@ The workflow:
    close together can finish out of order and the older job moves the label back. Only that
    job's Keycloak client is meant to move it. Opik cannot enforce that, so the drift report
    (§1.2 item 5) compares the label with the pointer and reports a mismatch.
-5. Rollback is a revert of the pointer pull request.
+5. Rollback is a revert of the pointer pull request. (Amended 2026-11-12 by
+   shared-llm-library-spec.md §8.2 principle 3: after a move to another backend, rolling
+   back to a version from before the move is a forward pointer change naming that version's
+   new id, since a revert would restore the old backend's id.)
 6. The pull request that moves a pointer also commits the text of the pointed version, beside
    the pointer file, as the embedded default (§3 item 4). The person moving the pointer
    exports it (`ol-llm-prompts export`), and the pull request's check fails unless every
@@ -334,7 +337,9 @@ Decided 2026-10-01: the mechanics below, with every gate advisory at first (item
    routed like any other model call. It should not be the model
    under test.
 8. Deterministic validators are metrics. The translation checks become `BaseMetric`
-   subclasses used in experiments and stay as runtime checks in the plugin.
+   subclasses used in experiments and stay as runtime checks in the plugin. (Amended
+   2026-11-12 by shared-llm-library-spec.md §8.3 seam 4: they become ol-llm scoring
+   functions, which the Opik backend wraps as `BaseMetric`.)
 9. Online scoring is the second line, not the gate. Rules run in the Opik backend with
    provider keys stored in Opik (`LlmProviderFactoryImpl.java:55-86`), sampled per project.
    A rule cannot filter on the trace environment field

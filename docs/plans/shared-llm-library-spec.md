@@ -12,7 +12,7 @@ decision task and stays Proposed until the decision is recorded here.
 | §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange (§5.5) |
 | §6 Call contract | `tk-specify-the-library-s-call-contract-timeouts-ret-badb39` | Specified 2026-10-01 from the §3 decision |
 | §7 Durable execution | `tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78` | Direction set 2026-10-01; nothing decided |
-| §8 LLMOps backend portability | `tk-record-the-llmops-portability-decision-as-shared-478015` | Decided 2026-11-12; amends §2.3 item 1, §4.1, and the lifecycle spec's §3 items 1, 3 and 4 |
+| §8 LLMOps backend portability | `tk-record-the-llmops-portability-decision-as-shared-478015` | Decided 2026-11-12; amends §2.3 item 1, §4.1, and the lifecycle spec's §2.3 item 5, §3 items 1, 3 and 4, and §5.1 item 8 |
 
 "Inventory" and "direction assessment" below are two internal survey pages dated 2026-09-10
 that are not in this repository, and `tk-` ids are tasks in the team's internal tracker. Facts
@@ -1537,7 +1537,11 @@ mit-learn `5390a0d4e` and gwarek `9adef88`.
    the backend-neutral identity: moving to another backend imports each export as a version
    there and rewrites the version ids in pointer files and exports, matched by hash. That
    rewrite is generated, one pull request per app, and the command that does it is written
-   when a move happens (principle 6).
+   when a move happens (principle 6). The move imports each prompt's full version history,
+   not only the pointed versions, so earlier versions exist in the new backend. Reverting a
+   pointer change made before the move would restore an old backend's id, so rollback to a
+   version from before the move is a forward pointer change naming that version's new id,
+   found by its `template_hash` (lifecycle spec §2.3 item 5, amended).
 4. ol-llm renders templates itself, so the embedded default and a fetched version render
    through the same code whatever the backend. `mustache` means placeholder substitution
    only, no sections, partials or escaping, with exactly the matching rules of Opik's
@@ -1616,8 +1620,15 @@ online scoring rules, access control (Keycloak, the bearer route), retention, an
    from the SDK stays inside that backend.
 4. Evaluation, `tk-ol-llm-evaluation-behind-an-interface-metrics-as-905e52`. Metrics become
    plain scoring functions returning a name, value and reason, wrapped into Opik's `BaseMetric`
-   by the adapter; golden datasets stay in the repository; experiment runs and feedback scores
-   sit behind an interface with Opik first. The gate declaration format does not change.
+   by the adapter (lifecycle spec §5.1 item 8, amended). Experiment runs and feedback scores
+   sit behind an interface with Opik first. Golden datasets keep the lifecycle spec's
+   arrangement (§5.1 items 3 and 6): curated in the backend, with the gate declaration
+   pinning the dataset name and version, which the adapter resolves in the backend. A gate may
+   also declare a repository file (`dataset.file`, as ol-data-platform's does) that it seeds
+   into the backend before each run, adding only new items, and it checks that the pinned
+   version holds those items. Whether each pinned dataset version is also exported to the
+   repository, as prompts are, is open (§8.4).
+   The gate declaration format does not change.
 
 Order: seam 1 lands before ol-data-platform#3348 merges, because #3348 is the first app to
 commit an export and a pointer file. Seams 2 to 4 follow this section's review. Each seam
@@ -1630,6 +1641,9 @@ Opik metrics waits for seam 4.
 - Whether ol-data-platform's remaining Prompt Library use (`opik_auth.py`, for the courseware
   and categorization prompts) moves onto the registry interface or onto pointer files.
 - Which second backend, if any, to prove the seams against beyond the file and in-memory ones.
+- Whether pinned golden dataset versions are exported to the repository the way prompts are.
+  Without that, a dataset curated in the backend after its seed exists only in the backend,
+  and a move would have to copy it from there (seam 4).
 
 Sources for the market survey: [Prompty](https://github.com/Microsoft/prompty/),
 [Dotprompt](https://pypi.org/project/dotpromptz/),
