@@ -157,7 +157,10 @@ The workflow:
    close together can finish out of order and the older job moves the label back. Only that
    job's Keycloak client is meant to move it. Opik cannot enforce that, so the drift report
    (§1.2 item 5) compares the label with the pointer and reports a mismatch.
-5. Rollback is a revert of the pointer pull request.
+5. Rollback is a revert of the pointer pull request. (Amended 2026-11-12 by
+   shared-llm-library-spec.md §8.2 principle 3: after a move to another backend, rolling
+   back to a version from before the move is a forward pointer change naming that version's
+   new id, since a revert would restore the old backend's id.)
 6. The pull request that moves a pointer also commits the text of the pointed version, beside
    the pointer file, as the embedded default (§3 item 4). The person moving the pointer
    exports it (`ol-llm-prompts export`), and the pull request's check fails unless every
@@ -189,17 +192,25 @@ the pointer (§2.3 item 6, amended 2026-11-10).
    only `development`, `staging`, and `production`, and moving a label to an unregistered
    name fails (measured: `EnvironmentNotFoundError`), so `ci` and `qa` are created once per
    instance. Local development uses the embedded default and does not need Opik.
+   (Amended 2026-11-12 by shared-llm-library-spec.md §8: ol-llm calls an environment a
+   label and the project an app, and reaches Opik through its prompt registry interface.)
 2. Version pins are for batch runs and evaluations, not for request-time code. A batch run
    resolves the label once at the start and uses that version for the whole run.
 3. Cache: keep the SDK default of 300 s (`OPIK_PROMPT_CACHE_TTL_SECONDS`,
    `config.py:391-396`). A label move reaches every process within five minutes. A warm
-   entry keeps being served if a refresh fails (`prompt_cache.py:142-161`).
+   entry keeps being served if a refresh fails (`prompt_cache.py:142-161`). (Amended
+   2026-11-12 by shared-llm-library-spec.md §8.3 seam 2: ol-llm owns this cache, with the
+   same TTL and refresh-failure behavior, above the registry interface, so every backend
+   gets it. Its TTL becomes an ol-llm setting; `OPIK_PROMPT_CACHE_TTL_SECONDS` stops
+   applying.)
 4. Cold start with Opik unreachable: fall back to the embedded default, which is the text of
    the pointed production version committed beside the pointer file (§2.3), and mark the
    result degraded with reason `embedded_prompt`
    (call contract §6.7). The SDK's own failure took 11 s to surface in the local test, so the
    helper puts a 2 s deadline on a cold fetch. This applies to both profiles: a batch run
-   does not fail because Opik is down.
+   does not fail because Opik is down. (Amended 2026-11-12 by shared-llm-library-spec.md
+   §8.3 seam 2: the deadline and the fallback sit in ol-llm above the registry interface, so
+   they apply to whichever backend is unreachable.)
 5. Batch idempotency keys include the prompt, keyed on a hash of the template text, not on
    the Opik version number. The version number is recorded alongside for linkage. A run that
    fell back to the embedded default then produces the same key as one that fetched the same
@@ -326,7 +337,9 @@ Decided 2026-10-01: the mechanics below, with every gate advisory at first (item
    routed like any other model call. It should not be the model
    under test.
 8. Deterministic validators are metrics. The translation checks become `BaseMetric`
-   subclasses used in experiments and stay as runtime checks in the plugin.
+   subclasses used in experiments and stay as runtime checks in the plugin. (Amended
+   2026-11-12 by shared-llm-library-spec.md §8.3 seam 4: they become ol-llm scoring
+   functions, which the Opik backend wraps as `BaseMetric`.)
 9. Online scoring is the second line, not the gate. Rules run in the Opik backend with
    provider keys stored in Opik (`LlmProviderFactoryImpl.java:55-86`), sampled per project.
    A rule cannot filter on the trace environment field
