@@ -153,6 +153,26 @@ data_loading_db_stacks = (
     if stack_info.env_suffix in ("ci", "qa", "production")
     else []
 )
+# The Open edX deployments whose edxapp MariaDB the edxapp dlt source reads, as
+# (<NAME>_DB_HOST variable, edxapp stack deployment). The edxapp stacks export
+# their hosts differently from the application stacks above; see
+# data_loading_edxapp_db_host.
+DATA_LOADING_EDXAPP_SOURCES = (
+    ("MITX_EDXAPP_DB_HOST", "mitx"),
+    ("XPRO_EDXAPP_DB_HOST", "xpro"),
+    ("MITXONLINE_EDXAPP_DB_HOST", "mitxonline"),
+)
+data_loading_edxapp_stacks = (
+    [
+        (
+            env_var,
+            make_stack_reference(projects.EDXAPP, f"{deployment}.{stack_info.name}"),
+        )
+        for env_var, deployment in DATA_LOADING_EDXAPP_SOURCES
+    ]
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else []
+)
 
 
 def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[str]:
@@ -174,6 +194,23 @@ def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[
         "rds_replica_host" if stack_info.env_suffix == "production" else "rds_host"
     )
     return app_stack.require_output(output_name)[host_key]
+
+
+def data_loading_edxapp_db_host(edxapp_stack: StackReference) -> Output[str]:
+    """Pick the edxapp MariaDB host the edxapp dlt source reads.
+
+    Same rule as data_loading_db_host, for the edxapp stack's exports: the read
+    replica (``edxapp_read_replica``) in production, the primary
+    (``edxapp["mariadb"]``) elsewhere.
+
+    :param edxapp_stack: The edxapp deployment's stack reference.
+
+    :returns: The host for the deployment's ``<NAME>_EDXAPP_DB_HOST`` variable.
+    :rtype: Output[str]
+    """
+    if stack_info.env_suffix == "production":
+        return edxapp_stack.require_output("edxapp_read_replica")
+    return edxapp_stack.require_output("edxapp")["mariadb"]
 
 
 # The ml code location traces its LLM calls to the Production Opik from every
@@ -3066,6 +3103,10 @@ for location in code_locations:
         deployment["env"].extend(
             {"name": env_var, "value": data_loading_db_host(app_stack, output_name)}
             for env_var, app_stack, output_name in data_loading_db_stacks
+        )
+        deployment["env"].extend(
+            {"name": env_var, "value": data_loading_edxapp_db_host(edxapp_stack)}
+            for env_var, edxapp_stack in data_loading_edxapp_stacks
         )
 
     # ml's Opik tracing and Prompt Library. Only the non-secret settings live
