@@ -1098,6 +1098,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "https://apps.nb-qa.data.ol.mit.edu/*",
             "https://apps.nb-ci.data.ol.mit.edu/*",
         ],
+        # The app's StarRocks connection hands Gravitino the token it logged in
+        # with, as with ol-starrocks-client.
+        access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 

@@ -51,8 +51,9 @@ the facts below.
 
 D12 is an accepted risk. The hub admits every `ol-data-platform` realm user (F18), and a gated
 app's author can read each viewer's access token (D8, D9). In pass 1, then, any realm user can
-act as any viewer of an app they publish, with that viewer's StarRocks and Gravitino grants.
-Token expiry ends new StarRocks logins and Gravitino catalog calls, but StarRocks checks the
+act as any viewer of an app they publish, with that viewer's StarRocks and Gravitino grants,
+for up to the token's 1h lifespan (`STARROCKS_TOKEN_LIFESPAN_SECONDS`, which Gravitino calls
+over a StarRocks connection need, B4). Token expiry ends new StarRocks logins and Gravitino catalog calls, but StarRocks checks the
 token only at login (B4), so a connection the author opens before expiry keeps the viewer's
 Glue-catalog grants for as long as it stays open. Revisit this if hub access widens, or before
 pass 2 adds a shared credential.

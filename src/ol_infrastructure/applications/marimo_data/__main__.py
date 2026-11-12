@@ -41,11 +41,11 @@ viewer of the app, because marimo runs each session as a thread in one process.
 
 Author code in an app can read each viewer's access token, and with it use all
 of that viewer's StarRocks and Gravitino grants, writes included, until it
-expires.  A StarRocks connection it opens before then keeps the viewer's
-Glue-catalog grants for as long as the connection stays open, since StarRocks
-checks the token only at login.  That is the cost of querying as the viewer.
-Published pods run as the ``marimo-published`` ServiceAccount below, which has
-no IRSA role and no token.
+expires (``ol-marimo-app-client`` issues 1h tokens).  A StarRocks connection
+it opens before then keeps the viewer's Glue-catalog grants for as long as the
+connection stays open, since StarRocks checks the token only at login.  That
+is the cost of querying as the viewer.  Published pods run as the
+``marimo-published`` ServiceAccount below, which has no IRSA role and no token.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.
