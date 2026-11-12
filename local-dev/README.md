@@ -1055,8 +1055,9 @@ What differs from the other apps:
   slower than a hot reload.
 - **Python changes reload like the other Django apps, but only with a checkout.** The
   `local-dev` target turns granian's reload on through `GRANIAN_RELOAD`, so Tilt
-  syncs edits under the app's Python directories and granian restarts its worker
-  (`Changes detected, reloading workers..` in the logs). Without an ocw-studio
+  syncs edits across the whole checkout into the pod and granian restarts its worker
+  (`Changes detected, reloading workers..` in the logs). Frontend build inputs and
+  dependency files instead trigger an image rebuild (about four minutes). Without an ocw-studio
   checkout, Tilt runs the prebuilt production image, which does not reload; restart
   `ocwstudio-webapp` from the Tilt UI instead.
 

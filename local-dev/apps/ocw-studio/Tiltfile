@@ -37,10 +37,13 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
                 APP_DIR + '/webpack.config.dev.js',
                 APP_DIR + '/.yarnrc.yml',
                 APP_DIR + '/.yarn/releases',
+                APP_DIR + '/postcss.config.js',
+                APP_DIR + '/.swcrc',
             ]),
             sync(APP_DIR, '/src'),
         ],
-        ignore=['.ruff_cache/', 'webpack-stats.json'],
+        # .claude/ holds agent worktrees. Syncing one into the pods restarts granian in a loop.
+        ignore=['.claude/', '.ruff_cache/', 'webpack-stats.json'],
     )
 
 k8s_yaml_local([
