@@ -218,7 +218,8 @@ if embeddings_metering:
     embeddings_profile = bedrock.InferenceProfile(
         f"hindsight-embeddings-inference-profile-{stack_info.env_suffix}",
         name=f"hindsight-embeddings-{stack_info.env_suffix}",
-        description="Hindsight embeddings, tagged for cost attribution",
+        # Bedrock allows only ([0-9a-zA-Z:.][ _-]?)+ here: no commas.
+        description="Hindsight embeddings tagged for cost attribution",
         model_source=bedrock.InferenceProfileModelSourceArgs(
             copy_from=bedrockfoundation.get_model(
                 model_id=EMBEDDINGS_MODEL.removeprefix("bedrock/")
