@@ -91,8 +91,8 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         anywhere in the repo triggers it.
     :param prerelease_branch: Also publish a prerelease of each package under the
         npm ``next`` dist-tag whenever a spec change lands on this branch of the
-        source repo, so a consumer can pin a client for an API that has merged
-        but not yet been released. The version
+        source repo, so a consumer branch can develop against an API that has
+        merged but not yet been released. The version
         (``<CalVer date>.0-dev.<unix time>.g<sha7>``) exists only on npm: nothing
         is committed to the client repo, and ``latest`` stays on the stable
         channel above.
