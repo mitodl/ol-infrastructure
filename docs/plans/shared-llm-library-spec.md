@@ -12,6 +12,7 @@ decision task and stays Proposed until the decision is recorded here.
 | §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange (§5.5) |
 | §6 Call contract | `tk-specify-the-library-s-call-contract-timeouts-ret-badb39` | Specified 2026-10-01 from the §3 decision |
 | §7 Durable execution | `tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78` | Direction set 2026-10-01; nothing decided |
+| §8 LLMOps backend portability | `tk-record-the-llmops-portability-decision-as-shared-478015` | Decided 2026-11-12; amends §2.3 item 1 |
 
 "Inventory" and "direction assessment" below are two internal survey pages dated 2026-09-10
 that are not in this repository, and `tk-` ids are tasks in the team's internal tracker. Facts
@@ -263,7 +264,9 @@ do not use `exclude-newer`, so they need no override.
    distribution:
    opik 2.2.87 hard-requires litellm, openai, pytest, and boto3-stubs, and opik#4633 is open
    with no maintainer commitment (last comment 2026-09-15). The OTel-plus-REST shape stays on
-   file as the fallback if a release breaks the slimmed install.
+   file as the fallback if a release breaks the slimmed install. (Amended 2026-11-12 by §8:
+   the SDK stays, but inside an Opik backend behind ol-llm's own interfaces, and the files
+   app repositories commit use ol-llm's schemas, not Opik's.)
 2. The translation plugins adopt on master-only mitxonline. They cannot then be installed on
    ulmo or verawood edxapp until those releases move off `openai<=0.28.1`.
 
@@ -1476,3 +1479,119 @@ decided. This part records the starting facts and what the evaluation has to ans
 7. Whether the engine, if it is a service, is shared across apps the way memory is (§5.5).
 
 Out of scope until that evaluation reports: adding `temporal` or `dbos` extras to `ol-llm`.
+
+## 8. LLMOps backend portability
+
+Decided 2026-11-12 by the project owner. Epic
+`tk-llmops-backend-portability-ol-llm-interfaces-and-801aca`.
+
+Opik stays the platform's LLMOps backend (§2.3), but the market for tracing, prompt
+registries and evaluation is moving fast, and the platform should not be locked to one
+vendor. So ol-llm's public interfaces, and every file ol-llm has app repositories commit, are
+defined in ol-llm's terms, with Opik as one backend behind them. Memory already works this
+way: the backend is chosen by name (`hindsight`, `in-memory`, or an entry point in
+`ol_llm.memory_backends`) and call sites do not change when it does (§5.5). Replacing Opik
+should then mean writing one adapter and importing files the repositories already hold, not
+a migration in every app.
+
+### 8.1 Where the coupling is
+
+Read on 2026-11-12 at ol-llm `4237559`, ol-data-platform `e8c77daeb`, learn-ai `99a5fe2`,
+mit-learn `5390a0d4e` and gwarek `9adef88`.
+
+- Inside ol-llm, the Opik SDK is imported by `evaluation.py` (10 imports), `gate.py` (8),
+  `tracing.py` (7), `traces.py` (7), `prompts.py` (6), `langchain.py` (5), and `testing.py`,
+  `runs.py` and `pointers.py` (1 each). Evaluation is the deepest: metrics subclass Opik's
+  `BaseMetric`, and runs, datasets and experiments are Opik objects.
+- Opik shows in ol-llm's public API: `ManagedPrompt.source` is `"opik"` or `"embedded"`, and
+  `ManagedPrompt.opik_prompt` carries the SDK's prompt object for the trace link.
+- Apps: learn-ai (since learn-ai#157), mit-learn and gwarek import no Opik outside tests.
+  ol-data-platform does in `ml/resources/opik_auth.py` (the Prompt Library for prompts not
+  yet on ol-llm), `ml/lib/summarize_gate.py`, and ol-orchestrate-lib's
+  `embeddings/evaluation.py`, and `ml/lib/summarize.py` checks `prompt.source == "opik"`.
+- Committed files: the gate declaration (TOML) and golden datasets (JSON) are already in
+  ol-llm's schemas. The pointer file names its namespace `project`, Opik's word, where the gate
+  declaration and `UseCase` say `app`. ol-llm 0.0.12 exports prompts as JSON that mirrors
+  Opik's prompt fields; no app has committed one yet (ol-data-platform#3348, the first, is
+  held in draft for §8.3).
+
+### 8.2 Principles
+
+1. Apps import `ol_llm` only. A feature an app needs from the backend is added to ol-llm's
+   interface first.
+2. Committed files use ol-llm's schemas. They are the durable record of what production runs
+   and the import source for a future backend.
+3. One concept, our name. Opik environments, Langfuse labels and MLflow aliases are the same
+   thing, a mutable pointer to a version, and ol-llm calls it a label. Versions are opaque
+   strings as the backend names them.
+4. ol-llm renders templates itself, so the embedded default and a fetched version render
+   through the same code whatever the backend. `mustache` means `{{name}}` substitution only,
+   the subset Opik's mustache implements and MLflow's registry uses. `jinja2` stays
+   supported and is documented as not portable.
+5. Tracing is OpenTelemetry first. Call sites use ol-llm's trace API; a backend is an exporter
+   plus whatever mapping it needs. The OTel GenAI conventions are still Development status
+   (no `gen_ai.*` attribute was marked Stable in the registry as of mid-2026), so attribute
+   names live in one module.
+6. One real adapter per seam, plus the file or in-memory backend that tests use. No adapters
+   for backends we do not run.
+
+What stays backend-specific on purpose, configured in this repository rather than in apps:
+online scoring rules, access control (Keycloak, the bearer route), retention, and the UI.
+
+### 8.3 Seams
+
+1. Prompt export and API, `tk-ol-llm-export-prompts-as-readable-text-frontmatt-27b388`.
+   `ol-llm-prompts export` writes `<exports>/<name>.prompt.yaml`, a serialization of an ol-llm
+   prompt version: `name`, `app`, `version`, `type`, `template_hash`, and `template` (text) or
+   `messages` (chat, any content). The pointer file's `project` becomes `app`, and
+   `ManagedPrompt` loses its Opik names. YAML, because a standard serializer round-trips the
+   text exactly and reads well in a pull request diff: with literal blocks preferred, PyYAML
+   reproduced the feedback-summary v4 text, trailing spaces, 1,900 trailing spaces, trailing
+   blank lines, a leading indent, tabs and Unicode, and a chat list exactly (2026-11-12), and
+   it falls back to a quoted style when a literal block cannot hold the text, so no trailing
+   whitespace reaches the file for a hook to strip. TOML was rejected because `tomli-w` writes
+   trailing spaces raw inside multiline strings. Prompt file formats were rejected because
+   each brings its own renderer: Prompty (YAML frontmatter, a markdown body with role markers,
+   Jinja2 by default), Dotprompt (Handlebars) and Humanloop's `.prompt` (JSX-like tags) would
+   each render differently from the fetched version, and would move the lock-in rather than
+   remove it. The registries themselves define no repository format: Opik's CLI exports JSON
+   or CSV with full history for migration, Langfuse's GitHub integration is a webhook that
+   commits each version, and we found none documented for MLflow's registry. PyYAML becomes a base
+   dependency of ol-llm; slimmed installs do not have it today.
+2. Prompt registry, `tk-ol-llm-prompt-registry-interface-with-an-opik-ad-4700e7`. An interface
+   to fetch a version by label or version, read which version a label is on, move a label, and
+   create a version, chosen by name like memory. Opik implements it with today's code (including
+   registering an environment before labeling); a file backend reads committed exports. Rendering
+   moves into ol-llm (principle 4). The runtime policy of the lifecycle spec (fetch by label,
+   300 s cache, 2 s cold deadline, embedded fallback) does not change.
+3. Tracing, `tk-ol-llm-tracing-as-opentelemetry-first-with-the-l-aee37d`. The root trace and
+   the §4 attribution become OTel spans and attributes (`gen_ai.*` where defined, an `ol.`
+   namespace for the rest), exported over OTLP to destinations configured by name. Opik is the
+   first; Tempo becomes possible, which also closes the parentless Bedrock spans
+   (`tk-ol-llm-the-library-s-model-spans-reach-opik-only-63c31a`). §4.1 records that Opik's OTLP
+   mapping has no rule for the trace environment field, so the work starts by listing which of
+   Opik's native trace fields OTLP reaches; anything the Opik backend still needs from the SDK
+   stays inside that backend.
+4. Evaluation, `tk-ol-llm-evaluation-behind-an-interface-metrics-as-905e52`. Metrics become
+   plain scoring functions returning a name, value and reason, wrapped into Opik's `BaseMetric`
+   by the adapter; golden datasets stay in the repository; experiment runs and feedback scores
+   sit behind an interface with Opik first. The gate declaration format does not change.
+
+Order: seam 1 lands before ol-data-platform#3348 merges, because #3348 is the first app to
+commit an export and a pointer file. Seams 2 to 4 follow this section's review. Each seam
+blocks the open tasks that would otherwise build on the Opik-specific shape it replaces, e.g.
+the drift report and the httpx2 move wait for seam 2, and learn-ai's port of its evaluation to
+Opik metrics waits for seam 4.
+
+### 8.4 Not decided
+
+- Whether ol-data-platform's remaining Prompt Library use (`opik_auth.py`, for the courseware
+  and categorization prompts) moves onto the registry interface or onto pointer files.
+- Which second backend, if any, to prove the seams against beyond the file and in-memory ones.
+
+Sources for the market survey: [Prompty](https://github.com/Microsoft/prompty/),
+[Dotprompt](https://pypi.org/project/dotpromptz/),
+[Humanloop .prompt files](https://humanloop.com/docs/prompt-file-format),
+[Langfuse GitHub integration](https://langfuse.com/docs/prompt-management/features/github-integration),
+[MLflow Prompt Registry](https://mlflow.org/docs/latest/genai/prompt-registry/),
+[OTel GenAI conventions status](https://dev.to/azena-ai/opentelemetrys-genai-semantic-conventions-are-not-stable-yet-heres-what-actually-shipped-in-2026-3mke).
