@@ -50,8 +50,8 @@ config:
     # Memory is sized for dbt builds on QA's loaded raw, not that idle peak:
     # at 6Gi, staging models and tests over the tracking logs hit batch's
     # 2.8 GB group limit and 2Gi big-query limit (substructure/starrocks).
-    # 12Gi plus the node's ~1Gi of daemonsets still fits the r7a.large
-    # Karpenter picks (14.6Gi allocatable).
+    # 12Gi plus ~1Gi of daemonsets still fits an r7a.large (14.6Gi
+    # allocatable), the node Karpenter had the 6Gi CN on 2026-11-12.
     cpu_request: 1000m
     cpu_limit: 4000m
     memory_request: 12Gi
