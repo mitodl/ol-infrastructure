@@ -33,6 +33,10 @@ config:
     # ClusterGraphMissing on: ol-analytics-api (39), platform-engineering-site (36).
   - https://github.com/mitodl/ol-analytics-api
   - https://github.com/mitodl/platform-engineering-site
+    # Added 2026-11-12 by the same cut (146 human commits in the 90 days to
+    # 2026-11-12); Production logged ~420 ClusterGraphMissing calls for it
+    # 2026-11-05..10 from witan-code's edit hook.
+  - https://github.com/mitodl/ol-llm
   # Turns actor-token sync on: the bootstrap Job and the hourly CronJob take
   # ownership of secret-operations/witan/actor-tokens, which Pulumi otherwise
   # writes directly. Safe only because the existing actor-tokens resource
