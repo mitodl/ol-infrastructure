@@ -245,6 +245,30 @@ uv run pytest tests/test_my_component.py::test_security_group_created
 uv run pytest tests/ --disable-pytest-warnings
 ```
 
+## Fastly VCL Testing
+
+Fastly services here are built from VCL snippets, which Fastly only validates when a
+new service version activates. [falco](https://github.com/ysugimoto/falco) lints VCL and
+runs unit tests against it locally. `src/ol_infrastructure/lib/falco.py` renders a
+service's main VCL from the same snippet list and dictionaries its stack deploys, so the
+tests run against what ships.
+
+To cover a service:
+
+1. Move its snippet list into a stdlib-only `vcl.py` beside `__main__.py` that both the
+   stack and a `vcl_suite()` function use (see `applications/ocw_site/vcl.py`).
+2. Register the module in `SUITES` in `lib/falco.py`.
+3. Write tests in `tests/vcl/<suite>/*.test.vcl` ([syntax](https://github.com/ysugimoto/falco/blob/main/docs/testing.md)).
+
+```bash
+bin/falco-vcl                      # lint and test every suite (also a prek hook)
+bin/falco-vcl ocw_site             # one suite
+bin/falco-vcl render ocw_site main.vcl   # write the rendered VCL, e.g. for falco simulate
+```
+
+pytest runs the same suites in `tests/ol_infrastructure/lib/test_falco.py`. The pinned
+falco release downloads on first use; set `FALCO_BIN` to use a local binary instead.
+
 ## Integration Testing
 
 **When to use:** Validate multi-resource orchestration, deployment lifecycle, runtime behavior.

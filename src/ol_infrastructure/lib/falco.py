@@ -1,0 +1,326 @@
+"""Lint and unit test Fastly VCL locally with falco.
+
+falco (https://github.com/ysugimoto/falco) lints VCL and runs ``*.test.vcl``
+unit tests in a local interpreter. It needs a complete main VCL, but our
+services are assembled by Fastly from snippets and dictionaries that Pulumi
+uploads. :func:`render_main_vcl` builds the equivalent main VCL from the same
+snippet list a stack deploys, so the tests exercise what ships.
+
+A service opts in by exposing ``vcl_suite()`` from a module listed in
+:data:`SUITES` and putting its tests in ``tests/vcl/<suite name>/``.
+``bin/falco-vcl`` (and the prek hook that runs it) and the pytest suite both
+iterate over :data:`SUITES`.
+
+This module and the suite modules use only the standard library so the prek
+hook can import them without installing the project.
+"""
+
+import hashlib
+import importlib
+import io
+import os
+import platform
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import urllib.request
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+VCL_TESTS_DIR = REPO_ROOT.joinpath("tests", "vcl")
+
+# Platform -> (release tag, sha256 of falco-<platform>.tar.gz). Renovate updates
+# the tag and digest together: the github-release-attachments datasource hashes
+# the same-named asset in the new release. Keep the comment, tag and digest in
+# this layout, which the falco manager in renovate.json5 matches.
+FALCO_RELEASES = {
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "darwin-amd64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "e62caa67731876e288a92edc44acbd4d718992e8b0c5b85ebdf9f7f432ce05a8",
+    ),
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "darwin-arm64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "bddb89e465cb65d463986040c5d083c7d8eacaa4785655bfb8622c85e8cd0a8f",
+    ),
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "linux-amd64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "9888d04cd63a6b1058ecf228997f7ee6a18480394bfa9e5e00c8d8f46d03d19f",
+    ),
+    # renovate: datasource=github-release-attachments depName=ysugimoto/falco
+    "linux-arm64": (
+        "v2.3.0",
+        # pragma: allowlist nextline secret
+        "b559fb0772fc280337b03c7b9d9221a0bd89c274c7d917f4c0832e1578d05dfa",
+    ),
+}
+DOWNLOAD_TIMEOUT_SECONDS = 120
+
+# Suite name -> module exposing ``vcl_suite() -> VclSuite``.
+SUITES = {
+    "ocw_site": "ol_infrastructure.applications.ocw_site.vcl",
+}
+
+# Fastly's own default when a snippet is created without a priority.
+DEFAULT_SNIPPET_PRIORITY = 100
+
+# The return each Fastly-generated subroutine ends with when no snippet returns.
+_SUBROUTINE_DEFAULT_RETURNS = {
+    "recv": "return(lookup);",
+    "hash": "return(hash);",
+    "hit": "return(deliver);",
+    "miss": "return(fetch);",
+    "pass": "return(pass);",
+    "fetch": "return(deliver);",
+    "error": "return(deliver);",
+    "deliver": "return(deliver);",
+    "log": "",
+}
+
+
+@dataclass(frozen=True)
+class VclSnippet:
+    """One Fastly VCL snippet, as a stack passes it to ``vcl_snippet()``."""
+
+    name: str
+    type: str
+    content: str
+    priority: int | None = None
+
+
+@dataclass(frozen=True)
+class VclSuite:
+    """A service's VCL plus the edge dictionaries its snippets read."""
+
+    name: str
+    snippets: list[VclSnippet]
+    dictionaries: dict[str, dict[str, str]] = field(default_factory=dict)
+
+    @property
+    def tests_dir(self) -> Path:
+        return VCL_TESTS_DIR.joinpath(self.name)
+
+
+def _vcl_table_key(key: str) -> str:
+    """Quote a table key as a ``"..."`` literal, the only form a key takes.
+
+    That form decodes ``%XX`` escapes and can't hold a quote, so a key with
+    either would not match what Fastly stores.
+
+    :param key: The dictionary key.
+    :returns: The VCL literal.
+    :rtype: str
+    :raises ValueError: If the key contains ``%`` or ``"``.
+    """
+    if "%" in key or '"' in key:
+        msg = f"Cannot render dictionary key {key!r} as a VCL string literal"
+        raise ValueError(msg)
+    return f'"{key}"'
+
+
+def _vcl_table_value(value: str) -> str:
+    """Quote a table value as a VCL long string, which VCL reads byte for byte.
+
+    Fastly hands edge dictionary values to VCL as stored, but a ``"..."``
+    literal decodes ``%XX`` escapes, so ``Instructor%20Insights`` would reach
+    the tests as ``Instructor Insights``. A ``{"..."}`` long string keeps it.
+
+    :param value: The dictionary value.
+    :returns: The VCL literal.
+    :rtype: str
+    :raises ValueError: If the value contains ``"}``, which ends a long string.
+    """
+    if '"}' in value:
+        msg = f"Cannot render dictionary value {value!r} as a VCL long string"
+        raise ValueError(msg)
+    return '{"' + value + '"}'
+
+
+def render_main_vcl(suite: VclSuite) -> str:
+    """Render the main VCL Fastly would generate from the suite's snippets.
+
+    Snippets of one type are placed in that subroutine in priority order, the
+    way Fastly expands its ``#FASTLY <type>`` macro. Edge dictionaries become
+    tables. Fastly-generated configuration that is not a snippet (conditions,
+    response objects, request settings) is not reproduced.
+
+    :param suite: The service's snippets and dictionaries.
+    :returns: A main VCL that falco can lint and test.
+    :rtype: str
+    """
+    by_type: dict[str, list[VclSnippet]] = {}
+    for snippet in suite.snippets:
+        by_type.setdefault(snippet.type, []).append(snippet)
+    unknown = set(by_type) - {"init", *_SUBROUTINE_DEFAULT_RETURNS}
+    if unknown:
+        msg = f"Unsupported snippet types in {suite.name}: {sorted(unknown)}"
+        raise ValueError(msg)
+
+    def ordered(snippets: Iterable[VclSnippet]) -> list[VclSnippet]:
+        return sorted(
+            snippets,
+            key=lambda s: (s.priority or DEFAULT_SNIPPET_PRIORITY, s.name),
+        )
+
+    parts = [f"# Generated by ol_infrastructure.lib.falco for {suite.name}"]
+    for name, items in suite.dictionaries.items():
+        entries = "".join(
+            f"  {_vcl_table_key(key)}: {_vcl_table_value(value)},\n"
+            for key, value in sorted(items.items())
+        )
+        parts.append(f"table {name} {{\n{entries}}}")
+    parts.extend(
+        f"# snippet: {snippet.name}\n{snippet.content.strip()}"
+        for snippet in ordered(by_type.get("init", []))
+    )
+    for scope, default_return in _SUBROUTINE_DEFAULT_RETURNS.items():
+        body = "\n".join(
+            f"  # snippet: {snippet.name}\n  {{\n{_indent(snippet.content)}\n  }}"
+            for snippet in ordered(by_type.get(scope, []))
+        )
+        parts.append(
+            f"sub vcl_{scope} {{\n#FASTLY {scope}\n{body}\n  {default_return}\n}}"
+        )
+    return "\n\n".join(parts) + "\n"
+
+
+def _indent(content: str) -> str:
+    return "\n".join(
+        f"    {line}" if line else "" for line in content.strip().splitlines()
+    )
+
+
+def _platform() -> str:
+    system = platform.system().lower()
+    machine = {"x86_64": "amd64", "aarch64": "arm64"}.get(
+        platform.machine().lower(), platform.machine().lower()
+    )
+    return f"{system}-{machine}"
+
+
+def _cache_dir(version: str, digest: str) -> Path:
+    # Keyed by the digest too, so a re-pinned asset is downloaded again
+    base = os.environ.get("XDG_CACHE_HOME") or Path.home().joinpath(".cache")
+    return Path(base).joinpath("ol-infrastructure", "falco", f"{version}-{digest}")
+
+
+def _absolute_executable(command: str | Path) -> Path:
+    """Resolve a falco path or command name before ``run_suite`` changes cwd.
+
+    :param command: A path, relative or absolute, or a command name on ``PATH``.
+    :returns: The absolute path.
+    :rtype: Path
+    :raises FileNotFoundError: If it isn't an executable file.
+    """
+    found = shutil.which(command)
+    if found is None:
+        msg = f"falco executable not found: {command}"
+        raise FileNotFoundError(msg)
+    return Path(found).resolve()
+
+
+def ensure_falco() -> Path:
+    """Return a falco binary, downloading the pinned release on first use.
+
+    ``FALCO_BIN`` overrides the download, e.g. for an offline machine. It may be
+    a path, relative or absolute, or a command name on ``PATH``.
+
+    :returns: Absolute path to an executable falco binary.
+    :rtype: Path
+    """
+    if override := os.environ.get("FALCO_BIN"):
+        return _absolute_executable(override)
+    platform_name = _platform()
+    version, expected = FALCO_RELEASES[platform_name]
+    binary = _cache_dir(version, expected).joinpath("falco")
+    if binary.exists():
+        return binary
+
+    url = (
+        "https://github.com/ysugimoto/falco/releases/download/"
+        f"{version}/falco-{platform_name}.tar.gz"
+    )
+    with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:  # noqa: S310
+        archive = response.read()
+    actual = hashlib.sha256(archive).hexdigest()
+    if actual != expected:
+        msg = f"falco {version} {platform_name}: sha256 {actual} != {expected}"
+        raise RuntimeError(msg)
+
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
+        member = tar.extractfile("./falco")
+        if member is None:
+            msg = f"falco binary missing from {url}"
+            raise RuntimeError(msg)
+        content = member.read()
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    # Write then rename so a concurrent run never executes a partial file.
+    partial = binary.with_suffix(f".{os.getpid()}.partial")
+    partial.write_bytes(content)
+    partial.chmod(0o755)
+    partial.replace(binary)
+    return binary
+
+
+def load_suite(name: str) -> VclSuite:
+    """Import a suite listed in :data:`SUITES` and build it.
+
+    :param name: Key in :data:`SUITES`.
+    :returns: The suite.
+    :rtype: VclSuite
+    """
+    return importlib.import_module(SUITES[name]).vcl_suite()
+
+
+@dataclass(frozen=True)
+class FalcoResult:
+    command: str
+    returncode: int
+    output: str
+
+    @property
+    def ok(self) -> bool:
+        return self.returncode == 0
+
+
+def run_suite(suite: VclSuite, falco: Path | None = None) -> list[FalcoResult]:
+    """Lint the suite's rendered VCL, then run its ``*.test.vcl`` files.
+
+    :param suite: The suite to check.
+    :param falco: The falco binary; downloaded when omitted.
+    :returns: One result for ``lint`` and, when the suite has tests, one for ``test``.
+    :rtype: list[FalcoResult]
+    """
+    # Absolute, because falco runs with the temporary directory as its cwd
+    falco = _absolute_executable(falco) if falco else ensure_falco()
+    with tempfile.TemporaryDirectory(prefix=f"falco-{suite.name}-") as tmp:
+        main_vcl = Path(tmp).joinpath("main.vcl")
+        main_vcl.write_text(render_main_vcl(suite))
+        commands = [["lint"]]
+        if suite.tests_dir.is_dir():
+            commands.append(["test", "-I", str(suite.tests_dir)])
+        results = []
+        for command in commands:
+            completed = subprocess.run(  # noqa: S603
+                [str(falco), *command, str(main_vcl)],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=tmp,
+            )
+            results.append(
+                FalcoResult(
+                    command=command[0],
+                    returncode=completed.returncode,
+                    output=completed.stdout + completed.stderr,
+                )
+            )
+        return results
