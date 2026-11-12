@@ -1580,8 +1580,11 @@ online scoring rules, access control (Keycloak, the bearer route), retention, an
      leading indent, tabs and Unicode, and a chat message list. Where a literal block cannot
      hold a string exactly it switches to a quoted style, so no trailing whitespace reaches
      the file for a hook to strip. One character does not survive a literal block (U+0085,
-     NEL, with `allow_unicode=True`), so `export` asserts `safe_load(dump(x)) == x` before
-     writing a file.
+     NEL, with `allow_unicode=True`), so `export` checks each string's literal form reads back
+     exactly and writes any that do not in the double-quoted, escaped style, which PyYAML
+     round-trips for U+0085, U+2028 and a byte-order mark alike. It verifies
+     `safe_load(dump(x)) == x` before writing and fails only if that still differs, so no
+     prompt text is unexportable.
    - Why not TOML: `tomli-w` either escapes the whole template onto one line (its default),
      which reads no better than JSON, or, with `multiline_strings=True`, writes trailing
      spaces raw where a whitespace hook would strip them.
