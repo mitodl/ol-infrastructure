@@ -20,7 +20,9 @@ COREPACK_ENABLE_DOWNLOAD_PROMPT=0 yarn install --immutable
 # YYYY.MM0D.INC0): month unpadded, day zero-padded, so the minor never has a
 # leading zero.
 version="$(date -u +%Y.%-m%d).0-dev.$(date -u +%s).g${SOURCE_SHA:0:7}"
-yarn version "$version"
+# npm, not yarn's version command: yarn spawns git whenever the checkout has
+# a .git, and node:*-slim ships without git ("Process git failed to spawn").
+npm pkg set "version=$version"
 yarn build
 echo "Publishing prerelease $version"
 yarn npm publish --access public --tag next
