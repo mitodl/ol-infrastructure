@@ -42,6 +42,25 @@ config:
     # 2026-11-12); Production logged ~420 ClusterGraphMissing calls for it
     # 2026-11-05..10 from witan-code's edit hook.
   - https://github.com/mitodl/ol-llm
+    # Added 2026-11-12 for cross-repo bridge coverage rather than commit
+    # volume: each one gives an existing binding its missing other side.
+    # micromasters and ocw-hugo-projects are services this repo already
+    # deploys; smoot-design and course-search-utils are npm packages the
+    # indexed frontends import; open-learning-ai-tutor, mitx-grading-library
+    # and django-aqueduct are Python packages indexed apps depend on; the
+    # Keycloak repos sit behind ol-django's mitol.keycloak and mitol.scim.
+    # edx-platform is deliberately not here yet: at about 2.3 GB, its cold
+    # first parse risks the indexer's serial 3h deadline for the whole sweep.
+  - https://github.com/mitodl/micromasters
+  - https://github.com/mitodl/ocw-hugo-projects
+  - https://github.com/mitodl/smoot-design
+  - https://github.com/mitodl/course-search-utils
+  - https://github.com/mitodl/open-learning-ai-tutor
+  - https://github.com/mitodl/mitx-grading-library
+  - https://github.com/mitodl/django-aqueduct
+  - https://github.com/mitodl/ol-keycloak
+  - https://github.com/mitodl/ol-keycloakify
+  - https://github.com/mitodl/keycloak-scim
   # Setting this is what turns actor-token sync on: the bootstrap Job and the
   # hourly CronJob take ownership of secret-operations/witan/actor-tokens,
   # which Pulumi otherwise writes directly. Safe to set only because the
