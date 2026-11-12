@@ -129,30 +129,29 @@ cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 # Single-stack (default) because there is one Sentry org, and one Dagster
 # project within it shared by every environment.
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
-# Keycloak is deployed to CI/QA/Production only; the Dev Dagster stack has no
-# counterpart to reference, so its data_loading deployment simply goes without
-# the Keycloak host and that source stays unavailable there.
-keycloak_stack = (
-    make_stack_reference(projects.KEYCLOAK_APP, stack_info.name)
-    if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+# The application databases data_loading's dlt sources read, as
+# (<NAME>_DB_HOST variable, application project, the stack export holding its
+# RDS hosts). The variable is the ol_dlt source's env prefix plus _HOST. The
+# Dev Dagster stack goes without these hosts, so those sources stay unavailable
+# there. Each application stack's database admits the data VPC's pod subnets
+# (the shared OLAppDatabase component, or the stack's own security group).
+# Loading the QA applications is what lets the QA lake validate identity-bearing
+# features such as the B2B dashboard (RFC 12711).
+DATA_LOADING_DB_SOURCES = (
+    ("KEYCLOAK_DB_HOST", projects.KEYCLOAK_APP, "keycloak"),
+    ("MITXONLINE_APP_DB_HOST", projects.MITXONLINE, "mitxonline"),
+    ("XPRO_APP_DB_HOST", projects.XPRO, "xpro"),
+    ("MITLEARN_APP_DB_HOST", projects.MIT_LEARN, "mit_learn"),
+    ("LEARN_AI_APP_DB_HOST", projects.LEARN_AI, "learn_ai"),
+    ("OCW_STUDIO_APP_DB_HOST", projects.OCW_STUDIO, "ocw_studio"),
 )
-# Same shape as Keycloak: MITx Online is deployed to CI/QA/Production only, so
-# the Dev Dagster stack goes without the host and that source stays unavailable
-# there. Its app database is what the mitxonline_app dlt source reads
-# (RFC 12711 step 8) -- the QA data lake cannot validate the B2B dashboard while
-# it holds nothing from the QA app.
-mitxonline_stack = (
-    make_stack_reference(projects.MITXONLINE, stack_info.name)
+data_loading_db_stacks = (
+    [
+        (env_var, make_stack_reference(project, stack_info.name), output_name)
+        for env_var, project, output_name in DATA_LOADING_DB_SOURCES
+    ]
     if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
-)
-# xPro is deployed to CI/QA/Production only, like MITx Online. Its app database
-# is what the xpro_app dlt source reads (RFC 12711).
-xpro_stack = (
-    make_stack_reference(projects.XPRO, stack_info.name)
-    if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+    else []
 )
 
 
@@ -3063,28 +3062,10 @@ for location in code_locations:
     # data_loading's dlt database sources connect by host and take their
     # credentials from Vault at run time, so only the host is passed through
     # here -- from the owning application's stack, not duplicated in config.
-    if name == "data_loading" and keycloak_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "KEYCLOAK_DB_HOST",
-                "value": data_loading_db_host(keycloak_stack, "keycloak"),
-            }
-        )
-
-    if name == "data_loading" and mitxonline_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "MITXONLINE_APP_DB_HOST",
-                "value": data_loading_db_host(mitxonline_stack, "mitxonline"),
-            }
-        )
-
-    if name == "data_loading" and xpro_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "XPRO_APP_DB_HOST",
-                "value": data_loading_db_host(xpro_stack, "xpro"),
-            }
+    if name == "data_loading":
+        deployment["env"].extend(
+            {"name": env_var, "value": data_loading_db_host(app_stack, output_name)}
+            for env_var, app_stack, output_name in data_loading_db_stacks
         )
 
     # ml's Opik tracing and Prompt Library. Only the non-secret settings live
