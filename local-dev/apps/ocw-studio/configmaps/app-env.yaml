@@ -127,9 +127,21 @@ data:
   OCW_HUGO_THEMES_BRANCH: "main"
   OCW_HUGO_PROJECTS_BRANCH: "main"
   USE_LOCAL_STARTERS: "false"
-  OCW_IMPORT_STARTER_SLUG: "ocw-course-v3"
-  OCW_COURSE_STARTER_SLUG: "ocw-course-v3"
-  OCW_DEFAULT_COURSE_THEME: "ocw-course-v3"
+  # Course themes, set up as production has them: sites use the ocw-course-v2
+  # starter and build with it at the bucket root, and every live publish also
+  # builds the __OCW_LEARN_THEME__ extra theme into __OCW_LEARN_THEME__/courses/
+  # with a /courses/o base URL. That second build is what MIT Learn serves at
+  # learn.mit.test/courses/o/ (see the sitehost's :8047 listener). The theme
+  # slug comes from the ocw-studio Tiltfile, which also feeds it to that
+  # listener, so the two can't drift apart.
+  OCW_IMPORT_STARTER_SLUG: "ocw-course-v2"
+  OCW_COURSE_STARTER_SLUG: "ocw-course-v2"
+  OCW_DEFAULT_COURSE_THEME: "ocw-course-v2"
+  OCW_EXTRA_COURSE_THEMES: "__OCW_LEARN_THEME__"
+  OCW_EXTRA_THEMES_BASE_URLS: '{"__OCW_LEARN_THEME__": "/courses/o"}'
+  # The theme's fully qualified links to other courses (canonical_course_url)
+  # go to this host, like learn.mit.edu in production.
+  COURSE_V3_CANONICAL_DOMAIN: "learn.mit.test"
   OCW_MASS_BUILD_BATCH_SIZE: "80"
   OCW_MASS_BUILD_MAX_IN_FLIGHT: "40"
   OCW_STUDIO_DELETABLE_CONTENT_TYPES: "external-resource,instructor,page,course-collection"

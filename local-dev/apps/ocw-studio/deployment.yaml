@@ -342,9 +342,19 @@ spec:
           name: live
         - containerPort: 8046
           name: test
+        - containerPort: 8047
+          name: learn-courses
+        # Mounted as a template so the image's entrypoint renders it into
+        # conf.d, filling in only NGINX_LOCAL_RESOLVERS (the :8047 listener's
+        # resolver). The filter leaves nginx's own $variables alone.
+        env:
+        - name: NGINX_ENTRYPOINT_LOCAL_RESOLVERS
+          value: "1"
+        - name: NGINX_ENVSUBST_FILTER
+          value: "^NGINX_LOCAL_RESOLVERS$"
         volumeMounts:
         - name: sitehost-config
-          mountPath: /etc/nginx/conf.d/default.conf
+          mountPath: /etc/nginx/templates/default.conf.template
           subPath: default.conf
         # Every Hugo build in a mass build fetches instructor JSON through
         # here, so it sees the full fan-out. Memory is not the constraint
@@ -399,3 +409,6 @@ spec:
   - name: test
     port: 8046
     targetPort: test
+  - name: learn-courses
+    port: 8047
+    targetPort: learn-courses
