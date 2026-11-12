@@ -390,7 +390,10 @@ SDK (`@track(project_name=, tags=, metadata=, environment=)` and
 `opik_context.update_current_trace`). PydanticAI's OTel spans become children of that trace
 through `OpikSpanProcessor` (§2.2). PydanticAI's own `metadata=` lands as a single JSON
 attribute on its `invoke_agent` span, which Opik does not unpack, so the library does not rely
-on it.
+on it. (Amended 2026-11-12 by §8.3 seam 3: the root trace and these fields move to OTel spans
+and attributes behind ol-llm's trace API, and the Opik backend maps them onto Opik's fields,
+using the SDK only where OTLP cannot carry a field. The `opik.metadata.*` names in the table
+become that backend's mapping, not what call sites write.)
 
 Environment on the OTel-only fallback. Opik's OTel mapping has no rule for the trace
 environment field. Anything that reaches Opik over OTLP alone, which is only the §2.2 fallback,
@@ -1491,8 +1494,9 @@ vendor. So ol-llm's public interfaces, and every file ol-llm has app repositorie
 defined in ol-llm's terms, with Opik as one backend behind them. Memory already works this
 way: the backend is chosen by name (`hindsight`, `in-memory`, or an entry point in
 `ol_llm.memory_backends`) and call sites do not change when it does (§5.5). Replacing Opik
-should then mean writing one adapter and importing files the repositories already hold, not
-a migration in every app.
+should then mean writing one adapter, importing the exports the repositories already hold,
+and a generated rewrite of each app's version ids (principle 3), not code changes in every
+app.
 
 ### 8.1 Where the coupling is
 
@@ -1503,17 +1507,20 @@ mit-learn `5390a0d4e` and gwarek `9adef88`.
   `tracing.py` (7), `traces.py` (7), `prompts.py` (6), `langchain.py` (5), and `testing.py`,
   `runs.py` and `pointers.py` (1 each). Evaluation is the deepest: metrics subclass Opik's
   `BaseMetric`, and runs, datasets and experiments are Opik objects.
-- Opik shows in ol-llm's public API: `ManagedPrompt.source` is `"opik"` or `"embedded"`, and
-  `ManagedPrompt.opik_prompt` carries the SDK's prompt object for the trace link.
+- Opik shows in ol-llm's public API: `ManagedPrompt.source` is `"opik"` or `"embedded"`,
+  `ManagedPrompt.opik_prompt` carries the SDK's prompt object for the trace link, and
+  `get_prompt` and the prompt-creation helper take `project_name=`, documented as the app's
+  Opik project. `gate.py` documents the gate declaration's `app` the same way.
 - Apps: learn-ai (since learn-ai#157), mit-learn and gwarek import no Opik outside tests.
   ol-data-platform does in `ml/resources/opik_auth.py` (the Prompt Library for prompts not
   yet on ol-llm), `ml/lib/summarize_gate.py`, and ol-orchestrate-lib's
   `embeddings/evaluation.py`, and `ml/lib/summarize.py` checks `prompt.source == "opik"`.
 - Committed files: the gate declaration (TOML) and golden datasets (JSON) are already in
   ol-llm's schemas. The pointer file names its namespace `project`, Opik's word, where the gate
-  declaration and `UseCase` say `app`. ol-llm 0.0.12 exports prompts as JSON that mirrors
-  Opik's prompt fields; no app has committed one yet (ol-data-platform#3348, the first, is
-  held in draft for §8.3).
+  declaration and `UseCase` say `app`. ol-llm 0.0.12 exports each prompt as `<name>.json`
+  with ol-llm's fields (`name`, `project`, `version`, `type`, `template_hash`, and `template` or
+  `messages`); only `project` and the meaning of `version` are Opik's. No app has committed
+  one yet (ol-data-platform#3348, the first, is held in draft for §8.3).
 
 ### 8.2 Principles
 
@@ -1522,18 +1529,28 @@ mit-learn `5390a0d4e` and gwarek `9adef88`.
 2. Committed files use ol-llm's schemas. They are the durable record of what production runs
    and the import source for a future backend.
 3. One concept, our name. Opik environments, Langfuse labels and MLflow aliases are the same
-   thing, a mutable pointer to a version, and ol-llm calls it a label. Versions are opaque
-   strings as the backend names them.
+   thing, a mutable pointer to a version, and ol-llm calls it a label; the namespace is the
+   app. Versions are opaque strings as the backend names them, so pointer files and exports
+   hold backend-specific version ids. `template_hash`, ol-llm's SHA-256 of the template, is
+   the backend-neutral identity: moving to another backend imports each export as a version
+   there and rewrites the version ids in pointer files and exports, matched by hash. That
+   rewrite is generated, one pull request per app, and the command that does it is written
+   when a move happens (principle 6).
 4. ol-llm renders templates itself, so the embedded default and a fetched version render
-   through the same code whatever the backend. `mustache` means `{{name}}` substitution only,
-   the subset Opik's mustache implements and MLflow's registry uses. `jinja2` stays
-   supported and is documented as not portable.
+   through the same code whatever the backend. `mustache` means placeholder substitution
+   only, no sections, partials or escaping, with exactly the matching rules of Opik's
+   implementation so versions already in Opik render as they do today: placeholders match
+   `\{\{([^{}]*?)\}\}` and the name is stripped, so `{{ name }}` equals `{{name}}`, and a
+   third brace is left as literal text (opik `api_objects/prompt/text/prompt_template.py`).
+   MLflow's registry uses the same double-brace placeholders. `jinja2` stays supported and is
+   documented as not portable.
 5. Tracing is OpenTelemetry first. Call sites use ol-llm's trace API; a backend is an exporter
-   plus whatever mapping it needs. The OTel GenAI conventions are still Development status
-   (no `gen_ai.*` attribute was marked Stable in the registry as of mid-2026), so attribute
-   names live in one module.
+   plus whatever mapping it needs. The OTel GenAI conventions are not yet stable (the
+   specification moved to its own repository, open-telemetry/semantic-conventions-genai,
+   created 2026-05-05, with no tagged release as of 2026-11-12), so attribute names live in one
+   module.
 6. One real adapter per seam, plus the file or in-memory backend that tests use. No adapters
-   for backends we do not run.
+   or migration tooling for backends we do not run.
 
 What stays backend-specific on purpose, configured in this repository rather than in apps:
 online scoring rules, access control (Keycloak, the bearer route), retention, and the UI.
@@ -1541,37 +1558,57 @@ online scoring rules, access control (Keycloak, the bearer route), retention, an
 ### 8.3 Seams
 
 1. Prompt export and API, `tk-ol-llm-export-prompts-as-readable-text-frontmatt-27b388`.
-   `ol-llm-prompts export` writes `<exports>/<name>.prompt.yaml`, a serialization of an ol-llm
-   prompt version: `name`, `app`, `version`, `type`, `template_hash`, and `template` (text) or
-   `messages` (chat, any content). The pointer file's `project` becomes `app`, and
-   `ManagedPrompt` loses its Opik names. YAML, because a standard serializer round-trips the
-   text exactly and reads well in a pull request diff: with literal blocks preferred, PyYAML
-   reproduced the feedback-summary v4 text, trailing spaces, 1,900 trailing spaces, trailing
-   blank lines, a leading indent, tabs and Unicode, and a chat list exactly (2026-11-12), and
-   it falls back to a quoted style when a literal block cannot hold the text, so no trailing
-   whitespace reaches the file for a hook to strip. TOML was rejected because `tomli-w` writes
-   trailing spaces raw inside multiline strings. Prompt file formats were rejected because
-   each brings its own renderer: Prompty (YAML frontmatter, a markdown body with role markers,
-   Jinja2 by default), Dotprompt (Handlebars) and Humanloop's `.prompt` (JSX-like tags) would
-   each render differently from the fetched version, and would move the lock-in rather than
-   remove it. The registries themselves define no repository format: Opik's CLI exports JSON
-   or CSV with full history for migration, Langfuse's GitHub integration is a webhook that
-   commits each version, and we found none documented for MLflow's registry. PyYAML becomes a base
-   dependency of ol-llm; slimmed installs do not have it today.
+   - `ol-llm-prompts export` writes `<exports>/<name>.prompt.yaml` with the same fields 0.0.12
+     writes, `project` renamed `app`: `name`, `app`, `version`, `type` (the template engine,
+     `mustache` or `jinja2`), `template_hash`, and either `template` (a text prompt) or
+     `messages` (a chat prompt, any content). The pointer file's `project` becomes `app`.
+   - The public prompt API loses its Opik names: `ManagedPrompt.source` becomes `"registry"`
+     or `"embedded"`, `ManagedPrompt.opik_prompt` becomes an opaque backend reference, and
+     `project_name=` becomes `app=` on `get_prompt` and the creation helper.
+     ol-data-platform's `summarize.py` and its test change in the same pull request that
+     takes the release.
+   - Why YAML: a standard serializer round-trips the text exactly and reads well in a pull
+     request diff. Dumped with literal blocks preferred and read back with `safe_load`,
+     PyYAML reproduced each of these exactly on 2026-11-12: the feedback-summary v4 text,
+     lines with trailing spaces, a string ending in 1,900 spaces, trailing blank lines, a
+     leading indent, tabs and Unicode, and a chat message list. Where a literal block cannot
+     hold a string exactly it switches to a quoted style, so no trailing whitespace reaches
+     the file for a hook to strip. One character does not survive a literal block (U+0085,
+     NEL, with `allow_unicode=True`), so `export` asserts `safe_load(dump(x)) == x` before
+     writing a file.
+   - Why not TOML: `tomli-w` either escapes the whole template onto one line (its default),
+     which reads no better than JSON, or, with `multiline_strings=True`, writes trailing
+     spaces raw where a whitespace hook would strip them.
+   - Why not a prompt file format: each brings its own renderer. Prompty (YAML frontmatter, a
+     markdown body with role markers, Jinja2 by default), Dotprompt (Handlebars) and
+     Humanloop's `.prompt` (JSX-like tags) would each render differently from the fetched
+     version, and would move the lock-in rather than remove it. The registries define no
+     repository format: Opik's CLI exports JSON or CSV with version history, for moving
+     between instances; Langfuse sends a webhook or a `repository_dispatch` for each version
+     and leaves the commit to a server you host (its example writes JSON); we found none
+     documented for MLflow's registry.
+   - PyYAML becomes a base dependency of ol-llm. Slimmed installs do not install it today:
+     their lock records it only through litellm and huggingface-hub, which the slimming
+     overrides drop.
 2. Prompt registry, `tk-ol-llm-prompt-registry-interface-with-an-opik-ad-4700e7`. An interface
-   to fetch a version by label or version, read which version a label is on, move a label, and
-   create a version, chosen by name like memory. Opik implements it with today's code (including
-   registering an environment before labeling); a file backend reads committed exports. Rendering
-   moves into ol-llm (principle 4). The runtime policy of the lifecycle spec (fetch by label,
-   300 s cache, 2 s cold deadline, embedded fallback) does not change.
+   to fetch a version by label or by version, read which version a label is on, move a label,
+   and create a version, with the backend chosen by name like memory. Opik implements all of it
+   with today's code, including registering an environment before labeling. The file backend
+   reads committed exports and implements only the reads: fetch by version and by the
+   production label, which are the pointed versions. Moving a label or creating a version
+   raises. It replaces the reader `load_default` uses today rather than adding a second one.
+   Rendering moves into ol-llm (principle 4). The runtime policy of the lifecycle spec (§3:
+   fetch by label, the 300 s cache whose warm entries keep serving when a refresh fails, the
+   2 s cold-start deadline, the embedded fallback) moves above the interface into ol-llm, so
+   every backend gets it; the Opik SDK's own prompt cache stops being what provides it.
 3. Tracing, `tk-ol-llm-tracing-as-opentelemetry-first-with-the-l-aee37d`. The root trace and
    the §4 attribution become OTel spans and attributes (`gen_ai.*` where defined, an `ol.`
    namespace for the rest), exported over OTLP to destinations configured by name. Opik is the
-   first; Tempo becomes possible, which also closes the parentless Bedrock spans
-   (`tk-ol-llm-the-library-s-model-spans-reach-opik-only-63c31a`). §4.1 records that Opik's OTLP
-   mapping has no rule for the trace environment field, so the work starts by listing which of
-   Opik's native trace fields OTLP reaches; anything the Opik backend still needs from the SDK
-   stays inside that backend.
+   first. Tempo becomes possible as a second destination, which is the fix
+   `tk-ol-llm-the-library-s-model-spans-reach-opik-only-63c31a` needs. §4.1 records that Opik's
+   OTLP mapping has no rule for the trace environment field, so the work starts by listing
+   which of Opik's native trace fields OTLP reaches; anything the Opik backend still needs
+   from the SDK stays inside that backend.
 4. Evaluation, `tk-ol-llm-evaluation-behind-an-interface-metrics-as-905e52`. Metrics become
    plain scoring functions returning a name, value and reason, wrapped into Opik's `BaseMetric`
    by the adapter; golden datasets stay in the repository; experiment runs and feedback scores
@@ -1594,4 +1631,4 @@ Sources for the market survey: [Prompty](https://github.com/Microsoft/prompty/),
 [Humanloop .prompt files](https://humanloop.com/docs/prompt-file-format),
 [Langfuse GitHub integration](https://langfuse.com/docs/prompt-management/features/github-integration),
 [MLflow Prompt Registry](https://mlflow.org/docs/latest/genai/prompt-registry/),
-[OTel GenAI conventions status](https://dev.to/azena-ai/opentelemetrys-genai-semantic-conventions-are-not-stable-yet-heres-what-actually-shipped-in-2026-3mke).
+[OTel GenAI semantic conventions](https://github.com/open-telemetry/semantic-conventions-genai).

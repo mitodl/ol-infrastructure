@@ -189,11 +189,16 @@ the pointer (§2.3 item 6, amended 2026-11-10).
    only `development`, `staging`, and `production`, and moving a label to an unregistered
    name fails (measured: `EnvironmentNotFoundError`), so `ci` and `qa` are created once per
    instance. Local development uses the embedded default and does not need Opik.
+   (Amended 2026-11-12 by shared-llm-library-spec.md §8: ol-llm calls an environment a
+   label and the project an app, and reaches Opik through its prompt registry interface.)
 2. Version pins are for batch runs and evaluations, not for request-time code. A batch run
    resolves the label once at the start and uses that version for the whole run.
 3. Cache: keep the SDK default of 300 s (`OPIK_PROMPT_CACHE_TTL_SECONDS`,
    `config.py:391-396`). A label move reaches every process within five minutes. A warm
-   entry keeps being served if a refresh fails (`prompt_cache.py:142-161`).
+   entry keeps being served if a refresh fails (`prompt_cache.py:142-161`). (Amended
+   2026-11-12 by shared-llm-library-spec.md §8.3 seam 2: ol-llm owns this cache, with the
+   same TTL and refresh-failure behavior, above the registry interface, so every backend
+   gets it.)
 4. Cold start with Opik unreachable: fall back to the embedded default, which is the text of
    the pointed production version committed beside the pointer file (§2.3), and mark the
    result degraded with reason `embedded_prompt`
