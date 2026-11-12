@@ -47,10 +47,15 @@ config:
     # Measured 2026-09-29 over 60 days: CN peaked at 0.02 cores and 2.8Gi.
     # See the prod stack for why the request, not the limit, is what matters
     # to the HPA.
+    # Memory is sized for dbt builds on QA's loaded raw, not that idle peak:
+    # at 6Gi, staging models and tests over the tracking logs hit batch's
+    # 2.8 GB group limit and 2Gi big-query limit (substructure/starrocks).
+    # 12Gi plus the node's ~1Gi of daemonsets still fits the r7a.large
+    # Karpenter picks (14.6Gi allocatable).
     cpu_request: 1000m
     cpu_limit: 4000m
-    memory_request: 6Gi
-    memory_limit: 6Gi
+    memory_request: 12Gi
+    memory_limit: 12Gi
   starrocks:enable_data_lake_integration: "true"
   starrocks:gravitino_catalog_enabled: "true"
   starrocks:ssl_enabled: "true"
