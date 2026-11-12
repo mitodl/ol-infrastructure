@@ -609,9 +609,16 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             standard_flow_enabled=True,
             **MANAGED_CLIENT_ARGS,
             service_accounts_enabled=False,
-            # Not PKCE_REQUIRED_CLIENT_ARGS yet. mit-learn's AccountActionStartView
-            # sends its own authorization request with this client (change email
-            # and password) and that request has no code_challenge.
+            # Not PKCE_REQUIRED_CLIENT_ARGS yet. Masai School and Board Infinity
+            # send their learners to Keycloak's authorize endpoint with this
+            # client, kc_idp_hint and no code_challenge (mitodl/hq#12760,
+            # mitodl/hq#13793), from links in their own systems. With the marker
+            # set Keycloak rejects those requests and those logins fail. The
+            # upGrad and Apply7 IdPs below also log in through direct
+            # kc_idp_hint links; which client those use is unchecked.
+            # mitxonline#4119 adds an IdP login_url of the same shape. Move the
+            # partners to links the gateway serves before setting it. mit-learn's
+            # AccountActionStartView sends S256 since mit-learn#4167.
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-mitlearn-client-redirect-uris"
             ),
