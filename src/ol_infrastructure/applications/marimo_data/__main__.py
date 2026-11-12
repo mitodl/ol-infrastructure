@@ -41,9 +41,11 @@ viewer of the app, because marimo runs each session as a thread in one process.
 
 Author code in an app can read each viewer's access token, and with it use all
 of that viewer's StarRocks and Gravitino grants, writes included, until it
-expires.  That is the cost of querying as the viewer.  Published pods run as
-the ``marimo-published`` ServiceAccount below, which has no IRSA role and no
-token.
+expires.  A StarRocks connection it opens before then keeps the viewer's
+Glue-catalog grants for as long as the connection stays open, since StarRocks
+checks the token only at login.  That is the cost of querying as the viewer.
+Published pods run as the ``marimo-published`` ServiceAccount below, which has
+no IRSA role and no token.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.
@@ -237,6 +239,8 @@ marimo_shared_plugins = OLApisixSharedPlugins(
 # The marimo-operator creates a per-MarimoNotebook ClusterIP Service named
 # after each notebook (e.g. Service/my-notebook in the marimo namespace).
 # Each published notebook therefore needs its own OLApisixRoute pointing at
-# its individual Service, using marimo_oidc.get_full_oidc_plugin_config() and
-# marimo_shared_plugins.resource_name.  Those routes are out-of-band from
-# this stack and should be managed alongside the MarimoNotebook manifests.
+# its individual Service, using marimo_oidc.get_full_oidc_plugin_config() with
+# set_id_token_header and set_userinfo_header set to False (OLApisixOIDCResources
+# leaves both at the plugin's true default), and
+# marimo_shared_plugins.resource_name.  Those routes are out-of-band from this
+# stack and should be managed alongside the MarimoNotebook manifests.

@@ -41,7 +41,7 @@ out of the latter.
 | D6 | The MarimoNotebook and ApisixRoute CRs are the publisher's only state. There is no database. |
 | D7 | Published apps keep marimo token auth (`auth.password`, a per-app Secret). APISIX injects the token upstream with `proxy-rewrite`, so APISIX is the only entry point for viewers. Inside the cluster, anything that holds an app's token can still reach that app's Service directly: the app itself and APISIX. The token matters because NetworkPolicy is not enforced on the data cluster (F16). |
 | D8 | Gated published apps query the warehouse as the viewer, with the viewer's Keycloak access token. There is no shared warehouse credential in a gated pod (owner decision 2026-11-10, replacing the shared `readonly` credential this row used to describe). |
-| D9 | Published routes forward the viewer's access token and nothing else of theirs. The OIDC plugin (client `ol-marimo-app-client`) keeps `set_access_token_header` on and sets `set_id_token_header` and `set_userinfo_header` to `false`. The plugin replaces a client-sent `X-Access-Token`, but not its underscore spelling, so `proxy-rewrite` removes `Cookie`, `X-ID-Token`, `X-Userinfo`, and `X_Access_Token`, and overwrites `Authorization` with the app token. Author code can read the access token (F17), which is the accepted cost of D8. |
+| D9 | Published routes forward the viewer's access token and nothing else of theirs. The OIDC plugin (client `ol-marimo-app-client`) keeps `set_access_token_header` on. `OLApisixOIDCResources` doesn't emit `set_id_token_header` or `set_userinfo_header` (F17), so each per-notebook route sets both to `false` on its copy of the plugin config, as `mitxonline/definition.py` does for the login gate. The plugin replaces a client-sent `X-Access-Token`, but not its underscore spelling, so `proxy-rewrite` removes `Cookie`, `X-ID-Token`, `X-Userinfo`, and `X_Access_Token`, and overwrites `Authorization` with the app token. Author code can read the access token (F17), which is the accepted cost of D8. |
 | D10 | Approving (pass 2) is gated on a Keycloak role, synced into JupyterHub groups (`manage_groups`, `auth_state_groups_key`). The publisher checks group membership through the hub API with its service token (F18). |
 | D11 | The first implementation pass ships Keycloak-gated apps only. The `notebook_public` role, the public route shape, and the approval workflow are deferred to pass 2. |
 | D12 | In pass 1, anyone who can log in to the hub may publish. The publisher checks only that the caller holds a valid hub token. |
@@ -51,9 +51,11 @@ the facts below.
 
 D12 is an accepted risk. The hub admits every `ol-data-platform` realm user (F18), and a gated
 app's author can read each viewer's access token (D8, D9). In pass 1, then, any realm user can
-act as any viewer of an app they publish, with that viewer's StarRocks and Gravitino grants, for
-the token's remaining lifetime. Revisit this if hub access widens, or before pass 2 adds a
-shared credential.
+act as any viewer of an app they publish, with that viewer's StarRocks and Gravitino grants.
+Token expiry ends new StarRocks logins and Gravitino catalog calls, but StarRocks checks the
+token only at login (B4), so a connection the author opens before expiry keeps the viewer's
+Glue-catalog grants for as long as it stays open. Revisit this if hub access widens, or before
+pass 2 adds a shared credential.
 
 ## Facts this rests on
 
