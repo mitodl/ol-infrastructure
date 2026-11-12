@@ -20,9 +20,10 @@ from pulumi import InvokeOptions, Output, ResourceOptions
 
 SERVICE_ACCOUNT_NAME = "concourse-release-markers"
 CONCOURSE_VAULT_PATH = "secret-concourse/infrastructure/grafana_annotations"
-# The marker script reads the last marker before it posts one. The writer role
-# looks like it would cover both but grants create, delete and write only;
-# ``annotations:read`` comes from the reader role.
+# The marker script reads the newest marker before it posts one.
+# ``fixed:annotations:writer`` looks sufficient but grants only create, delete
+# and write; ``annotations:read`` comes from ``fixed:annotations:reader``:
+# https://github.com/grafana/grafana/blob/c762526fbe957bbf880894235e1035865c36a966/pkg/api/accesscontrol.go#L286-L319
 FIXED_ROLES = ("fixed:annotations:reader", "fixed:annotations:writer")
 
 

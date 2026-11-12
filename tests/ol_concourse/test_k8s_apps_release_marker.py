@@ -49,10 +49,22 @@ ROLE_ACTIONS = {
 REQUIRED_ACTION = {"GET": "annotations:read", "POST": "annotations:create"}
 
 
+def _pipeline(app_name: str) -> dict[str, Any]:
+    return json.loads(build_app_pipeline(app_name).model_dump_json())
+
+
 def _plan(app_name: str, job_suffix: str) -> list[dict[str, Any]]:
-    pipeline = json.loads(build_app_pipeline(app_name).model_dump_json())
-    (job,) = [j for j in pipeline["jobs"] if j["name"].endswith(job_suffix)]
+    (job,) = [j for j in _pipeline(app_name)["jobs"] if j["name"].endswith(job_suffix)]
     return job["plan"]
+
+
+def _marker_task(app_name: str) -> dict[str, Any]:
+    (task,) = [
+        step["try"]
+        for step in _plan(app_name, "-production")
+        if _step_name(step) == RELEASE_MARKER_TASK_NAME
+    ]
+    return task
 
 
 def _step_name(step: dict[str, Any]) -> str:
@@ -91,11 +103,7 @@ def test_qa_posts_no_marker(app_name):
 @pytest.mark.parametrize("app_name", APPS)
 def test_marker_reads_the_deployed_version_and_infra_commit(app_name):
     """Both come from the job itself: the image_tag var and its ol-infra get."""
-    (task,) = [
-        step["try"]
-        for step in _plan(app_name, "-production")
-        if _step_name(step) == RELEASE_MARKER_TASK_NAME
-    ]
+    task = _marker_task(app_name)
     params = task["config"]["params"]
 
     assert params["APP_NAME"] == app_name
@@ -108,6 +116,24 @@ def test_marker_reads_the_deployed_version_and_infra_commit(app_name):
         "release-marker",
         f"ol-infra-{app_name}",
     }
+
+
+@pytest.mark.parametrize("app_name", APPS)
+def test_a_marker_step_that_does_not_finish_alerts_slack(app_name):
+    """The ``try`` keeps the job green, so the alert is the only sign it failed."""
+    slack_resources = {
+        resource["name"]
+        for resource in _pipeline(app_name)["resources"]
+        if resource["type"] == "slack-notification"
+    }
+    task = _marker_task(app_name)
+
+    for hook, alert_type in [("on_failure", "failed"), ("on_error", "errored")]:
+        assert task[hook]["put"] in slack_resources
+        assert task[hook]["params"]["alert_type"] == alert_type
+        # An implicit get that errored after the failure alert had posted
+        # would set off the error alert as well.
+        assert task[hook]["no_get"] is True
 
 
 def test_concourse_reads_the_vault_path_the_grafana_stack_writes():
@@ -140,7 +166,9 @@ class _Grafana(BaseHTTPRequestHandler):
         self.requests.append(
             {
                 "method": self.command,
-                "path": self.path,
+                # Not ``self.path``: the server collapses a leading ``//``
+                # there, and the request line is what the script sent.
+                "path": self.requestline.split()[1],
                 "auth": self.headers["Authorization"],
                 "body": body,
             }

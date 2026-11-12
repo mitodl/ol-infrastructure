@@ -29,7 +29,8 @@ Environment:
     INFRA_REF_FILE: file holding the ol-infrastructure commit deployed.
     INFRA_REPO_URL: the ol-infrastructure repository URL.
     GRAFANA_URL: the Grafana instance.
-    GRAFANA_TOKEN: a service account token that can write annotations.
+    GRAFANA_TOKEN: a service account token that can read and create
+        organization annotations.
 """
 
 import json
