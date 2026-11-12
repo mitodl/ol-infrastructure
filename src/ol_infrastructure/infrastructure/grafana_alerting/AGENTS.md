@@ -112,6 +112,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `dashboards/starrocks_overview.py` | StarRocks lakehouse service health: FE quorum and JVM, queries/errors/latency by catalog, CN capacity and data cache, and the shared-data S3 path. Reads only the families kept by the ServiceMonitor allowlists in `applications/starrocks/__main__.py`; a panel on any other StarRocks family renders empty until that allowlist grows. |
 | `dashboards/witan_memory.py` | Whether witan's stored memories reach sessions: the share of first task claims that carried a memory, how many people read them, and the surfaced memories themselves so their relevance can be judged. Reads Loki, because `witan_tool_calls_total` undercounts rare tools and memory tools are the rare ones. Raw read counts include the web UI's 30-second polling, so people is the reliable figure. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
+| `release_markers.py` | The `concourse-release-markers` service account (no basic role, only `fixed:annotations:reader` and `fixed:annotations:writer`) and its token, written to `secret-concourse/infrastructure/grafana_annotations` for the k8s app Production deploy jobs, which post one organization annotation per release (`ol_concourse/pipelines/infrastructure/k8s_apps/scripts/grafana_release_marker.py`). Runs in the production stack only. |
 | `AGENTS.md` | This file. |
 
 ---
