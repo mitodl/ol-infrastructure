@@ -198,13 +198,16 @@ the pointer (§2.3 item 6, amended 2026-11-10).
    entry keeps being served if a refresh fails (`prompt_cache.py:142-161`). (Amended
    2026-11-12 by shared-llm-library-spec.md §8.3 seam 2: ol-llm owns this cache, with the
    same TTL and refresh-failure behavior, above the registry interface, so every backend
-   gets it.)
+   gets it. Its TTL becomes an ol-llm setting; `OPIK_PROMPT_CACHE_TTL_SECONDS` stops
+   applying.)
 4. Cold start with Opik unreachable: fall back to the embedded default, which is the text of
    the pointed production version committed beside the pointer file (§2.3), and mark the
    result degraded with reason `embedded_prompt`
    (call contract §6.7). The SDK's own failure took 11 s to surface in the local test, so the
    helper puts a 2 s deadline on a cold fetch. This applies to both profiles: a batch run
-   does not fail because Opik is down.
+   does not fail because Opik is down. (Amended 2026-11-12 by shared-llm-library-spec.md
+   §8.3 seam 2: the deadline and the fallback sit in ol-llm above the registry interface, so
+   they apply to whichever backend is unreachable.)
 5. Batch idempotency keys include the prompt, keyed on a hash of the template text, not on
    the Opik version number. The version number is recorded alongside for linkage. A run that
    fell back to the embedded default then produces the same key as one that fetched the same

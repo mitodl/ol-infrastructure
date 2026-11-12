@@ -12,7 +12,7 @@ decision task and stays Proposed until the decision is recorded here.
 | §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange (§5.5) |
 | §6 Call contract | `tk-specify-the-library-s-call-contract-timeouts-ret-badb39` | Specified 2026-10-01 from the §3 decision |
 | §7 Durable execution | `tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78` | Direction set 2026-10-01; nothing decided |
-| §8 LLMOps backend portability | `tk-record-the-llmops-portability-decision-as-shared-478015` | Decided 2026-11-12; amends §2.3 item 1 |
+| §8 LLMOps backend portability | `tk-record-the-llmops-portability-decision-as-shared-478015` | Decided 2026-11-12; amends §2.3 item 1, §4.1, and the lifecycle spec's §3 items 1, 3 and 4 |
 
 "Inventory" and "direction assessment" below are two internal survey pages dated 2026-09-10
 that are not in this repository, and `tk-` ids are tasks in the team's internal tracker. Facts
@@ -398,7 +398,9 @@ become that backend's mapping, not what call sites write.)
 Environment on the OTel-only fallback. Opik's OTel mapping has no rule for the trace
 environment field. Anything that reaches Opik over OTLP alone, which is only the §2.2 fallback,
 carries environment as the `env:…` tag and `opik.metadata.environment`. Prompt environment
-labels are a separate mechanism and are unaffected.
+labels are a separate mechanism and are unaffected. (Amended 2026-11-12 by §8.3 seam 3: OTLP
+becomes the primary path, not the fallback, so the Opik backend has to set the environment
+field itself; this paragraph is why seam 3 starts by listing what OTLP reaches.)
 
 Model names must match Opik's price table. Opik computes cost from model name and token
 usage. opik#5620 (an incoming `gen_ai.usage.cost` was dropped) was closed on 2026-09-18 and
@@ -1588,8 +1590,8 @@ online scoring rules, access control (Keycloak, the bearer route), retention, an
      and leaves the commit to a server you host (its example writes JSON); we found none
      documented for MLflow's registry.
    - PyYAML becomes a base dependency of ol-llm. Slimmed installs do not install it today:
-     their lock records it only through litellm and huggingface-hub, which the slimming
-     overrides drop.
+     their lock records it only through litellm and huggingface-hub, and the slimming
+     overrides drop litellm, which is the only way huggingface-hub is reached.
 2. Prompt registry, `tk-ol-llm-prompt-registry-interface-with-an-opik-ad-4700e7`. An interface
    to fetch a version by label or by version, read which version a label is on, move a label,
    and create a version, with the backend chosen by name like memory. Opik implements all of it
@@ -1597,6 +1599,9 @@ online scoring rules, access control (Keycloak, the bearer route), retention, an
    reads committed exports and implements only the reads: fetch by version and by the
    production label, which are the pointed versions. Moving a label or creating a version
    raises. It replaces the reader `load_default` uses today rather than adding a second one.
+   A fetch reports `source="registry"` whatever the backend, the file backend included, and
+   only the cold-start fallback to the embedded default reports `"embedded"` and is marked
+   degraded.
    Rendering moves into ol-llm (principle 4). The runtime policy of the lifecycle spec (§3:
    fetch by label, the 300 s cache whose warm entries keep serving when a refresh fails, the
    2 s cold-start deadline, the embedded fallback) moves above the interface into ol-llm, so
