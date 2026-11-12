@@ -374,14 +374,14 @@ def test_switch_session_expires_this_hosts_session_without_reading_it():
     """
     direct, _ = _route_groups(_deployed_bindings())
     [switch] = [route for route in direct if route.route_name == "switch-session"]
-    plugin_names = [getattr(plugin, "name", None) for plugin in switch.plugins]
+    # Route plugins are coerced to OLApisixPluginConfig, so the dict that
+    # get_full_oidc_plugin_config() returns has a .name here too.
+    plugin_names = [plugin.name for plugin in switch.plugins]
 
     assert switch.paths == ["/switch-session", "/switch-session/"]
     assert "openid-connect" not in plugin_names
     [reset] = [
-        plugin
-        for plugin in switch.plugins
-        if getattr(plugin, "name", None) == "serverless-post-function"
+        plugin for plugin in switch.plugins if plugin.name == "serverless-post-function"
     ]
     rendered = str(reset.config)
     assert "mitxonline_apisix_session" in rendered
