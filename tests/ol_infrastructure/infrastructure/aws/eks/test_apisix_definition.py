@@ -140,6 +140,17 @@ def test_memory_limit_defaults_to_double_the_request():
     ] == {"memory": "1Gi"}
 
 
+def test_wasm_plugins_go_under_apisix():
+    plugins = [
+        {"name": "coraza-filter", "priority": 7999, "file": "/x/coraza-filter.wasm"}
+    ]
+    values = apisix_helm_values(_single_pod(wasm_plugins=plugins))
+
+    assert values["apisix"]["wasm"] == {"enabled": True, "plugins": plugins}
+    assert "wasm" not in values
+    assert "wasm" not in apisix_helm_values(_single_pod())["apisix"]
+
+
 def test_admission_webhook_is_on_unless_turned_off():
     assert apisix_helm_values(_fleet())["ingress-controller"]["webhook"] == {
         "enabled": True
