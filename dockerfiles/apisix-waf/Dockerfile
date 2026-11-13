@@ -6,8 +6,8 @@
 # in and registering it via Helm values (see apisix_official.py).
 #
 # Base tag must track APISIX_CHART_VERSION's default appVersion
-# (src/bridge/lib/versions.py) -- chart 2.16.0 => APISIX 3.17.0-ubuntu.
-ARG APISIX_IMAGE_TAG="3.17.0-ubuntu"
+# (src/bridge/lib/versions.py) -- chart 2.18.2 => APISIX 3.19.0-ubuntu.
+ARG APISIX_IMAGE_TAG="3.19.0-ubuntu"
 ARG CORAZA_PROXY_WASM_VERSION="0.6.0"
 
 FROM ghcr.io/corazawaf/coraza-proxy-wasm:${CORAZA_PROXY_WASM_VERSION} AS coraza
