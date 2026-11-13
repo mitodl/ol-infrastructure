@@ -27,11 +27,14 @@ stack mounts this package from a ConfigMap and selects each class with a
     the tag ``app:<name>`` for the writing app (the write tag scope refuses
     anything else), and only items carrying an app's tag can be changed or
     deleted by it. General banks are readable by every app and writable only
-    under the general grant, on the same terms. Apps may retain, update and
-    delete their own notes and nothing else: config changes, server-side LLM
-    features, knowledge pages, directives and the other bank operations are
-    refused. The admin client is limited to the forget sequence, and a deleted
-    bank is fenced so nothing can recreate it until in-flight work has drained.
+    under the general grant, on the same terms. Apps may retain their own notes,
+    change a note's tags or observation scopes, and delete them, and nothing
+    else. A note is replaced by retaining it again, not edited: memory unit
+    edits would skip Memory Defense, which screens only retain. Config changes,
+    server-side LLM features, knowledge pages, directives and the other bank
+    operations are refused. The admin client is limited to the forget sequence,
+    and a deleted bank is fenced so nothing can recreate it until in-flight work
+    has drained.
 
 ``OLMemoryDefense``
     The built-in sensitive-data screen, plus email addresses and phone numbers.
