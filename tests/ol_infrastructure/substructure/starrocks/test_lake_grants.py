@@ -3,7 +3,7 @@
 GRANTs are additive, so the revokes are what narrow a role that already holds
 more, e.g. the catalog-wide SELECT the Glue catalogs granted every governance
 role before they were scoped. A statement both granted and revoked would flap
-on every apply, so the two must never overlap.
+on every run, so the two must never overlap.
 """
 
 import re

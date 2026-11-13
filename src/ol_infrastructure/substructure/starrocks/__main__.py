@@ -526,9 +526,12 @@ if enable_data_lake:
 # true.  SET CATALOG switches the session context so the subsequent table-level
 # GRANT applies to the Iceberg catalog's databases rather than default_catalog.
 #
-# The layer-scoped governance roles' lake grants are reconciled: every apply
-# also revokes what lake_grants.py says they may not hold, so narrowing
-# data_lake_access takes effect. Every other GRANT here is additive. If
+# The layer-scoped governance roles' lake grants are reconciled whenever
+# roles_setup_cmd runs, which is when its SQL changes (data_lake_access, the
+# layers or the catalogs): it also revokes what lake_grants.py says they may
+# not hold, so narrowing data_lake_access takes effect. An unchanged apply
+# skips it, so a grant restored by hand stays until the next change or a
+# `pulumi up --replace` of the Command. Every other GRANT here is additive. If
 # enable_data_lake_integration is later set to false, or a catalog is dropped
 # from query_engine_lake_access, the grants already on the roles are NOT
 # revoked, and removing them takes a manual REVOKE.
