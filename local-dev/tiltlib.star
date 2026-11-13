@@ -39,6 +39,15 @@ def current_root_domain():
     return os.environ.get("LOCAL_DEV_ROOT_DOMAIN", _ROOT_DOMAIN_DEFAULT)
 
 
+def prebuilt_image_tags_env(image):
+    """Return LOCAL_DEV_PREBUILT_IMAGE_TAGS cut down to one image, for a
+    Pulumi-rendered app's apply_env. The full map holds every selected app's
+    pin, so passing it on would make selecting or dropping another pinned app
+    re-apply this one and rebuild its image."""
+    tags = decode_json(os.environ.get(_PREBUILT_IMAGE_TAGS_ENV, "") or "{}")
+    return str(encode_json({image: tags[image]} if image in tags else {}))
+
+
 def _config_fingerprint(paths_and_texts):
     """Return a stable fingerprint of the combined data/binaryData/stringData
     of every ConfigMap and Secret across the given (path, text) pairs (not the
