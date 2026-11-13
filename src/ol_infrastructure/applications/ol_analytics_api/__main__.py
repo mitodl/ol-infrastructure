@@ -798,6 +798,10 @@ _learner_records_bearer_plugin["config"].update(
         "claim_validator": {
             "audience": {"required": True, "match_with_client_id": True}
         },
+        # bearer_token() falls back to X-Access-Token when a request has no
+        # Authorization header.  The plugin clears an inbound X-Access-Token
+        # and only puts the verified token back with this on.
+        "set_access_token_header": True,
     }
 )
 

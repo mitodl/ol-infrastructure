@@ -197,6 +197,13 @@ marimo_oidc = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
+        # Author code can read every request header (mo.app_meta().request),
+        # so a published route forwards the viewer's access token, for
+        # querying StarRocks as the viewer, and nothing else of theirs.  This
+        # is D9 of docs/plans/marimo-first-data-notebooks-spec.md as revised
+        # for viewer credentials.
+        oidc_set_access_token_header=True,
+        oidc_set_userinfo_header=False,
         credentials=OLApisixOIDCVaultCredentials(
             mount="secret-operations",
             path="sso/marimo",

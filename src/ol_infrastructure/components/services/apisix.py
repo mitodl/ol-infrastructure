@@ -738,6 +738,11 @@ class OLApisixOIDCConfig(BaseModel):
     # that uses this component, so no caller needs it off; the field exists to
     # make that a choice.
     oidc_session_cookie_secure: bool = True
+    # lua-resty-session 4.x already defaults to HttpOnly and SameSite=Lax.
+    # They are emitted anyway so the cookie's attributes are read off the
+    # rendered route, not off whichever library version the gateway runs.
+    oidc_session_cookie_http_only: bool = True
+    oidc_session_cookie_same_site: Literal["Strict", "Lax", "None", "Default"] = "Lax"
     oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
     # 3600s rolling) untouched for callers that haven't opted in. 0
@@ -746,6 +751,15 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
+    # What the plugin forwards to the upstream.  X-Userinfo (base64 JSON, keyed
+    # by ``sub``) is the identity every Django app authenticates off through
+    # mitol-apigateway.  The tokens are opt-in: an upstream that never reads
+    # X-Access-Token or X-ID-Token should not receive a credential it could
+    # leak into logs or replay.  The plugin's own defaults forward all three.
+    # X-Raw-ID-Token and X-Refresh-Token are always off.
+    oidc_set_userinfo_header: bool = True
+    oidc_set_access_token_header: bool = False
+    oidc_set_id_token_header: bool = False
     # Sends code_challenge (S256) on the authorization request and
     # code_verifier on the token request. Keycloak accepts both from a client
     # that does not require PKCE, so this has to be on, and deployed in every
@@ -844,8 +858,10 @@ class OLApisixOIDCResources(ComponentResource):
         # Always emitted, so the session block now exists for every caller.
         # That block already reaches APISIX for all of them anyway: the
         # secretRef merges session.secret into it.
-        session_config.setdefault("session", {})["cookie_secure"] = (
-            oidc_config.oidc_session_cookie_secure
+        session_config.setdefault("session", {}).update(
+            cookie_secure=oidc_config.oidc_session_cookie_secure,
+            cookie_http_only=oidc_config.oidc_session_cookie_http_only,
+            cookie_same_site=oidc_config.oidc_session_cookie_same_site,
         )
 
         if oidc_config.oidc_session_absolute_timeout:
@@ -877,6 +893,11 @@ class OLApisixOIDCResources(ComponentResource):
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
             "use_pkce": oidc_config.oidc_use_pkce,
+            "set_userinfo_header": oidc_config.oidc_set_userinfo_header,
+            "set_access_token_header": oidc_config.oidc_set_access_token_header,
+            "set_id_token_header": oidc_config.oidc_set_id_token_header,
+            "set_raw_id_token_header": False,
+            "set_refresh_token_header": False,
             **session_config,
         }
 
@@ -1054,12 +1075,17 @@ def learn_session_oidc_config(  # noqa: PLR0913
     k8s_namespace: str,
     k8s_labels: dict[str, str],
     credentials: OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials,
+    set_access_token_header: bool = False,
+    set_id_token_header: bool = False,
 ) -> OLApisixOIDCConfig:
     """Return the OIDC config for a route group that shares MIT Learn's session.
 
     Everything that decides whether one participant accepts a cookie another
     wrote comes from ``session``; only the logout settings, which depend on
-    where the group is served, come from ``route_group``.
+    where the group is served, come from ``route_group``.  Which tokens reach
+    the upstream is per participant: the session stores all of them either
+    way, so forwarding a header to one group's upstream changes nothing for
+    another's.
 
     :param session: The shared MIT Learn session for this environment.
     :param route_group: Where this resource's routes are served.
@@ -1068,6 +1094,9 @@ def learn_session_oidc_config(  # noqa: PLR0913
     :param k8s_labels: Labels for the credential Secret.
     :param credentials: Where the plugin's client credentials come from.  Vault
         credentials have to name the shared client's path.
+    :param set_access_token_header: Forward X-Access-Token to this group's
+        upstream.
+    :param set_id_token_header: Forward X-ID-Token to this group's upstream.
     :returns: The config to hand to ``OLApisixOIDCResources``.
     :rtype: OLApisixOIDCConfig
     """
@@ -1096,6 +1125,8 @@ def learn_session_oidc_config(  # noqa: PLR0913
         oidc_session_cookie_domain=session.cookie_domain,
         oidc_session_cookie_name=session.cookie_name,
         oidc_use_session_secret=True,
+        oidc_set_access_token_header=set_access_token_header,
+        oidc_set_id_token_header=set_id_token_header,
     )
 
 

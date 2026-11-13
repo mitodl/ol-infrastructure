@@ -425,6 +425,23 @@ def test_deployed_routes_read_oidc_credentials_from_the_mitlearn_vault_client():
     assert prefixed.credentials == expected
 
 
+def test_both_route_groups_forward_the_id_token_and_not_the_access_token():
+    """ApisixRemoteUserOrgBackend reads auth_time from X-ID-Token to skip stale
+    org data.  Without the header nothing errors; reconcile_user_orgs just
+    loses that guard, so it is pinned here.
+    """
+    for config in (
+        definition.direct_oidc_config(_deployed_bindings()),
+        definition.prefixed_oidc_config(_deployed_bindings()),
+    ):
+        plugin = OLApisixOIDCResources(
+            f"header-contract-{config.application_name}", oidc_config=config
+        ).get_full_oidc_plugin_config(unauth_action="pass")["config"]
+        assert plugin["set_userinfo_header"] is True
+        assert plugin["set_id_token_header"] is True
+        assert plugin["set_access_token_header"] is False
+
+
 def test_local_routes_read_oidc_credentials_from_the_bound_secret():
     bindings = _local_bindings(oidc_secret_name=LOCAL_OIDC_SECRET)
 

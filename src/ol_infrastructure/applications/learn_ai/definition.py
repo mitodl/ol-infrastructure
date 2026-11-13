@@ -317,7 +317,10 @@ def direct_oidc_config(bindings: LearnAiBindings) -> OLApisixOIDCConfig:
     """
     return OLApisixOIDCConfig(
         application_name="learn-ai",
+        # learn-ai is the upstream the forwarded access token is kept for: the
+        # ol-memory exchange (ol_llm.memory.tokens) swaps it at Keycloak.
         oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
+        oidc_set_access_token_header=True,
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
         # The component default adds organization:*; this host's session is not
@@ -355,6 +358,7 @@ def prefixed_oidc_config(bindings: LearnAiBindings) -> OLApisixOIDCConfig:
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
         credentials=_oidc_credentials(bindings),
+        set_access_token_header=True,
     )
 
 

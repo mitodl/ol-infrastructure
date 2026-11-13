@@ -406,17 +406,47 @@ def test_session_cookie_name_and_domain_coexist():
     assert oidc.base_oidc_config["session"] == {
         "cookie_name": "mitlearn_apisix_session",
         "cookie_domain": ".learn.mit.edu",
-        "cookie_secure": True,
+        **EXPLICIT_COOKIE_ATTRIBUTES,
     }
 
 
-def test_session_cookie_is_secure_when_nothing_else_is_set():
-    """A caller that sets none of the session options still gets the Secure
-    flag, and nothing else, so lua-resty-session keeps its own defaults.
+EXPLICIT_COOKIE_ATTRIBUTES = {
+    "cookie_secure": True,
+    "cookie_http_only": True,
+    "cookie_same_site": "Lax",
+}
+
+
+def test_session_cookie_attributes_are_explicit_when_nothing_else_is_set():
+    """A caller that sets none of the session options still gets Secure,
+    HttpOnly and SameSite=Lax spelled out, and no timeouts, so lua-resty-session
+    keeps its own defaults for everything else.
     """
     oidc = oidc_resources("test-oidc-no-session-config")
 
-    assert oidc.base_oidc_config["session"] == {"cookie_secure": True}
+    assert oidc.base_oidc_config["session"] == EXPLICIT_COOKIE_ATTRIBUTES
+
+
+def test_session_cookie_http_only_and_same_site_can_be_changed():
+    oidc = oidc_resources(
+        "test-oidc-cookie-attributes",
+        oidc_session_cookie_http_only=False,
+        oidc_session_cookie_same_site="Strict",
+    )
+
+    session = oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"][
+        "session"
+    ]
+    assert session["cookie_http_only"] is False
+    assert session["cookie_same_site"] == "Strict"
+
+
+def test_session_cookie_same_site_rejects_values_lua_resty_session_does_not():
+    """The openid-connect schema enumerates SameSite; a lower-case or unknown
+    value would only fail when the ingress controller syncs the route.
+    """
+    with pytest.raises(ValidationError, match="oidc_session_cookie_same_site"):
+        oidc_config(oidc_session_cookie_same_site="lax")
 
 
 def test_session_cookie_secure_can_be_turned_off():
@@ -496,6 +526,34 @@ def test_access_token_leeway_reaches_the_plugin_config():
         config["access_token_expires_leeway"]
         == FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS
     )
+
+
+def test_only_x_userinfo_is_forwarded_by_default():
+    """The plugin's own defaults forward X-Access-Token and X-ID-Token too, so
+    every header flag is spelled out rather than left to them.
+    """
+    config = oidc_resources("test-oidc-header-defaults").get_full_oidc_plugin_config(
+        unauth_action="pass"
+    )["config"]
+
+    assert {key: value for key, value in config.items() if key.startswith("set_")} == {
+        "set_userinfo_header": True,
+        "set_access_token_header": False,
+        "set_id_token_header": False,
+        "set_raw_id_token_header": False,
+        "set_refresh_token_header": False,
+    }
+
+
+def test_tokens_are_forwarded_only_when_asked_for():
+    config = oidc_resources(
+        "test-oidc-header-opt-in",
+        oidc_set_access_token_header=True,
+        oidc_set_id_token_header=True,
+    ).get_full_oidc_plugin_config(unauth_action="pass")["config"]
+
+    assert config["set_access_token_header"] is True
+    assert config["set_id_token_header"] is True
 
 
 # ─── Session cookie naming ─────────────────────────────────────────────────────
@@ -2027,6 +2085,40 @@ def test_learn_session_writers_all_refresh_with_the_forwarded_token_leeway():
         config["access_token_expires_leeway"]
         == FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS
     )
+
+
+def test_learn_session_participants_choose_their_own_token_headers():
+    """The shared session stores every token either way; whether one reaches a
+    participant's upstream is that participant's choice alone.
+    """
+    session = LearnSession.for_host("production", "api.learn.mit.edu")
+    common = {
+        "k8s_namespace": "mitlearn",
+        "k8s_labels": {},
+        "credentials": OLApisixOIDCSecretCredentials(secret_name=LOCAL_SECRET_NAME),
+    }
+
+    plain = learn_session_oidc_config(
+        session, _learn_group(), application_name="plain", **common
+    )
+    with_tokens = learn_session_oidc_config(
+        session,
+        _learn_group(),
+        application_name="with-tokens",
+        set_access_token_header=True,
+        set_id_token_header=True,
+        **common,
+    )
+
+    assert (plain.oidc_set_access_token_header, plain.oidc_set_id_token_header) == (
+        False,
+        False,
+    )
+    assert (
+        with_tokens.oidc_set_access_token_header,
+        with_tokens.oidc_set_id_token_header,
+    ) == (True, True)
+    assert plain.oidc_session_contents == with_tokens.oidc_session_contents
 
 
 def test_learn_session_rejects_another_clients_vault_path():
