@@ -37,6 +37,28 @@ config:
     # 2026-11-12); Production logged ~420 ClusterGraphMissing calls for it
     # 2026-11-05..10 from witan-code's edit hook.
   - https://github.com/mitodl/ol-llm
+    # Added 2026-11-12 to widen the witan-code cross-repo bridge rather than by
+    # commit volume. smoot-design and course-search-utils publish @mitodl
+    # packages that mit-learn, learn-ai and ocw-hugo-themes already import;
+    # ocw-hugo-projects is the repo anchor ocw_studio declares (the deploy
+    # edge needs agent-kit #639); micromasters is deployed from
+    # applications/micromasters. The other six add graphs but no bridge edges
+    # yet: ol-keycloak and keycloak-scim are Java, which witan-code does not
+    # parse; ol-keycloakify's package is not @mitodl; and
+    # open-learning-ai-tutor, mitx-grading-library and django-aqueduct import
+    # outside the mitol.* namespace the package extractor reads. edx-platform
+    # is left out: at about 2.3 GB, its cold first parse risks the indexer's
+    # serial 3h deadline for the whole sweep.
+  - https://github.com/mitodl/micromasters
+  - https://github.com/mitodl/ocw-hugo-projects
+  - https://github.com/mitodl/smoot-design
+  - https://github.com/mitodl/course-search-utils
+  - https://github.com/mitodl/open-learning-ai-tutor
+  - https://github.com/mitodl/mitx-grading-library
+  - https://github.com/mitodl/django-aqueduct
+  - https://github.com/mitodl/ol-keycloak
+  - https://github.com/mitodl/ol-keycloakify
+  - https://github.com/mitodl/keycloak-scim
   # Turns actor-token sync on: the bootstrap Job and the hourly CronJob take
   # ownership of secret-operations/witan/actor-tokens, which Pulumi otherwise
   # writes directly. Safe only because the existing actor-tokens resource
@@ -92,8 +114,17 @@ config:
   # so the pod is scheduled where the memory exists. data_tier.py's
   # DEFAULT_SERVER_MEMORY_LIMIT has the upstream mechanism. Revisit when
   # omnigraph can cap its per-graph Lance caches.
-  omnigraph:server_memory_request: 2Gi
-  omnigraph:server_memory_limit: 4Gi
+  #
+  # Raised 2026-11-12 from 2Gi/4Gi alongside the ten graphs added to
+  # managed_repos above (19 to 29 graphs). Over the 7 days before, the working
+  # set peaked at 3,417 MiB against the 4Gi limit and the server was
+  # OOMKilled once, and each graph adds its own Lance session with caches
+  # omnigraph cannot shrink, plus a cold first index of all ten. The request
+  # follows the observed peak and the limit keeps the same ~2 GiB of headroom
+  # above it. QA peaked at 263 MiB of its 2Gi default, so only Production
+  # changes.
+  omnigraph:server_memory_request: 3Gi
+  omnigraph:server_memory_limit: 6Gi
   # The nightly window only optimizes here. 0.13's cleanup plans every object
   # under _versions/, 0.17 to 0.22s each (the 2026-10-20 backlog run's Job
   # logs), including the commit manifests it never removes. On 2026-10-21 the

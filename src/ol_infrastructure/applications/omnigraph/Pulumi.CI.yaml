@@ -42,6 +42,28 @@ config:
     # 2026-11-12); Production logged ~420 ClusterGraphMissing calls for it
     # 2026-11-05..10 from witan-code's edit hook.
   - https://github.com/mitodl/ol-llm
+    # Added 2026-11-12 to widen the witan-code cross-repo bridge rather than by
+    # commit volume. smoot-design and course-search-utils publish @mitodl
+    # packages that mit-learn, learn-ai and ocw-hugo-themes already import;
+    # ocw-hugo-projects is the repo anchor ocw_studio declares (the deploy
+    # edge needs agent-kit #639); micromasters is deployed from
+    # applications/micromasters. The other six add graphs but no bridge edges
+    # yet: ol-keycloak and keycloak-scim are Java, which witan-code does not
+    # parse; ol-keycloakify's package is not @mitodl; and
+    # open-learning-ai-tutor, mitx-grading-library and django-aqueduct import
+    # outside the mitol.* namespace the package extractor reads. edx-platform
+    # is left out: at about 2.3 GB, its cold first parse risks the indexer's
+    # serial 3h deadline for the whole sweep.
+  - https://github.com/mitodl/micromasters
+  - https://github.com/mitodl/ocw-hugo-projects
+  - https://github.com/mitodl/smoot-design
+  - https://github.com/mitodl/course-search-utils
+  - https://github.com/mitodl/open-learning-ai-tutor
+  - https://github.com/mitodl/mitx-grading-library
+  - https://github.com/mitodl/django-aqueduct
+  - https://github.com/mitodl/ol-keycloak
+  - https://github.com/mitodl/ol-keycloakify
+  - https://github.com/mitodl/keycloak-scim
   # Setting this is what turns actor-token sync on: the bootstrap Job and the
   # hourly CronJob take ownership of secret-operations/witan/actor-tokens,
   # which Pulumi otherwise writes directly. Safe to set only because the
