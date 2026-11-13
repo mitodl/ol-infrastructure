@@ -844,7 +844,7 @@ command.local.Command(
 # match, and a Vault-issued username ends in random characters.
 #
 # Who holds which active role today:
-#   readonly        Superset
+#   readonly        Superset; mitxonline's migrate_edx_data command (Production)
 #   app             ol-analytics-api; `ol-dbt starrocks` from a laptop defaults
 #                   to it too
 #   admin           Dagster: the lakehouse dbt build. Its REFRESH MATERIALIZED
