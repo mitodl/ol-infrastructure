@@ -145,6 +145,11 @@ raw_env_vars = {
     "NEXT_PUBLIC_CACHE_S_MAXAGE_SECONDS": nextjs_config.get("cache_s_maxage_seconds")
     or "",
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
+    # Optional: the educator page hides its "Share your story" panel when unset.
+    "NEXT_PUBLIC_EDUCATOR_SHARE_STORY_URL": nextjs_config.get(
+        "educator_share_story_url"
+    )
+    or "",
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
     "NEXT_PUBLIC_HUBSPOT_PORTAL_ID": hubspot_portal_id,
     "NEXT_PUBLIC_LEARN_AI_CSRF_COOKIE_NAME": f"learn_ai_{stack_info.env_suffix}_csrftoken".replace(  # noqa: E501
