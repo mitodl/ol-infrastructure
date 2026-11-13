@@ -120,7 +120,7 @@ config:
   keycloak_realm:ol-data-platform-starrocks-client-secret:
     secure: v1:90Gi8Rntqe/2GVS5:B7N1eNNNtVv+DS3S240LBpZE68RsIu+KWP1TJREZQi6ZLbeGc4VwtkWzgB6pVuFB
   keycloak_realm:session_secret:
-    secure: v1:9Y54vvxTRbuuDCro:dXlzvu2/QqxZyEA1iG/elwzgP3xAQSVChqh/c5bXsLmz3j6hDzBlgBzlp9pIbxVk/+1GhYKrIgsULgU=
+    secure: v1:+JqMlkawQwntvi8D:K9giI/ojhmcyN4+EMncxAZMN0qcdj2T6/mtIFGuqvzvpiAVD/m8IXQg3F9Noajb6g3Tt8BwuXMaqLRGYieLYpiAXqzrnJIi0Ghwv1AIn0TA=
   keycloak_realm:olapps_email_tmeme: ol-learn
   keycloak_realm:ol-mit-ovs-redirect-uris:
   - "https://video-rc.odl.mit.edu/auth/complete/keycloak/"

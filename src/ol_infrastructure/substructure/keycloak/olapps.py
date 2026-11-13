@@ -1,6 +1,7 @@
 """Keycloak realm definition for OL applications."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pulumi_keycloak as keycloak
@@ -57,7 +58,7 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     mailgun_email_username: str,
     mailgun_email_host: str,
     mit_touchstone_cert: str,
-    session_secret: str,
+    session_secret_for: Callable[[str], str],
     fetch_realm_public_key_partial,
 ):
     """Create the OL Apps realm and all of its resources."""
@@ -484,10 +485,6 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ),
             client_id=olapps_learn_ai_client.client_id,
             client_secret=olapps_learn_ai_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=olapps_learn_ai_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_learn_ai_client.realm_id.apply(
@@ -573,10 +570,7 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 ),
                 client_id=olapps_ol_analytics_api_client.client_id,
                 client_secret=olapps_ol_analytics_api_client.client_secret,
-                # This is included for the case where we are using traefik-forward-auth.
-                # It requires a random secret value to be present which is independent
-                # of the OAuth credentials.
-                secret=session_secret,
+                secret=session_secret_for("secret-operations/sso/ol-analytics-api"),
                 realm_id=olapps_ol_analytics_api_client.realm_id,
                 realm_name="olapps",
                 realm_public_key=olapps_ol_analytics_api_client.realm_id.apply(
@@ -675,10 +669,9 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 ),
                 client_id=olapps_mitlearn_client.client_id,
                 client_secret=olapps_mitlearn_client.client_secret,
-                # This is included for the case where we are using traefik-forward-auth.
-                # It requires a random secret value to be present which is independent
-                # of the OAuth credentials.
-                secret=session_secret,
+                # Encrypts the shared MIT Learn session (LearnSession.vault_path)
+                # and the other sessions whose gateways use this client.
+                secret=session_secret_for("secret-operations/sso/mitlearn"),
                 realm_id=olapps_mitlearn_client.realm_id,
                 realm_name="olapps",
                 realm_public_key=olapps_mitlearn_client.realm_id.apply(
@@ -776,10 +769,6 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ),
             client_id=olapps_open_discussions_client.client_id,
             client_secret=olapps_open_discussions_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=olapps_open_discussions_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_open_discussions_client.realm_id.apply(
@@ -815,10 +804,6 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ),
             client_id=olapps_mitxonline_client.client_id,
             client_secret=olapps_mitxonline_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=olapps_mitxonline_client.realm_id,
             realm_name="olapps",
             realm_public_key=olapps_mitxonline_client.realm_id.apply(
