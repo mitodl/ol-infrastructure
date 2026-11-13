@@ -26,19 +26,24 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
             # Dependency changes rebuild the image rather than running uv sync
             # in the pods: Celery doesn't reload, so running processes would
             # keep the old packages, and a restarted container loses the sync.
-            fall_back_on([APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock']),
-            sync(APP_DIR + '/main', '/src/main'),
-            sync(APP_DIR + '/content_sync', '/src/content_sync'),
-            sync(APP_DIR + '/websites', '/src/websites'),
-            sync(APP_DIR + '/users', '/src/users'),
-            sync(APP_DIR + '/videos', '/src/videos'),
-            sync(APP_DIR + '/gdrive_sync', '/src/gdrive_sync'),
-            sync(APP_DIR + '/news', '/src/news'),
-            sync(APP_DIR + '/localdev', '/src/localdev'),
-            sync(APP_DIR + '/external_resources', '/src/external_resources'),
-            sync(APP_DIR + '/ocw_import', '/src/ocw_import'),
-            sync(APP_DIR + '/templates', '/src/templates'),
+            fall_back_on([
+                APP_DIR + '/pyproject.toml',
+                APP_DIR + '/uv.lock',
+                APP_DIR + '/package.json',
+                APP_DIR + '/yarn.lock',
+                APP_DIR + '/static',
+                APP_DIR + '/webpack.config.prod.js',
+                APP_DIR + '/webpack.config.shared.js',
+                APP_DIR + '/webpack.config.dev.js',
+                APP_DIR + '/.yarnrc.yml',
+                APP_DIR + '/.yarn/releases',
+                APP_DIR + '/postcss.config.js',
+                APP_DIR + '/.swcrc',
+            ]),
+            sync(APP_DIR, '/src'),
         ],
+        # .claude/ holds agent worktrees. Syncing one into the pods restarts granian in a loop.
+        ignore=['.claude/', '.ruff_cache/', 'webpack-stats.json'],
     )
 
 # The extra course theme that MIT Learn serves at /courses/o. Studio publishes
