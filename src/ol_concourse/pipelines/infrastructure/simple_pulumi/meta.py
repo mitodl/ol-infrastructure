@@ -206,6 +206,7 @@ if __name__ == "__main__":
         "gravitino",
         "hindsight",
         "jupyterhub-data",
+        "label-studio",
         "mailgun",
         "marimo-data",
         "mongodb-atlas",
