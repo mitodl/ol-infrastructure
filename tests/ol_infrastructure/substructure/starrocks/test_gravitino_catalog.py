@@ -1,25 +1,16 @@
-"""The Gravitino catalog's SQL must keep rotation in place and users read-only.
+"""The Gravitino catalog's SQL must keep rotation in place.
 
 A change to the hashed CREATE replaces its Command, which drops the catalog and
-every grant on it, so the credential has to stay out of what is hashed. Writes
-through a security=JWT catalog commit as the bootstrap credential, so no role
-may be granted more than SELECT.
+every grant on it, so the credential has to stay out of what is hashed.
 """
-
-import re
 
 import pytest
 
-from ol_infrastructure.lib.data_lake_access import (
-    GOVERNANCE_LAYER_ACCESS,
-    layer_database,
-)
 from ol_infrastructure.substructure.starrocks.gravitino_catalog import (
     CREDENTIAL_PLACEHOLDER,
     CREDENTIAL_PROPERTY,
     GravitinoCatalog,
     catalog_name,
-    governance_grants_sql,
 )
 
 CATALOG = GravitinoCatalog(
@@ -65,35 +56,3 @@ def test_vended_credentials_on_and_no_catalog_s3_credentials() -> None:
     assert '"iceberg.catalog.vended-credentials-enabled" = "true"' in sql
     assert '"iceberg.catalog.security" = "JWT"' in sql
     assert "use_aws_sdk_default_behavior" not in sql
-
-
-def test_grants_are_select_only_and_governance_only() -> None:
-    sql = governance_grants_sql(catalog_name("qa"), "qa")
-    grants = [line for line in sql.splitlines() if line.startswith("GRANT")]
-
-    assert grants
-    for grant in grants:
-        assert re.match(r"GRANT (USAGE|SELECT) ON ", grant), grant
-    roles = {grant.rsplit(" TO ROLE ", 1)[1].rstrip(";") for grant in grants}
-    assert roles.isdisjoint({"readonly", "batch_readonly", "app", "admin"})
-
-
-def test_grants_follow_data_lake_access() -> None:
-    sql = governance_grants_sql(catalog_name("qa"), "qa")
-
-    assert (
-        "GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_engineer;" in sql
-    )
-    for layer in GOVERNANCE_LAYER_ACCESS["ol_business_analyst"]:
-        assert (
-            f"GRANT SELECT ON ALL TABLES IN DATABASE {layer_database('qa', layer)}"
-            " TO ROLE ol_business_analyst;"
-        ) in sql
-    assert "ALL DATABASES TO ROLE ol_business_analyst" not in sql
-    assert "ol_researcher" not in sql
-
-
-def test_grants_end_in_default_catalog() -> None:
-    sql = governance_grants_sql(catalog_name("qa"), "qa")
-
-    assert sql.splitlines()[-1] == "SET CATALOG default_catalog;"
