@@ -282,6 +282,7 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
         actor_tokens_file="/etc/omnigraph/tokens/tokens.json",
         apply_actor="svc-witan-admin",
         graph_removal_allowlist=["code-a"],
+        branch_drop_allowlist=["code-b", "code-bridge"],
         config_hash=pulumi.Output.from_input("abc123"),
         depends_on=[],
     )
@@ -303,6 +304,7 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
             "OMNIGRAPH_SERVER_BEARER_TOKENS_FILE": "/etc/omnigraph/tokens/tokens.json",
             "OMNIGRAPH_APPLY_ACTOR": "svc-witan-admin",
             "OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST": "code-a",
+            "OMNIGRAPH_BRANCH_DROP_ALLOWLIST": "code-b,code-bridge",
         }
         mounts = {m["name"]: m["mountPath"] for m in container["volumeMounts"]}
         assert mounts == {

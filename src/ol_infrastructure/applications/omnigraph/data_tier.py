@@ -54,6 +54,8 @@ import yaml
 from pulumi import Output, ResourceOptions
 
 from ol_infrastructure.applications.omnigraph.cluster_config import (
+    BRIDGE_SCHEMA_FILE,
+    CODE_SCHEMA_FILE,
     build_cluster_graphs,
     build_cluster_policies,
     require_withheld_graphs_removable,
@@ -593,6 +595,17 @@ def create_data_tier(  # noqa: PLR0913
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
     cluster_graphs = build_cluster_graphs(managed_repos, withheld_graphs)
+    # Graphs whose non-main branches are derived views (witan-code's per-writer
+    # branch indexes, which the next index rebuilds), so the boot may delete
+    # them when omnigraph refuses a schema change on a graph with branches.
+    # Derived from the declared graphs rather than configured, so a withheld
+    # graph never reaches the entrypoint, which refuses an id cluster.yaml does
+    # not declare. Never the council graph: its branches hold data.
+    branch_drop_graphs = sorted(
+        graph
+        for graph, spec in cluster_graphs.items()
+        if spec["schema"] in (CODE_SCHEMA_FILE, BRIDGE_SCHEMA_FILE)
+    )
     removable_graphs = validate_graph_removal_allowlist(
         [] if graph_removal_allowlist is None else graph_removal_allowlist,
         list(cluster_graphs),
@@ -710,6 +723,12 @@ def create_data_tier(  # noqa: PLR0913
     # deploy. The entrypoint applies instead, on every boot, under the lock it
     # has just taken over (lock_handoff.py). `plan_gate_job` below takes this
     # slot there.
+    #
+    # No OMNIGRAPH_BRANCH_DROP_ALLOWLIST here: only the entrypoint and the plan
+    # gate read it, and this Job runs `omnigraph` directly. Nor can it meet a
+    # 0.15 binary's branch refusal: 0.15 opens formats 14 and up, so
+    # validate_image_internal_schema refuses it against the pre-14 root this
+    # Job is limited to.
     cluster_apply_job = (
         None
         if migration_armed or persisted_lock
@@ -820,6 +839,7 @@ def create_data_tier(  # noqa: PLR0913
             actor_tokens_file=f"{ACTOR_TOKENS_MOUNT_PATH}/{ACTOR_TOKENS_FILENAME}",
             apply_actor=CLUSTER_APPLY_ACTOR,
             graph_removal_allowlist=removable_graphs,
+            branch_drop_allowlist=branch_drop_graphs,
             config_hash=cluster_apply_hash,
             depends_on=[
                 cluster_configmap,
@@ -848,6 +868,7 @@ def create_data_tier(  # noqa: PLR0913
             pod_selector=omnigraph_pod_selector,
             apply_actor=CLUSTER_APPLY_ACTOR,
             graph_removal_allowlist=removable_graphs,
+            branch_drop_allowlist=branch_drop_graphs,
         )
         if persisted_lock
         else None
