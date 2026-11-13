@@ -800,11 +800,6 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
             else {}
         ),
         **(
-            {"wasm": {"enabled": True, "plugins": config.wasm_plugins}}
-            if config.wasm_plugins
-            else {}
-        ),
-        **(
             _high_availability_values(config.high_availability)
             if config.high_availability is not None
             else {"autoscaling": {"enabled": False}, "replicaCount": 1}
@@ -858,6 +853,13 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
         "service": _gateway_service_values(config),
         # --- APISIX Configuration ---
         "apisix": {
+            # The chart renders the wasm block into config.yaml from
+            # apisix.wasm, not from a top-level wasm key.
+            **(
+                {"wasm": {"enabled": True, "plugins": config.wasm_plugins}}
+                if config.wasm_plugins
+                else {}
+            ),
             # Traditional mode with a YAML config provider: the Admin API is
             # backed by YAML storage, and the ingress controller pushes routes
             # through it rather than APISIX reading the YAML directly.
