@@ -120,3 +120,34 @@ def test_build_job_reads_the_checked_manifest(tmp_path: Path) -> None:
         assert f"--build-manifest ./{LEHRER_BUILD_MANIFEST_PATH} " in (
             job.model_dump_json()
         )
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param("", id="empty"),
+        pytest.param("- version: 1\n", id="list"),
+    ],
+)
+def test_manifest_that_is_not_a_mapping_fails(tmp_path: Path, content: str) -> None:
+    manifest = tmp_path / "build_manifest.yaml"
+    manifest.write_text(content)
+    with pytest.raises(BuildManifestMismatchError, match="not a mapping"):
+        check_build_manifest(manifest, TOPOLOGY)
+
+
+def test_manifest_without_cells_fails(tmp_path: Path) -> None:
+    manifest = tmp_path / "build_manifest.yaml"
+    manifest.write_text(yaml.safe_dump({"version": VERSION}))
+    with pytest.raises(BuildManifestMismatchError, match="no `cells` list"):
+        check_build_manifest(manifest, TOPOLOGY)
+
+
+@pytest.mark.parametrize("key", ["release", "deployment"])
+def test_cell_without_a_coordinate_fails(tmp_path: Path, key: str) -> None:
+    manifest = _manifest(tmp_path, TOPOLOGY)
+    document = yaml.safe_load(manifest.read_text())
+    del document["cells"][1][key]
+    manifest.write_text(yaml.safe_dump(document))
+    with pytest.raises(BuildManifestMismatchError, match=rf"cells\[1\] lacks {key}"):
+        check_build_manifest(manifest, TOPOLOGY)

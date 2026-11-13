@@ -45,10 +45,18 @@ def check_build_manifest(
 
     :param manifest_path: lehrer's ``build_manifest.yaml``.
     :param coordinates: ``(release, deployment)`` pairs the pipeline builds.
-    :raises BuildManifestMismatchError: on an unsupported or missing schema
-        version, or a coordinate with no cell.
+    :raises BuildManifestMismatchError: on a manifest that isn't a mapping, an
+        unsupported or missing schema version, a missing ``cells`` list or cell
+        coordinate, or a coordinate with no cell.
     """
     manifest = yaml.safe_load(manifest_path.read_text())
+    if not isinstance(manifest, dict):
+        msg = (
+            f"{manifest_path} is not a mapping (parsed as "
+            f"{type(manifest).__name__}); expected a build manifest with "
+            "`version` and `cells`."
+        )
+        raise BuildManifestMismatchError(msg)
     version = manifest.get("version")
     # bool is an int subclass and True == 1, so `version: true` would pass a
     # bare membership test.
@@ -62,7 +70,19 @@ def check_build_manifest(
             "once this reader handles the new schema."
         )
         raise BuildManifestMismatchError(msg)
-    cells = {(cell["release"], cell["deployment"]) for cell in manifest["cells"]}
+    manifest_cells = manifest.get("cells")
+    if not isinstance(manifest_cells, list):
+        msg = f"{manifest_path} has no `cells` list."
+        raise BuildManifestMismatchError(msg)
+    for index, cell in enumerate(manifest_cells):
+        if absent := [
+            key
+            for key in ("release", "deployment")
+            if not isinstance(cell, dict) or key not in cell
+        ]:
+            msg = f"{manifest_path} cells[{index}] lacks {' and '.join(absent)}."
+            raise BuildManifestMismatchError(msg)
+    cells = {(cell["release"], cell["deployment"]) for cell in manifest_cells}
     if missing := sorted(set(coordinates) - cells):
         msg = (
             f"{manifest_path} has no build cell for "
