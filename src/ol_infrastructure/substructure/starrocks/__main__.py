@@ -676,8 +676,8 @@ roles_setup_cmd = command.local.Command(
 # leaves the old one serving.
 #
 # Unlike the Glue catalogs' grants, these re-run whenever the catalog is
-# re-created (its hash is in their trigger), and they are additive: narrowing
-# data_lake_access does not revoke what was granted here.
+# re-created (its hash is in their trigger). Like them, they revoke what
+# lake_grants.py says a layer-scoped role may not hold.
 if gravitino_catalog_enabled:
     _gravitino = make_stack_reference(
         pulumi_projects.GRAVITINO_APP, stack_info.name

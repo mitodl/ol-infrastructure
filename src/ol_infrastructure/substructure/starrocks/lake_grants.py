@@ -108,13 +108,18 @@ def governance_grants_sql(catalog: str, env_suffix: str) -> str:
 
 
 def layer_scoped_revokes_sql(catalog: str, env_suffix: str) -> str:
-    """Render REVOKEs of every grant a layer-scoped role may not hold.
+    """Render REVOKEs of the grants a layer-scoped role may not hold.
 
     That is SELECT on all databases, which the Glue catalogs granted every
     governance role before they were scoped and which also covers every
     developer's dbt schemas; SELECT on each layer the mapping does not give the
     role; and USAGE on the catalog for a role given no layer. Most of these
     name a grant the role does not hold, so run them with ``revoke_step``.
+
+    Only roles and layers in today's mapping are covered. A role taken out of
+    ``GOVERNANCE_LAYER_ACCESS``, a layer taken out of ``DATA_LAKE_LAYERS``, or a
+    role moved there from ``CATALOG_WIDE_WRITE_ROLES`` (which also holds ALL and
+    db_admin) keeps what it held and needs a manual REVOKE.
 
     :param catalog: The StarRocks catalog name.
     :param env_suffix: The environment suffix of the lake the catalog reads,
