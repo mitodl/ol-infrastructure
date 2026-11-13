@@ -23,6 +23,12 @@ CREDENTIAL_PROPERTY = "iceberg.catalog.oauth2.credential"
 # Takes the credential's place in the SQL that is hashed into a Command trigger,
 # so rotating the secret changes neither the trigger nor what state records.
 CREDENTIAL_PLACEHOLDER = "<bootstrap credential>"
+# Iceberg's HTTPClient builds this catalog's TLS context from the named
+# TLSConfigurer (applications/starrocks files/CaFileTLSConfigurer.java), which
+# adds the CA file to the JVM's default CAs for this client alone, so the FE JVM
+# never has to trust the Gravitino CA.
+TLS_CONFIGURER_PROPERTY = "iceberg.catalog.rest.client.tls.configurer-impl"
+TLS_CA_FILE_PROPERTY = "iceberg.catalog.rest.client.tls.ca-file"
 
 
 def catalog_name(env_suffix: str) -> str:
@@ -67,6 +73,46 @@ class GravitinoCatalog(BaseModel):
     warehouse: str
     oauth2_server_uri: str
     aws_region: str
+    tls_configurer_impl: str
+    tls_ca_file: str
+
+    def _identity_properties(self, credential: str) -> dict[str, str]:
+        return {
+            "type": "iceberg",
+            "iceberg.catalog.type": "rest",
+            "iceberg.catalog.uri": self.uri,
+            "iceberg.catalog.warehouse": self.warehouse,
+            "iceberg.catalog.security": "JWT",
+            "iceberg.catalog.oauth2.server-uri": self.oauth2_server_uri,
+            "iceberg.catalog.oauth2.scope": "openid",
+            CREDENTIAL_PROPERTY: credential,
+        }
+
+    def _tls_properties(self) -> dict[str, str]:
+        return {
+            TLS_CONFIGURER_PROPERTY: self.tls_configurer_impl,
+            TLS_CA_FILE_PROPERTY: self.tls_ca_file,
+        }
+
+    def _create_statement(self, properties: Mapping[str, str]) -> str:
+        return (
+            f"CREATE EXTERNAL CATALOG IF NOT EXISTS {self.name}\n"
+            "COMMENT 'MIT OL Data Lake, with your own Gravitino access'\n"
+            f"PROPERTIES(\n{_properties_sql(properties)}\n);"
+        )
+
+    def create_trigger_sql(self) -> str:
+        """Render what the CREATE Command's trigger hashes.
+
+        That is the CREATE with the credential replaced by
+        ``CREDENTIAL_PLACEHOLDER`` and without the TLS properties. ALTER sets
+        both, so changing either must not replace the Command, which would drop
+        the catalog and every grant on it.
+
+        :returns: The statement, never executed.
+        :rtype: str
+        """
+        return self._create_statement(self._identity_properties(CREDENTIAL_PLACEHOLDER))
 
     def create_sql(self, credential: str) -> str:
         """Render the CREATE EXTERNAL CATALOG statement.
@@ -95,20 +141,8 @@ class GravitinoCatalog(BaseModel):
         :returns: The statement.
         :rtype: str
         """
-        properties = {
-            "type": "iceberg",
-            "iceberg.catalog.type": "rest",
-            "iceberg.catalog.uri": self.uri,
-            "iceberg.catalog.warehouse": self.warehouse,
-            "iceberg.catalog.security": "JWT",
-            "iceberg.catalog.oauth2.server-uri": self.oauth2_server_uri,
-            "iceberg.catalog.oauth2.scope": "openid",
-            CREDENTIAL_PROPERTY: credential,
-        }
-        return (
-            f"CREATE EXTERNAL CATALOG IF NOT EXISTS {self.name}\n"
-            "COMMENT 'MIT OL Data Lake, with your own Gravitino access'\n"
-            f"PROPERTIES(\n{_properties_sql(properties)}\n);"
+        return self._create_statement(
+            {**self._identity_properties(credential), **self._tls_properties()}
         )
 
     def alter_sql(self, credential: str) -> str:
@@ -138,5 +172,6 @@ class GravitinoCatalog(BaseModel):
             CREDENTIAL_PROPERTY: credential,
             "iceberg.catalog.vended-credentials-enabled": "true",
             "aws.s3.region": self.aws_region,
+            **self._tls_properties(),
         }
         return f"ALTER CATALOG {self.name} SET (\n{_properties_sql(properties)}\n);"
