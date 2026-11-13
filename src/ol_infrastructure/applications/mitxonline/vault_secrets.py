@@ -164,6 +164,8 @@ def vault_secrets(
                 "RECAPTCHA_SECRET_KEY": ("recaptcha", "secret-key"),
                 "RECAPTCHA_SITE_KEY": ("recaptcha", "site-key"),
                 "SECRET_KEY": ("django", "secret-key"),
+                # Rotating this makes every user look new to Sentry.
+                "SENTRY_USER_HASH_KEY": ("sentry", "user-hash-key"),
                 "STATUS_TOKEN": ("django", "status-token"),
                 "TRINO_CATALOG": Template("ol_data_lake_production"),
                 "TRINO_HOST": Template(
