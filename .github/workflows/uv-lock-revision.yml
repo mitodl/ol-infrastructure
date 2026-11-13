@@ -1,0 +1,79 @@
+---
+# Reference workflow asserting that `uv.lock` stays on the format revision the repository expects.
+#
+# Copy to .github/workflows/uv-lock-revision.yml and change only the lines marked ADAPT.
+# Contract: https://github.com/mitodl/ol-github-workflows/blob/main/docs/uv-lock-revision-contract.md
+# Source:   https://github.com/mitodl/ol-github-workflows/blob/main/workflow-templates/uv-lock-revision.yml
+#
+# uv writes a `revision` key into uv.lock identifying the lockfile format. Any command that
+# re-resolves -- `uv lock --upgrade`, `uv add`, and so a Renovate dependency bump -- rewrites that
+# key to whatever the running uv natively writes, in either direction: a newer uv raises it, an
+# older uv lowers it and drops fields. `uv lock --check` and `uv sync --locked` both pass either
+# way, because uv accepts a lockfile written by a different version, so nothing else catches it.
+#
+# The constraint cannot be expressed as a uv version range: uv has only ever changed the revision
+# mid-minor (0.6.10 -> 0.6.17, 0.8.0 -> 0.8.4, 0.12.21 -> 0.12.22), never at a minor boundary, so
+# any `<next-minor` bound permits exactly the change it is meant to prevent. Asserting the revision
+# tests the property directly, and fails on the pull request that moves it rather than in a later
+# image build.
+#
+# Moving to a new lockfile format is then a deliberate edit to EXPECTED_REVISION in the same pull
+# request as the lockfile change, which is the point.
+name: uv.lock revision
+on:
+  pull_request:
+  push:
+    branches: [main] # ADAPT: the repository's default branch
+permissions:
+  contents: read
+concurrency:
+  group: uv-lock-revision-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  uv-lock-revision:
+    name: uv.lock revision # the required-check context; keep it stable
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_REVISION: "5" # ADAPT: the `revision` every uv.lock in this repository is on
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+          # Kept in every repository, public or private. The autofix templates let private
+          # repositories drop this because autofix-ci/action runs `git fetch origin <sha>`,
+          # which needs the persisted token; this workflow only runs `git ls-files` against
+          # the checkout it already has, so persisting credentials would buy nothing.
+        persist-credentials: false
+    - name: Every uv.lock is on the expected revision
+      id: revision
+      run: |
+        set -euo pipefail
+        status=0
+        count=0
+        while IFS= read -r -d '' lock; do
+          count=$((count + 1))
+          if [ ! -f "$lock" ]; then
+            echo "::error file=$lock::tracked by git but missing from the checkout"
+            status=1
+            continue
+          fi
+          # Tolerate CRLF, trailing spaces and loose spacing around `=`: a mismatch
+          # the eye cannot see ("revision is 5, expected 5") is worse than no check.
+          actual="$(awk '/^revision[ \t]*=/ {
+            v = $0
+            sub(/^revision[ \t]*=[ \t]*/, "", v)
+            sub(/[^0-9].*$/, "", v)
+            print v
+            exit
+          }' "$lock" 2>/dev/null)"
+          if [ "$actual" != "$EXPECTED_REVISION" ]; then
+            echo "::error file=$lock::lockfile revision is ${actual:-absent}, expected ${EXPECTED_REVISION}. A uv that re-resolves (uv add, uv lock --upgrade) rewrites this; change EXPECTED_REVISION only when the new format is intended."
+            status=1
+          fi
+        done < <(git ls-files -z '*uv.lock')
+        if [ "$count" -eq 0 ]; then
+          echo "::error::no uv.lock found, so this workflow does not belong in this repository"
+          status=1
+        fi
+        echo "checked ${count} lockfile(s) against revision ${EXPECTED_REVISION}"
+        exit "$status"
