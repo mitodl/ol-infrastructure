@@ -1,5 +1,7 @@
 # ruff: noqa: E501
+import os
 import sys
+from pathlib import Path
 
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
@@ -31,12 +33,34 @@ from bridge.settings.openedx.types import (
 )
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.open_edx.edx_platform_v3.build_manifest import (
+    LEHRER_BUILD_MANIFEST_PATH,
+    check_build_manifest,
+)
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
 
-def build_edx_pipeline(release_names: list[str]) -> Pipeline:
+def build_edx_pipeline(release_names: list[str], build_manifest: Path) -> Pipeline:
+    """Build the edxapp image and deploy pipeline for ``release_names``.
+
+    :param release_names: Open edX releases to build.
+    :param build_manifest: lehrer's ``build_manifest.yaml``, checked before
+        anything is built so a schema or cell mismatch fails here, at
+        set-pipeline time, rather than in a build job.
+    :returns: The pipeline.
+    :rtype: Pipeline
+    :raises BuildManifestMismatchError: when the manifest can't serve it.
+    """
+    check_build_manifest(
+        build_manifest,
+        [
+            (release_name, deployment.deployment_name)
+            for release_name in release_names
+            for deployment in filter_deployments_by_release(release_name)
+        ],
+    )
     # This resource will be shared by all releases/deployment combinations
     lehrer_git_resource = git_repo(
         name=Identifier("lehrer"),
@@ -184,7 +208,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                                     THEME_DIR="../{theme_git_resource.name}"
                                     PYTHON_VERSION="{edx_platform.runtime_version}"
                                     NODE_VERSION="((.:node_version))"
-                                    DAGGER_LOG_LEVEL=debug dagger call platform build-platform --progress plain --deployment-name $DEPLOYMENT_NAME --release-name $RELEASE_NAME --build-manifest ./deployments/mit-ol/build_manifest.yaml --custom-settings ./deployments/mit-ol/settings --source $EDX_PLATFORM_DIR --theme-source $THEME_DIR --node-version $NODE_VERSION --python-version $PYTHON_VERSION export --path ../artifacts/image.tar;""",
+                                    DAGGER_LOG_LEVEL=debug dagger call platform build-platform --progress plain --deployment-name $DEPLOYMENT_NAME --release-name $RELEASE_NAME --build-manifest ./{LEHRER_BUILD_MANIFEST_PATH} --custom-settings ./deployments/mit-ol/settings --source $EDX_PLATFORM_DIR --theme-source $THEME_DIR --node-version $NODE_VERSION --python-version $PYTHON_VERSION export --path ../artifacts/image.tar;""",
                                 ],
                             ),
                         ),
@@ -283,8 +307,10 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
 
 if __name__ == "__main__":
     releases = [release_name.name for release_name in OpenEdxSupportedRelease]
+    # meta.py points this at the lehrer checkout it passes in. Run by hand,
+    # point it at a lehrer checkout of main, which is what the pipeline builds.
     pipeline_json = pipeline_json_with_user_data(
-        build_edx_pipeline(releases),
+        build_edx_pipeline(releases, Path(os.environ["LEHRER_BUILD_MANIFEST"])),
         user_data={
             "description": (
                 "Builds the edx-platform Docker image (edx-platform + theme, via "
