@@ -2,36 +2,17 @@
 
 from __future__ import annotations
 
-import importlib.machinery
-import importlib.util
-import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from ol_concourse.pipelines.infrastructure.promotion_gate_age.pipeline import (
     promotion_gate_age_pipeline,
 )
+from tests.bin.script_loader import load_script
 
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "bin" / "promotion-gate-age"
 NOW = datetime(2026, 8, 24, 14, 0, tzinfo=UTC)
 
 
-def load_module():
-    """Load the CLI directly; `bin/` is not a package and the file has no suffix."""
-    loader = importlib.machinery.SourceFileLoader(
-        "test_bin_promotion_gate_age", str(SCRIPT_PATH)
-    )
-    spec = importlib.util.spec_from_loader("test_bin_promotion_gate_age", loader)
-    if spec is None or spec.loader is None:
-        msg = f"Unable to load module from {SCRIPT_PATH}"
-        raise RuntimeError(msg)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-gate_age = load_module()
+gate_age = load_script("promotion-gate-age")
 
 
 def issue(

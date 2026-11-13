@@ -8,15 +8,11 @@ shape is pinned here.
 
 from __future__ import annotations
 
-import importlib.machinery
-import importlib.util
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "bin" / "gcp-external-grants"
+from tests.bin.script_loader import load_script
 
 SA_KEY = {
     "client_email": "probe@example.iam.gserviceaccount.com",
@@ -27,18 +23,7 @@ SA_KEY = {
 
 
 def load_module():
-    """Load the CLI directly; `bin/` is not a package and the file has no suffix."""
-    loader = importlib.machinery.SourceFileLoader(
-        "test_bin_gcp_external_grants", str(SCRIPT_PATH)
-    )
-    spec = importlib.util.spec_from_loader("test_bin_gcp_external_grants", loader)
-    if spec is None or spec.loader is None:
-        msg = f"Unable to load module from {SCRIPT_PATH}"
-        raise RuntimeError(msg)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return load_script("gcp-external-grants")
 
 
 @pytest.fixture(scope="module")

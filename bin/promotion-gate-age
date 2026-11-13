@@ -143,7 +143,7 @@ def slack_text(stale: list[Gate], now: datetime, max_age: timedelta) -> str | No
     lines = [
         f"*{len(unheld)} Pulumi promotion gate(s) open longer than "
         f"{format_age(max_age)}.* Production deploys only when the gate is "
-        "closed, so each of these stacks is running older code than QA.",
+        "closed, so each of these stacks has a change Production has not taken.",
     ]
     lines.extend(
         f"• <{gate.url}|#{gate.number}> {gate_name(gate.title)}, "
