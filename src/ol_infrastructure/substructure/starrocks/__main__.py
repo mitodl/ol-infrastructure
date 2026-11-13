@@ -853,14 +853,14 @@ command.local.Command(
 # match, and a Vault-issued username ends in random characters.
 #
 # Who holds which active role today:
-#   readonly        Superset; OpenMetadata and the mit-learn warehouse pull until
-#                   they move to batch_readonly
+#   readonly        Superset; mitxonline's migrate_edx_data command (Production)
 #   app             ol-analytics-api; `ol-dbt starrocks` from a laptop defaults
 #                   to it too
 #   admin           Dagster: the lakehouse dbt build. Its REFRESH MATERIALIZED
 #                   VIEW does not land here: an MV task run sets its session
 #                   resource_group to the MV's property, else default_mv_wg.
-#   batch_readonly  nothing yet
+#   batch_readonly  OpenMetadata's ingestion jobs and the mit-learn warehouse
+#                   pull
 #   governance      OIDC-authenticated people, from the file group provider
 #
 # Interactive takes only SELECTs, so a write from any of those principals falls

@@ -42,11 +42,12 @@ path "secret-openmetadata/data/profiler-bot" {
   capabilities = ["read"]
 }
 # Read-only StarRocks credentials for the StarRocks ingestion jobs. Only QA
-# and Production create the secret that reads this path.
-path "database-starrocks/creds/readonly" {
+# and Production create the secret that reads this path. batch_readonly holds
+# readonly's grants and puts the jobs' queries in the batch resource group.
+path "database-starrocks/creds/batch_readonly" {
   capabilities = ["read"]
 }
-path "database-starrocks/creds/readonly/*" {
+path "database-starrocks/creds/batch_readonly/*" {
   capabilities = ["read"]
 }
 # vault-secrets-operator is a little more particular about
@@ -56,12 +57,12 @@ path "database-starrocks/creds/readonly/*" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/readonly/*"]
+    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/batch_readonly/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/readonly/*"]
+    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/batch_readonly/*"]
   }
 }

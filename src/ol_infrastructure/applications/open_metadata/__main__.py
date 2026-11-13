@@ -589,7 +589,7 @@ if stack_info.name != "CI":
             dest_secret_name="om-connector-starrocks",  # noqa: S106  # pragma: allowlist secret
             labels=k8s_global_labels,
             mount="database-starrocks",
-            path="creds/readonly",
+            path="creds/batch_readonly",
             templates={
                 "OM_STARROCKS_USERNAME": '{{ get .Secrets "username" }}',
                 "OM_STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',

@@ -68,17 +68,18 @@ path "secret-mitlearn/*" {
 }
 
 # Read-only StarRocks credentials for the warehouse-pull catalog ETL
-# (learning_resources.lib.warehouse). The `readonly` role holds SELECT on the
-# Iceberg catalog, which is what the integrations__learn__* views live in.
+# (learning_resources.lib.warehouse). The `batch_readonly` role holds readonly's
+# SELECT on the Iceberg catalog, which is what the integrations__learn__* views
+# live in, and puts the pull's queries in the batch resource group.
 #
 # Granted in every environment, including those not yet reading it: a policy
 # path pointing at a mount that does not exist, or that nothing reads, grants
 # no access on its own. Which stacks actually mint these credentials is decided
 # by STARROCKS_HOST in __main__.py, not here.
-path "database-starrocks/creds/readonly" {
+path "database-starrocks/creds/batch_readonly" {
   capabilities = ["read"]
 }
-path "database-starrocks/creds/readonly/*" {
+path "database-starrocks/creds/batch_readonly/*" {
   capabilities = ["read"]
 }
 
@@ -93,12 +94,12 @@ path "secret-xpro/hubspot" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitlearn/creds/app/*", "database-starrocks/creds/readonly/*"]
+    lease_id = ["postgres-mitlearn/creds/app/*", "database-starrocks/creds/batch_readonly/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-mitlearn/creds/app/*", "database-starrocks/creds/readonly/*"]
+    lease_id = ["postgres-mitlearn/creds/app/*", "database-starrocks/creds/batch_readonly/*"]
   }
 }
