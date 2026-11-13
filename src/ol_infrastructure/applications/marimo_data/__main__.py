@@ -17,33 +17,46 @@ their own ``ApisixRoute`` resources that reference the shared OIDC config
 (``marimo_oidc``) and shared plugin config (``marimo_shared_plugins``) from
 this stack.
 
-Published apps have no user session, so the interactive Galaxy OAuth2 flow the
-JupyterHub templates use is unavailable to them -- there is nobody to click a
-login link.  They therefore need a non-interactive warehouse credential.
+Published apps query the warehouse as the viewer; there is no shared warehouse
+credential.  The openid-connect plugin logs the viewer in through
+``ol-marimo-app-client`` and forwards their access token upstream in
+``X-Access-Token`` (the plugin's default), refreshing it from the session's
+refresh token once it is within ``oidc_access_token_expires_leeway`` of expiry.
+marimo gives notebook code the headers of the request behind each kernel command
+through ``mo.app_meta().request``: the WebSocket upgrade when the page loads, then
+the POST behind each UI interaction.  Notebook code logs in to StarRocks with
+that token (``authentication_openid_connect_client`` to the
+``fe_mysql_internal_host`` output of ``applications/starrocks``, port 9030), and
+StarRocks forwards it to Gravitino for the governed lake catalog.  The client
+plugin refuses to send a token without TLS, which the CI FE doesn't have, and
+the FE certificate is for the ``fe_tls_server_name`` output, not the Service
+name.
 
-``ol-marimo-app-client`` is NOT that credential.  It is a Keycloak
-service-account client, and the client-credentials flow returns a
-Keycloak-issued JWT.  Starburst Galaxy does not accept externally-issued JWTs;
-customer-JWKS JWT auth is a Starburst Enterprise feature.  Galaxy accepts a
-Galaxy username/password over HTTP Basic, or its own OAuth2 flow.  Pointing a
-published app's Trino client at these credentials produces the same
-``401 Authentication required`` the JupyterHub template hit before #5700.
+So a per-notebook route has to leave ``X-Access-Token`` in place while it strips
+the other identity headers and ``Cookie``.  Notebook code should read the token
+in the cell that queries and connect there.  A connection opened at page load
+keeps that token after it expires, which StarRocks only checks at login but
+Gravitino checks on every catalog call.  A module-level cache is shared by every
+viewer of the app, because marimo runs each session as a thread in one process.
 
-What is needed is a GALAXY service account, in the shape OpenMetadata already
-uses -- ``login_email``/``password`` synced from Vault, see
-``applications/open_metadata/__main__.py`` and ``OM_TRINO_USERNAME`` /
-``OM_TRINO_PASSWORD``.  That account does not exist yet, and nothing consumes
-the secret below, so nothing is broken today; it breaks the moment someone
-publishes a notebook that queries the warehouse.
+Author code in an app can read each viewer's access token, and with it use all
+of that viewer's StarRocks and Gravitino grants, writes included, until it
+expires (``ol-marimo-app-client`` issues 1h tokens).  A StarRocks connection
+it opens before then keeps the viewer's Glue-catalog grants for as long as the
+connection stays open, since StarRocks checks the token only at login.  That
+is the cost of querying as the viewer.  Published pods run as the
+``marimo-published`` ServiceAccount below, which has no IRSA role and no token.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.
 """
 
+import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, ResourceOptions
 
 from ol_infrastructure.components.services.apisix import (
+    FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixOIDCVaultCredentials,
@@ -57,8 +70,6 @@ from ol_infrastructure.components.services.cert_manager import (
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
-    OLVaultK8SSecret,
-    OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
@@ -103,18 +114,10 @@ application_labels = k8s_global_labels | {
 
 apps_domain = marimo_data_config.require("apps_domain")
 
-# Vault policy for the marimo namespace.  sso/marimo holds the ol-marimo-client
-# credentials that ol-apisix-marimo-data-oidc-secrets syncs for the gated
-# routes.  sso/marimo-app holds the ol-marimo-app-client service-account
-# credentials, which are Keycloak credentials and are not usable against
-# Galaxy -- see the module docstring.
+# Vault policy for the marimo namespace.  sso/marimo-app holds the
+# ol-marimo-app-client credentials that ol-apisix-marimo-data-oidc-secrets syncs
+# for the gated routes.
 marimo_vault_policy_hcl = """
-path "secret-operations/data/sso/marimo" {
-  capabilities = ["read"]
-}
-path "secret-operations/sso/marimo" {
-  capabilities = ["read"]
-}
 path "secret-operations/data/sso/marimo-app" {
   capabilities = ["read"]
 }
@@ -136,7 +139,7 @@ marimo_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
     # Only the VSO ServiceAccount OLVaultK8SResources creates. Published
     # notebooks run author code in this namespace, and with "*" any pod that
     # mounts a ServiceAccount token could log in and read the OIDC client
-    # secret above.
+    # secret.
     bound_service_account_names=["marimo-data-vault"],
     bound_service_account_namespaces=[marimo_namespace],
     token_policies=[marimo_vault_policy.name],
@@ -157,49 +160,38 @@ marimo_vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-# VaultStaticSecret: syncs ol-marimo-app-client credentials for published apps.
-# Nothing mounts this secret yet.  It is not a warehouse credential; a Galaxy
-# service account is still required for that.
-marimo_app_trino_secret = OLVaultK8SSecret(
-    f"marimo-app-trino-secret-{stack_info.env_suffix}",
-    resource_config=OLVaultK8SStaticSecretConfig(
-        dest_secret_labels=k8s_global_labels,
-        dest_secret_name="marimo-app-oidc-secret",  # pragma: allowlist secret  # noqa: S106
-        exclude_raw=True,
-        excludes=[".*"],
-        includes=["client_id", "client_secret"],
-        labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        name="marimo-app-oidc-secret",
+# The identity published notebook pods run as.  It has no IRSA annotation, and
+# no token is mounted, so author code gets no AWS or Kubernetes API access
+# from it.  Never reuse the hub's IRSA ServiceAccount here.
+marimo_published_service_account = kubernetes.core.v1.ServiceAccount(
+    f"marimo-published-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="marimo-published",
         namespace=marimo_namespace,
-        path="sso/marimo-app",
-        refresh_after="1h",
-        templates={
-            "MARIMO_APP_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "MARIMO_APP_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',  # pragma: allowlist secret  # noqa: E501
-        },
-        vaultauth=marimo_vault_k8s_resources.auth_name,
+        labels=application_labels,
     ),
-    opts=ResourceOptions(depends_on=[marimo_vault_k8s_resources]),
+    automount_service_account_token=False,
 )
 
 # APISIX OIDC resources for the published-apps gateway (apps_domain).
 # Published apps require authentication; all authenticated ol-data-platform
-# realm users can view any published app (per v1 scope decision).
+# realm users can view any published app (per v1 scope decision).  What each
+# viewer can see in one is their own StarRocks and Gravitino grants.
 marimo_oidc = OLApisixOIDCResources(
     f"ol-k8s-apisix-marimo-data-olapisixoidcresources-{stack_info.env_suffix}",
     oidc_config=OLApisixOIDCConfig(
         application_name="marimo-data",
         k8s_labels=application_labels,
         k8s_namespace=marimo_namespace,
+        # Apps log in to StarRocks with the forwarded token.
+        oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
         oidc_logout_path="/logout/oidc",
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         credentials=OLApisixOIDCVaultCredentials(
             mount="secret-operations",
-            path="sso/marimo",
+            path="sso/marimo-app",
             vaultauth=marimo_vault_k8s_resources.auth_name,
         ),
     ),
@@ -247,6 +239,8 @@ marimo_shared_plugins = OLApisixSharedPlugins(
 # The marimo-operator creates a per-MarimoNotebook ClusterIP Service named
 # after each notebook (e.g. Service/my-notebook in the marimo namespace).
 # Each published notebook therefore needs its own OLApisixRoute pointing at
-# its individual Service, using marimo_oidc.get_full_oidc_plugin_config() and
-# marimo_shared_plugins.resource_name.  Those routes are out-of-band from
-# this stack and should be managed alongside the MarimoNotebook manifests.
+# its individual Service, using marimo_oidc.get_full_oidc_plugin_config() with
+# set_id_token_header and set_userinfo_header set to False (OLApisixOIDCResources
+# leaves both at the plugin's true default), and
+# marimo_shared_plugins.resource_name.  Those routes are out-of-band from this
+# stack and should be managed alongside the MarimoNotebook manifests.
