@@ -81,6 +81,7 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
         pod_selector={"app.kubernetes.io/name": "omnigraph-server"},
         apply_actor="svc-witan-admin",
         graph_removal_allowlist=["code-a", "code-b"],
+        branch_drop_allowlist=["code-c"],
     )
 
     def check(_: object) -> None:
@@ -134,6 +135,7 @@ def test_the_env_is_what_the_entrypoint_reads() -> None:
         pod_selector={"app.kubernetes.io/name": "omnigraph-server"},
         apply_actor="svc-witan-admin",
         graph_removal_allowlist=[],
+        branch_drop_allowlist=["code-a", "code-bridge"],
     )
 
     assert [e.name for e in handoff.env] == [
@@ -142,11 +144,13 @@ def test_the_env_is_what_the_entrypoint_reads() -> None:
         "POD_NAME",
         "OMNIGRAPH_APPLY_ACTOR",
         "OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST",
+        "OMNIGRAPH_BRANCH_DROP_ALLOWLIST",
     ]
     values = {e.name: e.value for e in handoff.env}
     assert values["OMNIGRAPH_UNLOCK_LEASE"] == "omnigraph-unlock"
     assert values["OMNIGRAPH_POD_SELECTOR"] == "app.kubernetes.io/name=omnigraph-server"
     assert values["OMNIGRAPH_APPLY_ACTOR"] == "svc-witan-admin"
     assert values["OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST"] == ""
+    assert values["OMNIGRAPH_BRANCH_DROP_ALLOWLIST"] == "code-a,code-bridge"
     pod_name = next(e for e in handoff.env if e.name == "POD_NAME")
     assert pod_name.value_from.field_ref.field_path == "metadata.name"

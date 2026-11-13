@@ -97,19 +97,31 @@ def pod_selector_env(pod_selector: dict[str, str]) -> str:
 
 
 def plan_env(
-    apply_actor: str, graph_removal_allowlist: list[str]
+    apply_actor: str,
+    graph_removal_allowlist: list[str],
+    branch_drop_allowlist: list[str],
 ) -> list[kubernetes.core.v1.EnvVarArgs]:
     """Env for the image's plan check, shared by the entrypoint and the gate.
 
     :param apply_actor: passed as ``--as`` to plan and apply. Required whenever
         policy bundles are in the image.
     :param graph_removal_allowlist: graph ids the plan may delete.
+    :param branch_drop_allowlist: graph ids whose non-main branches the boot
+        may delete so a schema change can apply (omnigraph 0.15 applies one
+        only to a graph whose sole branch is ``main``). The gate passes that
+        refusal for these graphs, since the boot clears it. The entrypoint
+        refuses an id that does not start with ``code-`` or that
+        ``cluster.yaml`` does not declare.
     """
     return [
         kubernetes.core.v1.EnvVarArgs(name="OMNIGRAPH_APPLY_ACTOR", value=apply_actor),
         kubernetes.core.v1.EnvVarArgs(
             name="OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST",
             value=",".join(graph_removal_allowlist),
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="OMNIGRAPH_BRANCH_DROP_ALLOWLIST",
+            value=",".join(branch_drop_allowlist),
         ),
     ]
 
@@ -130,6 +142,7 @@ def create_lock_handoff(  # noqa: PLR0913
     pod_selector: dict[str, str],
     apply_actor: str,
     graph_removal_allowlist: list[str],
+    branch_drop_allowlist: list[str],
 ) -> OmnigraphLockHandoff:
     """Provision the unlock Lease and the server's access to it and to its pods.
 
@@ -139,6 +152,8 @@ def create_lock_handoff(  # noqa: PLR0913
     :param apply_actor: passed as ``--as`` to the entrypoint's plan and apply.
         Required whenever policy bundles are in the image.
     :param graph_removal_allowlist: graph ids the entrypoint may delete.
+    :param branch_drop_allowlist: graph ids whose branch views the entrypoint
+        may delete before a schema apply. See ``plan_env``.
     """
     # PRE-CREATED, WITH NO HOLDER. RBAC cannot restrict `create` by resource
     # name, so letting the pod create its own Lease would mean granting create
@@ -211,7 +226,7 @@ def create_lock_handoff(  # noqa: PLR0913
                 )
             ),
         ),
-        *plan_env(apply_actor, graph_removal_allowlist),
+        *plan_env(apply_actor, graph_removal_allowlist, branch_drop_allowlist),
     ]
     return OmnigraphLockHandoff(lease=lease, role_binding=role_binding, env=env)
 
@@ -229,6 +244,7 @@ def create_plan_gate(  # noqa: PLR0913
     actor_tokens_file: str,
     apply_actor: str,
     graph_removal_allowlist: list[str],
+    branch_drop_allowlist: list[str],
     config_hash: Output[str],
     depends_on: list[Resource],
 ) -> kubernetes.batch.v1.Job:
@@ -251,6 +267,8 @@ def create_plan_gate(  # noqa: PLR0913
     :param actor_tokens_file: path of the actor-token map inside the mounted
         Secret. Group membership is rendered from it before planning, as on
         boot, so the plan is for the bundles the server would apply.
+    :param branch_drop_allowlist: has to be the value the entrypoint gets,
+        or the gate passes a refusal the boot then keeps. See ``plan_env``.
     :param config_hash: of ``cluster.yaml`` and the image. A Job's pod template
         is immutable, so a new hash replaces the Job, which is what makes it
         run again.
@@ -298,7 +316,11 @@ def create_plan_gate(  # noqa: PLR0913
                                     name="OMNIGRAPH_SERVER_BEARER_TOKENS_FILE",
                                     value=actor_tokens_file,
                                 ),
-                                *plan_env(apply_actor, graph_removal_allowlist),
+                                *plan_env(
+                                    apply_actor,
+                                    graph_removal_allowlist,
+                                    branch_drop_allowlist,
+                                ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "100m", "memory": "256Mi"},

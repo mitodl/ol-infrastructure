@@ -77,6 +77,7 @@ def _build(  # noqa: PLR0913
     image_min_format: int | None = None,
     migration_armed: bool = False,
     boot_budget_seconds: int | None = None,
+    withheld_graphs: list[str] | None = None,
     deployed_marks: dict[str, float] | None = None,
     deployed_witan_http_api_contracts: list[str] | None = None,
     memory: dict[str, str] | None = None,
@@ -114,6 +115,8 @@ def _build(  # noqa: PLR0913
         suspend_maintenance=migration_armed,
         migration_armed=migration_armed,
         boot_budget_seconds=boot_budget_seconds,
+        graph_removal_allowlist=withheld_graphs,
+        withheld_graphs=withheld_graphs,
         deployed_written_internal_schema=deployed_marks,
         storage_restored_to_format=None,
         deployed_witan_http_api_contracts=deployed_witan_http_api_contracts,
@@ -360,6 +363,43 @@ def test_a_boot_budget_lengthens_the_probe_and_both_rollout_waits(monkeypatch):
         }
 
     return tier.deployment.urn.apply(check)
+
+
+@pytest.mark.parametrize(
+    ("withheld_graphs", "expected"),
+    [
+        (None, "code-bridge,code-github-com-mitodl-ol-django"),
+        # The entrypoint refuses an id cluster.yaml does not declare, so a
+        # withheld graph in the list would refuse every boot.
+        (["code-github-com-mitodl-ol-django"], "code-bridge"),
+    ],
+)
+@pulumi.runtime.test
+def test_the_gate_and_the_boot_may_drop_views_on_the_declared_code_graphs(
+    monkeypatch, withheld_graphs, expected
+):
+    """Never council, whose branches hold data. A gate with a different list
+    than the boot would pass a refusal the boot then keeps, or the reverse.
+    """
+    mocks, tier = _build(
+        monkeypatch,
+        served_format=14,
+        image_format=14,
+        withheld_graphs=withheld_graphs,
+    )
+
+    def check(_: object) -> None:
+        (gate,) = mocks.of_type(JOB)
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        for pod_spec in (
+            gate["spec"]["template"]["spec"],
+            deployment["spec"]["template"]["spec"],
+        ):
+            (container,) = pod_spec["containers"]
+            env = {e["name"]: e.get("value") for e in container["env"]}
+            assert env["OMNIGRAPH_BRANCH_DROP_ALLOWLIST"] == expected
+
+    return pulumi.Output.all(tier.deployment.urn, tier.plan_gate_job.urn).apply(check)
 
 
 @pytest.mark.parametrize(
