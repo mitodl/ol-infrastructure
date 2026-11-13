@@ -174,8 +174,8 @@ def create_ci_indexer(  # noqa: PLR0913
         # The data tier, addressed directly. `code_server` being set is what
         # selects the `--server <url> --graph <id>` path in
         # `witan_code.store.store_for_repo`; the graph id per repo is derived
-        # client-side by `witan_code.config.graph_id`, which the omnigraph
-        # stack's `code_graph_id` mirrors when it declares those graphs.
+        # client-side by `witan_core.graph_ids.code_graph_id`, the function the
+        # omnigraph stack imports to declare those graphs.
         kubernetes.core.v1.EnvVarArgs(
             name="WITAN_CODE_SERVER", value=omnigraph_server_addr
         ),

@@ -1203,8 +1203,8 @@ Do not do this on a root a server is serving or has served. That handoff
 belongs to the server's entrypoint.
 
 **A `code-<repo>` graph is missing after the rebuild.** Its id is derived by
-`code_graph_id()` in `data_tier.py`, mirroring `witan_code.config.graph_id` in
-agent-kit. Enumerating from `managed_repos` instead of from the live cluster.yaml
+`code_graph_id()`, which `cluster_config.py` imports from agent-kit's
+`witan_core.graph_ids`. Enumerating from `managed_repos` instead of from the live cluster.yaml
 will drop any repo whose normalization you got wrong. Re-check against the
 ConfigMap listing in *What gets rebuilt*.
 

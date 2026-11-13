@@ -4,16 +4,13 @@
 Split out of ``data_tier.py`` so it can be imported without pulling in
 ``pulumi_aws`` and the EKS/S3 components, which need AWS credentials and a
 region at import time. That makes this module unit-testable in CI, which
-matters more here than it looks: ``code_graph_id`` is a byte-for-byte shared
-contract with agent-kit's client-side ``witan_code.config.graph_id``, and
-``build_cluster_policies`` decides which Cedar bundle governs which graph — a
-graph that ends up in no bundle is not "open", it is default-deny, and it
-fails every write with an error pointing at policy rather than at the missing
-wiring. ``storage.py`` exists for the same reason.
+matters more here than it looks: ``build_cluster_policies`` decides which Cedar
+bundle governs which graph — a graph that ends up in no bundle is not "open",
+it is default-deny, and it fails every write with an error pointing at policy
+rather than at the missing wiring. ``storage.py`` exists for the same reason.
 """
 
-import hashlib
-import re
+from witan_core.graph_ids import BRIDGE_GRAPH_ID, code_graph_id
 
 # ── Cluster graph ids ────────────────────────────────────────────────────────
 #
@@ -24,10 +21,13 @@ import re
 # mcp/servers/witan/witan/config.py) — a cluster that declares anything else
 # serves a graph no client addresses.
 COUNCIL_GRAPH_ID = "council"
-# Layer 2.5 cross-repo bridge, the deployed analogue of witan-code's local
-# `_bridge.omni` store. Fixed id, not derived from any repo.
-BRIDGE_GRAPH_ID = "code-bridge"
-CODE_GRAPH_PREFIX = "code-"
+# The code graph ids (`code-<repo>`, plus the fixed `code-bridge`) come from
+# witan-core, the same function witan-code calls to pick its `--graph`. The two
+# sides used to keep byte-for-byte copies of it; importing it is what keeps a
+# client from addressing a graph this stack never declared. A witan-core bump
+# that changed these ids would rename deployed graphs out from under their
+# data; test_cluster_policies.py's expected `code-github-com-...` ids fail
+# first.
 
 # Schema filenames, all three baked into the omnigraph-server image at
 # CLUSTER_CONFIG_DIR by the image build (agent-kit
@@ -47,38 +47,6 @@ MEMORY_POLICY_FILE = "memory.policy.yaml"
 CODE_POLICY_FILE = "code-graph.policy.yaml"
 BRIDGE_POLICY_FILE = "bridge.policy.yaml"
 SERVER_POLICY_FILE = "server.policy.yaml"
-
-_GRAPH_ID_MAX_LEN = 64
-
-
-def code_graph_id(repo: str) -> str:
-    """Canonical cluster graph id for ``repo``'s code graph.
-
-    e.g. ``https://github.com/mitodl/ol-django`` ->
-    ``code-github-com-mitodl-ol-django``.
-
-    SHARED CONTRACT — this is a mirror of ``witan_code.config.graph_id``
-    (agent-kit, mcp/servers/witan-code/witan_code/config.py), which is what
-    selects the ``--graph`` id on the *client* side. This function declares the
-    graph the cluster creates. They MUST agree byte-for-byte or a client will
-    address a graph that was never created. Any change has to land in lockstep
-    on both sides — see agent-kit task
-    tk-code-graph-deployment-topology-shared-per-repo-c-cac400.
-
-    Strips the URI scheme, collapses every run of non-alphanumerics to ``-``,
-    lowercases, and prefixes ``code-``. omnigraph graph ids must match
-    ``^[a-zA-Z0-9-]{1,64}$`` (note: no underscores), so ids that would exceed
-    64 characters are truncated and disambiguated with a hash of the full repo
-    URI, keeping distinct long repos from colliding.
-    """
-    body = re.sub(r"(?i)^[a-z][a-z0-9+.-]*://", "", repo)  # strip scheme
-    body = re.sub(r"[^a-zA-Z0-9]+", "-", body).strip("-").lower()
-    candidate = f"{CODE_GRAPH_PREFIX}{body}"
-    if len(candidate) <= _GRAPH_ID_MAX_LEN:
-        return candidate
-    digest = hashlib.sha256(repo.encode()).hexdigest()[:8]
-    keep = _GRAPH_ID_MAX_LEN - len(CODE_GRAPH_PREFIX) - len(digest) - 1
-    return f"{CODE_GRAPH_PREFIX}{body[:keep].strip('-')}-{digest}"
 
 
 def build_cluster_graphs(
