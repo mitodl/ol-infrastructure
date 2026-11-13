@@ -723,6 +723,12 @@ def create_data_tier(  # noqa: PLR0913
     # deploy. The entrypoint applies instead, on every boot, under the lock it
     # has just taken over (lock_handoff.py). `plan_gate_job` below takes this
     # slot there.
+    #
+    # No OMNIGRAPH_BRANCH_DROP_ALLOWLIST here: only the entrypoint and the plan
+    # gate read it, and this Job runs `omnigraph` directly. Nor can it meet a
+    # 0.15 binary's branch refusal: 0.15 opens formats 14 and up, so
+    # validate_image_internal_schema refuses it against the pre-14 root this
+    # Job is limited to.
     cluster_apply_job = (
         None
         if migration_armed or persisted_lock
