@@ -439,7 +439,7 @@ def create_mitlearn_k8s_secrets(
             namespace=mitlearn_namespace,
             labels=k8s_global_labels,
             mount=starrocks_vault_mount_path,
-            path="creds/readonly",
+            path="creds/batch_readonly",
             templates={
                 "STARROCKS_USER": '{{ get .Secrets "username" }}',
                 "STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',
