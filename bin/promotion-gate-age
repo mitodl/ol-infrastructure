@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Report Pulumi promotion gates that have sat open past a threshold.
+
+Production on a chained Pulumi pipeline deploys only when someone closes the
+`promotion-to-production` gate issue the previous stage opened on
+github.mit.edu. That is deliberate: the issue body is the resource diff, so the
+promotion is a decision made on evidence. Nothing reports a gate nobody closes,
+though. The pipeline stays green in every environment while production runs
+old code: the Dagster server gate opened 2026-08-21 sat for 2 days 21 hours,
+and the edxorg fixes it carried stayed dark the whole time.
+
+This lists every open gate older than `--max-age-hours` and posts one Slack
+message naming them, oldest first. It changes nothing about who promotes or
+when.
+
+A gate someone is holding on purpose (e.g. the xpro stacks while xpro is
+retired) can be labelled `promotion-held`. It then drops out of the list and
+is counted in one line instead, so a deliberate hold does not bury a new gate.
+A hold covers the stack, not one change: a later deploy updates the open gate
+in place, so its new diff stays held until someone removes the label.
+The github-issues resource ignores that label, so closing a held gate still
+deploys. With no stale unheld gates the job posts nothing.
+
+Usage:
+    GITHUB_TOKEN=... bin/promotion-gate-age                  # print only
+    GITHUB_TOKEN=... SLACK_WEBHOOK_URL=... bin/promotion-gate-age --post
+    bin/promotion-gate-age --max-age-hours 48
+"""
+
+import os
+import sys
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any
+
+import cyclopts
+import httpx
+
+app = cyclopts.App(help="Report Pulumi promotion gates open past a threshold.")
+
+GITHUB_API = "https://github.mit.edu/api/v3"
+GATE_REPOSITORY = "ol-platform-eng/concourse-workflow"
+GATE_LABEL = "promotion-to-production"
+# Pulumi chains title their gates "[bot] Pulumi <project> <stack> ...". MFE and
+# site pipelines carry the same label under other titles; they are batched on
+# their own cadence and out of scope here.
+GATE_TITLE_PREFIX = "[bot] Pulumi "
+HELD_LABEL = "promotion-held"
+REQUEST_TIMEOUT_SECONDS = 30
+ONE_DAY_SECONDS = 86_400
+ONE_HOUR_SECONDS = 3_600
+
+
+@dataclass(frozen=True)
+class Gate:
+    number: int
+    title: str
+    url: str
+    opened_at: datetime
+    held: bool
+
+    def age(self, now: datetime) -> timedelta:
+        return now - self.opened_at
+
+
+def format_age(age: timedelta) -> str:
+    """Render an age as days and hours, the resolution a gate is acted on at.
+
+    :param age: How long the gate has been open.
+    :returns: e.g. ``"2d 21h"``, ``"1d"`` or ``"5h"``.
+    :rtype: str
+    """
+    total_seconds = int(age.total_seconds())
+    days, remainder = divmod(total_seconds, ONE_DAY_SECONDS)
+    hours = remainder // ONE_HOUR_SECONDS
+    if days and hours:
+        return f"{days}d {hours}h"
+    return f"{days}d" if days else f"{hours}h"
+
+
+def gate_name(title: str) -> str:
+    """Strip the bot boilerplate so the project and stack lead the line.
+
+    :param title: Gate issue title, e.g.
+        ``"[bot] Pulumi ol-application-witan Production ready to deploy."``.
+    :returns: e.g. ``"ol-application-witan Production"``.
+    :rtype: str
+    """
+    name = title.removeprefix(GATE_TITLE_PREFIX).removesuffix(".")
+    for suffix in (" ready to deploy", " deployed"):
+        name = name.removesuffix(suffix)
+    return name
+
+
+def parse_gates(issues: list[dict[str, Any]]) -> list[Gate]:
+    """Keep the Pulumi gates from a page of issues, dropping pull requests.
+
+    :param issues: Items from the GitHub issues API.
+    :returns: The Pulumi gates among them.
+    :rtype: list[Gate]
+    """
+    return [
+        Gate(
+            number=issue["number"],
+            title=issue["title"],
+            url=issue["html_url"],
+            opened_at=datetime.fromisoformat(issue["created_at"]),
+            held=any(label["name"] == HELD_LABEL for label in issue["labels"]),
+        )
+        for issue in issues
+        if "pull_request" not in issue and issue["title"].startswith(GATE_TITLE_PREFIX)
+    ]
+
+
+def stale_gates(gates: list[Gate], now: datetime, max_age: timedelta) -> list[Gate]:
+    """Return the gates open longer than ``max_age``, oldest first.
+
+    :param gates: Open gates.
+    :param now: The reference time.
+    :param max_age: How long a gate may stay open before it is reported.
+    :returns: The stale gates, oldest first.
+    :rtype: list[Gate]
+    """
+    return sorted(
+        (gate for gate in gates if gate.age(now) > max_age),
+        key=lambda gate: gate.opened_at,
+    )
+
+
+def slack_text(stale: list[Gate], now: datetime, max_age: timedelta) -> str | None:
+    """Build the Slack message for the stale gates, if any are unheld.
+
+    :param stale: Stale gates, oldest first.
+    :param now: The reference time.
+    :param max_age: The threshold, quoted back so the message stands alone.
+    :returns: Slack mrkdwn text, or None when every stale gate is held.
+    :rtype: str | None
+    """
+    unheld = [gate for gate in stale if not gate.held]
+    held = [gate for gate in stale if gate.held]
+    if not unheld:
+        return None
+    lines = [
+        f"*{len(unheld)} Pulumi promotion gate(s) open longer than "
+        f"{format_age(max_age)}.* Production deploys only when the gate is "
+        "closed, so each of these stacks is running older code than QA.",
+    ]
+    lines.extend(
+        f"• <{gate.url}|#{gate.number}> {gate_name(gate.title)}, "
+        f"open {format_age(gate.age(now))}"
+        for gate in unheld
+    )
+    if held:
+        lines.append(
+            f"Not listed: {len(held)} gate(s) labelled `{HELD_LABEL}`, the "
+            f"oldest open {format_age(held[0].age(now))}."
+        )
+    # Not "close it as not planned": the github-issues resource triggers on any
+    # closed gate whatever its state_reason, so that would deploy too.
+    lines.append("Closing a gate, by any close reason, deploys it to production.")
+    return "\n".join(lines)
+
+
+def fetch_open_gates(client: httpx.Client) -> list[Gate]:
+    """Page through every open gate issue in the gate repository.
+
+    :param client: An authenticated client against the GitHub API.
+    :returns: Every open Pulumi gate.
+    :rtype: list[Gate]
+    """
+    gates: list[Gate] = []
+    url: str | None = f"/repos/{GATE_REPOSITORY}/issues"
+    params: dict[str, str | int] | None = {
+        "state": "open",
+        "labels": GATE_LABEL,
+        "per_page": 100,
+    }
+    while url:
+        response = client.get(url, params=params)
+        response.raise_for_status()
+        gates.extend(parse_gates(response.json()))
+        url = response.links.get("next", {}).get("url")
+        # The next link already carries the query string.
+        params = None
+    return gates
+
+
+@app.default
+def main(
+    *,
+    max_age_hours: Annotated[
+        float,
+        cyclopts.Parameter(help="Report gates open longer than this many hours."),
+    ] = 24.0,
+    post: Annotated[
+        bool,
+        cyclopts.Parameter(
+            help="Post to the Slack webhook in SLACK_WEBHOOK_URL as well as printing."
+        ),
+    ] = False,
+) -> int:
+    max_age = timedelta(hours=max_age_hours)
+    now = datetime.now(tz=UTC)
+    with httpx.Client(
+        base_url=GITHUB_API,
+        headers={
+            "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+            "Accept": "application/vnd.github+json",
+        },
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    ) as client:
+        stale = stale_gates(fetch_open_gates(client), now, max_age)
+
+    text = slack_text(stale, now, max_age)
+    if text is None:
+        print(
+            f"No unheld Pulumi promotion gate open longer than {format_age(max_age)}."
+        )
+        return 0
+
+    print(text)
+    if post:
+        httpx.post(
+            os.environ["SLACK_WEBHOOK_URL"],
+            json={"text": text},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        ).raise_for_status()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(app())

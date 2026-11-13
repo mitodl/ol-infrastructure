@@ -71,6 +71,10 @@ PIPELINE_CONFIGS: list[tuple[str, str]] = [
         "src/ol_concourse/pipelines/infrastructure/iam_drift/pipeline.py",
     ),
     (
+        "promotion-gate-age",
+        "src/ol_concourse/pipelines/infrastructure/promotion_gate_age/pipeline.py",
+    ),
+    (
         "pulumi-eks-cluster",
         "src/ol_concourse/pipelines/infrastructure/eks_clusters/pipeline.py",
     ),
