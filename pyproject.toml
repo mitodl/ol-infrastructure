@@ -57,6 +57,10 @@ dependencies = [
   "pulumi-kubernetes>=4,<5",
   "pyyaml>=6,<7",
   "botocore~=1.24",
+  # The code graph ids cluster.yaml declares. witan-code picks its `--graph`
+  # with the same function, so importing it (rather than copying it) is what
+  # keeps the two from drifting. Stdlib-only, so it adds nothing else.
+  "witan-core>=0.57.0,<1",
 ]
 
 [project.urls]
@@ -429,6 +433,7 @@ mitol-django-apigateway = "0d"
 mitol-django-observability = "0d"
 mitol-django-scim = "0d"
 mitol-drf-lint = "0d"
+witan-core = "0d"
 
 [tool.uv.workspace]
 members = ["sdks/qdrant-cloud", "sdks/rootly"]

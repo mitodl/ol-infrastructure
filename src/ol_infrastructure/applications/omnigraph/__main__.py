@@ -149,8 +149,8 @@ omnigraph_config = Config("omnigraph")
 
 # Repos that get a per-repo `code-<repo>` graph on this cluster. Canonical repo
 # URIs — the exact strings witan-code detects from a checkout's git remote and
-# runs through witan_code.config.graph_id to pick its `--graph`; data_tier's
-# code_graph_id mirrors that function to declare the same id here.
+# runs through witan_core.graph_ids.code_graph_id to pick its `--graph`;
+# cluster_config imports the same function to declare the same id here.
 #
 # Provisioning a new repo is deliberately explicit: add it here, `pulumi up`,
 # then `omnigraph cluster apply` + restart the server (see data_tier's
