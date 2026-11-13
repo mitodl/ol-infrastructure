@@ -17,6 +17,9 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.open_edx.edx_platform_v3.build_manifest import (
+    LEHRER_BUILD_MANIFEST_PATH,
+)
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 pipeline_code = git_repo(
@@ -25,8 +28,21 @@ pipeline_code = git_repo(
     branch="main",
 )
 
+# The global pipeline's generator checks this manifest before setting the
+# pipeline, so a change to it re-runs the check rather than waiting for the
+# next ol-infrastructure change to surface a dropped cell or a schema bump.
+lehrer_build_manifest = git_repo(
+    name=Identifier("lehrer-build-manifest"),
+    uri="https://github.com/mitodl/lehrer",
+    branch="main",
+    paths=[LEHRER_BUILD_MANIFEST_PATH],
+)
+
 
 def build_meta_job(pipeline_name: str):
+    get_steps = [GetStep(get=pipeline_code.name, trigger=True)]
+    inputs = [Input(name=Identifier(pipeline_code.name))]
+    params = {"PYTHONPATH": f"../{pipeline_code.name}/src"}
     if pipeline_name == "meta":
         pipeline_definition_path = (
             "src/ol_concourse/pipelines/open_edx/edx_platform_v3/meta.py"
@@ -34,6 +50,11 @@ def build_meta_job(pipeline_name: str):
         pipeline_team = "main"
         pipeline_id = "self"
     else:
+        get_steps.append(GetStep(get=lehrer_build_manifest.name, trigger=True))
+        inputs.append(Input(name=lehrer_build_manifest.name))
+        params["LEHRER_BUILD_MANIFEST"] = (
+            f"../{lehrer_build_manifest.name}/{LEHRER_BUILD_MANIFEST_PATH}"
+        )
         pipeline_definition_path = (
             "src/ol_concourse/pipelines/open_edx/edx_platform_v3/pipeline.py"
         )
@@ -42,7 +63,7 @@ def build_meta_job(pipeline_name: str):
     return Job(
         name=Identifier(f"create-edxapp-{pipeline_name}-dagger-pipeline"),
         plan=[
-            GetStep(get=pipeline_code.name, trigger=True),
+            *get_steps,
             TaskStep(
                 task=Identifier(f"generate-{pipeline_name}-pipeline-definition"),
                 config=TaskConfig(
@@ -57,9 +78,9 @@ def build_meta_job(pipeline_name: str):
                             "aws_region": ECR_REGION,
                         },
                     ),
-                    inputs=[Input(name=Identifier(pipeline_code.name))],
+                    inputs=inputs,
                     outputs=[Output(name=Identifier("pipeline"))],
-                    params={"PYTHONPATH": f"../{pipeline_code.name}/src"},
+                    params=params,
                     run=Command(
                         path="python",
                         dir="pipeline",
@@ -81,7 +102,9 @@ def build_meta_job(pipeline_name: str):
 
 meta_jobs = [build_meta_job("meta"), build_meta_job("global")]
 
-meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
+meta_pipeline = Pipeline(
+    resources=[pipeline_code, lehrer_build_manifest], jobs=meta_jobs
+)
 
 
 if __name__ == "__main__":
