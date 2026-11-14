@@ -601,16 +601,33 @@ if starrocks_config.get_bool("oidc_enabled"):
 # Keycloak, so the entrypoint imports the Gravitino CA into a copy of the JDK's
 # cacerts before starting the FE. The copy is made at container start, so a new
 # CA reaches the FE only when its pods restart.
+#
+# That JVM-wide trust is on its way out. The entrypoint also compiles
+# files/CaFileTLSConfigurer.java into fe/lib. Named in the catalog's
+# rest.client.tls.configurer-impl (substructure/starrocks), it gives the
+# catalog's own HTTP client the JVM's default CAs plus the Gravitino CA (that
+# client also fetches the catalog's token from Keycloak). Once that is live in
+# every environment, the keytool import and the javax.net.ssl flags go, and the
+# FE's other TLS peers (Keycloak JWKS, STS, Glue, S3) see only the JDK's CAs.
+# The class is compiled at container start because the FE image carries a JDK
+# and fe/lib is owned by the FE user; a changed class, like a new CA, reaches
+# the FE only when its pods restart.
 gravitino_catalog_enabled = (
     starrocks_config.get_bool("gravitino_catalog_enabled") or False
 )
 FE_TRUST_STORE_DIR = "/opt/starrocks/truststore"
 FE_TRUST_STORE_PATH = f"{FE_TRUST_STORE_DIR}/cacerts"
 GRAVITINO_CA_MOUNT_PATH = "/etc/starrocks/gravitino-ca"
+ICEBERG_TLS_SOURCE_MOUNT_PATH = "/etc/starrocks/iceberg-tls"
+ICEBERG_TLS_SOURCE_FILE = "CaFileTLSConfigurer.java"
+ICEBERG_TLS_CONFIGURER = "edu.mit.ol.iceberg.CaFileTLSConfigurer"
+# start_fe.sh puts every jar in fe/lib on the classpath, and Iceberg's HTTPClient
+# loads the configurer through its own classloader, which is that one.
+ICEBERG_TLS_JAR = "/opt/starrocks/fe/lib/ol-iceberg-tls.jar"
 # The JDK's published default for cacerts, not a credential.
 JDK_TRUST_STORE_PASSWORD = "changeit"  # pragma: allowlist secret  # noqa: S105
 fe_trust_store_jvm_opts = ""
-gravitino_ca_configmap: kubernetes.core.v1.ConfigMap | None = None
+gravitino_fe_configmaps: list[kubernetes.core.v1.ConfigMap] = []
 if gravitino_catalog_enabled:
     gravitino_stack = make_stack_reference(projects.GRAVITINO_APP, stack_info.name)
     _gravitino = gravitino_stack.require_output("gravitino")
@@ -650,14 +667,34 @@ if gravitino_catalog_enabled:
         ),
         data={"ca.crt": Output.unsecret(_gravitino_ca_pem)},
     )
+    _iceberg_tls_cm_name = f"{stack_info.env_prefix}-starrocks-iceberg-tls"
+    iceberg_tls_configmap = kubernetes.core.v1.ConfigMap(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-iceberg-tls-cm",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=_iceberg_tls_cm_name,
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        data={
+            ICEBERG_TLS_SOURCE_FILE: Path(__file__)
+            .parent.joinpath("files", ICEBERG_TLS_SOURCE_FILE)
+            .read_text()
+        },
+    )
+    gravitino_fe_configmaps = [gravitino_ca_configmap, iceberg_tls_configmap]
     _fe_trust_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
     _fe_trust_spec["configMaps"] = [
         *_fe_trust_spec.get("configMaps", []),
         {"name": _gravitino_ca_cm_name, "mountPath": GRAVITINO_CA_MOUNT_PATH},
+        {"name": _iceberg_tls_cm_name, "mountPath": ICEBERG_TLS_SOURCE_MOUNT_PATH},
     ]
     _fe_trust_spec["emptyDirs"] = [
         {"name": "fe-truststore", "mountPath": FE_TRUST_STORE_DIR}
     ]
+    # The FE image has to ship a JDK (javac and jar in $JAVA_HOME/bin) and an
+    # iceberg-core with rest.auth.TLSConfigurer in fe/lib, as 4.1.7 does. On an
+    # image without them the FE container exits here, before the FE starts.
+    # -proc:none keeps annotation processors that ship in fe/lib from running.
     _fe_trust_spec["entrypoint"] = {
         "script": (
             "#!/bin/bash\n"
@@ -667,6 +704,13 @@ if gravitino_catalog_enabled:
             f" -file {GRAVITINO_CA_MOUNT_PATH}/ca.crt"
             f" -keystore {FE_TRUST_STORE_PATH}"
             f" -storepass {JDK_TRUST_STORE_PASSWORD}\n"
+            "_classes=$(mktemp -d)\n"
+            '"$JAVA_HOME/bin/javac" -proc:none --release 17'
+            " -cp '/opt/starrocks/fe/lib/*'"
+            ' -d "$_classes"'
+            f" {ICEBERG_TLS_SOURCE_MOUNT_PATH}/{ICEBERG_TLS_SOURCE_FILE}\n"
+            f'"$JAVA_HOME/bin/jar" cf {ICEBERG_TLS_JAR} -C "$_classes" .\n'
+            'rm -rf "$_classes"\n'
             'exec /opt/starrocks/fe_entrypoint.sh "$FE_SERVICE_NAME"\n'
         )
     }
@@ -1167,7 +1211,7 @@ starrocks_release = kubernetes.helm.v3.Release(
             starrocks_root_password_secret,
             starrocks_auth_binding,
             *([ssl_keystore_password_secret] if ssl_keystore_password_secret else []),
-            *([gravitino_ca_configmap] if gravitino_ca_configmap else []),
+            *gravitino_fe_configmaps,
         ],
     ),
 )
@@ -1536,6 +1580,18 @@ export("fe_mysql_domain", fe_mysql_domain)
 # so no CI client can use TLS whatever this says.
 export("fe_mysql_internal_host", f"{fe_service_name}.{namespace}.svc.cluster.local")
 export("fe_tls_server_name", starrocks_config.require("domain"))
+
+# For substructure/starrocks to set on the Gravitino catalog. The Helm release
+# does not wait for the FE roll, and the class is on an FE's classpath only after
+# that FE restarts, so check every FE has rolled before applying the substructure.
+if gravitino_catalog_enabled:
+    export(
+        "gravitino_catalog_tls",
+        {
+            "configurer_impl": ICEBERG_TLS_CONFIGURER,
+            "ca_file": f"{GRAVITINO_CA_MOUNT_PATH}/ca.crt",
+        },
+    )
 
 export(
     "fe_mysql_host",
