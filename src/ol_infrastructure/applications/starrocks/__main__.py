@@ -691,6 +691,9 @@ if gravitino_catalog_enabled:
     _fe_trust_spec["emptyDirs"] = [
         {"name": "fe-truststore", "mountPath": FE_TRUST_STORE_DIR}
     ]
+    # The FE image has to ship a JDK (javac and jar in $JAVA_HOME/bin) and an
+    # iceberg-core with rest.auth.TLSConfigurer in fe/lib, as 4.1.7 does. On an
+    # image without them the FE container exits here, before the FE starts.
     # -proc:none keeps annotation processors that ship in fe/lib from running.
     _fe_trust_spec["entrypoint"] = {
         "script": (
