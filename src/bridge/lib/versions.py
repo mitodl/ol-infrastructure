@@ -90,6 +90,8 @@ OPIK_CHART_VERSION = "2.2.143"
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.8"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_CHART_VERSION = "1.11.8"
+# The FE entrypoint compiles applications/starrocks/files/CaFileTLSConfigurer.java
+# against this image, which needs javac and Iceberg's TLSConfigurer in it.
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
 STARROCKS_VERSION = "4.1.7"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
