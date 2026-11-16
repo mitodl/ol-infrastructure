@@ -33,8 +33,8 @@ config:
   # dedicates any threads and stays within CPU the pod is guaranteed.
   # Keep CN pods uniformly sized (applications/starrocks starrocks:cn_config)
   # and revisit this when they change. mem_limit is a fraction of each CN's
-  # query pool (90% of the CN's mem_limit, itself 90% of the pod memory
-  # limit). Batch is not memory-capped below the CN (mem_limit 1, no
+  # query pool, 0.729 of the pod memory limit (three 90% factors; QA measured
+  # it). Batch is not memory-capped below the CN (mem_limit 1, no
   # big_query_mem_limit), as in QA and production.
   starrocks:resource_groups:
     interactive:

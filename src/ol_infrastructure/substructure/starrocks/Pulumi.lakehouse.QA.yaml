@@ -38,9 +38,10 @@ config:
   # query pool, which scales with the pod memory limit: on the 6Gi CN the CN
   # reported batch's limit as 2817928042 bytes (0.6 x 0.729 x pod).
   # Batch is not memory-capped below the CN (mem_limit 1, no
-  # big_query_mem_limit). At 0.6 and 4Gi it refused dim_course_content and a
-  # tracking-log test on 2026-11-13 while the CN's working set stayed under
-  # 2 GB of 12Gi. Cap it again only once a measured conflict with interactive
+  # big_query_mem_limit). At 0.6 and 4Gi it refused dim_course_content (a
+  # 4294967296-byte request with 1955247216 used, against the 5635856085-byte
+  # group limit) and a mitx tracking-log test (at the 4Gi big-query limit) on
+  # 2026-11-13, on a 12Gi CN. Cap it again only once a measured conflict with interactive
   # queries shows the need.
   starrocks:resource_groups:
     interactive:
