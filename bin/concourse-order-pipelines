@@ -76,7 +76,6 @@ PIPELINE_ORDER: dict[str, dict[str, list[str]]] = {
             "pulumi-aws-ecr",
             "pulumi-aws-sftp",
             "pulumi-eks-cluster",
-            "packer-docker-baseline",
             "packer-pulumi-vault",
             "packer-pulumi-consul",
             "packer-pulumi-concourse",
