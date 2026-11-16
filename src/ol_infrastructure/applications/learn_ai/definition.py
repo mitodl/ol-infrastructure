@@ -415,7 +415,7 @@ def _canvas_route(
         paths=[path],
         backend_service_name=WEBAPP_SERVICE_NAME,
         backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        backend_resolve_granularity="service",
+        backend_resolve_granularity="endpoint",
     )
 
 
@@ -443,7 +443,7 @@ def direct_route_configs(
             paths=["/*"],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            backend_resolve_granularity="endpoint",
         ),
         # Strip trailing slash from logout redirect. This route's `redirect`
         # overrides the shared config's (http_to_https) rather than merging.
@@ -465,7 +465,7 @@ def direct_route_configs(
             paths=["/logout/*"],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            backend_resolve_granularity="endpoint",
         ),
         OLApisixRouteConfig(
             route_name="reqauth",
@@ -481,7 +481,7 @@ def direct_route_configs(
             ],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            backend_resolve_granularity="endpoint",
         ),
         OLApisixRouteConfig(
             route_name="websocket",
@@ -497,7 +497,7 @@ def direct_route_configs(
             ],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            backend_resolve_granularity="endpoint",
         ),
         # 204 is the EFF Do Not Track convention for "no policy published".
         # Without this route passauth sends every crawl to a Django 404.
@@ -509,7 +509,7 @@ def direct_route_configs(
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            backend_resolve_granularity="endpoint",
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -551,6 +551,7 @@ def prefixed_route_configs(
             rewrite_plugins=[proxy_rewrite_plugin()],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
         ),
         OLApisixRouteConfig(
             route_name="websocket",
@@ -565,7 +566,7 @@ def prefixed_route_configs(
             paths=[f"/{API_PATH_PREFIX}/ws/*"],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            backend_resolve_granularity="endpoint",
         ),
     ]
 

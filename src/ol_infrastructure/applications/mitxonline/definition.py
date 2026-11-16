@@ -664,6 +664,7 @@ def direct_route_configs(
             extra_plugins=[frame_ancestors, stale_session_cleanup],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
         ),
         # Entry point for hand-offs from MIT Learn (hq#12763).  Learn's session
         # and this host's are separate cookies on separate parent domains, so a
@@ -686,6 +687,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
         ),
         OLApisixRouteConfig(
             route_name="cart",
@@ -704,6 +706,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
         ),
         # The `location` blocks that used to live in the nginx sidecar
         # (docs/plans/remove-nginx-sidecar.md, stage 5). nginx resolved
@@ -719,6 +722,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
             plugins=[_uncached_hash_plugin()],
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
@@ -738,6 +742,7 @@ def direct_route_configs(
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -794,6 +799,7 @@ def prefixed_route_configs(
             extra_plugins=[frame_ancestors, stale_session_cleanup],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
         ),
         # Static assets requested through this prefix (frontend references
         # like /mitxonline/static/...) rewrite through "passauth" the same way,
@@ -812,6 +818,7 @@ def prefixed_route_configs(
             plugins=[strip_prefix, _uncached_hash_plugin()],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            backend_resolve_granularity="endpoint",
         ),
     ]
 

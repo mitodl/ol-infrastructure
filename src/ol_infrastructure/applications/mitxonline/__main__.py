@@ -45,6 +45,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRoute,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -792,6 +794,20 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
         # definition.cors_allow_origins for why the gateway needs them too.
         cors_allow_origins=definition.cors_allow_origins(bindings),
         plugins=definition.shared_plugins(bindings),
+    ),
+)
+
+# The routes resolve to pod IPs, so a connection refused or reset by a pod that
+# just died (OOMKill, crash, spot interruption) is retried on another pod
+# instead of becoming a 502. retries=1 caps the extra attempts at one instead
+# of APISIX's default of one per remaining pod.
+mitxonline_apisix_upstream = OLApisixUpstream(
+    f"mitxonline-webapp-apisix-upstream-{stack_info.env_suffix}",
+    upstream_config=OLApisixUpstreamConfig(
+        service_name=definition.WEBAPP_SERVICE_NAME,
+        k8s_namespace=mitxonline_namespace,
+        k8s_labels=k8s_app_labels,
+        retries=1,
     ),
 )
 

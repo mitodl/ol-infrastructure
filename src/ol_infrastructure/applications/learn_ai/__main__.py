@@ -42,6 +42,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRoute,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -987,9 +989,19 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )
 
-# ApisixUpstream resources don't seem to work but we don't really need them?
-# Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
-# Ref: https://github.com/apache/apisix-ingress-controller/issues/1855
+# The routes resolve to pod IPs, so a connection refused or reset by a pod that
+# just died (OOMKill, crash, spot interruption) is retried on another pod
+# instead of becoming a 502. retries=1 caps the extra attempts at one instead
+# of APISIX's default of one per remaining pod.
+learn_ai_apisix_upstream = OLApisixUpstream(
+    f"learn-ai-{stack_info.env_suffix}-webapp-apisix-upstream",
+    upstream_config=OLApisixUpstreamConfig(
+        service_name=definition.WEBAPP_SERVICE_NAME,
+        k8s_namespace=learn_ai_namespace,
+        k8s_labels=k8s_global_labels,
+        retries=1,
+    ),
+)
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
