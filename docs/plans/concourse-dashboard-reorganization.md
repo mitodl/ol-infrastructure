@@ -245,10 +245,10 @@ Both orderings below were verified for exact coverage against the live inventory
    `pulumi-infrastructure-meta`, `simple-pulumi-meta`, `k8s-apps-meta`,
    `dagger-pulumi-edxapp-meta-v3`, `packer-pulumi-xqwatcher-meta`,
    `xqwatcher-grader-images-meta`
-2. **core-platform** (25) — AWS substrate, clusters, AMIs, identity,
+2. **core-platform** (24) — AWS substrate, clusters, AMIs, identity,
    observability, notification:
    `pulumi-aws`, `pulumi-aws-ecr`, `pulumi-aws-sftp`, `pulumi-eks-cluster`,
-   `packer-docker-baseline`, `packer-pulumi-vault`, `packer-pulumi-consul`,
+   `packer-pulumi-vault`, `packer-pulumi-consul`,
    `packer-pulumi-concourse`, `docker-pulumi-keycloak`, `pulumi-monitoring`,
    `misc-grafana-management`, `pulumi-vector-log-proxy`, `pulumi-kubewatch`,
    `pulumi-sentry`, `pulumi-rootly`, `misc-cloud-custodian`, `pulumi-mailgun`,
