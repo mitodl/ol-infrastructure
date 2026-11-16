@@ -379,7 +379,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.uv]
-constraint-dependencies = ["certifi>=2026.10.19"]  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
+constraint-dependencies = [
+  "certifi>=2026.10.19",  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
+  "paramiko>=5.0.0",  # CVE-2026-44405 (SHA-1 in rsakey.py), pulled in by pyinfra
+]
 exclude-newer = "7d"
 required-version = ">=0.9.17"
 

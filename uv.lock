@@ -65,7 +65,10 @@ members = [
     "pulumi-qdrant-cloud",
     "pulumi-rootly",
 ]
-constraints = [{ name = "certifi", specifier = ">=2026.10.19" }]
+constraints = [
+    { name = "certifi", specifier = ">=2026.10.19" },
+    { name = "paramiko", specifier = ">=5.0.0" },
+]
 
 [[package]]
 name = "aiohappyeyeballs"
