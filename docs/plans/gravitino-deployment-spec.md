@@ -317,11 +317,13 @@ D3). Serve the Iceberg REST service over HTTPS with the same server certificate 
 `keyStorePath` and so on, `gravitino.iceberg-rest.httpsPort = 9433`). StarRocks' catalog URI becomes
 `https://gravitino.gravitino.svc.cluster.local:9433/iceberg`.
 
-StarRocks has to trust the namespace CA for this to work, and how it does so is unverified. Its
-Iceberg REST client runs in the FE JVM, which already takes `JAVA_TOOL_OPTIONS` for IRSA
-(`applications/starrocks/__main__.py:326-335`). Pointing `javax.net.ssl.trustStore` at a store holding
-only our CA would break the FE's TLS to AWS, so the store has to be the JDK's `cacerts` plus our CA.
-Settle it in QA. If it cannot be done cleanly, run the Iceberg REST service over plain HTTP on 9001 and record that in-cluster token
+StarRocks has to trust the namespace CA for this to work. Resolved (2026-11): only the governed
+catalog's Iceberg REST client trusts it, through `rest.client.tls.configurer-impl` naming
+`applications/starrocks/files/CaFileTLSConfigurer.java`, compiled into the FE at container start, and
+the FE JVM's default trust store is left as the JDK's `cacerts`. The first QA rollout used a JVM-wide
+`javax.net.ssl.trustStore` holding `cacerts` plus our CA. That was dropped because the CA has no name constraints (and Java PKIX
+ignores them on a trust anchor), so it would have been trusted for Keycloak's JWKS and AWS too.
+The fallback considered before that was settled: if it could not be done cleanly, run the Iceberg REST service over plain HTTP on 9001 and record that in-cluster token
 exposure as an accepted risk. Do not quietly drop TLS.
 
 `gravitino.iceberg-rest.enableClientAuth` would also let us admit only StarRocks to the Iceberg REST port, in place
