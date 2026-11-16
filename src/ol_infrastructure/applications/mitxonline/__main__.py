@@ -800,7 +800,9 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
 # The routes resolve to pod IPs, so a connection refused or reset by a pod that
 # just died (OOMKill, crash, spot interruption) is retried on another pod
 # instead of becoming a 502. retries=1 caps the extra attempts at one instead
-# of APISIX's default of one per remaining pod.
+# of APISIX's default of one per remaining pod ("set according to the number
+# of available backend nodes by default",
+# https://apisix.apache.org/docs/apisix/admin-api/#upstream).
 mitxonline_apisix_upstream = OLApisixUpstream(
     f"mitxonline-webapp-apisix-upstream-{stack_info.env_suffix}",
     upstream_config=OLApisixUpstreamConfig(
