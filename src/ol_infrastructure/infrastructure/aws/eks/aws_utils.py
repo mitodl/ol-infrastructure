@@ -470,8 +470,18 @@ def setup_aws_integrations(
                 "enableSpotInterruptionDraining": True,
                 "enableASGLifecycleDraining": True,
                 "enableScheduledEventDraining": True,
-                "enableRebalanceMonitoring": True,
-                "enableRebalanceDraining": True,
+                # Ignore rebalance recommendations. Draining on them is meant for
+                # ASGs that replace the instance on rebalance, and Karpenter nodes
+                # aren't in one. In Production, rebalance drains outnumbered real
+                # spot interruptions 431 to 142 over 14 days, and a drain blocked
+                # by a PDB retries every 5 s until the node goes away (one handler
+                # pod logged ~16k rejections in that window). Cordon-only is no
+                # better: it leaves the node unschedulable with no replacement,
+                # which is why Karpenter's interruption queue omits rebalance
+                # events (substructure/aws/eks/karpenter.py). Spot interruption
+                # notices are still drained here and by Karpenter.
+                "enableRebalanceMonitoring": False,
+                "enableRebalanceDraining": False,
                 "emitKubernetesEvents": True,
                 "podTerminationGracePeriod": 30,
                 # 24Mi (set in #3560, never revisited) is fine for idle
