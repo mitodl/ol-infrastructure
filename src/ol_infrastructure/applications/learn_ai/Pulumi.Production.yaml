@@ -31,10 +31,10 @@ config:
     # must come from this instance. Zendesk silently drops an id it doesn't
     # recognise and files the ticket anyway, so check custom_fields on a real
     # create response.
-    AI_ZENDESK_API_URL: "https://<PROD_SUBDOMAIN>.zendesk.com"
-    AI_ZENDESK_NAME_FIELD_ID: "<PROD_NAME_FIELD_ID>"
-    AI_ZENDESK_URL_FIELD_ID: "<PROD_URL_FIELD_ID>"
-    AI_ZENDESK_USERNAME_FIELD_ID: "<PROD_USERNAME_FIELD_ID>"
+    AI_ZENDESK_API_URL: "https://odl.zendesk.com"
+    AI_ZENDESK_NAME_FIELD_ID: "58726239101595"
+    AI_ZENDESK_URL_FIELD_ID: "58726207203995"
+    AI_ZENDESK_USERNAME_FIELD_ID: "58726209850395"
     CSRF_COOKIE_NAME: learn_ai_csrftoken
     CSRF_COOKIE_DOMAIN: "learn.mit.edu"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
