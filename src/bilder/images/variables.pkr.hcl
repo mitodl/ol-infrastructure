@@ -7,8 +7,8 @@ variable "app_name" {
   description = "The name of the third party application."
 
   validation {
-    condition     = contains(["vault", "consul", "concourse", "docker_baseline_ami"], var.app_name)
-    error_message = "Valid app_name inputs are 'vault', 'consul', 'docker_baseline_ami', or 'concourse'."
+    condition     = contains(["vault", "consul", "concourse"], var.app_name)
+    error_message = "Valid app_name inputs are 'vault', 'consul', or 'concourse'."
   }
 }
 
@@ -27,7 +27,7 @@ variable "business_unit" {
 variable "node_type" {
   type        = string
   default     = "server"
-  description = "The node type for the image. Available options are 'web' or 'worker' for Concourse and 'server' for Consul, Docker_baseline_ami, and Vault."
+  description = "The node type for the image. Available options are 'web' or 'worker' for Concourse and 'server' for Consul and Vault."
 
   validation {
     condition     = contains(["web", "worker", "server"], var.node_type)
