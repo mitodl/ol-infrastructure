@@ -174,11 +174,11 @@ config:
       # Replacements for the legacy reCAPTCHA keys in
       # recaptcha-migrated-075600d5919, ol-data-platform and mit-open, one per
       # legacy key and covering the same hosts, so each old key can be deleted
-      # once its replacement is live. Non-production only; production follows
-      # once the runbook in README.md has been proven on these. Every consumer
-      # renders the v2 checkbox through www.google.com/recaptcha/api.js (or
-      # www.recaptcha.net for Keycloak) and verifies through classic
-      # siteverify, which needs the key's legacy secret (README.md).
+      # once its replacement is live. Every consumer renders the v2 checkbox
+      # through www.google.com/recaptcha/api.js (or www.recaptcha.net for
+      # Keycloak) and verifies through classic siteverify, which needs the
+      # key's legacy secret (README.md). Open Discussions is being retired, so
+      # its legacy keys are deletions with no replacement here.
     recaptcha_keys:
       # mitxonline QA and CI: SOPS mitxonline/secrets.{qa,ci}.yaml.
     - key_name: mitxonline-rc
@@ -197,14 +197,6 @@ config:
       - rc.xpro.mit.edu
       - ci.xpro.mit.edu
       - xpro-ci.odl.mit.edu
-      # Open Discussions QA and CI share one Vault path,
-      # secret-operations/rc-apps/mit-open/recaptcha-keys, written by hand.
-    - key_name: open-discussions-rc
-      display_name: MIT Open Discussions RC and CI
-      integration_type: CHECKBOX
-      allowed_domains:
-      - discussions-rc.odl.mit.edu
-      - discussions-ci.odl.mit.edu
       # mit-learn QA: SOPS mitlearn/secrets.qa.yaml, read by mit_learn and
       # mit_learn_nextjs. CI holds no key today; its domain is listed so CI
       # can take this key rather than a third one.
@@ -221,6 +213,32 @@ config:
       allowed_domains:
       - sso-qa.ol.mit.edu
       - sso-ci.ol.mit.edu
+      # Production, one per legacy production key and covering the same
+      # hosts. Each consumer reads it from the production counterpart of the
+      # RC store above.
+    - key_name: mitxonline-production
+      display_name: MITx Online Production
+      integration_type: CHECKBOX
+      allowed_domains:
+      - mitxonline.mit.edu
+    - key_name: xpro-production
+      display_name: MITxPro Production
+      integration_type: CHECKBOX
+      allowed_domains:
+      - xpro.mit.edu
+    - key_name: learn-production
+      display_name: Learn Production
+      integration_type: CHECKBOX
+      allowed_domains:
+      - learn.mit.edu
+      # Keycloak olapps registration form. Cut over last: it guards the login
+      # of every property behind SSO. The legacy key also lists
+      # sso.odl.mit.edu, which no longer resolves.
+    - key_name: sso-production
+      display_name: SSO Production
+      integration_type: CHECKBOX
+      allowed_domains:
+      - sso.ol.mit.edu
     # OCW's YouTube Analytics feed into the HighSystems course-records database
     # built by Data Collaborative (mitodl/hq#13305). Its own project rather than
     # mitol01 because the OAuth consent screen is one per project: a vendor
