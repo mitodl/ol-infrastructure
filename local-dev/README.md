@@ -1399,7 +1399,7 @@ Common causes:
 ### `local-infra-apps` fails with `Missing required argument "client_id"`
 
 ```
-keycloak:openid/clientServiceAccountRole:ClientServiceAccountRole resource 'olapps-mitxonline-b2b-view-realm'
+keycloak:openid/clientServiceAccountRole:ClientServiceAccountRole resource 'olapps-mitxonline-b2b-view-users'
 has a problem: Missing required argument. The argument "client_id" is required, but no definition was found.
 ```
 
