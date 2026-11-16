@@ -594,29 +594,23 @@ if starrocks_config.get_bool("oidc_enabled"):
         {"name": _oidc_group_cm_name, "mountPath": "/opt/starrocks/fe/conf/groups"}
     ]
 
-# The FE's Iceberg REST client verifies Gravitino's certificate against the JVM
-# default trust store, and that certificate comes from a CA local to the
-# gravitino namespace. javax.net.ssl.trustStore replaces the default store
-# rather than adding to it, and the FE still needs the public CAs for AWS and
-# Keycloak, so the entrypoint imports the Gravitino CA into a copy of the JDK's
-# cacerts before starting the FE. The copy is made at container start, so a new
-# CA reaches the FE only when its pods restart.
+# Gravitino's certificate comes from a CA local to the gravitino namespace, and
+# only the governed catalog's Iceberg REST client trusts it. The entrypoint
+# compiles files/CaFileTLSConfigurer.java into fe/lib. Named in the catalog's
+# rest.client.tls.configurer-impl (substructure/starrocks), it gives that one
+# HTTP client the JDK's CAs plus the Gravitino CA (the client also fetches the
+# catalog's token from Keycloak). The rest of the FE JVM (Keycloak JWKS, STS,
+# Glue, S3) trusts only the JDK's CAs. The CA has no name constraints, and Java
+# PKIX ignores them on a trust anchor anyway, so trusting it JVM-wide would let
+# its key holder impersonate any of those hosts to the FE.
 #
-# That JVM-wide trust is on its way out. The entrypoint also compiles
-# files/CaFileTLSConfigurer.java into fe/lib. Named in the catalog's
-# rest.client.tls.configurer-impl (substructure/starrocks), it gives the
-# catalog's own HTTP client the JVM's default CAs plus the Gravitino CA (that
-# client also fetches the catalog's token from Keycloak). Once that is live in
-# every environment, the keytool import and the javax.net.ssl flags go, and the
-# FE's other TLS peers (Keycloak JWKS, STS, Glue, S3) see only the JDK's CAs.
 # The class is compiled at container start because the FE image carries a JDK
-# and fe/lib is owned by the FE user; a changed class, like a new CA, reaches
-# the FE only when its pods restart.
+# and fe/lib is owned by the FE user, so a changed class reaches the FE only
+# when its pods restart. The CA file is read each time the catalog's REST
+# client is built (FE start or ALTER CATALOG).
 gravitino_catalog_enabled = (
     starrocks_config.get_bool("gravitino_catalog_enabled") or False
 )
-FE_TRUST_STORE_DIR = "/opt/starrocks/truststore"
-FE_TRUST_STORE_PATH = f"{FE_TRUST_STORE_DIR}/cacerts"
 GRAVITINO_CA_MOUNT_PATH = "/etc/starrocks/gravitino-ca"
 ICEBERG_TLS_SOURCE_MOUNT_PATH = "/etc/starrocks/iceberg-tls"
 ICEBERG_TLS_SOURCE_FILE = "CaFileTLSConfigurer.java"
@@ -624,9 +618,6 @@ ICEBERG_TLS_CONFIGURER = "edu.mit.ol.iceberg.CaFileTLSConfigurer"
 # start_fe.sh puts every jar in fe/lib on the classpath, and Iceberg's HTTPClient
 # loads the configurer through its own classloader, which is that one.
 ICEBERG_TLS_JAR = "/opt/starrocks/fe/lib/ol-iceberg-tls.jar"
-# The JDK's published default for cacerts, not a credential.
-JDK_TRUST_STORE_PASSWORD = "changeit"  # pragma: allowlist secret  # noqa: S105
-fe_trust_store_jvm_opts = ""
 gravitino_fe_configmaps: list[kubernetes.core.v1.ConfigMap] = []
 if gravitino_catalog_enabled:
     gravitino_stack = make_stack_reference(projects.GRAVITINO_APP, stack_info.name)
@@ -688,9 +679,6 @@ if gravitino_catalog_enabled:
         {"name": _gravitino_ca_cm_name, "mountPath": GRAVITINO_CA_MOUNT_PATH},
         {"name": _iceberg_tls_cm_name, "mountPath": ICEBERG_TLS_SOURCE_MOUNT_PATH},
     ]
-    _fe_trust_spec["emptyDirs"] = [
-        {"name": "fe-truststore", "mountPath": FE_TRUST_STORE_DIR}
-    ]
     # The FE image has to ship a JDK (javac and jar in $JAVA_HOME/bin) and an
     # iceberg-core with rest.auth.TLSConfigurer in fe/lib, as 4.1.7 does. On an
     # image without them the FE container exits here, before the FE starts.
@@ -699,11 +687,6 @@ if gravitino_catalog_enabled:
         "script": (
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            f'cp "$JAVA_HOME/lib/security/cacerts" {FE_TRUST_STORE_PATH}\n'
-            '"$JAVA_HOME/bin/keytool" -importcert -noprompt -alias gravitino-ca'
-            f" -file {GRAVITINO_CA_MOUNT_PATH}/ca.crt"
-            f" -keystore {FE_TRUST_STORE_PATH}"
-            f" -storepass {JDK_TRUST_STORE_PASSWORD}\n"
             "_classes=$(mktemp -d)\n"
             '"$JAVA_HOME/bin/javac" -proc:none --release 17'
             " -cp '/opt/starrocks/fe/lib/*'"
@@ -714,12 +697,6 @@ if gravitino_catalog_enabled:
             'exec /opt/starrocks/fe_entrypoint.sh "$FE_SERVICE_NAME"\n'
         )
     }
-    # The Gravitino CA has no name constraints, so trusting it JVM-wide also
-    # trusts it for every other host the FE reaches (Keycloak JWKS, AWS).
-    fe_trust_store_jvm_opts = (
-        f" -Djavax.net.ssl.trustStore={FE_TRUST_STORE_PATH}"
-        f" -Djavax.net.ssl.trustStorePassword={JDK_TRUST_STORE_PASSWORD}"
-    )
 
 if starrocks_config.get_bool("use_be"):
     # Shared-nothing configuration
@@ -949,7 +926,7 @@ _FE_CONFIG_BASE = (
     # keeping CPU available for query planning and Thrift RPC handling.
     # -Xms=Xmx pre-allocates heap at startup to avoid resize churn during init.
     f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true'
-    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m{fe_trust_store_jvm_opts}"
+    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m"
     ' -XX:+UseZGC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
@@ -1104,12 +1081,6 @@ _needs_fe_config = (
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
 )
-if gravitino_catalog_enabled and not _needs_fe_config:
-    msg = (
-        "starrocks:gravitino_catalog_enabled needs the FE trust store options in"
-        " fe.conf, which is only rendered with SSL, CN or BE enabled"
-    )
-    raise ValueError(msg)
 if _needs_fe_config:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
