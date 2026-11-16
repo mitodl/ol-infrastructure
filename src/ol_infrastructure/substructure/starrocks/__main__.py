@@ -691,7 +691,9 @@ if gravitino_catalog_enabled:
         opts=InvokeOptions(provider=_vault_provider),
     )
     _gravitino_catalog: pulumi.Output[GravitinoCatalog] = pulumi.Output.all(
-        _gravitino, _gravitino_client.data
+        _gravitino,
+        _gravitino_client.data,
+        applications_stack.require_output("gravitino_catalog_tls"),
     ).apply(
         lambda args: GravitinoCatalog(
             name=catalog_name(stack_info.env_suffix),
@@ -699,15 +701,15 @@ if gravitino_catalog_enabled:
             warehouse=args[0]["catalog"],
             oauth2_server_uri=f"{args[1]['url']}/protocol/openid-connect/token",
             aws_region=aws_region,
+            tls_configurer_impl=args[2]["configurer_impl"],
+            tls_ca_file=args[2]["ca_file"],
         )
     )
     _bootstrap_credential: pulumi.Output[str] = pulumi.Output.secret(
         _gravitino_client.data.apply(lambda d: f"{d['client_id']}:{d['client_secret']}")
     )
     _gravitino_create_hash = _gravitino_catalog.apply(
-        lambda c: hashlib.sha256(
-            c.create_sql(CREDENTIAL_PLACEHOLDER).encode()
-        ).hexdigest()
+        lambda c: hashlib.sha256(c.create_trigger_sql().encode()).hexdigest()
     )
     gravitino_catalog_setup = command.local.Command(
         f"starrocks-{stack_info.env_suffix}-gravitino-catalog-setup",
