@@ -119,9 +119,20 @@ class ModelConfig(BaseModel):
     # deployed: its only version (2024-07-18) is Deprecating, and Azure refuses new
     # deployments of it with ServiceModelDeprecating. gpt-5-mini is its stand-in, so an
     # app moving that workload to Azure changes its model name deliberately rather than
-    # silently.
+    # silently. The gpt-5.4 family is offered to every consumer so apps can move to it
+    # without an infra change. An app can call only the deployments on its own account,
+    # so this list bounds what it can reach through Azure. README.md "Changing the
+    # deployed models" covers adding or removing one.
     models: list[str] = Field(
-        default_factory=lambda: ["gpt-4o", "gpt-5-mini", "gpt-5.2"]
+        default_factory=lambda: [
+            "gpt-4o",
+            "gpt-5-mini",
+            "gpt-5.2",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.4-nano",
+            "gpt-5.4-pro",
+        ]
     )
 
     # Models deployed on one consumer's account only, after the shared chat models.
