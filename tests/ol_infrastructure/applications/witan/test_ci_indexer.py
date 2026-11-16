@@ -74,9 +74,9 @@ def test_a_failed_run_outlives_the_next_run():
 
 @pulumi.runtime.test
 def test_the_sweep_runs_on_on_demand_capacity():
-    """A spot node's rebalance recommendation makes aws-node-termination-handler
-    drain it, and that drain was every indexer eviction in operations-qa over
-    the week to 2026-10-28.
+    """A spot interruption evicts the indexer mid-clone, and do-not-disrupt
+    can't stop it. Rebalance drains (since turned off) caused every indexer
+    eviction in operations-qa over the week to 2026-10-28.
     """
     mocks, indexer = _render()
 
