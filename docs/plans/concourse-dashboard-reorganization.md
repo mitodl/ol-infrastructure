@@ -238,7 +238,7 @@ credentials, and no source. Re-running it with a different list fully reverts.
 Both orderings below were verified for exact coverage against the live inventory
 — 84/84 for `infrastructure`, 32/32 for `main`, no duplicates, no phantoms.
 
-#### `infrastructure` (84 tiles, 6 clusters)
+#### `infrastructure` (83 tiles, 6 clusters)
 
 1. **meta** — the registries that generate everything else, so the dashboard
    starts with "where do pipelines come from":
