@@ -25,7 +25,7 @@ imported, and so tested, without ``pulumi_aws``.
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Output, Resource, ResourceOptions
+from pulumi import CustomTimeouts, Output, Resource, ResourceOptions
 
 from ol_infrastructure.applications.omnigraph.cluster_config import (
     require_graph_id_list,
@@ -38,6 +38,10 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 # 14 in the cutover change, so everything keyed on this arrives with the image
 # that needs it.
 PERSISTED_LOCK_MIN_FORMAT = 14
+
+# How long Pulumi waits for the plan gate, which deletes branch views through
+# the serving pod one at a time at 1 to 3 seconds each on S3.
+PLAN_GATE_TIMEOUT_MINUTES = 60
 
 UNLOCK_LEASE_NAME = "omnigraph-unlock"
 LOCK_HANDOFF_ROLE_NAME = "omnigraph-server-lock-handoff"
@@ -100,18 +104,22 @@ def plan_env(
     apply_actor: str,
     graph_removal_allowlist: list[str],
     branch_drop_allowlist: list[str],
+    view_drop_actor: str,
 ) -> list[kubernetes.core.v1.EnvVarArgs]:
     """Env for the image's plan check, shared by the entrypoint and the gate.
 
     :param apply_actor: passed as ``--as`` to plan and apply. Required whenever
         policy bundles are in the image.
     :param graph_removal_allowlist: graph ids the plan may delete.
-    :param branch_drop_allowlist: graph ids whose non-main branches the boot
-        may delete so a schema change can apply (omnigraph 0.15 applies one
-        only to a graph whose sole branch is ``main``). The gate passes that
-        refusal for these graphs, since the boot clears it. The entrypoint
-        refuses an id that does not start with ``code-`` or that
+    :param branch_drop_allowlist: graph ids whose non-main branches the gate
+        and the boot may delete so a schema change can apply (omnigraph 0.15
+        applies one only to a graph whose sole branch is ``main``). The
+        entrypoint refuses an id that does not start with ``code-`` or that
         ``cluster.yaml`` does not declare.
+    :param view_drop_actor: the actor in the token map whose token deletes
+        those branches through the HTTP API, which is the only way the 0.15
+        CLI can reach an S3 root's branches. It needs ``read`` and
+        ``branch_delete`` on the code graphs and the bridge.
     """
     return [
         kubernetes.core.v1.EnvVarArgs(name="OMNIGRAPH_APPLY_ACTOR", value=apply_actor),
@@ -122,6 +130,9 @@ def plan_env(
         kubernetes.core.v1.EnvVarArgs(
             name="OMNIGRAPH_BRANCH_DROP_ALLOWLIST",
             value=",".join(branch_drop_allowlist),
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="OMNIGRAPH_VIEW_DROP_ACTOR", value=view_drop_actor
         ),
     ]
 
@@ -143,6 +154,7 @@ def create_lock_handoff(  # noqa: PLR0913
     apply_actor: str,
     graph_removal_allowlist: list[str],
     branch_drop_allowlist: list[str],
+    view_drop_actor: str,
 ) -> OmnigraphLockHandoff:
     """Provision the unlock Lease and the server's access to it and to its pods.
 
@@ -154,6 +166,7 @@ def create_lock_handoff(  # noqa: PLR0913
     :param graph_removal_allowlist: graph ids the entrypoint may delete.
     :param branch_drop_allowlist: graph ids whose branch views the entrypoint
         may delete before a schema apply. See ``plan_env``.
+    :param view_drop_actor: see ``plan_env``.
     """
     # PRE-CREATED, WITH NO HOLDER. RBAC cannot restrict `create` by resource
     # name, so letting the pod create its own Lease would mean granting create
@@ -226,7 +239,9 @@ def create_lock_handoff(  # noqa: PLR0913
                 )
             ),
         ),
-        *plan_env(apply_actor, graph_removal_allowlist, branch_drop_allowlist),
+        *plan_env(
+            apply_actor, graph_removal_allowlist, branch_drop_allowlist, view_drop_actor
+        ),
     ]
     return OmnigraphLockHandoff(lease=lease, role_binding=role_binding, env=env)
 
@@ -245,10 +260,12 @@ def create_plan_gate(  # noqa: PLR0913
     apply_actor: str,
     graph_removal_allowlist: list[str],
     branch_drop_allowlist: list[str],
+    view_drop_actor: str,
+    server_url: str,
     config_hash: Output[str],
     depends_on: list[Resource],
 ) -> kubernetes.batch.v1.Job:
-    """Provision the read-only pre-deploy plan gate.
+    """Provision the pre-deploy plan gate.
 
     The entrypoint applies schema and policy changes on boot, after
     ``Recreate`` has stopped the old pod, so a change the apply refuses would
@@ -258,7 +275,11 @@ def create_plan_gate(  # noqa: PLR0913
     update while the old pod is still serving.
 
     `cluster plan` takes no writer lock, so this is not a second writer
-    beside the running server, and it needs no Kubernetes access.
+    beside the running server, and it needs no Kubernetes access. When a
+    schema change is refused only for branch views on allow-listed graphs,
+    the gate deletes them through the serving pod at ``server_url``, which
+    can take a long time (Production's 1006 views took 25 minutes on
+    2026-11-16), so Pulumi waits up to ``PLAN_GATE_TIMEOUT_MINUTES``.
 
     It does not replace the entrypoint's check. The ``cluster.yaml`` ConfigMap
     is updated before this Job runs and a failed Job does not roll it back, so
@@ -269,6 +290,8 @@ def create_plan_gate(  # noqa: PLR0913
         boot, so the plan is for the bundles the server would apply.
     :param branch_drop_allowlist: has to be the value the entrypoint gets,
         or the gate passes a refusal the boot then keeps. See ``plan_env``.
+    :param view_drop_actor: see ``plan_env``.
+    :param server_url: the serving pod's in-cluster URL.
     :param config_hash: of ``cluster.yaml`` and the image. A Job's pod template
         is immutable, so a new hash replaces the Job, which is what makes it
         run again.
@@ -316,10 +339,15 @@ def create_plan_gate(  # noqa: PLR0913
                                     name="OMNIGRAPH_SERVER_BEARER_TOKENS_FILE",
                                     value=actor_tokens_file,
                                 ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_VIEW_DROP_SERVER_URL",
+                                    value=server_url,
+                                ),
                                 *plan_env(
                                     apply_actor,
                                     graph_removal_allowlist,
                                     branch_drop_allowlist,
+                                    view_drop_actor,
                                 ),
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
@@ -358,5 +386,11 @@ def create_plan_gate(  # noqa: PLR0913
                 ),
             ),
         ),
-        opts=ResourceOptions(depends_on=depends_on),
+        opts=ResourceOptions(
+            depends_on=depends_on,
+            custom_timeouts=CustomTimeouts(
+                create=f"{PLAN_GATE_TIMEOUT_MINUTES}m",
+                update=f"{PLAN_GATE_TIMEOUT_MINUTES}m",
+            ),
+        ),
     )

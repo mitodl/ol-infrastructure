@@ -119,6 +119,10 @@ ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 # than silently writing as nobody. Matches the break-glass identity in
 # agent-kit ADR-0005 path (b).
 CLUSTER_APPLY_ACTOR = "svc-witan-admin"
+# The witan CI indexer's and view reaper's actor. The plan gate and the boot
+# also delete code-graph branch views as this actor, because the code-graph
+# and bridge policies grant `branch_delete` to witan-ci and not witan-admin.
+WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
 # ── Server resource envelope ─────────────────────────────────────────────────
 #
@@ -840,6 +844,8 @@ def create_data_tier(  # noqa: PLR0913
             apply_actor=CLUSTER_APPLY_ACTOR,
             graph_removal_allowlist=removable_graphs,
             branch_drop_allowlist=branch_drop_graphs,
+            view_drop_actor=WITAN_CI_ACTOR_ID,
+            server_url=omnigraph_server_addr(namespace),
             config_hash=cluster_apply_hash,
             depends_on=[
                 cluster_configmap,
@@ -869,6 +875,7 @@ def create_data_tier(  # noqa: PLR0913
             apply_actor=CLUSTER_APPLY_ACTOR,
             graph_removal_allowlist=removable_graphs,
             branch_drop_allowlist=branch_drop_graphs,
+            view_drop_actor=WITAN_CI_ACTOR_ID,
         )
         if persisted_lock
         else None

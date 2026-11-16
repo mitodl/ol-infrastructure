@@ -398,6 +398,13 @@ def test_the_gate_and_the_boot_may_drop_views_on_the_declared_code_graphs(
             (container,) = pod_spec["containers"]
             env = {e["name"]: e.get("value") for e in container["env"]}
             assert env["OMNIGRAPH_BRANCH_DROP_ALLOWLIST"] == expected
+            assert env["OMNIGRAPH_VIEW_DROP_ACTOR"] == "svc-witan-ci"
+        (gate_container,) = gate["spec"]["template"]["spec"]["containers"]
+        gate_env = {e["name"]: e.get("value") for e in gate_container["env"]}
+        # The gate deletes views through the pod that is still serving.
+        assert gate_env["OMNIGRAPH_VIEW_DROP_SERVER_URL"] == (
+            "http://omnigraph-server.omnigraph.svc.cluster.local:8080"
+        )
 
     return pulumi.Output.all(tier.deployment.urn, tier.plan_gate_job.urn).apply(check)
 
