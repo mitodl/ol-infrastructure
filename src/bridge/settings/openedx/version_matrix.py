@@ -13,8 +13,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     mitx = DeploymentEnvRelease(
         deployment_name="mitx",
         env_release_map=[
-            # Residential environments want to track master in CI for testing new
-            # features as they land. (TMM 2025-05-20)
+            # Residential environments track master across all stages.
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
             EnvRelease("QA", OpenEdxSupportedRelease["master"]),
             EnvRelease("Production", OpenEdxSupportedRelease["master"]),
@@ -23,8 +22,7 @@ class OpenLearningOpenEdxDeployment(Enum):
     mitx_staging = DeploymentEnvRelease(
         deployment_name="mitx-staging",
         env_release_map=[
-            # Residential environments want to track master in CI for testing new
-            # features as they land. (TMM 2025-05-20)
+            # Residential environments track master across all stages.
             EnvRelease("CI", OpenEdxSupportedRelease["master"]),
             EnvRelease("QA", OpenEdxSupportedRelease["master"]),
             EnvRelease("Production", OpenEdxSupportedRelease["master"]),
