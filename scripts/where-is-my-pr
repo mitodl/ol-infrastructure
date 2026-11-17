@@ -362,6 +362,7 @@ def _diagnose_fly_access() -> FlyAccess:
         )
     # `fly status` skips the version check; `fly curl` refuses any major or
     # minor mismatch with the server ("... is out of sync with the target").
+    # A patch-only mismatch prints the same text as a warning but succeeds.
     lookup = _run_fly("curl", "/api/v1/user", "--", "-s")
     if lookup is None:
         return FlyAccess(
@@ -369,7 +370,7 @@ def _diagnose_fly_access() -> FlyAccess:
             summary=f"fly couldn't fetch your user info from {CONCOURSE_URL} in time",
             fix=("Check your network or VPN, then re-run this script.",),
         )
-    if "out of sync" in f"{lookup.stdout}\n{lookup.stderr}":
+    if lookup.returncode != 0 and "out of sync" in f"{lookup.stdout}\n{lookup.stderr}":
         return FlyAccess(
             ok=False,
             summary="your fly version doesn't match our Concourse server's",
@@ -1425,15 +1426,15 @@ def _fetch_pr_or_explain(url: str) -> PullRequest:
     try:
         return _fetch_pr(url)
     except (GhNotFoundError, RuntimeError) as error:
+        # Keep GitHub's reason, not the gh command line _gh_json prefixes.
+        reason = str(error).rpartition(" failed: ")[2]
         # Only auth failures mean "log in"; network or outage errors fall
         # through so the user sees gh's real reason.
-        if any(marker in str(error) for marker in GH_AUTH_ERRORS):
+        if any(marker in reason for marker in GH_AUTH_ERRORS):
             _fail(
                 "gh isn't logged in to GitHub, or its token has expired",
                 ("Log in: gh auth login", "Check it worked: gh auth status"),
             )
-        # Keep GitHub's reason, not the gh command line _gh_json prefixes.
-        reason = str(error).rpartition(" failed: ")[2]
         detail = next((line for line in reason.splitlines() if line), "")
         _fail(
             f"GitHub wouldn't return that PR ({detail})",

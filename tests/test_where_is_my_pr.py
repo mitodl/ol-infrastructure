@@ -1204,6 +1204,26 @@ def test_login_steps_cover_github_not_a_member(
 
 
 @pytest.mark.usefixtures("fly_installed")
+def test_patch_version_warning_keeps_live_checks(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fly warns about patch skew but still succeeds; that is not a failure."""
+    user = {"is_admin": False, "teams": {"infrastructure": ["viewer"]}}
+    warning = "WARNING:\n\nfly version (8.3.2) is out of sync with the target (8.3.3)."
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(
+            side_effect=[
+                _completed(0),
+                _completed(0, stdout=json.dumps(user), stderr=warning),
+            ]
+        ),
+    )
+    assert script._diagnose_fly_access().ok
+
+
+@pytest.mark.usefixtures("fly_installed")
 def test_status_version_skew_suggests_sync(
     script: ModuleType, monkeypatch: pytest.MonkeyPatch
 ) -> None:
