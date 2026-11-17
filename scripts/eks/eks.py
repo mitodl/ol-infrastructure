@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 import webbrowser
 from collections.abc import Iterator
@@ -179,10 +180,22 @@ def load_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def make_private_dir(path: Path) -> None:
+    """Create ``path`` readable only by its owner; the cache holds live credentials."""
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # mkdir's mode applies only when it creates the directory.
+    path.chmod(0o700)
+
+
 def dump_json(path: Path, payload: dict[str, Any]) -> None:
-    """Write JSON payloads to a cache file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    """Write JSON payloads to a cache file readable only by its owner."""
+    make_private_dir(path.parent)
+    # mkstemp creates the file 0600. Renaming it into place means a reader, which
+    # takes no lock, sees the old contents or the new, never an empty file.
+    fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    with os.fdopen(fd, "w") as cache:
+        cache.write(json.dumps(payload, indent=2, sort_keys=True))
+    Path(temp_path).replace(path)
 
 
 @contextmanager
@@ -192,7 +205,7 @@ def cache_lock(name: str, wait_message: str | None = None) -> Iterator[None]:
     ``wait_message`` is printed to stderr when another process holds the lock.
     """
     lock_path = CACHE_DIR / f"{name}.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    make_private_dir(lock_path.parent)
     with lock_path.open("w") as lock_file:
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -265,7 +278,7 @@ def append_exec_debug_event(event: str, **fields: Any) -> None:
         **fields,
     }
     try:
-        EXEC_DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        make_private_dir(EXEC_DEBUG_LOG_PATH.parent)
         with EXEC_DEBUG_LOG_PATH.open("a") as debug_log:
             debug_log.write(json.dumps(payload, sort_keys=True) + "\n")
     except OSError:
@@ -743,6 +756,9 @@ def load_valid_aws_credentials(
 
     aws_role_name = VAULT_AWS_ROLE_BY_MODE[mode.value]
     aws_cache_path = cache_file(f"aws-creds-{mode.value}")
+    # Every cache read comes through here, so a cache directory created
+    # group-readable is made private even when the read below is a cache hit.
+    make_private_dir(CACHE_DIR)
     # Checked before the cache too: a setup that logged in but then failed
     # discovery leaves unexpired credentials behind the marker.
     refuse_if_logged_out(mode, earlier_logout)

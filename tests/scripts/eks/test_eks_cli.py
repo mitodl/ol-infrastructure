@@ -305,6 +305,56 @@ def test_append_exec_debug_event_is_disabled_by_default(
 
 
 @pytest.mark.unit
+def test_dump_json_makes_existing_cache_private(eks_module):
+    """A group-readable cache directory and file are made owner-only on write."""
+    cache_path = eks_module.cache_file("aws-creds-developer")
+    eks_module.CACHE_DIR.chmod(0o755)
+    cache_path.write_text("{}")
+    cache_path.chmod(0o644)
+
+    eks_module.dump_json(cache_path, {"session_token": "secret"})
+
+    assert eks_module.CACHE_DIR.stat().st_mode & 0o777 == 0o700
+    assert cache_path.stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.unit
+def test_dump_json_replaces_the_file_instead_of_rewriting_it(eks_module):
+    """Cache readers take no lock, so a rewrite in place could show them an
+    empty file; a new file renamed over the old one cannot.
+    """
+    cache_path = eks_module.cache_file("aws-creds-developer")
+    eks_module.dump_json(cache_path, {"session_token": "old"})
+    old_inode = cache_path.stat().st_ino
+
+    eks_module.dump_json(cache_path, {"session_token": "new"})
+
+    assert cache_path.stat().st_ino != old_inode
+    assert eks_module.load_json(cache_path) == {"session_token": "new"}
+    assert [path.name for path in eks_module.CACHE_DIR.iterdir()] == [cache_path.name]
+
+
+@pytest.mark.unit
+def test_cache_hit_makes_cache_dir_private(eks_module):
+    """A group-readable cache directory is made owner-only even on a cache hit."""
+    expires_at = eks_module.json_datetime_now() + eks_module.timedelta(hours=1)
+    eks_module.dump_json(
+        eks_module.cache_file("aws-creds-developer"),
+        {
+            "access_key": "a",
+            "secret_key": "s",
+            "session_token": "t",
+            "expires_at": expires_at.isoformat(),
+        },
+    )
+    eks_module.CACHE_DIR.chmod(0o755)
+
+    eks_module.load_valid_aws_credentials(eks_module.AccessMode.DEVELOPER)
+
+    assert eks_module.CACHE_DIR.stat().st_mode & 0o777 == 0o700
+
+
+@pytest.mark.unit
 def test_build_kubeconfig_sets_no_current_context_by_default(eks_module, two_clusters):
     """No cluster becomes the default kubectl target unless one is requested."""
     kubeconfig = eks_module.build_kubeconfig(
