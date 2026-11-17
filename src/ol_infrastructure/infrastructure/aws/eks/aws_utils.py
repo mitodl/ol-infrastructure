@@ -478,8 +478,9 @@ def setup_aws_integrations(
                 # pod logged ~16k rejections in that window). Cordon-only is no
                 # better: it leaves the node unschedulable with no replacement,
                 # which is why Karpenter's interruption queue omits rebalance
-                # events (substructure/aws/eks/karpenter.py). Spot interruption
-                # notices are still drained here and by Karpenter.
+                # events (src/ol_infrastructure/substructure/aws/eks/karpenter.py).
+                # Spot interruption notices are still drained here and by
+                # Karpenter.
                 "enableRebalanceMonitoring": False,
                 "enableRebalanceDraining": False,
                 "emitKubernetesEvents": True,
