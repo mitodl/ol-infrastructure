@@ -141,6 +141,8 @@ def test_production_checks_the_gate_before_it_promotes():
     assert params["TAG_PREFIX"] == PRODUCTION_TAG_PREFIX
     assert params["GITHUB_REPOSITORY"] == f"mitodl/{APP}"
     assert "CHECK_ONLY" not in params
+    # Only a k8s rollback may go untagged; a tag-only release refuses one.
+    assert "ALLOW_OLDER" not in params
     assert plan[check_tag]["config"]["params"] == {**params, "CHECK_ONLY": "true"}
     assert plan[-1]["put"] == f"{APP}-release"
     assert plan[-1]["params"]["action"] == "finish"
