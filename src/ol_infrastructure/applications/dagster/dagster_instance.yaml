@@ -477,9 +477,11 @@ event_log_storage:
 #     commit ("Added data files were found matching the filter") on 2026-10-26.
 #     The tables now keep full bounds on run_readable_id
 #     (mitodl/ol-data-platform#3410), and every partition written before that
-#     was rewritten, so runs of different partitions commit concurrently. Limit
-#     4 bounds the embedding calls against dagster-ml's 1M TPM
-#     text-embedding-3-large deployment.
+#     was rewritten, so runs of different partitions commit concurrently. The
+#     limit is a placeholder token, substituted in __main__.py from the
+#     dagster:learn_embeddings_run_limit stack config, because it is sized
+#     against each environment's text-embedding-3-large deployment
+#     (Production 4, every other stack 1).
 run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
@@ -491,7 +493,7 @@ run_coordinator:
     - key: ocw/content_load
       limit: 1
     - key: learn_embeddings/model_calls
-      limit: 4
+      limit: LEARN_EMBEDDINGS_RUN_LIMIT
 
 # Configures how long Dagster waits for code locations
 # to load before timing out.
