@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import subprocess
 import sys
 from dataclasses import replace
 from importlib.machinery import SourceFileLoader
@@ -1245,3 +1246,51 @@ def test_bad_pr_url_is_explained(
     with pytest.raises(SystemExit):
         script._fetch_pr_or_explain("https://github.com/mitodl/learn-ai")
     assert "isn't a GitHub pull request URL" in capsys.readouterr().err
+
+
+def test_missing_packages_are_explained() -> None:
+    """Without the uv environment's packages, explain instead of a traceback."""
+    path = Path(__file__).resolve().parents[1] / "scripts" / "where-is-my-pr"
+    # -S hides site-packages, like running with a Python outside the venv.
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-S", str(path), "https://github.com/mitodl/x/pull/1"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 1
+    assert "can't import the 'cyclopts' package" in result.stderr
+    run_step = "uv run python scripts/where-is-my-pr https://github.com/mitodl/x/pull/1"
+    assert run_step in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("in_checkout", "in_repo_venv", "have_uv", "expected", "absent"),
+    [
+        (True, False, True, "Set up the environment (once)", "Install uv"),
+        (True, True, True, "Update the environment", "Set up"),
+        (True, False, False, "Install uv", "Clone"),
+        (False, False, True, "git clone", "Update"),
+    ],
+)
+def test_environment_fix_steps(  # noqa: PLR0913
+    *,
+    script: ModuleType,
+    in_checkout: bool,
+    in_repo_venv: bool,
+    have_uv: bool,
+    expected: str,
+    absent: str,
+) -> None:
+    """Fit setup advice to what's missing: uv, the checkout, or a fresh sync."""
+    steps = " ".join(
+        script._environment_fix(
+            in_checkout=in_checkout, in_repo_venv=in_repo_venv, have_uv=have_uv
+        )
+    )
+    assert expected in steps
+    assert absent not in steps
+    # The run step works when pasted anywhere, not only from the repo root.
+    assert "&& uv run python scripts/where-is-my-pr" in steps

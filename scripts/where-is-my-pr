@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Show which deployment pipeline stages a GitHub PR has reached.
 
+Run it from an ol-infrastructure checkout with ``uv run python
+scripts/where-is-my-pr <PR URL>``. Started any other way (a Python without the repo's packages, an
+older Python, or a copy outside the checkout), it says how to fix that instead
+of failing on an import.
+
 Maps a PR's GitHub repo to its ol-infrastructure Concourse pipeline via the
 canonical app registry (``bridge.settings.apps``), then checks git ancestry
 of the PR's merge commit against that pipeline's stage branches:
@@ -61,9 +66,14 @@ is pipeline evidence, not proof a particular key was written to Vault. No SOPS
 decryption or Vault read-back is performed.
 """
 
+# Everything up to the environment check below has to run on old Pythons
+# (e.g. 3.8), so it can explain the problem instead of failing first.
+from __future__ import annotations
+
 import json
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -71,21 +81,88 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from fnmatch import fnmatchcase
-from functools import cache
 from pathlib import Path
 from typing import Any, NoReturn
 from urllib.parse import quote, urlencode
 
-import cyclopts
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Keep in step with requires-python in pyproject.toml.
+MIN_PYTHON = (3, 14)
+UV_INSTALL_URL = "https://docs.astral.sh/uv/getting-started/installation/"
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from bridge.settings.apps import APPS, github_repo, repo_main_branch
-from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
-from ol_concourse.pipelines.secrets_map import (
-    DEPLOY_CREDENTIAL_SECRETS,
-    PROJECT_SECRETS,
-    SECRETS_ROOT,
-)
+
+def _environment_fix(
+    *, in_checkout: bool, in_repo_venv: bool, have_uv: bool
+) -> list[str]:
+    """List the steps to run this script in the ol-infrastructure uv environment."""
+    repo = (
+        shlex.quote(str(REPO_ROOT)) if in_checkout else "<your ol-infrastructure clone>"
+    )
+    args = " ".join(shlex.quote(arg) for arg in sys.argv[1:]) or "<PR URL>"
+    steps = [] if have_uv else [f"Install uv: {UV_INSTALL_URL}"]
+    if not in_checkout:
+        steps.append(
+            "This copy isn't inside an ol-infrastructure checkout, which it "
+            "needs for the app registry. Clone it if you haven't: "
+            "git clone https://github.com/mitodl/ol-infrastructure.git"
+        )
+    if in_repo_venv:
+        steps.append(f"Update the environment: cd {repo} && uv sync")
+    else:
+        steps.append(f"Set up the environment (once): cd {repo} && uv sync")
+    steps.append(
+        f"Run the script through uv: cd {repo} && "
+        f"uv run python scripts/where-is-my-pr {args}"
+    )
+    return steps
+
+
+def _wrong_environment(problem: str) -> NoReturn:
+    """Stop before the third-party imports, explaining how to run under uv."""
+    in_checkout = (REPO_ROOT / "src" / "bridge").is_dir()
+    venv = (REPO_ROOT / ".venv").resolve()
+    in_repo_venv = in_checkout and Path(sys.prefix).resolve() == venv
+    print(
+        f"where-is-my-pr has to run in the ol-infrastructure Python "
+        f"environment, but {problem}.",
+        file=sys.stderr,
+    )
+    if in_repo_venv:
+        print("That environment looks out of date.", file=sys.stderr)
+    print("To fix this:", file=sys.stderr)
+    steps = _environment_fix(
+        in_checkout=in_checkout,
+        in_repo_venv=in_repo_venv,
+        have_uv=bool(shutil.which("uv")),
+    )
+    for number, step in enumerate(steps, start=1):
+        print(f"  {number}. {step}", file=sys.stderr)
+    sys.exit(1)
+
+
+if sys.version_info < MIN_PYTHON:
+    _wrong_environment(
+        f"it was started with Python {platform.python_version()} "
+        f"({sys.executable}), and it needs {'.'.join(map(str, MIN_PYTHON))} or "
+        "newer"
+    )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+try:
+    from functools import cache  # Python 3.9+
+
+    import cyclopts
+
+    from bridge.settings.apps import APPS, github_repo, repo_main_branch
+    from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
+    from ol_concourse.pipelines.secrets_map import (
+        DEPLOY_CREDENTIAL_SECRETS,
+        PROJECT_SECRETS,
+        SECRETS_ROOT,
+    )
+except ModuleNotFoundError as error:
+    missing = f"the '{error.name}' package" if error.name else "a required package"
+    _wrong_environment(f"{sys.executable} can't import {missing}")
 
 app = cyclopts.App(
     help="Show which ol-infrastructure deployment pipeline stages a GitHub PR has reached."
