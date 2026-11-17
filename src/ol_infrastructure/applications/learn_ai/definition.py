@@ -34,6 +34,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sConfig,
     OLApplicationK8sKedaWebappScalingConfig,
+    application_deployment_names,
 )
 from ol_infrastructure.lib.app_bindings import (
     ClusterCapabilities,
@@ -62,6 +63,7 @@ __all__ = [
     "application_config",
     "canvas_agent_consumer_spec",
     "cors_allow_origins",
+    "deployment_names",
     "direct_oidc_config",
     "direct_route_configs",
     "environment_variables",
@@ -208,6 +210,39 @@ def environment_variables(bindings: LearnAiBindings) -> dict[str, Any]:
     return env_vars
 
 
+def _celery_beat_config(sizing: LearnAiSizing) -> OLApplicationK8sCeleryBeatConfig:
+    return OLApplicationK8sCeleryBeatConfig(
+        scheduler="celery.beat.PersistentScheduler",
+        resource_requests=sizing.celery_beat.requests,
+        resource_limits=sizing.celery_beat.limits,
+    )
+
+
+def deployment_names(
+    sizing: LearnAiSizing,
+    *,
+    celery_topology: Literal["per-queue", "merged"],
+) -> list[str]:
+    """Return the Deployments ``application_config`` has ``OLApplicationK8s`` create.
+
+    Every one of them mounts the bindings' Secrets with ``envFrom``. The deployed
+    program needs the names as VSO restart targets for the Secrets it creates
+    before the bindings exist, since the bindings carry those Secrets' names.
+
+    :param sizing: The bindings' ``sizing``.
+    :param celery_topology: The bindings' ``celery_topology``.
+    :returns: The names, as ``OLApplicationK8s.all_deployment_names`` lists them.
+    :rtype: list[str]
+    """
+    return application_deployment_names(
+        application_name="learn-ai",
+        celery_worker_configs=celery_worker_configs(
+            CELERY_QUEUE_NAMES, celery_topology, sizing.celery_queues
+        ),
+        celery_beat_config=_celery_beat_config(sizing),
+    )
+
+
 def application_config(bindings: LearnAiBindings) -> OLApplicationK8sConfig:
     """Return the ``OLApplicationK8s`` config for these bindings."""
     cluster = bindings.cluster
@@ -267,11 +302,7 @@ def application_config(bindings: LearnAiBindings) -> OLApplicationK8sConfig:
         celery_worker_configs=celery_worker_configs(
             CELERY_QUEUE_NAMES, bindings.celery_topology, sizing.celery_queues
         ),
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            scheduler="celery.beat.PersistentScheduler",
-            resource_requests=sizing.celery_beat.requests,
-            resource_limits=sizing.celery_beat.limits,
-        ),
+        celery_beat_config=_celery_beat_config(sizing),
         webapp_keda_config=bindings.webapp_keda,
         manage_webapp_autoscaler=cluster.autoscalers,
         manage_celery_autoscalers=cluster.autoscalers,
