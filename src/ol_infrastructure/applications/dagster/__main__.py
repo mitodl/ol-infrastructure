@@ -144,6 +144,7 @@ DATA_LOADING_DB_SOURCES = (
     ("MITLEARN_APP_DB_HOST", projects.MIT_LEARN, "mit_learn"),
     ("LEARN_AI_APP_DB_HOST", projects.LEARN_AI, "learn_ai"),
     ("OCW_STUDIO_APP_DB_HOST", projects.OCW_STUDIO, "ocw_studio"),
+    ("MICROMASTERS_APP_DB_HOST", projects.MICROMASTERS, "micromasters"),
 )
 data_loading_db_stacks = (
     [
