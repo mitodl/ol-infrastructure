@@ -58,6 +58,12 @@ LOOKUP_CLIENT_VAULT_PATH = "sso/ol-memory-forget-lookup"
 # Each forget waits for the bank's in-flight work to drain, so a run at the cap
 # can take minutes. An hour means a hung connection, not a slow run.
 ACTIVE_DEADLINE_SECONDS = 3600
+# The script's exit status when the forget cap stopped the run
+# (forget_deleted_learners.CAP_EXCEEDED_STATUS).
+CAP_EXCEEDED_STATUS = 3
+# WorkloadJobFailed* fires while a failed Job exists, so a failed Job is removed
+# before the next daily run: one failure alerts once, a repeated one again.
+FINISHED_JOB_TTL_SECONDS = 12 * 60 * 60
 
 # A login that can read bank ids and nothing else. The tables belong to the app
 # role, so the grant is made as that role, the way the app role's own statements
@@ -122,10 +128,13 @@ def create_forget_job(  # noqa: PLR0913
     labels = k8s_app_labels.model_dump()
     keycloak_url, realm = keycloak_issuer.rsplit("/realms/", 1)
 
+    policy_template = (Path(__file__).parent / "forget_policy.hcl").read_text()
     vault_policy = Policy(
         f"{NAME}-vault-policy-{stack_info.env_suffix}",
         name=NAME,
-        policy=(Path(__file__).parent / "forget_policy.hcl").read_text(),
+        policy=Output.from_input(db_mount).apply(
+            lambda mount: policy_template.replace("DB_MOUNT", mount)
+        ),
     )
     vault_auth_role = vault_kubernetes.AuthBackendRole(
         f"{NAME}-k8s-vault-auth-backend-role-{stack_info.env_suffix}",
@@ -335,15 +344,28 @@ def create_forget_job(  # noqa: PLR0913
             concurrency_policy="Forbid",
             starting_deadline_seconds=3600,
             successful_jobs_history_limit=1,
-            failed_jobs_history_limit=3,
+            failed_jobs_history_limit=1,
             job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=labels),
                 spec=kubernetes.batch.v1.JobSpecArgs(
-                    # One retry rides out a Keycloak or Hindsight blip. A run that
-                    # hit the cap fails again and the Job fails, which alerts
-                    # (WorkloadJobFailed* in grafana_alerting).
+                    # One retry rides out a Keycloak or Hindsight blip. A failed
+                    # Job alerts (WorkloadJobFailed* in grafana_alerting).
                     backoff_limit=1,
+                    # A run the cap stopped would find the same learners again.
+                    pod_failure_policy=kubernetes.batch.v1.PodFailurePolicyArgs(
+                        rules=[
+                            kubernetes.batch.v1.PodFailurePolicyRuleArgs(
+                                action="FailJob",
+                                on_exit_codes=kubernetes.batch.v1.PodFailurePolicyOnExitCodesRequirementArgs(
+                                    container_name=NAME,
+                                    operator="In",
+                                    values=[CAP_EXCEEDED_STATUS],
+                                ),
+                            )
+                        ]
+                    ),
                     active_deadline_seconds=ACTIVE_DEADLINE_SECONDS,
+                    ttl_seconds_after_finished=FINISHED_JOB_TTL_SECONDS,
                     template=pod_template,
                 ),
             ),

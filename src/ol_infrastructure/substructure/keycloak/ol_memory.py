@@ -253,7 +253,9 @@ def create_ol_memory_resources(
         "olapps-ol-memory-forget-lookup-client-default-scopes",
         realm_id=realm_id,
         client_id=forget_lookup_client.id,
-        default_scopes=[],
+        # basic carries sub, without which the admin API cannot tell whose
+        # token it is.
+        default_scopes=["basic"],
         opts=resource_options,
     )
     realm_management_client = keycloak.openid.get_client_output(
@@ -261,17 +263,16 @@ def create_ol_memory_resources(
         client_id="realm-management",
         opts=InvokeOptions(provider=resource_options.provider),
     )
-    # view-users for GET /users/{id}, query-users for the users/count check the
-    # job makes before trusting any 404.
-    for role in ("view-users", "query-users"):
-        keycloak.openid.ClientServiceAccountRole(
-            f"olapps-ol-memory-forget-lookup-client-{role}",
-            realm_id=realm_id,
-            service_account_user_id=forget_lookup_client.service_account_user_id,
-            client_id=realm_management_client.id,
-            role=role,
-            opts=resource_options,
-        )
+    # view-users covers GET /users/{id} and the users/count check, and is what
+    # makes a missing user a 404 rather than a 403.
+    keycloak.openid.ClientServiceAccountRole(
+        "olapps-ol-memory-forget-lookup-client-view-users",
+        realm_id=realm_id,
+        service_account_user_id=forget_lookup_client.service_account_user_id,
+        client_id=realm_management_client.id,
+        role="view-users",
+        opts=resource_options,
+    )
     vault.generic.Secret(
         "olapps-ol-memory-forget-lookup-client-vault-credentials",
         path="secret-operations/sso/ol-memory-forget-lookup",

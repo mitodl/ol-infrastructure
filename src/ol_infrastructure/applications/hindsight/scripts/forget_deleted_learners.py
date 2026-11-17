@@ -46,14 +46,19 @@ asks Keycloak whether each user still exists, and forgets the banks of the users
 Keycloak reports missing, through ol-llm's forget path as the platform admin
 client.
 
-Only a 404 for the user means "deleted". Any other answer skips that learner for
-this run, so a Keycloak outage never reads as a deletion. Before looking anyone
-up, the run checks that the realm answers and has users, which catches a wrong
-realm or URL. If more learners would be forgotten than ``FORGET_CAP``, the run
-forgets none of them and fails, so a misread cannot wipe every bank at once; an
-operator who confirms a real backlog raises the cap for one run.
+Only Keycloak's own answer for a missing user (a 404 whose JSON body is
+``{"error": "User not found"}``) means "deleted". Any other answer, including a
+404 from something in front of Keycloak, skips that learner for this run, so an
+outage never reads as a deletion. The run checks that the realm answers and has
+users before the scan and again after it, which catches a wrong realm or URL and
+a realm that went away mid-scan. If more learners would be forgotten than
+``FORGET_CAP``, the run forgets none of them and exits ``CAP_EXCEEDED_STATUS``,
+so a misread cannot wipe every bank at once; an operator who confirms a real
+backlog raises the cap in the stack config.
 
-Logs carry counts, never learner ids.
+Logs carry counts, never learner ids. httpx and httpx2 log every request URL at
+INFO, and those URLs name the learner, so only this script's logger logs at
+INFO.
 """
 
 import logging
@@ -74,6 +79,10 @@ LEARNER_ID_RE = re.compile(
 )
 USE_CASE = "account-deletion"
 KEYCLOAK_TIMEOUT_SECONDS = 10
+USER_NOT_FOUND = {"error": "User not found"}
+# The CronJob fails the Job on this status without a retry, which would only
+# find the same learners again.
+CAP_EXCEEDED_STATUS = 3
 
 
 def learner_banks(conninfo: str) -> list[str]:
@@ -102,15 +111,10 @@ def deleted_learners(
     :param learners: the learner ids to check.
     :returns: the deleted learners, and how many lookups failed.
     :rtype: tuple[list[str], int]
-    :raises RuntimeError: if the realm does not answer with a user count above zero.
+    :raises RuntimeError: if the realm does not answer with a user count above
+        zero, before or after the scan.
     """
-    count = keycloak.get(f"/admin/realms/{realm}/users/count")
-    if count.status_code != httpx.codes.OK or int(count.text) <= 0:
-        msg = (
-            f"realm {realm!r} user count check returned {count.status_code}; "
-            "refusing to treat any learner as deleted"
-        )
-        raise RuntimeError(msg)
+    check_realm(keycloak, realm)
     deleted: list[str] = []
     failed = 0
     for learner in learners:
@@ -120,23 +124,54 @@ def deleted_learners(
             log.warning("user lookup failed: %s", type(exc).__name__)
             failed += 1
             continue
-        if response.status_code == httpx.codes.NOT_FOUND:
+        if response.status_code == httpx.codes.OK:
+            continue
+        if response.status_code == httpx.codes.NOT_FOUND and _json(response) == (
+            USER_NOT_FOUND
+        ):
             deleted.append(learner)
-        elif response.status_code != httpx.codes.OK:
+        else:
             log.warning("user lookup returned %s", response.status_code)
             failed += 1
+    check_realm(keycloak, realm)
     return deleted, failed
+
+
+def check_realm(keycloak: httpx.Client, realm: str) -> None:
+    """Make sure the realm answers and has users.
+
+    :param keycloak: client for the Keycloak admin API, authenticated.
+    :param realm: the realm.
+    :raises RuntimeError: if it does not answer with a user count above zero.
+    """
+    count = keycloak.get(f"/admin/realms/{realm}/users/count")
+    if count.status_code != httpx.codes.OK or int(count.text) <= 0:
+        msg = (
+            f"realm {realm!r} user count check returned {count.status_code}; "
+            "refusing to treat any learner as deleted"
+        )
+        raise RuntimeError(msg)
+
+
+def _json(response: httpx.Response) -> object:
+    try:
+        return response.json()
+    except ValueError:
+        return None
 
 
 def main() -> int:
     """Run one pass and return the process exit code.
 
-    :returns: 0 when every check and forget succeeded, 1 otherwise.
+    :returns: 0 when every check and forget succeeded, ``CAP_EXCEEDED_STATUS``
+        when the cap stopped the run, 1 otherwise.
     :rtype: int
     """
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+        level=logging.WARNING,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    log.setLevel(logging.INFO)
     cap = int(os.environ["FORGET_CAP"])
     realm = os.environ["KEYCLOAK_REALM"]
     keycloak_url = os.environ["KEYCLOAK_URL"]
@@ -160,6 +195,7 @@ def main() -> int:
     with httpx.Client(
         base_url=keycloak_url,
         auth=HttpxBearerAuth(tokens, host=httpx.URL(keycloak_url).host),
+        headers={"Accept": "application/json"},
         timeout=KEYCLOAK_TIMEOUT_SECONDS,
     ) as keycloak:
         deleted, lookup_failed = deleted_learners(keycloak, realm, learners)
@@ -173,7 +209,7 @@ def main() -> int:
     }
     if len(deleted) > cap:
         log.error("forget cap exceeded, forgetting none: %s", summary)
-        return 1
+        return CAP_EXCEEDED_STATUS
 
     admin = SyncMemory(build_memory()).admin(use_case=USE_CASE)
     forgotten = 0

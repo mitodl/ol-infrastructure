@@ -6,7 +6,7 @@ path "secret-operations/sso/ol-memory-forget-lookup" {
   capabilities = ["read"]
 }
 
-path "postgres-hindsight/creds/bank-ids" {
+path "DB_MOUNT/creds/bank-ids" {
   capabilities = ["read"]
 }
 
