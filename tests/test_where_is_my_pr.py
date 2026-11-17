@@ -1261,9 +1261,8 @@ def test_missing_packages_are_explained() -> None:
     )
     assert result.returncode == 1
     assert "can't import the 'cyclopts' package" in result.stderr
-    assert "uv run scripts/where-is-my-pr https://github.com/mitodl/x/pull/1" in (
-        result.stderr
-    )
+    run_step = "uv run python scripts/where-is-my-pr https://github.com/mitodl/x/pull/1"
+    assert run_step in result.stderr
     assert "Traceback" not in result.stderr
 
 
@@ -1293,4 +1292,5 @@ def test_environment_fix_steps(  # noqa: PLR0913
     )
     assert expected in steps
     assert absent not in steps
-    assert "uv run scripts/where-is-my-pr" in steps
+    # The run step works when pasted anywhere, not only from the repo root.
+    assert "&& uv run python scripts/where-is-my-pr" in steps
