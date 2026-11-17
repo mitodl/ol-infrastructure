@@ -25,8 +25,9 @@ such a re-run fails before it records anything.
 k8s releases: the tag records that a release reached Production, for
 consumers that want only promoted releases (the app's API-client pipeline
 publishes its stable client from these tags). The k8s Production job runs
-this after the deploy and without ``CHECK_ONLY``, so a re-run of an old build
-still rolls Production back, and then fails here.
+this after the deploy, without ``CHECK_ONLY`` and with ``ALLOW_OLDER``, so a
+re-run of an old build still rolls Production back, gets no tag (so no client
+is published for it), and does not fail the job.
 
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the
@@ -41,6 +42,9 @@ Environment:
         release GitHub App's credentials.
     GITHUB_API_URL: optional, defaults to ``https://api.github.com``.
     CHECK_ONLY: optional; when non-empty, run every check but create nothing.
+    ALLOW_OLDER: optional; when non-empty, leave a version older than the
+        newest Production tag untagged instead of failing.
+
 """
 
 import base64
@@ -164,12 +168,20 @@ def newest_production_version(github: GitHub, repo: str, prefix: str) -> str | N
     return max(versions, key=_version_key, default=None)
 
 
-def promote(
-    github: GitHub, repo: str, version: str, prefix: str, *, check_only: bool = False
+def promote(  # noqa: PLR0913
+    github: GitHub,
+    repo: str,
+    version: str,
+    prefix: str,
+    *,
+    check_only: bool = False,
+    allow_older: bool = False,
 ) -> str:
     """Create ``<prefix><version>`` at the commit tagged *version*; return a report.
 
-    With *check_only*, stop after the checks and create nothing.
+    With *check_only*, stop after the checks and create nothing. With
+    *allow_older*, a version older than the newest Production tag is
+    reported and left untagged rather than refused.
 
     Raises RuntimeError when the release tag is gone, a newer version already
     has a Production tag, or the Production tag already names another commit.
@@ -177,6 +189,11 @@ def promote(
     production_tag = f"{prefix}{version}"
     newest = newest_production_version(github, repo, prefix)
     if newest is not None and _version_key(newest) > _version_key(version):
+        if allow_older:
+            return (
+                f"{prefix}{newest} is newer, so {version} gets no Production tag "
+                "(a rollback?); nothing to do."
+            )
         msg = (
             f"{prefix}{newest} is newer, and consumers run the newest Production "
             f"tag, so {version} cannot be put back in Production. Is this a "
@@ -241,6 +258,7 @@ def main() -> None:
             version,
             prefix,
             check_only=bool(os.environ.get("CHECK_ONLY")),
+            allow_older=bool(os.environ.get("ALLOW_OLDER")),
         )
         print(report)  # noqa: T201
     except RuntimeError as error:

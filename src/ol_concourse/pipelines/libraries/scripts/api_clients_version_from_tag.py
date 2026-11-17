@@ -31,6 +31,8 @@ Environment:
     SOURCE_DIR: the source repo's checkout, which the git resource got at the
         tag. The resource names the tag in ``.git/tag``, or in
         ``.git/metadata.json`` on a resource version that lacks that file.
+    TAG_REGEX: the pipeline's tag regex, which picks the tag that triggered
+        the build out of the tags on its commit.
     PACKAGES: the package directories under ``src/typescript/``, separated by
         whitespace.
 """
@@ -64,18 +66,32 @@ def client_version(tag: str) -> str:
     return f"{int(match['year'])}.{month}{day:02d}.{int(match['n'])}"
 
 
-def source_tag(source_dir: Path) -> str:
-    """Return the tag the git resource checked *source_dir* out at."""
+def source_tag(source_dir: Path, tag_regex: str) -> str:
+    """Return the tag matching *tag_regex* that *source_dir* is checked out at.
+
+    The git resource writes ``git tag --points-at HEAD``, one tag per line,
+    and a Production tag shares its commit with the release tag, so the file
+    holds both (``2026.11.17.1`` and ``production/2026.11.17.1``). Exactly one
+    line may match the pipeline's tag regex.
+    """
+    text = ""
     tag_file = source_dir / ".git" / "tag"
-    if tag_file.is_file() and (tag := tag_file.read_text().strip()):
-        return tag
+    if tag_file.is_file():
+        text = tag_file.read_text()
     metadata = source_dir / ".git" / "metadata.json"
-    if metadata.is_file():
+    if not text.strip() and metadata.is_file():
         for entry in json.loads(metadata.read_text()):
             if entry.get("name") == "tag" and entry.get("value"):
-                return str(entry["value"]).strip()
-    msg = f"{source_dir} has no .git/tag or tag metadata; is it a tag checkout?"
-    raise ValueError(msg)
+                text = str(entry["value"])
+    tags = [line.strip() for line in text.splitlines() if line.strip()]
+    if not tags:
+        msg = f"{source_dir} has no .git/tag or tag metadata; is it a tag checkout?"
+        raise ValueError(msg)
+    matching = [tag for tag in tags if re.search(tag_regex, tag)]
+    if len(matching) != 1:
+        msg = f"expected one of the tags {tags} to match {tag_regex!r}"
+        raise ValueError(msg)
+    return matching[0]
 
 
 def _release_key(version: str) -> tuple[int, int, int] | None:
@@ -129,7 +145,7 @@ def main() -> None:
         print("The client is unchanged: not setting a version.")  # noqa: T201
         return
     try:
-        tag = source_tag(Path(os.environ["SOURCE_DIR"]))
+        tag = source_tag(Path(os.environ["SOURCE_DIR"]), os.environ["TAG_REGEX"])
         version = client_version(tag)
         set_version(repo, version, os.environ.get("PACKAGES", "").split())
     except ValueError as error:

@@ -273,6 +273,7 @@ def test_a_tag_variant_versions_from_the_tag(variant):
     assert {"name": config["source_repo_name"]} in task["inputs"]
     assert task["params"] == {
         "SOURCE_DIR": f"../{config['source_repo_name']}",
+        "TAG_REGEX": PRODUCTION_RELEASE_TAG_REGEX,
         "PACKAGES": " ".join(_subpaths(variant)),
     }
     assert task["run"]["path"] == "python3"
@@ -340,7 +341,20 @@ def test_every_new_version_sorts_above_the_old_scheme():
 def test_the_tag_comes_from_the_resource_tag_file(tmp_path):
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "tag").write_text("production/2026.11.16.1\n")
-    assert source_tag(tmp_path) == "production/2026.11.16.1"
+    assert (
+        source_tag(tmp_path, PRODUCTION_RELEASE_TAG_REGEX) == "production/2026.11.16.1"
+    )
+
+
+def test_the_production_tag_is_picked_out_of_the_tags_on_its_commit(tmp_path):
+    """The resource writes `git tag --points-at HEAD`, and a Production tag
+    shares its commit with the release tag (and a depth-1 clone fetches both).
+    """
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "tag").write_text("2026.11.16.1\nproduction/2026.11.16.1\n")
+    assert (
+        source_tag(tmp_path, PRODUCTION_RELEASE_TAG_REGEX) == "production/2026.11.16.1"
+    )
 
 
 def test_the_tag_falls_back_to_the_resource_metadata(tmp_path):
@@ -350,17 +364,28 @@ def test_the_tag_falls_back_to_the_resource_metadata(tmp_path):
         json.dumps(
             [
                 {"name": "commit", "value": "a" * 40},
-                {"name": "tag", "value": "production/2026.11.16.2"},
+                {"name": "tag", "value": "2026.11.16.2\nproduction/2026.11.16.2"},
             ]
         )
     )
-    assert source_tag(tmp_path) == "production/2026.11.16.2"
+    assert (
+        source_tag(tmp_path, PRODUCTION_RELEASE_TAG_REGEX) == "production/2026.11.16.2"
+    )
 
 
-def test_a_checkout_with_no_tag_is_refused(tmp_path):
+@pytest.mark.parametrize(
+    ("tags", "match"),
+    [
+        ("", "tag checkout"),
+        ("2026.11.16.1\n", "expected one"),
+        ("production/2026.11.16.1\nproduction/2026.11.16.2\n", "expected one"),
+    ],
+)
+def test_a_checkout_without_exactly_one_matching_tag_is_refused(tmp_path, tags, match):
     (tmp_path / ".git").mkdir()
-    with pytest.raises(ValueError, match="tag checkout"):
-        source_tag(tmp_path)
+    (tmp_path / ".git" / "tag").write_text(tags)
+    with pytest.raises(ValueError, match=match):
+        source_tag(tmp_path, PRODUCTION_RELEASE_TAG_REGEX)
 
 
 PACKAGE_JSON = """{
@@ -425,9 +450,10 @@ def test_the_version_step_versions_a_changed_client(tmp_path, monkeypatch):
     (repo / ".git" / "client-changed").touch()
     source = tmp_path / "mitxonline"
     (source / ".git").mkdir(parents=True)
-    (source / ".git" / "tag").write_text("production/2026.11.17.1\n")
+    (source / ".git" / "tag").write_text("2026.11.17.1\nproduction/2026.11.17.1\n")
     monkeypatch.chdir(repo)
     monkeypatch.setenv("SOURCE_DIR", str(source))
+    monkeypatch.setenv("TAG_REGEX", PRODUCTION_RELEASE_TAG_REGEX)
     monkeypatch.setenv("PACKAGES", "one-api-axios")
 
     api_clients_version_from_tag.main()

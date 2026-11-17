@@ -95,6 +95,7 @@ def test_production_tags_the_version_it_deployed(app_name):
         "GITHUB_APP_ID": GITHUB_APP_ID,
         "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
         "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+        "ALLOW_OLDER": "true",
     }
     assert task["config"]["inputs"] == [{"name": f"{app_name}-release"}]
 

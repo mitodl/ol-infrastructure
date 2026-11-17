@@ -2250,9 +2250,12 @@ def _build_release_resource_app_pipeline(
     # publishes a stable client from them (libraries/configuration.py). A
     # re-run of an infrastructure-only promotion finds the tag in place and
     # changes nothing. A re-run of an old build that rolls Production back
-    # fails here, after deploying, because a newer version already has a
-    # Production tag: the rollback is live, and no client is published for it.
-    additional_post_steps[1].append(_promote_tag_task(github_repo, release_res))
+    # gets no tag, because a newer version already has one, so no client is
+    # published for it; ALLOW_OLDER keeps that from failing a deploy that
+    # succeeded (and from the job's Slack alert calling it a failed deploy).
+    additional_post_steps[1].append(
+        _promote_tag_task(github_repo, release_res, allow_older=True)
+    )
     # Last in QA, after the RC deployment is marked and the cache purged, so
     # a GitHub failure here leaves the job red without misreporting either.
     additional_post_steps[0].append(
@@ -2454,15 +2457,21 @@ CHECK_PROMOTE_TAG_TASK_NAME = "check-promote-tag"
 
 
 def _promote_tag_task(
-    github_repo: str, release_res: Resource, *, check_only: bool = False
+    github_repo: str,
+    release_res: Resource,
+    *,
+    check_only: bool = False,
+    allow_older: bool = False,
 ) -> TaskStep:
     """Create the release's ``production/<version>`` tag at its release tag.
 
     Retried: re-running finds the tag already at the commit and changes
     nothing. With *check_only* the task runs the script's checks (the release
     tag is there, no newer version has a Production tag, and this version's
-    tag is absent or already at the commit) and creates nothing. See the
-    script's docstring.
+    tag is absent or already at the commit) and creates nothing. With
+    *allow_older* a version older than the newest Production tag (a k8s
+    rollback) is left untagged instead of failing the task. See the script's
+    docstring.
     """
     params = {
         "VERSION_FILE": f"{release_res.name}/version",
@@ -2474,6 +2483,8 @@ def _promote_tag_task(
     }
     if check_only:
         params["CHECK_ONLY"] = "true"
+    if allow_older:
+        params["ALLOW_OLDER"] = "true"
     return TaskStep(
         task=Identifier(
             CHECK_PROMOTE_TAG_TASK_NAME if check_only else PROMOTE_TAG_TASK_NAME

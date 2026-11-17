@@ -207,6 +207,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
                 outputs=[Output(name=api_clients_repository.name)],
                 params={
                     "SOURCE_DIR": f"../{source_repository.name}",
+                    "TAG_REGEX": source_repo_tag_regex,
                     "PACKAGES": " ".join(client_repo_subpaths),
                 },
                 run=Command(

@@ -260,11 +260,16 @@ def _promote(  # noqa: PLR0913
     prefix: str = PRODUCTION_TAG_PREFIX,
     *,
     check_only: bool = False,
+    allow_older: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     (tmp_path / "version").write_text(version + "\n")
-    env = {k: v for k, v in os.environ.items() if k != "CHECK_ONLY"}
+    env = {
+        k: v for k, v in os.environ.items() if k not in {"CHECK_ONLY", "ALLOW_OLDER"}
+    }
     if check_only:
         env["CHECK_ONLY"] = "true"
+    if allow_older:
+        env["ALLOW_OLDER"] = "true"
     return subprocess.run(  # noqa: S603
         [sys.executable, "-c", _PROMOTE_TAG_SCRIPT],
         env={
@@ -341,6 +346,28 @@ def test_a_version_older_than_production_is_refused(
     assert result.returncode != 0
     assert "production/2026.11.10.1 is newer" in result.stderr
     assert _FakeGitHub.created == []
+
+
+def test_allow_older_leaves_a_rollback_untagged_without_failing(
+    tmp_path, fake_github, private_key
+):
+    """A k8s rollback has deployed already; it gets no tag and no failure."""
+    _FakeGitHub.refs["production/2026.11.10.1"] = {"type": "commit", "sha": OTHER}
+
+    result = _promote(tmp_path, fake_github, private_key, allow_older=True)
+
+    assert result.returncode == 0, result.stderr
+    assert "production/2026.11.10.1 is newer" in result.stdout
+    assert _FakeGitHub.created == []
+
+
+def test_allow_older_still_tags_a_newer_version(tmp_path, fake_github, private_key):
+    result = _promote(tmp_path, fake_github, private_key, allow_older=True)
+
+    assert result.returncode == 0, result.stderr
+    assert _FakeGitHub.created == [
+        {"ref": f"refs/tags/production/{VERSION}", "sha": COMMIT}
+    ]
 
 
 def test_an_older_production_tag_does_not_block_a_newer_version(
