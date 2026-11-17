@@ -54,7 +54,9 @@ users before the scan and again after it, which catches a wrong realm or URL and
 a realm that went away mid-scan. If more learners would be forgotten than
 ``FORGET_CAP``, the run forgets none of them and exits ``CAP_EXCEEDED_STATUS``,
 so a misread cannot wipe every bank at once; an operator who confirms a real
-backlog raises the cap in the stack config.
+backlog raises the cap in the stack config. If any lookup failed, the run also
+forgets none and exits 1: the Job's retry scans again from the start, and a run
+that forgot part of the set would let that retry forget up to another cap.
 
 Logs carry counts, never learner ids. httpx and httpx2 log every request URL at
 INFO, and those URLs name the learner, so only this script's logger logs at
@@ -207,6 +209,11 @@ def main() -> int:
         "lookups_failed": lookup_failed,
         "cap": cap,
     }
+    # The Job retries a failed run with a fresh scan. Forgetting part of the set
+    # first would let the retry forget up to another cap.
+    if lookup_failed:
+        log.error("user lookups failed, forgetting none: %s", summary)
+        return 1
     if len(deleted) > cap:
         log.error("forget cap exceeded, forgetting none: %s", summary)
         return CAP_EXCEEDED_STATUS
@@ -224,7 +231,7 @@ def main() -> int:
             forgotten += 1
     summary |= {"forgotten": forgotten, "forgets_failed": forget_failed}
     log.info("run complete: %s", summary)
-    return 1 if lookup_failed or forget_failed else 0
+    return 1 if forget_failed else 0
 
 
 if __name__ == "__main__":
