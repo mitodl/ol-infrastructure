@@ -67,7 +67,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
         "GRAVITINO_VERSION",
     ],
     "applications/gwarek/": [],
-    "applications/hindsight/": ["HINDSIGHT_VERSION"],
+    "applications/hindsight/": ["HINDSIGHT_VERSION", "UV_IMAGE_TAG"],
     "applications/jupyterhub/": ["JUPYTERHUB_CHART_VERSION"],
     "applications/jupyterhub_data/": [
         "JUPYTERHUB_CHART_VERSION",
