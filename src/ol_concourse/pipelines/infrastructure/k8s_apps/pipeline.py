@@ -2243,6 +2243,16 @@ def _build_release_resource_app_pipeline(
         additional_post_steps[1].append(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
+    # Last in Production, once the release is live, recorded as live, finished
+    # and its cache purged: tag the release `production/<version>`, as a
+    # tag-only release's Production job does. Consumers that want only what
+    # Production runs follow these tags; the app's API-client pipeline
+    # publishes a stable client from them (libraries/configuration.py). A
+    # re-run of an infrastructure-only promotion finds the tag in place and
+    # changes nothing. A re-run of an old build that rolls Production back
+    # fails here, after deploying, because a newer version already has a
+    # Production tag: the rollback is live, and no client is published for it.
+    additional_post_steps[1].append(_promote_tag_task(github_repo, release_res))
     # Last in QA, after the RC deployment is marked and the cache purged, so
     # a GitHub failure here leaves the job red without misreporting either.
     additional_post_steps[0].append(

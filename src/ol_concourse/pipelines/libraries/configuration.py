@@ -1,18 +1,25 @@
+# A release that reached Production. ol-analytics-api and mitxonline cut
+# releases as bare CalVer tags (2026.9.17.1) through the release-resource
+# workflow and keep no long-lived release branch, and their Production jobs add
+# `production/<version>` (bridge.settings.apps.PRODUCTION_TAG_PREFIX) at the
+# release tag once the release is live. Watching those rather than the release
+# tags publishes a client only for a promoted release: a published,
+# non-prerelease client means "ready to use", and an abandoned release
+# publishes nothing.
+#
+# POSIX ERE, not PCRE: the resource filters tags with `grep -E`, where `\d` is
+# not a digit class. GNU grep warns "stray \ before d" and drops it, leaving a
+# pattern that matches nothing and a pipeline that never fires on a release.
+# The anchors exclude the bare release tags, the legacy vX.Y.Z tags and the
+# release resource's abandoned/<version> tombstones.
+PRODUCTION_RELEASE_TAG_REGEX = r"^production/[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.[0-9]+$"
+
 PIPELINE_CONFIGS = {
-    # ol-analytics-api and mitxonline cut releases as bare CalVer tags
-    # (2026.9.17.1) through the release-resource workflow and keep no
-    # long-lived release branch, so they version on tags. mit-learn is still
-    # on the legacy flow and watches its `release` branch; move it to tags
-    # when its app flips to `release_resource_workflow` in bridge/settings/apps.py.
     "ol-analytics-api": {
         "source_repo_name": "ol-analytics-api",
         "source_repo_uri": "https://github.com/mitodl/ol-analytics-api",
         "source_repo_branch": "main",
-        # POSIX ERE, not PCRE: the resource filters tags with `grep -E`, where
-        # `\d` is not a digit class. GNU grep warns "stray \ before d" and drops
-        # it, leaving a pattern that matches nothing and a pipeline that never
-        # fires on a release.
-        "source_repo_tag_regex": r"^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.[0-9]+$",
+        "source_repo_tag_regex": PRODUCTION_RELEASE_TAG_REGEX,
         "client_repo_name": "ol-analytics-api-clients",
         "client_repo_uri": "git@github.com:mitodl/ol-analytics-api-clients.git",
         "client_repo_branch": "main",
@@ -26,6 +33,11 @@ PIPELINE_CONFIGS = {
             "ol-analytics-learner-records-api-axios",
         ],
     },
+    # mit-learn is still on the legacy flow and watches its `release` branch,
+    # which Doof merges a release candidate into only when it is promoted.
+    # Move it to PRODUCTION_RELEASE_TAG_REGEX, and so to versions taken from
+    # its releases rather than bumpver, when its app flips to
+    # `release_resource_workflow` in bridge/settings/apps.py.
     "mit-learn": {
         "source_repo_name": "mit-learn",
         "source_repo_uri": "https://github.com/mitodl/mit-learn",
@@ -43,9 +55,7 @@ PIPELINE_CONFIGS = {
         "source_repo_name": "mitxonline",
         "source_repo_uri": "https://github.com/mitodl/mitxonline",
         "source_repo_branch": "main",
-        # Same ERE as ol-analytics-api above. It excludes the legacy vX.Y.Z
-        # tags and the release resource's abandoned/<version> tombstones.
-        "source_repo_tag_regex": r"^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.[0-9]+$",
+        "source_repo_tag_regex": PRODUCTION_RELEASE_TAG_REGEX,
         "client_repo_name": "mitxonline-api-clients",
         "client_repo_uri": "git@github.com:mitodl/mitxonline-api-clients.git",
         "client_repo_branch": "main",

@@ -1,12 +1,13 @@
-"""Point the Production tag of a tag-only release at its release tag.
+"""Point the Production tag of a release at its release tag.
 
 Runs in a tag-only release's Production job after the gate approves the
-version. A tag-only release deploys nothing itself: its consumers check the
-repository out at a tag. RC consumers track the newest ``<version>`` tag,
-which the release resource pushes when it cuts a release. Production
-consumers track the newest ``production/<version>`` tag, and this is the only
-thing that writes one, so a release reaches Production only after its gate
-issue is closed.
+version, and last in a k8s release's Production job, after the deploy (see
+"k8s releases" below). A tag-only release deploys nothing itself: its
+consumers check the repository out at a tag. RC consumers track the newest
+``<version>`` tag, which the release resource pushes when it cuts a release.
+Production consumers track the newest ``production/<version>`` tag, and this
+is the only thing that writes one, so a release reaches Production only after
+its gate issue is closed.
 
 The Production tag names the same commit as the release tag, so Production
 gets exactly what RC ran. An annotated release tag is followed to its commit.
@@ -20,6 +21,12 @@ re-running an old Production build changes nothing they run, but its
 Production Deployment would report the old version as live. The Production
 job runs this with ``CHECK_ONLY`` set before it starts that Deployment, so
 such a re-run fails before it records anything.
+
+k8s releases: the tag records that a release reached Production, for
+consumers that want only promoted releases (the app's API-client pipeline
+publishes its stable client from these tags). The k8s Production job runs
+this after the deploy and without ``CHECK_ONLY``, so a re-run of an old build
+still rolls Production back, and then fails here.
 
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the

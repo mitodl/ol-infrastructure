@@ -8,6 +8,10 @@
 # `latest`. Unique per build, so a re-run publishes a new version instead of
 # hitting npm's 403 on an existing one. The `g` keeps an all-digit short sha
 # from being a numeric semver identifier, which may not have a leading zero.
+#
+# Published only when the built client differs from both the current `next`
+# and `latest` packages, so a spec edit that leaves the generated client as it
+# was publishes nothing.
 set -euo pipefail
 
 export YARN_NPM_PUBLISH_REGISTRY=https://registry.npmjs.org/
@@ -24,5 +28,17 @@ version="$(date -u +%Y.%-m%d).0-dev.$(date -u +%s).g${SOURCE_SHA:0:7}"
 # a .git, and node:*-slim ships without git ("Process git failed to spawn").
 npm pkg set "version=$version"
 yarn build
+# dist/ is everything the client is: the package ships dist/ and LICENSE only,
+# and nothing in dist/ carries the package version.
+name="$(node -p "require('./package.json').name")"
+for channel in next latest; do
+	published="$(mktemp -d)"
+	if npm pack "$name@$channel" --pack-destination "$published" >/dev/null 2>&1 &&
+		tar -xzf "$published"/*.tgz -C "$published" &&
+		diff -r -q dist "$published/package/dist" >/dev/null; then
+		echo "This client is the one already published as $name@$channel: publishing nothing."
+		exit 0
+	fi
+done
 echo "Publishing prerelease $version"
 yarn npm publish --access public --tag next
