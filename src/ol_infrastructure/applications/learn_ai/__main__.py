@@ -5,6 +5,7 @@ import json
 import mimetypes
 import textwrap
 from pathlib import Path
+from typing import Literal
 
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
@@ -57,6 +58,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -694,6 +696,25 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
+# The bindings below take these too, so the restart targets name the Deployments
+# the component goes on to create.
+learn_ai_sizing = definition.LearnAiSizing()
+learn_ai_celery_topology: Literal["per-queue", "merged"] = "per-queue"
+
+# Every Secret below reaches the webapp, celery worker and beat pods through
+# envFrom, so its values are environment variables fixed at pod start, and VSO
+# re-rendering the Secret doesn't touch a running pod. Worse, a Pulumi run that
+# changes a Vault value and the pod template together rolls the pods straight
+# away, while VSO picks up the new value only on its next refresh (up to
+# refreshAfter later), so the new pods start with the old value. With these
+# targets VSO rolling-restarts every Deployment when a Secret's content changes.
+env_secret_restart_targets = [
+    OLVaultRestartTarget(kind="Deployment", name=name)
+    for name in definition.deployment_names(
+        learn_ai_sizing, celery_topology=learn_ai_celery_topology
+    )
+]
+
 # Load the database creds into a k8s secret via VSO
 db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
 db_creds_secret = Output.all(
@@ -711,8 +732,7 @@ db_creds_secret = Output.all(
             labels=k8s_global_labels,
             mount=learn_ai_db.app_db_vault_backend.db_mount.path,
             path="creds/app",
-            restart_target_kind="Deployment",
-            restart_target_name="learn-ai-app",
+            restart_targets=env_secret_restart_targets,
             templates=secret_named(
                 vault_secrets(
                     database_mount=learn_ai_db.app_db_vault_backend.db_mount.path,
@@ -772,6 +792,7 @@ static_secrets = OLVaultK8SSecret(
         includes=["*"],
         excludes=[],
         exclude_raw=True,
+        restart_targets=env_secret_restart_targets,
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -799,7 +820,7 @@ opik_keycloak_secret = OLVaultK8SSecret(
         mount=OPIK_SDK_VAULT_MOUNT,
         mount_type="kv-v1",
         path=opik_sdk_vault_path("learn-ai"),
-        restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
+        restart_targets=env_secret_restart_targets,
         templates=secret_named(
             vault_secrets(database_mount="", database_host="", database_name=""),
             "learn-ai-opik-keycloak",
@@ -927,6 +948,8 @@ bindings = definition.LearnAiBindings(
     ),
     service_account_name=learn_ai_service_account.metadata.name,
     min_replicas=min_replicas,
+    sizing=learn_ai_sizing,
+    celery_topology=learn_ai_celery_topology,
     slack_channel=slack_channel,
     celery_redis=OLApplicationK8sCeleryRedisConfig(
         host=redis_cache.address,
