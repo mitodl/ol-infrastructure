@@ -32,6 +32,11 @@ from pydantic import SecretStr
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import HINDSIGHT_VERSION
+from ol_infrastructure.applications.hindsight.forget_job import (
+    BANK_IDS_DB_ROLE,
+    bank_ids_role_statements,
+    create_forget_job,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -203,6 +208,7 @@ hindsight_db_vault_backend = OLVaultDatabaseBackend(
                 **postgres_role_statements["app"],
                 "create": hindsight_app_create_statements,
             },
+            BANK_IDS_DB_ROLE: bank_ids_role_statements,
         },
     )
 )
@@ -528,10 +534,30 @@ kubernetes.apiextensions.CustomResource(
     },
 )
 
+################################
+# Forget on account deletion
+################################
+hindsight_url = f"http://{API_NAME}.{NAMESPACE}.svc.cluster.local:{API_PORT}"
+create_forget_job(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_app_labels=k8s_app_labels,
+    alert_tier=alert_tier,
+    vault_address=Config("vault").require("address"),
+    vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+    db_mount=hindsight_db_vault_backend.db_mount.path,
+    db_address=hindsight_db.db_instance.address,
+    db_name=DB_NAME,
+    hindsight_url=hindsight_url,
+    keycloak_issuer=keycloak_issuer,
+    schedule=hindsight_config.require("forget_schedule"),
+    forget_cap=hindsight_config.require_int("forget_cap"),
+)
+
 export(
     "hindsight",
     {
-        "url": f"http://{API_NAME}.{NAMESPACE}.svc.cluster.local:{API_PORT}",
+        "url": hindsight_url,
         "keycloak_audience": hindsight_config.require("keycloak_audience"),
         "general_scope": hindsight_config.require("general_scope"),
         "db_address": hindsight_db.db_instance.address,
