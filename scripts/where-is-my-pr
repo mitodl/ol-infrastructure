@@ -221,8 +221,8 @@ CONNECTOR_ADVICE = (
     "When the browser opens, choose GitHub. Any mitodl GitHub org member gets "
     "read access, which is all this script needs.",
     "'OL Platform Engineering' (Keycloak) works only if your Keycloak account "
-    "has the 'developer' role. Without it, login fails with \"you are not a "
-    "member of 'infrastructure'\".",
+    "has the 'developer' or 'admin' role. Without one, login fails with "
+    "\"you are not a member of 'infrastructure'\".",
 )
 GITHUB_ORG_ADVICE = (
     "Check that you belong to the mitodl GitHub org: "
@@ -283,8 +283,8 @@ def _no_role_access(user: dict[str, Any]) -> FlyAccess:
             ok=False,
             summary=(
                 f"you're logged in to Concourse with Keycloak (OL Platform "
-                f"Engineering) as {who}, but your account doesn't have the "
-                f"'developer' role, so you have no role on the "
+                f"Engineering) as {who}, but your account has neither the "
+                f"'developer' nor the 'admin' role, so you have no role on the "
                 f"'{CONCOURSE_TEAM}' team"
             ),
             fix=(
@@ -335,12 +335,6 @@ def _diagnose_fly_access() -> FlyAccess:
             summary=f"fly has no '{CONCOURSE_TEAM}' target yet",
             fix=login_steps,
         )
-    if "incompatible" in output.lower():
-        return FlyAccess(
-            ok=False,
-            summary="your fly version is incompatible with our Concourse server",
-            fix=(f"Update it: fly -t {CONCOURSE_TEAM} sync",),
-        )
     if status.returncode != 0:
         detail = next((line for line in output.splitlines() if line.strip()), "")
         detail = detail.strip().rstrip(".")
@@ -352,7 +346,25 @@ def _diagnose_fly_access() -> FlyAccess:
             ),
             fix=login_steps,
         )
-    user = _fly_curl("/api/v1/user")
+    # `fly status` skips the version check; `fly curl` refuses any major or
+    # minor mismatch with the server ("... is out of sync with the target").
+    lookup = _run_fly("curl", "/api/v1/user", "--", "-s")
+    if lookup is None:
+        return FlyAccess(
+            ok=False,
+            summary=f"fly couldn't fetch your user info from {CONCOURSE_URL} in time",
+            fix=("Check your network or VPN, then re-run this script.",),
+        )
+    if "out of sync" in f"{lookup.stdout}\n{lookup.stderr}":
+        return FlyAccess(
+            ok=False,
+            summary="your fly version doesn't match our Concourse server's",
+            fix=(f"Update it: fly -t {CONCOURSE_TEAM} sync",),
+        )
+    try:
+        user = json.loads(lookup.stdout) if lookup.returncode == 0 else None
+    except json.JSONDecodeError:
+        user = None
     if not isinstance(user, dict):
         return FlyAccess(
             ok=False,

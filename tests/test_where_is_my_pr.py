@@ -1,6 +1,7 @@
 """Regression tests for registry-driven, read-only SOPS deployment tracing."""
 
 import importlib.util
+import json
 import sys
 from dataclasses import replace
 from importlib.machinery import SourceFileLoader
@@ -1042,7 +1043,6 @@ def test_access_fly_not_installed(
     [
         (_completed(1, stderr="error: unknown target: infrastructure"), "no '"),
         (_completed(1, stderr="please login again.\ntoken expired"), "expired"),
-        (_completed(1, stderr="fly version (7.1.0) is incompatible"), "version"),
         (None, "didn't finish"),
     ],
 )
@@ -1069,7 +1069,7 @@ def test_access_fly_status_failures(
         (
             {"connector": "oidc", "user_name": "dev", "teams": {}},
             False,
-            "'developer' role",
+            "neither the 'developer' nor the 'admin' role",
         ),
         (
             {"connector": "github", "user_name": "dev", "teams": {"main": []}},
@@ -1087,13 +1087,49 @@ def test_access_team_roles(
     expected: str,
 ) -> None:
     """A valid login still needs a role on the team (or Concourse admin)."""
-    monkeypatch.setattr(script, "_run_fly", Mock(return_value=_completed(0)))
-    monkeypatch.setattr(script, "_fly_curl", Mock(return_value=user))
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(side_effect=[_completed(0), _completed(0, stdout=json.dumps(user))]),
+    )
     access = script._diagnose_fly_access()
     assert access.ok is ok
     assert expected in access.summary
     if not ok:
         assert any("fly -t infrastructure logout" in step for step in access.fix)
+
+
+@pytest.mark.usefixtures("fly_installed")
+@pytest.mark.parametrize(
+    ("lookup", "expected"),
+    [
+        (
+            _completed(
+                1,
+                stderr="fly version (8.2.0) is out of sync with the target (8.3.3).",
+            ),
+            "doesn't match",
+        ),
+        (_completed(1, stderr="connection refused"), "user info"),
+        (_completed(0, stdout="<html>not json</html>"), "user info"),
+        (None, "in time"),
+    ],
+)
+def test_access_user_lookup_failures(
+    script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    lookup: Mock | None,
+    expected: str,
+) -> None:
+    """`fly status` can pass while `fly curl` fails, e.g. on a minor version skew."""
+    monkeypatch.setattr(
+        script, "_run_fly", Mock(side_effect=[_completed(0, stdout="ok"), lookup])
+    )
+    access = script._diagnose_fly_access()
+    assert not access.ok
+    assert expected in access.summary
+    if expected == "doesn't match":
+        assert access.fix == ("Update it: fly -t infrastructure sync",)
 
 
 def test_access_report_is_silent_when_ok(
