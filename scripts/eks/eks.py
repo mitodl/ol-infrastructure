@@ -12,7 +12,7 @@ import sys
 import urllib.parse
 import webbrowser
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -23,6 +23,7 @@ from typing import Any
 import boto3
 import cyclopts
 import hvac
+import hvac.exceptions
 import yaml
 
 app = cyclopts.App(help="Manage MIT Open Learning EKS kubeconfig setup and auth.")
@@ -32,6 +33,11 @@ AWS_DEFAULT_REGION = "us-east-1"
 CACHE_DIR = Path.home() / ".cache" / "ol-infrastructure" / "eks"
 EXEC_DEBUG_LOG_PATH = CACHE_DIR / "exec-debug.log"
 EXEC_DEBUG_ENV_VAR = "OL_EKS_DEBUG_EXEC"
+# Cache key of the marker `logout` writes and `setup` removes.
+LOGGED_OUT_CACHE_KEY = "logged-out"
+LOGIN_COMMAND = (
+    "uv run python scripts/eks/eks.py setup --mode <readonly|developer|admin>"
+)
 KUBECONFIG_DEFAULT_PATH = Path.home() / ".kube" / "ol-eks.yaml"
 # Where kubectl looks when KUBECONFIG is unset, and where local-dev registers its
 # cluster.
@@ -180,12 +186,20 @@ def dump_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 @contextmanager
-def cache_lock(name: str) -> Iterator[None]:
-    """Serialize refreshes for a cache key across concurrent processes."""
+def cache_lock(name: str, wait_message: str | None = None) -> Iterator[None]:
+    """Serialize refreshes for a cache key across concurrent processes.
+
+    ``wait_message`` is printed to stderr when another process holds the lock.
+    """
     lock_path = CACHE_DIR / f"{name}.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("w") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            if wait_message:
+                print(wait_message, file=sys.stderr, flush=True)
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         try:
             yield
         finally:
@@ -301,19 +315,24 @@ def fetch_admin_role_arn(eks_client: Any, cluster_name: str) -> str:
     raise RuntimeError(msg)
 
 
-def fetch_all_cluster_configs(mode: AccessMode) -> list[ClusterConfig]:
+def fetch_all_cluster_configs(
+    mode: AccessMode, earlier_logout: dict[str, Any] | None = None
+) -> list[ClusterConfig]:
     """Discover all EKS clusters via the AWS API using Vault-generated credentials.
 
     Uses readonly credentials for cluster discovery regardless of operator mode —
     listing and describing clusters requires only read access to the EKS API.
     For admin mode, also discovers each cluster's admin IAM role from access entries.
+    ``earlier_logout`` is passed through to load_valid_aws_credentials.
     """
     # All modes use the readonly AWS role for cluster discovery.
     # Admin mode authenticates via the admin OIDC role but requests readonly
     # AWS credentials, which are sufficient for eks:ListClusters / DescribeCluster.
     discovery_mode = AccessMode.READONLY if mode is AccessMode.ADMIN else mode
     discovery_credentials = load_valid_aws_credentials(
-        discovery_mode, block_noninteractive_login=False
+        discovery_mode,
+        block_noninteractive_login=False,
+        earlier_logout=earlier_logout,
     )
     eks_client = make_eks_client(discovery_credentials)
 
@@ -678,8 +697,28 @@ def cached_aws_credentials(mode: AccessMode) -> AwsCredentialsCache | None:
     )
 
 
+def refuse_if_logged_out(
+    mode: AccessMode, earlier_logout: dict[str, Any] | None = None
+) -> None:
+    """Raise if ``logout`` has run since the last completed ``setup``.
+
+    ``earlier_logout`` is the marker ``setup`` read when it started. That logout
+    is the one ``setup`` is ending, so it does not refuse; a later one does.
+    """
+    logout_marker = load_json(cache_file(LOGGED_OUT_CACHE_KEY))
+    if logout_marker is not None and logout_marker != earlier_logout:
+        append_exec_debug_event("aws_credentials_blocked_logged_out", mode=mode.value)
+        msg = (
+            "Logged out with `eks.py logout`. Log in again from a terminal "
+            f"with: {LOGIN_COMMAND}"
+        )
+        raise RuntimeError(msg)
+
+
 def load_valid_aws_credentials(
-    mode: AccessMode, block_noninteractive_login: bool = False
+    mode: AccessMode,
+    block_noninteractive_login: bool = False,
+    earlier_logout: dict[str, Any] | None = None,
 ) -> AwsCredentialsCache:
     """Load cached AWS credentials or generate fresh ones from Vault.
 
@@ -692,6 +731,8 @@ def load_valid_aws_credentials(
         mode: Access mode (readonly, developer, admin).
         block_noninteractive_login: Passed to load_valid_vault_token to prevent
             browser OIDC login in non-interactive environments.
+        earlier_logout: The logout marker ``setup`` read when it started; see
+            refuse_if_logged_out. Only ``setup`` passes it.
     """
     if mode is AccessMode.ADMIN:
         msg = (
@@ -702,12 +743,19 @@ def load_valid_aws_credentials(
 
     aws_role_name = VAULT_AWS_ROLE_BY_MODE[mode.value]
     aws_cache_path = cache_file(f"aws-creds-{mode.value}")
+    # Checked before the cache too: a setup that logged in but then failed
+    # discovery leaves unexpired credentials behind the marker.
+    refuse_if_logged_out(mode, earlier_logout)
     creds = cached_aws_credentials(mode)
     if creds:
         append_exec_debug_event("aws_credentials_cache_hit", mode=mode.value)
         return creds
 
     with cache_lock(f"aws-creds-{mode.value}"):
+        # Checked again under the lock, so a call that queued before logout wrote
+        # the marker still refuses once it gets the lock.
+        refuse_if_logged_out(mode, earlier_logout)
+
         creds = cached_aws_credentials(mode)
         if creds:
             append_exec_debug_event(
@@ -762,7 +810,8 @@ def setup(
     """Generate a kubeconfig covering all OL EKS clusters.
 
     Cluster metadata is discovered via the AWS EKS API using Vault-generated
-    credentials — no Pulumi CLI or state is required.
+    credentials — no Pulumi CLI or state is required. Once it has logged in, it
+    also ends an earlier ``logout``.
 
         For developer and admin modes each cluster gets an operator context:
             - ``<cluster-name>`` — operator credentials (read/write)
@@ -796,7 +845,21 @@ def setup(
         )
         raise RuntimeError(msg)
 
-    clusters = fetch_all_cluster_configs(mode)
+    logout_marker = cache_file(LOGGED_OUT_CACHE_KEY)
+    earlier_logout = load_json(logout_marker)
+    clusters = fetch_all_cluster_configs(mode, earlier_logout=earlier_logout)
+    # Only once discovery has logged in, so an abandoned setup stays logged out.
+    # A logout that ran after this setup got its credentials deleted the cached
+    # copies, so only the marker seen before discovery is lifted.
+    with cache_lock(LOGGED_OUT_CACHE_KEY):
+        if load_json(logout_marker) == earlier_logout:
+            logout_marker.unlink(missing_ok=True)
+        else:
+            print(
+                "Warning: `eks.py logout` ran during this setup, so you are still "
+                "logged out. Run setup again to log in.",
+                file=sys.stderr,
+            )
     if not clusters:
         print("Warning: No EKS clusters found in this AWS account.", file=sys.stderr)
 
@@ -875,6 +938,113 @@ def prune_default_kubeconfig(path: Path = KUBECTL_DEFAULT_KUBECONFIG_PATH) -> No
     removed = sorted(eks_context_names | eks_users | eks_clusters)
     print(f"Removed EKS entries from {path}: {', '.join(removed)}")
     print(f"  Backup             : {backup_path}")
+
+
+@app.command
+def logout() -> None:
+    """Log out of EKS until the next ``setup``.
+
+    Revokes the cached Vault tokens, deletes the cached credentials, and marks
+    the cache logged out: until ``setup`` runs again, readonly and developer
+    contexts refuse to mint tokens or start a browser login. Admin contexts and
+    their in-flight calls are unaffected; they assume the cluster admin role with
+    your ambient AWS credentials.
+
+    What outlives a logout:
+      - AWS credentials already issued stay valid until they expire (up to eight
+        hours). Logout cannot revoke them; an IAM admin can, by revoking the
+        shared role's active sessions, which ends every user's sessions.
+      - A running client keeps its current EKS token (about 15 minutes), and
+        open port-forwards, exec sessions and log or watch streams stay
+        connected until closed.
+    """
+    # The marker goes first, so every call that gets an aws-creds lock from here on
+    # refuses instead of starting a login while logout waits for the locks.
+    # setup compares this timestamp to tell this logout from an earlier one.
+    with cache_lock(LOGGED_OUT_CACHE_KEY):
+        dump_json(
+            cache_file(LOGGED_OUT_CACHE_KEY),
+            {"logged_out_at": json_datetime_now().isoformat()},
+        )
+
+    aws_expires_at: datetime | None = None
+    found_credentials = False
+    revoked = expired = 0
+    unrevoked: list[str] = []
+    # Every credential write happens under an aws-creds lock, so with all of them
+    # held nothing can re-cache credentials behind the deletes.
+    with ExitStack() as locks:
+        for mode in VAULT_AWS_ROLE_BY_MODE:
+            locks.enter_context(
+                cache_lock(
+                    f"aws-creds-{mode}",
+                    wait_message=(
+                        f"Waiting for another eks.py run to release the {mode} "
+                        "credential lock, usually `setup` or kubectl waiting on a "
+                        "browser login. Finish or cancel that login, or wait up to "
+                        f"{OIDC_CALLBACK_TIMEOUT_SECONDS // 60} minutes..."
+                    ),
+                )
+            )
+
+        # AWS credentials first: deleting them needs no network, and they mint
+        # EKS tokens on their own until they expire.
+        for aws_path in CACHE_DIR.glob("aws-creds-*.json"):
+            found_credentials = True
+            payload = load_json(aws_path) or {}
+            if payload.get("expires_at"):
+                expires_at = parse_expiration(str(payload["expires_at"]))
+                aws_expires_at = max(aws_expires_at or expires_at, expires_at)
+            aws_path.unlink(missing_ok=True)
+
+        for token_path in sorted(CACHE_DIR.glob("vault-token-*.json")):
+            found_credentials = True
+            token = (load_json(token_path) or {}).get("token")
+            if token:
+                print(f"Revoking {token_path.name}...", flush=True)
+                try:
+                    vault_client(str(token)).auth.token.revoke_self()
+                except hvac.exceptions.Forbidden:
+                    # The token is already expired or revoked; hvac's own
+                    # is_authenticated() reads a 403 the same way.
+                    expired += 1
+                except (hvac.exceptions.VaultError, OSError) as exc:
+                    # requests' exceptions subclass OSError. The marker already
+                    # keeps this machine from using the token; keep the file so a
+                    # rerun can revoke it.
+                    unrevoked.append(f"  {token_path.name}: {type(exc).__name__}")
+                    continue
+                else:
+                    revoked += 1
+            token_path.unlink(missing_ok=True)
+
+    if unrevoked:
+        print(
+            f"Logged out on this machine; {len(unrevoked)} Vault token(s) not "
+            "revoked (details below)."
+        )
+    elif found_credentials:
+        print("Logged out of EKS.")
+    else:
+        print("No cached EKS credentials; marked logged out.")
+    if revoked or expired:
+        print(f"  Vault tokens       : {revoked} revoked, {expired} already expired")
+    if aws_expires_at and aws_expires_at > json_datetime_now():
+        print(
+            "  Issued AWS creds   : valid until "
+            f"{aws_expires_at.astimezone():%Y-%m-%d %H:%M %Z} (STS cannot revoke them)"
+        )
+    print("  Admin contexts     : unaffected (they use your ambient AWS credentials)")
+    print(f"  Log in again with  : {LOGIN_COMMAND}")
+    if unrevoked:
+        msg = (
+            "Could not revoke these cached Vault tokens:\n"
+            + "\n".join(unrevoked)
+            + "\nThey stay valid in Vault until they expire (up to eight hours), "
+            "but nothing on this machine uses them before the next `setup`. Rerun "
+            "`eks.py logout` once Vault is reachable to revoke them."
+        )
+        raise RuntimeError(msg)
 
 
 @app.command(name="exec-credential")
