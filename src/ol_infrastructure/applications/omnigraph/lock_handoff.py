@@ -155,6 +155,8 @@ def create_lock_handoff(  # noqa: PLR0913
     graph_removal_allowlist: list[str],
     branch_drop_allowlist: list[str],
     view_drop_actor: str,
+    termination_grace_seconds: int,
+    peer_wait_seconds: int,
 ) -> OmnigraphLockHandoff:
     """Provision the unlock Lease and the server's access to it and to its pods.
 
@@ -167,6 +169,12 @@ def create_lock_handoff(  # noqa: PLR0913
     :param branch_drop_allowlist: graph ids whose branch views the entrypoint
         may delete before a schema apply. See ``plan_env``.
     :param view_drop_actor: see ``plan_env``.
+    :param termination_grace_seconds: the server pod's
+        ``terminationGracePeriodSeconds``. The entrypoint fits its cleanup after
+        SIGTERM inside it.
+    :param peer_wait_seconds: how long the entrypoint waits for another server
+        pod to exit before it refuses to boot. See ``SERVER_PEER_WAIT_SECONDS``
+        in ``data_tier.py``.
     """
     # PRE-CREATED, WITH NO HOLDER. RBAC cannot restrict `create` by resource
     # name, so letting the pod create its own Lease would mean granting create
@@ -238,6 +246,14 @@ def create_lock_handoff(  # noqa: PLR0913
                     field_path="metadata.name"
                 )
             ),
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="OMNIGRAPH_TERMINATION_GRACE_SECONDS",
+            value=str(termination_grace_seconds),
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="OMNIGRAPH_PEER_WAIT_SECONDS",
+            value=str(peer_wait_seconds),
         ),
         *plan_env(
             apply_actor, graph_removal_allowlist, branch_drop_allowlist, view_drop_actor
