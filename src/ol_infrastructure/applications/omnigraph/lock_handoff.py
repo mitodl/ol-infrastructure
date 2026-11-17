@@ -43,6 +43,13 @@ PERSISTED_LOCK_MIN_FORMAT = 14
 # the serving pod one at a time at 1 to 3 seconds each on S3.
 PLAN_GATE_TIMEOUT_MINUTES = 60
 
+# How much longer than the server pod's termination grace a booting pod waits
+# for another server pod to exit: the time the kubelet takes to remove the pod
+# object. A ReplicaSet starts the replacement for a deleted or evicted pod
+# while that pod is still terminating, so the wait has to cover the whole grace
+# (agent-kit `docker/omnigraph_server_entrypoint.py` peer_wait_seconds).
+PEER_EXIT_MARGIN_SECONDS = 15
+
 UNLOCK_LEASE_NAME = "omnigraph-unlock"
 LOCK_HANDOFF_ROLE_NAME = "omnigraph-server-lock-handoff"
 
@@ -155,6 +162,7 @@ def create_lock_handoff(  # noqa: PLR0913
     graph_removal_allowlist: list[str],
     branch_drop_allowlist: list[str],
     view_drop_actor: str,
+    termination_grace_seconds: int,
 ) -> OmnigraphLockHandoff:
     """Provision the unlock Lease and the server's access to it and to its pods.
 
@@ -167,6 +175,10 @@ def create_lock_handoff(  # noqa: PLR0913
     :param branch_drop_allowlist: graph ids whose branch views the entrypoint
         may delete before a schema apply. See ``plan_env``.
     :param view_drop_actor: see ``plan_env``.
+    :param termination_grace_seconds: the server pod's
+        ``terminationGracePeriodSeconds``. The entrypoint fits its cleanup after
+        SIGTERM inside it, and waits that long plus ``PEER_EXIT_MARGIN_SECONDS``
+        for another server pod to exit.
     """
     # PRE-CREATED, WITH NO HOLDER. RBAC cannot restrict `create` by resource
     # name, so letting the pod create its own Lease would mean granting create
@@ -238,6 +250,14 @@ def create_lock_handoff(  # noqa: PLR0913
                     field_path="metadata.name"
                 )
             ),
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="OMNIGRAPH_TERMINATION_GRACE_SECONDS",
+            value=str(termination_grace_seconds),
+        ),
+        kubernetes.core.v1.EnvVarArgs(
+            name="OMNIGRAPH_PEER_WAIT_SECONDS",
+            value=str(termination_grace_seconds + PEER_EXIT_MARGIN_SECONDS),
         ),
         *plan_env(
             apply_actor, graph_removal_allowlist, branch_drop_allowlist, view_drop_actor

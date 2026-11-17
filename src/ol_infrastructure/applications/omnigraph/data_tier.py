@@ -876,6 +876,7 @@ def create_data_tier(  # noqa: PLR0913
             graph_removal_allowlist=removable_graphs,
             branch_drop_allowlist=branch_drop_graphs,
             view_drop_actor=WITAN_CI_ACTOR_ID,
+            termination_grace_seconds=SERVER_TERMINATION_GRACE_SECONDS,
         )
         if persisted_lock
         else None

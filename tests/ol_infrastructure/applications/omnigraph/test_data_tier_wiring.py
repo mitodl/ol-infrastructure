@@ -178,8 +178,15 @@ def test_format_14_has_the_plan_gate_and_one_stop_window(monkeypatch):
         }
         # No boot budget, no new inputs: the spec a deploy without one sees.
         assert "progressDeadlineSeconds" not in deployment["spec"]
-        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        pod_spec = deployment["spec"]["template"]["spec"]
+        (container,) = pod_spec["containers"]
         assert container["startupProbe"]["failureThreshold"] == 24
+        # The entrypoint's SIGTERM cleanup and its wait for another server pod
+        # are sized from the grace this pod actually gets.
+        grace = pod_spec["terminationGracePeriodSeconds"]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        assert float(env["OMNIGRAPH_TERMINATION_GRACE_SECONDS"]) == grace
+        assert float(env["OMNIGRAPH_PEER_WAIT_SECONDS"]) > grace
 
     return pulumi.Output.all(
         tier.deployment.urn,

@@ -186,6 +186,8 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS": str(COMMAND_TIMEOUT_SECONDS),
             # A server draining writes for its whole grace is not stuck.
             "OMNIGRAPH_SERVER_STOP_SECONDS": "180",
+            # The close after SIGTERM is fitted to this pod's own grace.
+            "OMNIGRAPH_TERMINATION_GRACE_SECONDS": str(TERMINATION_GRACE_SECONDS),
             "LANCE_MEM_POOL_SIZE": str(LANCE_MEM_POOL_BYTES),
         }
         assert container["resources"]["limits"]["memory"] == MAINTENANCE_MEMORY_LIMIT
