@@ -70,7 +70,7 @@ def _resources(workload):
 
 
 def _await_result(mocks, typ, inputs):
-    (transform,) = mocks.transforms[APP_COMPONENT]
+    transform = mocks.transforms[APP_COMPONENT][0]
     return transform(
         pulumi.ResourceTransformArgs(
             custom=True,
@@ -100,10 +100,11 @@ def test_workloads_are_the_deployed_shape_without_a_readiness_wait(
         "learn-ai-celery-beat",
         LLM_STUB,
     }
-    # await_policy itself is covered in test_local_dev_program.py; here, that the
-    # component gets it.
-    (transform,) = mocks.transforms[APP_COMPONENT]
-    assert getattr(transform, "func", transform).__name__ == "await_policy"
+    # The transforms themselves are covered in test_local_dev_program.py; here,
+    # that the component gets them.
+    assert [
+        getattr(t, "func", t).__name__ for t in mocks.transforms[APP_COMPONENT]
+    ] == ["await_policy", "start_after_live_update"]
 
 
 def test_workloads_are_laptop_sized(tmp_path, monkeypatch):

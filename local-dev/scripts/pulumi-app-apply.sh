@@ -4,8 +4,12 @@
 # short name the deployed stacks use, so the stack file is Pulumi.Dev.yaml; the
 # app's own namespace; the file backend under local-dev/infra/.pulumi).
 #
-#   pulumi-app-apply.sh <app> up      pulumi up, then print the objects it owns as YAML
-#   pulumi-app-apply.sh <app> down    pulumi destroy, then wait for those objects to go
+#   pulumi-app-apply.sh <app> up [<deployment>...]
+#       pulumi up, then print the objects it owns as YAML, leaving out the
+#       named Deployments: each has a Tilt resource of its own
+#       (pulumi_app_workloads in local-dev/tiltlib.star)
+#   pulumi-app-apply.sh <app> down
+#       pulumi destroy, then wait for those objects to go
 #
 # Tilt reads stdout as the applied objects, so everything Pulumi says goes to
 # stderr. The program reads its inputs (the image Tilt built, the root domain,
@@ -69,6 +73,9 @@ up)
         echo "remove them first: kubectl --context local-dev -n $app delete ${legacy%% -l *} -l '${legacy#* -l }'" >&2
         exit 1
     fi
+    # The program takes the image from TILT_IMAGE_0.
+    image="$("$repo_root/local-dev/scripts/tilt-newest-image.sh")"
+    [ -z "$image" ] || export TILT_IMAGE_0="$image"
     # --refresh: state lives in the checkout and outlives the cluster, as for
     # the core and apps-infra stacks.
     if ! pulumi_ up --yes --skip-preview --refresh; then
@@ -76,7 +83,13 @@ up)
         kubectl_ logs -l "$selector,ol.mit.edu/job=pre-deploy" --all-containers --tail=100 1>&2 || :
         exit 1
     fi
-    kubectl_ get deploy,svc,apisixroute,apisixpluginconfig -l "$selector" -o yaml
+    # Only Deployments are left out by name: a Service or ConfigMap that
+    # shares a named Deployment's name stays in this resource.
+    others=""
+    for name in "${@:3}"; do others+="${others:+,}metadata.name!=$name"; done
+    kubectl_ get deploy -l "$selector" ${others:+--field-selector "$others"} -o yaml
+    echo ---
+    kubectl_ get svc,apisixroute,apisixpluginconfig -l "$selector" -o yaml
     ;;
 down)
     pulumi_ destroy --yes --skip-preview

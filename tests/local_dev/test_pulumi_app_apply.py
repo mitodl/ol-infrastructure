@@ -19,6 +19,7 @@ SCRIPTS = (
     "pulumi-app-apply.sh",
     "pulumi-clear-stale-lock.sh",
     "pulumi-pending-objects.py",
+    "tilt-newest-image.sh",
 )
 STUB = """#!/usr/bin/env bash
 echo "$(basename "$0") $*" >> "$STUB_LOG"

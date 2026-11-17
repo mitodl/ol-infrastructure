@@ -29,6 +29,7 @@
 _ROOT_DOMAIN_DEFAULT = "mit.test"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
 _PREBUILT_IMAGE_TAGS_ENV = "LOCAL_DEV_PREBUILT_IMAGE_TAGS"
+_LIVE_UPDATE_MARKER = "/tmp/tilt-synced"
 
 
 def current_root_domain():
@@ -88,11 +89,50 @@ def _pin_images(pod_spec, image_tags):
         if name in image_tags:
             c["image"] = "%s:%s" % (name, image_tags[name])
 
-def _stamp_workloads(content, fingerprint, image_tags):
+def checkout_live_update(steps):
+    """A docker_build's live_update for an image that several Deployments
+    run from a synced checkout: steps (the app's fall_back_on and sync)
+    between two additions.
+
+    initial_sync() copies the whole checkout into a container when it starts
+    or restarts. Tilt otherwise replays only the saves made since the image
+    was last built, and one resource can rebuild a shared image without
+    redeploying the others: a container still on the older image would come
+    back from a restart missing earlier saves.
+
+    The last step tells a container waiting in live_update_wait() that the
+    copy is in; Tilt runs it after every copy. The containers wait when the
+    image is in k8s_yaml_local's live_update_images or, for a Pulumi-rendered
+    app, when its apply_env passes LOCAL_DEV_LIVE_UPDATE_WAIT."""
+    return [initial_sync()] + steps + [run("touch " + _LIVE_UPDATE_MARKER)]
+
+def live_update_wait():
+    """The words to put in front of a container's command so the command
+    starts after Tilt's copy of the checkout, not during it.
+
+    A container starts on its image's files, and Tilt copies the checkout in
+    while the process is already importing. A process that reads some modules
+    before the copy and others after fails on the mix; the restarted
+    container is back on the image's files, so it fails the same way again.
+    With no copy in 30 s (Tilt is not running, say) the command starts on the
+    image's files."""
+    script = str(read_file(os.path.join(config.main_dir, "local-dev/scripts/wait-for-live-update.sh")))
+    return ["sh", "-c", script, "wait-for-live-update", _LIVE_UPDATE_MARKER, "30"]
+
+def _start_after_live_update(pod_spec, images):
+    """Put live_update_wait() in front of the command of every container
+    whose image is in images. Init containers are left alone: Tilt copies
+    nothing into them."""
+    for c in pod_spec.get("containers") or []:
+        if _image_name(c.get("image", "")) in images and c.get("command"):
+            c["command"] = live_update_wait() + c["command"]
+
+def _stamp_workloads(content, fingerprint, image_tags, live_update_images):
     """Add the config-fingerprint annotation to every Deployment pod
     template in a (possibly multi-doc) manifest text, so changing any
-    applied ConfigMap/Secret rolls the pods, and apply image_tags to its
-    containers. Returns a Blob, or None if there are no Deployments."""
+    applied ConfigMap/Secret rolls the pods, apply image_tags to its
+    containers and hold the commands of those running live_update_images.
+    Returns a Blob, or None if there are no Deployments."""
     docs = [d for d in decode_yaml_stream(content) if d != None]
     stamped = False
     for d in docs:
@@ -101,6 +141,7 @@ def _stamp_workloads(content, fingerprint, image_tags):
             annotations = template.setdefault("metadata", {}).setdefault("annotations", {})
             annotations[_CONFIG_HASH_ANNOTATION] = fingerprint
             _pin_images(template.get("spec") or {}, image_tags)
+            _start_after_live_update(template.get("spec") or {}, live_update_images)
             stamped = True
     if not stamped:
         return None
@@ -119,7 +160,7 @@ def _add_labels(content, labels):
     # A string, like the content it replaces: blob() below takes only a string.
     return str(encode_yaml_stream(docs))
 
-def k8s_yaml_local(paths, local_overrides=None, substitutions=None, labels=None):
+def k8s_yaml_local(paths, local_overrides=None, substitutions=None, labels=None, live_update_images=()):
     """Apply k8s YAML with root-domain substitution and a pod-template
     fingerprint annotation covering every applied ConfigMap/Secret, including
     an optional gitignored ConfigMap of per-developer overrides (see module
@@ -135,7 +176,11 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None, labels=None)
     call applies, the override ConfigMap included. An object Tilt applies
     beside a Pulumi program on purpose carries ol.mit.edu/yaml-by-design, which
     pulumi-app-apply.sh's leftover guard skips; a label written in the tracked
-    YAML cannot reach the gitignored override file, so the call adds it."""
+    YAML cannot reach the gitignored override file, so the call adds it.
+
+    live_update_images names the images Tilt builds with a
+    checkout_live_update(). Deployment containers running one start their
+    command through live_update_wait()."""
     rd = current_root_domain()
 
     # read_file(default=...) also registers a watch on the override path —
@@ -174,5 +219,56 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None, labels=None)
     image_tags = decode_json(os.environ.get(_PREBUILT_IMAGE_TAGS_ENV, "{}"))
 
     for p, content in contents:
-        stamped = _stamp_workloads(content, fingerprint, image_tags)
+        stamped = _stamp_workloads(content, fingerprint, image_tags, live_update_images)
         k8s_yaml(stamped if stamped != None else blob(content))
+
+
+def pulumi_app_workloads(app, app_resource, workloads, image):
+    """Give Deployments of a Pulumi-rendered app Tilt resources of their own,
+    each named after its Deployment, so each has its own status and log.
+
+    app is the name pulumi-app-apply.sh takes: the program's directory, the
+    namespace and the Tilt label. app_resource is the Tilt resource that runs
+    that script. image is the image the app's docker_build builds, or None
+    when there is no checkout to build from.
+
+    workloads maps a Deployment's name to {"labels": ..., "container": ...}.
+    labels must select that Deployment's pods and no others in the cluster.
+    container, where given, names the container that runs the app's image:
+    the resource then depends on the image, so saves sync into the container
+    and a click rebuilds the image and rolls the Deployment onto it. Without
+    a container (or an image) the resource only shows the Deployment.
+
+    An app's Tiltfile declares the mapping as a literal named WORKLOADS
+    (tests/local_dev/test_tilt_workloads.py reads it and checks it against
+    the rendered program), appends list(WORKLOADS) to the app resource's
+    apply_cmd so pulumi-app-apply.sh leaves those Deployments out of it, and
+    passes WORKLOADS here."""
+    script = os.path.join(config.main_dir, "local-dev/scripts/pulumi-workload-apply.sh")
+    for name in workloads:
+        container = workloads[name].get("container")
+        labels = workloads[name]["labels"]
+        k8s_custom_deploy(
+            name,
+            apply_cmd=[script, app, name] + ([container] if container else []),
+            # A click is a force update, which runs the delete before the
+            # apply. The Deployment is Pulumi's to delete, so the delete
+            # removes its pods: a click then restarts the process even when
+            # the rebuilt image has the tag the Deployment already runs,
+            # which the apply's `kubectl set image` would leave alone. Tilt's
+            # other applies (at `tilt up`, after a rebuild) run no delete.
+            delete_cmd=[
+                "kubectl", "--context", "local-dev", "-n", app, "delete", "pod", "--wait=false",
+                "-l", ",".join(["%s=%s" % (key, labels[key]) for key in labels]),
+            ],
+            deps=[],
+            image_deps=[image] if container and image else [],
+        )
+        k8s_resource(
+            name,
+            labels=[app],
+            resource_deps=[app_resource],
+            # The Deployment's uid changes when the app resource recreates
+            # the stack; the labels keep this resource on the new pods.
+            extra_pod_selectors=[labels],
+        )

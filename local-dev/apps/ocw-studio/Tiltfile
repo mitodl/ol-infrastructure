@@ -2,15 +2,16 @@
 # When the sibling ocw-studio repo is not checked out, Tilt uses the prebuilt
 # DockerHub image (mitodl/ocw-studio-app) without attempting a local build.
 
-load("../../tiltlib.star", "k8s_yaml_local")
+load("../../tiltlib.star", "k8s_yaml_local", "checkout_live_update")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "ocw-studio")
 IMAGE = 'mitodl/ocw-studio-app'
 NAMESPACE = 'ocw-studio'
 DEPLOY_NAME = 'ocwstudio-webapp'
+HAS_CHECKOUT = os.path.exists(os.path.join(APP_DIR, '.git'))
 
-if os.path.exists(os.path.join(APP_DIR, '.git')):
+if HAS_CHECKOUT:
     docker_build(
         IMAGE,
         context=APP_DIR,
@@ -22,7 +23,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         # The cost is that JS/SCSS edits rebuild the image instead of
         # hot-reloading — see the ocw-studio section of local-dev/README.md.
         target='local-dev',
-        live_update=[
+        live_update=checkout_live_update([
             # Dependency changes rebuild the image rather than running uv sync
             # in the pods: Celery doesn't reload, so running processes would
             # keep the old packages, and a restarted container loses the sync.
@@ -41,7 +42,7 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
                 APP_DIR + '/.swcrc',
             ]),
             sync(APP_DIR, '/src'),
-        ],
+        ]),
         # .claude/ holds agent worktrees. Syncing one into the pods restarts granian in a loop.
         ignore=['.claude/', '.ruff_cache/', 'webpack-stats.json'],
     )
@@ -65,7 +66,9 @@ k8s_yaml_local([
     'deployment.yaml',
     'apisix-routes.yaml',
 ], local_overrides='configmaps/app-env.local.yaml',
-   substitutions={'__OCW_LEARN_THEME__': OCW_LEARN_THEME})
+   substitutions={'__OCW_LEARN_THEME__': OCW_LEARN_THEME},
+   # Without a checkout the published image runs and Tilt copies nothing into it.
+   live_update_images=[IMAGE] if HAS_CHECKOUT else [])
 
 # Concourse is applied on its own, deliberately. k8s_yaml_local stamps every
 # Deployment in a call with a fingerprint of every ConfigMap and Secret in that
