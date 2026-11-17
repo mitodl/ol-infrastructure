@@ -1154,11 +1154,21 @@ def test_access_report_numbers_fix_steps(
 
 
 @pytest.mark.parametrize(
-    ("which", "logged_in", "expected"),
+    ("which", "error", "expected"),
     [
-        (None, True, "isn't installed"),
-        ("/usr/bin/gh", False, "gh auth login"),
-        ("/usr/bin/gh", True, "wouldn't return that PR"),
+        (None, "unused", "isn't installed"),
+        (
+            "/usr/bin/gh",
+            "gh pr view x failed: To get started with GitHub CLI, please run:  "
+            "gh auth login",
+            "isn't logged in",
+        ),
+        ("/usr/bin/gh", "gh api x failed: HTTP 401: Bad credentials", "expired"),
+        (
+            "/usr/bin/gh",
+            "gh pr view x failed: error connecting to api.github.com",
+            "wouldn't return that PR (error connecting to api.github.com)",
+        ),
     ],
 )
 def test_github_problems_are_explained(  # noqa: PLR0913
@@ -1167,18 +1177,45 @@ def test_github_problems_are_explained(  # noqa: PLR0913
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     which: str | None,
-    logged_in: bool,
+    error: str,
     expected: str,
 ) -> None:
-    """Gh problems stop the run with a fix rather than a traceback."""
+    """Stop with a fix for gh problems; blame login only for auth errors."""
     monkeypatch.setattr(script.shutil, "which", Mock(return_value=which))
-    monkeypatch.setattr(
-        script, "_fetch_pr", Mock(side_effect=RuntimeError("gh pr view failed"))
-    )
-    monkeypatch.setattr(script, "_gh_logged_in", Mock(return_value=logged_in))
+    monkeypatch.setattr(script, "_fetch_pr", Mock(side_effect=RuntimeError(error)))
     with pytest.raises(SystemExit):
         script._fetch_pr_or_explain("https://github.com/mitodl/learn-ai/pull/1")
     assert expected in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("fly_installed")
+def test_login_steps_cover_github_not_a_member(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A user whose GitHub login failed has no target, but still sees org advice."""
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(return_value=_completed(1, stderr="error: unknown target: x")),
+    )
+    fix = " ".join(script._diagnose_fly_access().fix)
+    assert "https://github.com/settings/applications" in fix
+    assert "you are not a member of 'infrastructure'" in fix
+
+
+@pytest.mark.usefixtures("fly_installed")
+def test_status_version_skew_suggests_sync(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Suggest sync, not login, if `fly status` ever rejects version skew."""
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(return_value=_completed(1, stderr="fly version is out of sync")),
+    )
+    assert script._diagnose_fly_access().fix == (
+        "Update it: fly -t infrastructure sync",
+    )
 
 
 def test_bad_pr_url_is_explained(

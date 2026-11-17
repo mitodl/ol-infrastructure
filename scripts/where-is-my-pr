@@ -217,13 +217,6 @@ LOGIN_COMMAND = f"fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE
 RELOGIN_COMMAND = f"fly -t {CONCOURSE_TEAM} logout && {LOGIN_COMMAND}"
 # Both connectors on the login page work, but only the GitHub one grants every
 # mitodl member read access; the Keycloak one needs a hand-assigned realm role.
-CONNECTOR_ADVICE = (
-    "When the browser opens, choose GitHub. Any mitodl GitHub org member gets "
-    "read access, which is all this script needs.",
-    "'OL Platform Engineering' (Keycloak) works only if your Keycloak account "
-    "has the 'developer' or 'admin' role. Without one, login fails with "
-    "\"you are not a member of 'infrastructure'\".",
-)
 GITHUB_ORG_ADVICE = (
     "Check that you belong to the mitodl GitHub org: "
     "https://github.com/orgs/mitodl/people",
@@ -231,6 +224,21 @@ GITHUB_ORG_ADVICE = (
     "https://github.com/settings/applications, select the Concourse app, and "
     "under 'Organization access' grant (or request) access for mitodl.",
 )
+CONNECTOR_ADVICE = (
+    "When the browser opens, choose GitHub. Any mitodl GitHub org member gets access.",
+    "If GitHub login fails with \"you are not a member of 'infrastructure'\", "
+    "Concourse can't see your mitodl membership. Check that you're in the org "
+    "(https://github.com/orgs/mitodl/people) and that the Concourse app has "
+    "mitodl access (https://github.com/settings/applications, then Concourse, "
+    "then grant or request mitodl under 'Organization access'), then log in "
+    "again.",
+    "'OL Platform Engineering' (Keycloak) works only if your Keycloak account "
+    "has the 'developer' or 'admin' role. Without one, login fails with the "
+    'same "not a member" error; use GitHub, or ask the DevOps team for the '
+    "'developer' role.",
+)
+# Markers gh prints when it has no token or GitHub rejects the one it has.
+GH_AUTH_ERRORS = ("gh auth login", "HTTP 401", "Bad credentials")
 
 
 @dataclass(frozen=True)
@@ -325,7 +333,7 @@ def _diagnose_fly_access() -> FlyAccess:
     if status is None:
         return FlyAccess(
             ok=False,
-            summary=f"`fly status` didn't finish; can't reach {CONCOURSE_URL}?",
+            summary=f"`fly status` didn't finish in time (is {CONCOURSE_URL} reachable?)",
             fix=("Check your network or VPN, then re-run this script.",),
         )
     output = f"{status.stdout}\n{status.stderr}"
@@ -334,6 +342,12 @@ def _diagnose_fly_access() -> FlyAccess:
             ok=False,
             summary=f"fly has no '{CONCOURSE_TEAM}' target yet",
             fix=login_steps,
+        )
+    if "out of sync" in output and status.returncode != 0:
+        return FlyAccess(
+            ok=False,
+            summary="your fly version doesn't match our Concourse server's",
+            fix=(f"Update it: fly -t {CONCOURSE_TEAM} sync",),
         )
     if status.returncode != 0:
         detail = next((line for line in output.splitlines() if line.strip()), "")
@@ -1394,15 +1408,6 @@ def _fail(summary: str, fix: tuple[str, ...]) -> NoReturn:
     sys.exit(1)
 
 
-def _gh_logged_in() -> bool:
-    """Whether gh holds a working GitHub token (one cheap API call)."""
-    try:
-        _gh_json("api", "user")
-    except (GhNotFoundError, RuntimeError, json.JSONDecodeError):
-        return False
-    return True
-
-
 def _fetch_pr_or_explain(url: str) -> PullRequest:
     """Fetch the PR, turning a missing or logged-out gh into steps to fix it."""
     try:
@@ -1420,7 +1425,9 @@ def _fetch_pr_or_explain(url: str) -> PullRequest:
     try:
         return _fetch_pr(url)
     except (GhNotFoundError, RuntimeError) as error:
-        if not _gh_logged_in():
+        # Only auth failures mean "log in"; network or outage errors fall
+        # through so the user sees gh's real reason.
+        if any(marker in str(error) for marker in GH_AUTH_ERRORS):
             _fail(
                 "gh isn't logged in to GitHub, or its token has expired",
                 ("Log in: gh auth login", "Check it worked: gh auth status"),
