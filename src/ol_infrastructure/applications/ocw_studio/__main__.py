@@ -301,7 +301,7 @@ ocw_studio_db_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"name": "ocw-studio-db-access-applications-{stack_info.env_suffix}"}
+        {"Name": f"ocw-studio-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=apps_vpc["id"],
 )
