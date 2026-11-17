@@ -266,7 +266,7 @@ micromasters_db_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"Name": "micromasters-db-access-applications-{stack_info.env_suffix}"}
+        {"Name": f"micromasters-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=micromasters_vpc["id"],
 )
