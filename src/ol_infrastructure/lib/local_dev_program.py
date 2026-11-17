@@ -35,9 +35,8 @@ CA_BUNDLE_FILE = f"{CA_BUNDLE_DIR}/ca-certificates.crt"
 # command out, so that wait only delays the YAML Tilt needs. The pre-deploy
 # Job is not here on purpose: every Deployment depends on it, so
 # migrations finish before any of them rolls.
-SKIP_AWAIT_TYPES = frozenset(
-    {"kubernetes:apps/v1:Deployment", "kubernetes:core/v1:Service"}
-)
+DEPLOYMENT_TYPE = "kubernetes:apps/v1:Deployment"
+SKIP_AWAIT_TYPES = frozenset({DEPLOYMENT_TYPE, "kubernetes:core/v1:Service"})
 JOB_TYPE = "kubernetes:batch/v1:Job"
 # Pulumi awaits the Job until it succeeds or fails. Its awaiter honours the
 # `pulumi.com/timeoutSeconds` annotation and the engine's CustomTimeouts as a
@@ -152,6 +151,38 @@ def await_policy(
         props=_with_annotations(args.props, {"pulumi.com/skipAwait": "true"}),
         opts=args.opts,
     )
+
+
+def start_after_live_update(
+    args: ResourceTransformArgs, environ: Mapping[str, str]
+) -> ResourceTransformResult | None:
+    """Start a Deployment's Tilt-built containers after Tilt's copy of the checkout.
+
+    A container starts on its image's files, and Tilt copies the checkout in
+    while the process is already importing. A process that reads some modules
+    before the copy and others after fails on the mix; the restarted container
+    is back on the image's files, so it fails the same way again. So each
+    container running ``TILT_IMAGE_0`` gets ``LOCAL_DEV_LIVE_UPDATE_WAIT`` (the
+    app Tiltfile's apply_env; tiltlib.star's live_update_wait) in front of its
+    command. Init containers keep theirs: Tilt copies nothing into them, so they
+    would wait out the limit. So does the pre-deploy Job.
+    """
+    image = environ.get("TILT_IMAGE_0")
+    wait = json.loads(environ.get("LOCAL_DEV_LIVE_UPDATE_WAIT") or "[]")
+    if args.type_ != DEPLOYMENT_TYPE or not image or not wait:
+        return None
+    spec = dict(cast("dict[str, Any]", args.props["spec"]))
+    template = dict(spec["template"])
+    pod = dict(template["spec"])
+    pod["containers"] = [
+        {**container, "command": [*wait, *container["command"]]}
+        if container.get("image") == image and container.get("command")
+        else container
+        for container in pod["containers"]
+    ]
+    template["spec"] = pod
+    spec["template"] = template
+    return ResourceTransformResult(props={**args.props, "spec": spec}, opts=args.opts)
 
 
 def k3d_provider() -> k8s.Provider:

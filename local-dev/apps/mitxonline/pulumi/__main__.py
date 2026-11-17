@@ -42,6 +42,7 @@ from ol_infrastructure.lib.local_dev_program import (
     manifest,
     merged_env,
     secrets_hash,
+    start_after_live_update,
     warn_leftover_app_env_local,
 )
 from ol_infrastructure.lib.ol_types import (
@@ -316,7 +317,8 @@ OLApplicationK8s(
         transforms=[
             partial(
                 await_policy, job_annotations={"ol.mit.edu/config-hash": config_hash}
-            )
+            ),
+            partial(start_after_live_update, environ=os.environ),
         ],
     ),
 )

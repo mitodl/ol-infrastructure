@@ -3,7 +3,14 @@
 # When the sibling mitxonline repo is not checked out, the published
 # mitodl/mitxonline-app image runs (latest, or the prebuilt_tags pin).
 
-load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+load(
+    "../../tiltlib.star",
+    "k8s_yaml_local",
+    "current_root_domain",
+    "checkout_live_update",
+    "live_update_wait",
+    "pulumi_app_workloads",
+)
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "mitxonline")
@@ -14,6 +21,19 @@ DEPLOY_NAME = 'mitxonline-app'
 PROGRAM_DIR = os.path.join(config.main_dir, 'local-dev/apps/mitxonline/pulumi')
 APPLY = os.path.join(config.main_dir, 'local-dev/scripts/pulumi-app-apply.sh')
 HAS_CHECKOUT = os.path.exists(os.path.join(APP_DIR, '.git'))
+# The Deployments with a Tilt resource of their own (pulumi_app_workloads).
+# A literal: tests/local_dev/test_tilt_workloads.py reads it with ast and
+# checks the labels against the rendered program.
+WORKLOADS = {
+    'mitxonline-all-celery-worker': {
+        'container': 'celery-worker',
+        'labels': {'ol.mit.edu/application': 'mitxonline', 'ol.mit.edu/worker-name': 'all'},
+    },
+    'mitxonline-celery-beat': {
+        'container': 'celery-beat',
+        'labels': {'ol.mit.edu/application': 'mitxonline', 'ol.mit.edu/worker-name': 'beat'},
+    },
+}
 
 if HAS_CHECKOUT:
     # Build the `local-dev` target: `production` (the only target that bakes in
@@ -40,7 +60,7 @@ if HAS_CHECKOUT:
         # Sync the whole repo: Django apps are top-level dirs (courses,
         # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
         # non-Python churn.
-        live_update=[
+        live_update=checkout_live_update([
             # Dependency changes rebuild the image rather than running uv sync
             # in the pods: Celery doesn't reload, so running processes would
             # keep the old packages, and a restarted container loses the sync.
@@ -60,7 +80,7 @@ if HAS_CHECKOUT:
                 APP_DIR + '/.yarn/releases',
             ]),
             sync(APP_DIR, '/src'),
-        ],
+        ]),
     )
 
 # ApisixTls stays hand-written; it references the local-dev-tls wildcard the
@@ -81,15 +101,18 @@ root_domain = current_root_domain()
 prebuilt_tags = os.environ.get('LOCAL_DEV_PREBUILT_IMAGE_TAGS', '')
 k8s_custom_deploy(
     DEPLOY_NAME,
-    apply_cmd=[APPLY, 'mitxonline', 'up'],
+    apply_cmd=[APPLY, 'mitxonline', 'up'] + list(WORKLOADS),
     delete_cmd=[APPLY, 'mitxonline', 'down'],
-    # The pin, and whether the pre-deploy Job registers ol-analytics-api's
-    # OAuth client, reach the program through the environment; naming them
-    # here makes a change re-apply, which os.putenv alone would not. Only the
-    # one app is passed, so toggling an unrelated app does not re-apply this.
+    # The pin, the wait the program puts in front of the commands Tilt copies
+    # the checkout under, and whether the pre-deploy Job registers
+    # ol-analytics-api's OAuth client, reach the program through the
+    # environment; naming them here makes a change re-apply, which os.putenv
+    # alone would not. Only the one app is passed, so toggling an unrelated
+    # app does not re-apply this.
     apply_env={
         'LOCAL_DEV_ROOT_DOMAIN': root_domain,
         'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags,
+        'LOCAL_DEV_LIVE_UPDATE_WAIT': encode_json(live_update_wait()),
         'LOCAL_DEV_ANALYTICS_API_ENABLED': str(
             'ol-analytics-api' in os.environ.get('LOCAL_DEV_ENABLED_APPS', '').split(',')
         ).lower(),
@@ -116,3 +139,4 @@ k8s_resource(
     labels=['mitxonline'],
     resource_deps=['local-infra-apps'],
 )
+pulumi_app_workloads('mitxonline', DEPLOY_NAME, WORKLOADS, IMAGE if HAS_CHECKOUT else None)
