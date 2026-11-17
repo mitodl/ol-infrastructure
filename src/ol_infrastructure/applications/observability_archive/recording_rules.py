@@ -28,7 +28,10 @@ from ol_infrastructure.lib.telemetry_archive import MIMIR_RULES_LABEL
 # matches what otel_service_red.py and dashboards/service_red.py select on.
 _DURATION = "http_server_duration_milliseconds"
 _SERVICE_BY = "cluster, deployment_environment, service_namespace, service_name"
-_SERVICE_SELECTOR = 'service_name=~".+"'
+# Probes excluded as otel_service_red.py's _SELECTOR does, so the archive's
+# trend matches Cloud's; the recorded series drop http_target, so this cannot
+# be filtered later.
+_SERVICE_SELECTOR = 'service_name=~".+", http_target!~"^\\^?health.*"'
 _SERVICE_5XX_SELECTOR = f'{_SERVICE_SELECTOR}, http_status_code=~"5.."'
 _CONTAINER_SELECTOR = 'container!="", container!="POD"'
 
