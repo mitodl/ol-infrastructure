@@ -355,7 +355,8 @@ Five open questions closed by the project owner. These narrow the scope substant
    Manageability differs per type and must be designed per type:
    - **Service accounts, IAM, enabled APIs** — fully Pulumi-manageable.
    - **API keys** — Pulumi-manageable (`gcp.projects.ApiKey`). Bring them under IaC *with*
-     restrictions. Only `mitx-residential` "Server key 1" still has none (2026-10-20).
+     restrictions. No unrestricted key remains: the last one, `mitx-residential`
+     "Server key 1", was deleted on 2026-11-10.
    - **reCAPTCHA keys** — Pulumi-manageable (`gcp.recaptcha.EnterpriseKey`), but the site
      key is embedded in production frontends, so a change is a coordinated app deploy.
    - **Generic OAuth clients** — not manageable by any API or IaC tool
@@ -382,7 +383,7 @@ authenticated. Deletion is held for now
 | `mit-odl-open-discussions-rc` | same as `-ci`, plus `telemetry` | same as `-ci` |
 | `ol-engineers` | BigQuery, Dataform, Dataplex and storage APIs enabled, created 2025-04-04 | 0 datasets, 0 buckets, 0 SAs, 0 keys, one Owner |
 | `ovs-youtube-prod` | `youtube.googleapis.com`, default quota, no keys | OVS YouTube sync needs no preservation (owner answer 5) |
-| `ovs-youtube-qa` | idle key "API key 1" (restricted 2026-10-20, see below), quota 0 | `ocw_studio/Pulumi.CI.yaml` sets `YT_PROJECT_ID: ovs-youtube-qa`, so OCW Studio CI's YouTube OAuth client probably lives here. With quota 0 it can't call YouTube today. Give CI a mitol01 client if CI publishing is ever wanted. |
+| `ovs-youtube-qa` | quota 0; its idle key "API key 1" was deleted 2026-11-16 (see below) | `ocw_studio/Pulumi.CI.yaml` sets `YT_PROJECT_ID: ovs-youtube-qa`, so OCW Studio CI's YouTube OAuth client probably lives here. With quota 0 it can't call YouTube today. Give CI a mitol01 client if CI publishing is ever wanted. |
 | `open-learning-analytics` | `analytics`, `policyanalyzer`, `telemetry`; two SAs that never authenticated | Universal Analytics only, which is retired (owner answer 4) |
 
 Not deletable, despite the 2026-07-21 list:
@@ -400,20 +401,22 @@ These six keys had no restriction of any kind and zero calls in the 45 days befo
 change. Each now allows only `apikeys.googleapis.com`, the key-management API. An API key
 carries no principal, so it can't authorize key management, and the keys no longer work
 against any real API. Each carries the annotations `ol-restricted-on` and
-`ol-restricted-reason`. A consumer we missed would get HTTP 403s. It is unverified whether
-`bin/gcp-credential-usage report` attributes a key-restriction rejection to that key, so
-before deleting, look for any 403 in each key's project, whatever credential it is attributed
-to. After about two weeks with none, delete them.
+`ol-restricted-reason`. A consumer we missed would have gotten HTTP 403s. It was unverified
+whether `bin/gcp-credential-usage report` attributes a key-restriction rejection to that key,
+so the gate for deletion was no 403 of any kind in each key's project, whatever credential it
+was attributed to, for about two weeks.
 
-The 403 check does not cover "Geocoding LTI Module". The Geocoding API reports a rejected key
+The 403 check did not cover "Geocoding LTI Module". The Geocoding API reports a rejected key
 in the response body, as `status: REQUEST_DENIED` on an HTTP 200. That was observed on
 2026-11-05 with an invalid key and with no key; a key restricted away from Geocoding was not
-tested. A consumer of that key could fail for the whole window without a single 403. Before
-deleting it, look for any `geocoding-backend.googleapis.com` call in `mitx-residential`,
-whatever its response code, and check the LTI module's own logs if its deployment can be found.
+tested. A consumer of that key could have failed for the whole window without a single 403,
+so its gate was no `geocoding-backend.googleapis.com` call in `mitx-residential` at any
+response code. The report below shows no API traffic of any kind in `mitx-residential` since
+the restriction.
 
-All six are now deleted. A key can be restored with
-`gcloud services api-keys undelete <uid> --project <project>` for 30 days after its delete time.
+All six are now deleted. A key can be restored for 30 days after its delete time. Find its uid
+with `gcloud services api-keys list --show-deleted --project <project>`, then run
+`gcloud services api-keys undelete <uid> --project <project>`.
 
 | Project | Key | Created | Deleted |
 |---|---|---|---|
@@ -459,8 +462,9 @@ deleted on 2026-11-10, after edxapp moved its YouTube calls to the mitol01 key.
    edx.org-owned GCS bucket via `GCSConnection`, and no `storage.googleapis.com` traffic
    appears. Confirm separately before assuming anything about GCS-only paths.
 4. **`ol-data-platform-production@`'s Sheets source** is unidentified (2,540 calls/30d).
-5. **What authenticated three GA SAs on 2026-07-15?** Determines whether the zombie cohort
-   is truly zombie or has a real monthly consumer.
+5. ~~What authenticated three GA SAs on 2026-07-15?~~ **Moot, 2026-11-16.** The owner
+   confirmed UA is not needed and all five GA SAs were deleted (see the zombie GA cohort
+   section), so whether the cohort had a monthly consumer no longer matters.
 6. Vault was not reachable this session (stale token; `vault login -method=oidc` needed), so
    the Vault-side half of the credential map is inferred from `k8s_secrets.py` templates and
    policy files rather than read directly.
