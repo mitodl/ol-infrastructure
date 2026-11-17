@@ -149,6 +149,14 @@ DEFAULT_SERVER_MEMORY_LIMIT = "2Gi"
 # grace around that. See termination_grace_period_seconds on the Deployment.
 SERVER_SHUTDOWN_GRACE_SECONDS = 120
 SERVER_TERMINATION_GRACE_SECONDS = SERVER_SHUTDOWN_GRACE_SECONDS + 5
+# How much longer than that grace a booting pod waits for another server pod to
+# exit (OMNIGRAPH_PEER_WAIT_SECONDS): the time the kubelet takes to remove the
+# pod object. A ReplicaSet starts the replacement for a deleted or evicted pod
+# while that pod is still terminating, so the wait has to cover the whole grace
+# (agent-kit `docker/omnigraph_server_entrypoint.py` peer_wait_seconds). The
+# wait runs before the converge, inside the startupProbe's budget.
+PEER_EXIT_MARGIN_SECONDS = 15
+SERVER_PEER_WAIT_SECONDS = SERVER_TERMINATION_GRACE_SECONDS + PEER_EXIT_MARGIN_SECONDS
 
 # The startupProbe's timing. See startup_probe on the Deployment for how the
 # default budget (135s) was sized.
@@ -164,29 +172,35 @@ DEFAULT_BOOT_BUDGET_SECONDS = (
 BOOT_ROLLOUT_SLACK_SECONDS = 300
 
 
-def startup_probe_failure_threshold(boot_budget_seconds: int | None) -> int:
+def startup_probe_failure_threshold(
+    boot_budget_seconds: int | None, peer_wait_seconds: int
+) -> int:
     """Return the startupProbe failure threshold that gives a boot this long.
 
     The Nth failure lands at initial_delay + (N-1) x period, so this is the
-    smallest N whose kill comes at or after ``boot_budget_seconds``.
+    smallest N whose kill comes at or after the peer wait plus the boot.
 
     :param boot_budget_seconds: ``omnigraph:boot_budget_seconds``, or ``None``
         for the default budget.
+    :param peer_wait_seconds: how long the entrypoint may wait for another
+        server pod to exit before it boots; 0 where it does not wait.
     :raises ValueError: when the budget is shorter than the default, which
         would kill a healthy boot.
     :returns: the probe's ``failure_threshold``.
     :rtype: int
     """
     if boot_budget_seconds is None:
-        return DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD
-    if boot_budget_seconds < DEFAULT_BOOT_BUDGET_SECONDS:
+        boot_budget_seconds = DEFAULT_BOOT_BUDGET_SECONDS
+    elif boot_budget_seconds < DEFAULT_BOOT_BUDGET_SECONDS:
         msg = (
             f"omnigraph:boot_budget_seconds={boot_budget_seconds} is shorter "
             f"than the default {DEFAULT_BOOT_BUDGET_SECONDS}s. It exists to "
             "lengthen a boot, e.g. one whose cluster apply deletes a graph."
         )
         raise ValueError(msg)
-    after_first_probe = boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    after_first_probe = (
+        peer_wait_seconds + boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    )
     # Integer ceiling division: exact for any budget, unlike float division.
     return (
         after_first_probe + STARTUP_PROBE_PERIOD_SECONDS - 1
@@ -877,14 +891,25 @@ def create_data_tier(  # noqa: PLR0913
             branch_drop_allowlist=branch_drop_graphs,
             view_drop_actor=WITAN_CI_ACTOR_ID,
             termination_grace_seconds=SERVER_TERMINATION_GRACE_SECONDS,
+            peer_wait_seconds=SERVER_PEER_WAIT_SECONDS,
         )
         if persisted_lock
         else None
     )
-    startup_failure_threshold = startup_probe_failure_threshold(boot_budget_seconds)
-    # The old pod's termination grace (Recreate) plus the new pod's boot.
+    # Only the lock-handoff entrypoint waits for other server pods to exit, and
+    # it does so before it converges, so the probe has to outlast the wait too.
+    # A boot that hangs is then killed that much later.
+    peer_wait_seconds = SERVER_PEER_WAIT_SECONDS if persisted_lock else 0
+    startup_failure_threshold = startup_probe_failure_threshold(
+        boot_budget_seconds, peer_wait_seconds
+    )
+    # The old pod's termination grace (Recreate) plus the new pod's probe
+    # budget. Without a raised boot budget that is at most 125 + 140 + 135 =
+    # 400s, inside Kubernetes' default 600s progress deadline and Pulumi's
+    # default 10 minute wait, so the spec stays unchanged.
     boot_rollout_seconds = (
         SERVER_TERMINATION_GRACE_SECONDS
+        + peer_wait_seconds
         + boot_budget_seconds
         + BOOT_ROLLOUT_SLACK_SECONDS
         if boot_budget_seconds is not None
@@ -1134,6 +1159,11 @@ def create_data_tier(  # noqa: PLR0913
                             # before it needs revisiting — and a boot that
                             # blows it is killed, which is correct: that is a
                             # stuck start, not a slow one.
+                            #
+                            # With the lock handoff (format 14 on), the
+                            # threshold also covers SERVER_PEER_WAIT_SECONDS
+                            # in front of that boot (52 failures, 275s), so a
+                            # hung boot is killed 140s later than this.
                             #
                             # Liveness and readiness then carry NO initial
                             # delay, deliberately: they cannot run until

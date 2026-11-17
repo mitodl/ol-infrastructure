@@ -180,7 +180,6 @@ def test_format_14_has_the_plan_gate_and_one_stop_window(monkeypatch):
         assert "progressDeadlineSeconds" not in deployment["spec"]
         pod_spec = deployment["spec"]["template"]["spec"]
         (container,) = pod_spec["containers"]
-        assert container["startupProbe"]["failureThreshold"] == 24
         # The entrypoint's SIGTERM cleanup and its wait for another server pod
         # are sized from the grace this pod actually gets.
         grace = pod_spec["terminationGracePeriodSeconds"]
@@ -360,14 +359,69 @@ def test_a_boot_budget_lengthens_the_probe_and_both_rollout_waits(monkeypatch):
     def check(_: object) -> None:
         (deployment,) = mocks.of_type(DEPLOYMENT)
         (container,) = deployment["spec"]["template"]["spec"]["containers"]
-        # 20 + (717 - 1) x 5 = 3600.
-        assert container["startupProbe"]["failureThreshold"] == 717
-        # 125s termination grace + 3600s boot + 300s slack.
-        assert deployment["spec"]["progressDeadlineSeconds"] == 4025
+        # 20 + (745 - 1) x 5 = 140s peer wait + 3600s boot.
+        assert container["startupProbe"]["failureThreshold"] == 745
+        # 125s termination grace + 140s peer wait + 3600s boot + 300s slack.
+        assert deployment["spec"]["progressDeadlineSeconds"] == 4165
         assert deployment["metadata"]["annotations"] == {
             "pulumi.com/patchForce": "true",
-            "pulumi.com/timeoutSeconds": "4025",
+            "pulumi.com/timeoutSeconds": "4165",
         }
+
+    return tier.deployment.urn.apply(check)
+
+
+def _probe_kill_seconds(container: dict[str, Any]) -> float:
+    """When the startupProbe kills a container that never answers."""
+    probe = container["startupProbe"]
+    return (
+        probe["initialDelaySeconds"]
+        + (probe["failureThreshold"] - 1) * probe["periodSeconds"]
+    )
+
+
+@pytest.mark.parametrize("boot_budget_seconds", [None, 3600])
+@pulumi.runtime.test
+def test_the_probe_outlasts_the_peer_wait_and_the_boot(
+    monkeypatch, boot_budget_seconds
+):
+    """The lock-handoff entrypoint waits for another server pod to exit before
+    it converges, so a probe sized to the boot alone kills a healthy wait.
+    """
+    mocks, tier = _build(
+        monkeypatch,
+        served_format=14,
+        image_format=14,
+        boot_budget_seconds=boot_budget_seconds,
+    )
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        peer_wait = float(env["OMNIGRAPH_PEER_WAIT_SECONDS"])
+        assert peer_wait == data_tier.SERVER_PEER_WAIT_SECONDS
+        boot = boot_budget_seconds or data_tier.DEFAULT_BOOT_BUDGET_SECONDS
+        assert _probe_kill_seconds(container) >= peer_wait + boot
+
+    return tier.deployment.urn.apply(check)
+
+
+@pulumi.runtime.test
+def test_a_server_without_the_lock_handoff_keeps_the_default_probe(monkeypatch):
+    """Format 9's entrypoint waits for no peer."""
+    mocks, tier = _build(monkeypatch, served_format=9, image_format=9)
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        assert (
+            container["startupProbe"]["failureThreshold"]
+            == data_tier.DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD
+        )
+        assert _probe_kill_seconds(container) == data_tier.DEFAULT_BOOT_BUDGET_SECONDS
+        env = {e["name"] for e in container["env"]}
+        assert "OMNIGRAPH_PEER_WAIT_SECONDS" not in env
 
     return tier.deployment.urn.apply(check)
 
@@ -443,13 +497,26 @@ def test_the_server_memory_envelope_follows_the_stack(monkeypatch, memory, expec
 
 
 @pytest.mark.parametrize(
-    ("budget", "threshold"),
-    [(None, 24), (135, 24), (136, 25), (140, 25), (1800, 357)],
+    ("budget", "peer_wait", "threshold"),
+    [
+        (None, 0, 24),
+        (135, 0, 24),
+        (136, 0, 25),
+        (140, 0, 25),
+        (1800, 0, 357),
+        # 20 + (52 - 1) x 5 = 140 + 135.
+        (None, 140, 52),
+        (136, 140, 53),
+    ],
 )
-def test_the_failure_threshold_kills_no_sooner_than_the_budget(budget, threshold):
-    assert data_tier.startup_probe_failure_threshold(budget) == threshold
+def test_the_failure_threshold_kills_no_sooner_than_the_budget(
+    budget, peer_wait, threshold
+):
+    assert data_tier.startup_probe_failure_threshold(budget, peer_wait) == threshold
 
 
 def test_a_boot_budget_shorter_than_the_default_is_refused():
     with pytest.raises(ValueError, match="shorter than the default 135s"):
-        data_tier.startup_probe_failure_threshold(120)
+        data_tier.startup_probe_failure_threshold(
+            120, data_tier.SERVER_PEER_WAIT_SECONDS
+        )

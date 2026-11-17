@@ -84,6 +84,7 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
         branch_drop_allowlist=["code-c"],
         view_drop_actor="svc-witan-ci",
         termination_grace_seconds=125,
+        peer_wait_seconds=140,
     )
 
     def check(_: object) -> None:
@@ -140,6 +141,7 @@ def test_the_env_is_what_the_entrypoint_reads() -> None:
         branch_drop_allowlist=["code-a", "code-bridge"],
         view_drop_actor="svc-witan-ci",
         termination_grace_seconds=125,
+        peer_wait_seconds=140,
     )
 
     assert [e.name for e in handoff.env] == [
@@ -161,7 +163,6 @@ def test_the_env_is_what_the_entrypoint_reads() -> None:
     assert values["OMNIGRAPH_BRANCH_DROP_ALLOWLIST"] == "code-a,code-bridge"
     assert values["OMNIGRAPH_VIEW_DROP_ACTOR"] == "svc-witan-ci"
     assert values["OMNIGRAPH_TERMINATION_GRACE_SECONDS"] == "125"
-    # Another server pod gets the same grace to exit before the boot gives up.
     assert values["OMNIGRAPH_PEER_WAIT_SECONDS"] == "140"
     pod_name = next(e for e in handoff.env if e.name == "POD_NAME")
     assert pod_name.value_from.field_ref.field_path == "metadata.name"
