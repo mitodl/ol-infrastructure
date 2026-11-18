@@ -14,8 +14,20 @@ MANAGED_MARKER_VALUE = "pulumi"
 # Keycloak 26.8.2 rejects Admin REST API tokens (401) unless the client carries this
 # built-in scope, which adds the Admin API audience. admin-cli and the admin console
 # get it on upgrade; any other client whose service account calls /admin/realms/...
-# must list it among its default scopes.
+# must carry it. A service-account-only client lists it as a default scope. A client
+# that also signs users in lists it as optional, so user login tokens don't gain the
+# Admin API audience, and its service account requests it with scope=kc-admin-api.
 ADMIN_API_SCOPE_NAME = "kc-admin-api"
+
+# What clients carry as optional scopes when none are declared (Keycloak's realm
+# defaults, read from QA on 2026-10-16). ClientOptionalScopes replaces the whole
+# set, so a client that adds an optional scope keeps these alongside it.
+REALM_DEFAULT_OPTIONAL_SCOPES = [
+    "address",
+    "phone",
+    "offline_access",
+    "microprofile-jwt",
+]
 
 # Spread into the arguments of every OpenID client Pulumi declares. The marker and the
 # two flags travel together because a marked client with either grant on fails its

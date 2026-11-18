@@ -28,6 +28,7 @@ from pulumi import Input, InvokeOptions, Output, ResourceOptions
 from ol_infrastructure.substructure.keycloak.client_policies import (
     ADMIN_API_SCOPE_NAME,
     MANAGED_CLIENT_ARGS,
+    REALM_DEFAULT_OPTIONAL_SCOPES,
 )
 
 AUDIENCE_CLIENT_ID = "ol-memory-client"
@@ -38,16 +39,6 @@ FORGET_LOOKUP_CLIENT_ID = "ol-memory-forget-lookup-client"
 LEARN_AI_AUDIENCE_SCOPE_NAME = "ol-learn-ai-audience"
 MITLEARN_MEMORY_CLIENT_ID = "ol-mitlearn-memory-client"
 MITLEARN_MEMORY_AUDIENCE_SCOPE_NAME = "ol-mitlearn-memory-audience"
-
-# What the olapps app clients carry as optional scopes today (Keycloak's realm
-# defaults, read from QA on 2026-10-16). ClientOptionalScopes replaces the whole
-# set, so these are kept alongside the memory audience.
-REALM_DEFAULT_OPTIONAL_SCOPES = [
-    "address",
-    "phone",
-    "offline_access",
-    "microprofile-jwt",
-]
 
 
 @dataclass(frozen=True)
