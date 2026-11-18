@@ -834,7 +834,7 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
         },
         # requests.memory != limits.memory deliberately: a transient
         # buffering spike (e.g. several concurrent large course-CSV/
-        # JupyterHub-bundle downloads pinned to one pod via HTTP/2)
+        # JupyterHub-bundle downloads landing on one pod)
         # needs burst headroom above the steady-state baseline.  With
         # requests == limits (the prior config), the pod was OOMKilled
         # the instant usage crossed the request value, well before the
