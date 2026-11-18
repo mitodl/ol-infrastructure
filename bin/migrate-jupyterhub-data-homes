@@ -11,11 +11,18 @@ Procedure for one environment:
 1. Stop every user's server from the hub's admin page.
 2. Scale the hub to zero so nobody can start one:
    kubectl --context <ctx> -n jupyter-data scale deploy/hub --replicas=0
-3. Run this with --apply. It refuses while the hub has replicas.
-4. Set jupyterhub_data:home_owned_by_jovyan for the stack and deploy it. The
-   deploy brings the hub back (Helm resets the replica count), and users'
-   next server starts mount home-<x>. If the deploy fails, scale the hub
-   back to 1 by hand: servers then still use the old homes.
+3. Run this with --apply until it exits 0. It refuses while the hub has
+   replicas.
+4. Only then set jupyterhub_data:home_owned_by_jovyan for the stack and
+   deploy it. The deploy brings the hub back (Helm resets the replica count),
+   and users' next server starts mount home-<x>. If the deploy fails, scale
+   the hub back to 1 by hand: servers then still use the old homes.
+
+Rolling back is turning the flag off and deploying: users' next starts mount
+claim-<x> again, which holds their home as of the copy.
+
+Once the deployed hub puts homes on efs-jovyan-sc, a home-<x> may hold a
+user's work, so this refuses to wipe one (no re-copy, no --recopy).
 
 For each claim-<x> PVC this:
 
@@ -34,11 +41,13 @@ For each claim-<x> PVC this:
 Without --apply this only prints what it would do.
 """
 
+import base64
 import time
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import cyclopts
+import yaml
 from kubernetes import client, config
 
 from bridge.lib.versions import MARIMO_JUPYTERLAB_VERSION
@@ -47,6 +56,9 @@ OLD_PREFIX = "claim-"
 NEW_PREFIX = "home-"
 TARGET_STORAGE_CLASS = "efs-jovyan-sc"
 HUB_DEPLOYMENT = "hub"
+# Z2JH keeps the release's chart values in this Secret.
+HUB_VALUES_SECRET = "hub"  # noqa: S105  # pragma: allowlist secret
+DESTINATION_LABEL = "ol.mit.edu/home-migration-destination"
 JOVYAN_UID = 1000
 JOVYAN_GID = 100
 COPY_IMAGE = f"ghcr.io/mitodl/marimo-jupyterlab:{MARIMO_JUPYTERLAB_VERSION}"
@@ -119,7 +131,13 @@ def _copy_job(
     return {
         "apiVersion": "batch/v1",
         "kind": "Job",
-        "metadata": {"name": name, "labels": {"app": "migrate-jupyterhub-data-homes"}},
+        "metadata": {
+            "name": name,
+            "labels": {
+                "app": "migrate-jupyterhub-data-homes",
+                DESTINATION_LABEL: destination,
+            },
+        },
         "spec": {
             "backoffLimit": 0,
             "activeDeadlineSeconds": JOB_TIMEOUT_SECONDS,
@@ -180,19 +198,42 @@ def _wait_for_job(
 ) -> bool:
     """Wait for the Job to finish, print its log, and say whether it succeeded.
 
-    activeDeadlineSeconds fails the Job itself on timeout, so this never
-    returns while it is still running.
+    Reads the Job's Complete/Failed conditions rather than its pod counts: a
+    Job that hits activeDeadlineSeconds before its pod ever ran gets the
+    Failed condition with no failed pod.
     """
     while True:
         status = batch.read_namespaced_job_status(name, namespace).status
-        if status.succeeded or status.failed:
+        finished = {
+            condition.type
+            for condition in status.conditions or []
+            if condition.type in {"Complete", "Failed"} and condition.status == "True"
+        }
+        if finished:
             pods = core.list_namespaced_pod(
                 namespace, label_selector=f"job-name={name}"
             ).items
             for pod in pods:
                 print(core.read_namespaced_pod_log(pod.metadata.name, namespace))
-            return bool(status.succeeded)
+            return finished == {"Complete"}
         time.sleep(POLL_SECONDS)
+
+
+def _active_copy_jobs(
+    batch: client.BatchV1Api, namespace: str, destination: str
+) -> list[str]:
+    jobs = batch.list_namespaced_job(
+        namespace, label_selector=f"{DESTINATION_LABEL}={destination}"
+    ).items
+    return [job.metadata.name for job in jobs if job.status.active]
+
+
+def _homes_live_on_jovyan(core: client.CoreV1Api, namespace: str) -> bool:
+    """Say whether the deployed hub already puts homes on efs-jovyan-sc."""
+    secret = core.read_namespaced_secret(HUB_VALUES_SECRET, namespace)
+    values = yaml.safe_load(base64.b64decode(secret.data["values.yaml"]))
+    storage_class = values["singleuser"]["storage"]["dynamic"]["storageClass"]
+    return storage_class == TARGET_STORAGE_CLASS
 
 
 def _migrate_one(
@@ -208,6 +249,10 @@ def _migrate_one(
         old.spec.volume_name,
         {"spec": {"persistentVolumeReclaimPolicy": "Retain"}},
     )
+    running = _active_copy_jobs(batch, namespace, destination)
+    if running:
+        print(f"FAILED {source}: copy Job {', '.join(running)} is still running")
+        return False
     if new is None:
         core.create_namespaced_persistent_volume_claim(
             namespace, _new_claim(old, destination)
@@ -278,6 +323,8 @@ def migrate(
             "first so no server can start during or after the copy"
         )
         raise SystemExit(msg)
+    # Needs Secret read access, which a migration run has anyway.
+    homes_live = apply and _homes_live_on_jovyan(core, namespace)
 
     pvcs = {
         pvc.metadata.name: pvc
@@ -307,6 +354,13 @@ def migrate(
             continue
         if verified and not recopy:
             print(f"SKIP {source}: {destination} already verified (--recopy to redo)")
+            continue
+        if new is not None and homes_live:
+            print(
+                f"REFUSED {source}: the hub already mounts {destination}, so wiping "
+                "it could erase the user's work; copy any files by hand"
+            )
+            failures.append(source)
             continue
         action = "RECOPY" if new is not None else "COPY"
         print(f"{action if apply else 'WOULD ' + action} {source} -> {destination}")

@@ -70,10 +70,13 @@ from ol_infrastructure.lib.vault import postgres_role_statements
 # the username, which is the username itself when it's a valid DNS label.
 _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
-# PVC names for homes on efs-jovyan-sc, distinct from KubeSpawner's default
-# claim-{user_server} for the efs-sc homes they replace.
+# PVC names for homes: KubeSpawner's default for the efs-sc homes, and a
+# distinct one for the efs-jovyan-sc homes that replace them.
 # bin/migrate-jupyterhub-data-homes maps claim-<x> to home-<x>.
+EFS_SC_HOME_PVC_NAME_TEMPLATE = "claim-{user_server}"
 JOVYAN_HOME_PVC_NAME_TEMPLATE = "home-{user_server}"
+# See the home_owned_by_jovyan flag in provision_jupyterhub_data_deployment.
+_HOME_PVC_FROM_TEMPLATE_CONFIG = "\nc.KubeSpawner.remember_pvc_name = False\n"
 
 # uv's cache, which also holds every notebook's sandbox environment. The image
 # builds the shipped templates' environments into a seed directory
@@ -250,17 +253,20 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     # existing homes, since a user's next server start gets the new PVC.
     #
     # KubeSpawner saves each server's PVC name in its state and reuses it over
-    # pvc_name_template (remember_pvc_name, on by default), so without turning
-    # that off every existing user would keep mounting their claim-<x> home.
+    # pvc_name_template (remember_pvc_name, on by default). The hub turns that
+    # off, so the template alone picks the PVC and flipping the flag moves
+    # users in either direction; otherwise turning it on would leave existing
+    # users on claim-<x>, and turning it off again would leave them on home-<x>.
     if jupyterhub_data_config.get_bool("home_owned_by_jovyan"):
         home_storage = {
             "storageClass": cluster_stack.require_output("efs_jovyan_storageclass"),
             "pvcNameTemplate": JOVYAN_HOME_PVC_NAME_TEMPLATE,
         }
-        home_hub_config = "\nc.KubeSpawner.remember_pvc_name = False\n"
     else:
-        home_storage = {"storageClass": "efs-sc"}
-        home_hub_config = ""
+        home_storage = {
+            "storageClass": "efs-sc",
+            "pvcNameTemplate": EFS_SC_HOME_PVC_NAME_TEMPLATE,
+        }
     # A cross-Region inference profile ID (e.g. us.anthropic.claude-sonnet-5);
     # newer models can't be invoked on demand by bare foundation-model ID.
     bedrock_model = f"bedrock/{jupyterhub_data_config.require('bedrock_chat_model')}"
@@ -655,7 +661,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                             _COMMON_HUB_CONFIG
                             + _PROFILE_LIST
                             + _GIT_IDENTITY_HOOK
-                            + home_hub_config
+                            + _HOME_PVC_FROM_TEMPLATE_CONFIG
                         ),
                     },
                     "config": auth_config,
