@@ -149,6 +149,49 @@ c.GenericOAuthenticator.client_id = os.environ.get("OAUTH_CLIENT_ID", "")
 c.GenericOAuthenticator.client_secret = os.environ.get("OAUTH_CLIENT_SECRET", "")
 """
 
+# Hands the user's Keycloak name and email to the singleuser postStart hook,
+# which makes them the git identity unless the user has set their own. Only
+# identity goes through the environment, never a token: the pod's environment
+# is fixed for its lifetime.
+#
+# auth_state is None for a user with no stored state, e.g. one an admin spawns
+# before they have logged in. KubeSpawner runs environment values through
+# str.format, so braces are doubled.
+_GIT_IDENTITY_HOOK = """
+def set_git_identity_env(spawner, auth_state):
+    if auth_state is None:
+        return
+    userinfo = auth_state["oauth_user"]
+    identity = {
+        "OL_GIT_USER_NAME": userinfo.get("name", ""),
+        "OL_GIT_USER_EMAIL": userinfo.get("email", ""),
+    }
+    spawner.environment = {
+        **spawner.environment,
+        **{
+            key: value.replace("{", "{{").replace("}", "}}")
+            for key, value in identity.items()
+        },
+    }
+
+
+c.KubeSpawner.auth_state_hook = set_git_identity_env
+"""
+
+# Runs in the singleuser postStart hook. For each of user.name and user.email:
+# skip if the hub had no value, keep the user's own setting if their global
+# git config (on the persistent home volume, includes followed) already has
+# one, otherwise set it. Once seeded, the value counts as the user's own, so a
+# later change in Keycloak does not reach git.
+_GIT_IDENTITY_SEED_COMMAND = (
+    '[ -z "$OL_GIT_USER_NAME" ] || '
+    "git config --global --includes user.name >/dev/null || "
+    'git config --global user.name "$OL_GIT_USER_NAME"; '
+    '[ -z "$OL_GIT_USER_EMAIL" ] || '
+    "git config --global --includes user.email >/dev/null || "
+    'git config --global user.email "$OL_GIT_USER_EMAIL"; '
+)
+
 
 def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     stack_info: StackInfo,
@@ -576,7 +619,9 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         },
                     ],
                     "extraConfig": {
-                        "hubDataConfig.py": (_COMMON_HUB_CONFIG + _PROFILE_LIST),
+                        "hubDataConfig.py": (
+                            _COMMON_HUB_CONFIG + _PROFILE_LIST + _GIT_IDENTITY_HOOK
+                        ),
                     },
                     "config": auth_config,
                     "resources": {
@@ -649,7 +694,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # directory is ever empty.
                     #
                     # It then fills in the Bedrock assistant defaults for any key
-                    # the user hasn't set (see marimo_ai_defaults.py).
+                    # the user hasn't set (see marimo_ai_defaults.py), and the
+                    # git identity (see _GIT_IDENTITY_SEED_COMMAND).
                     "lifecycleHooks": {
                         "postStart": {
                             "exec": {
@@ -659,6 +705,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "mkdir -p /home/jovyan/notebooks && "
                                     "cp -n /usr/local/share/marimo/templates/* "
                                     "/home/jovyan/notebooks/ || true; "
+                                    f"{_GIT_IDENTITY_SEED_COMMAND}"
                                     f"python3 {_MARIMO_AI_DEFAULTS_SCRIPT} "
                                     f"{_MARIMO_AI_DEFAULTS_JSON} || true",
                                 ]
