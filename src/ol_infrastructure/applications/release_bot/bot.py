@@ -540,9 +540,9 @@ async def _release_status_line(name, cfg, issues: list[dict[str, Any]]) -> str:
     open_version = _gate_version(issue["title"]) if issue else None
     if open_version == version:
         return f"{status} · {in_flight_text}"
-    # The newest open issue is not the in-flight release's. Either promotion
-    # closed it (a release stuck after production), or the release was cut
-    # and QA has not opened its issue yet. QA opens it only after deploying
+    # The newest open issue is not the in-flight release's. Usually either
+    # promotion closed it (a release stuck after production), or the release
+    # was cut and QA has not opened its issue yet. QA opens it only after deploying
     # the release, and then supersedes every older open gate issue, so until
     # then the old one (often an infrastructure-only gate for the live
     # version) is still the open issue. Shown side by side without saying so,
