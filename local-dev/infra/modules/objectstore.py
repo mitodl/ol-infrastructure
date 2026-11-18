@@ -54,6 +54,11 @@ OCW_STUDIO_BUCKETS = (
 # needs versioning turned on the way the real artifacts bucket does.
 VERSIONED_BUCKETS = ("ol-eng-artifacts-local",)
 
+# mit-learn's default file storage: figures cropped from OCR'd PDFs, which the
+# browser loads straight from the bucket as problem images. Public because
+# the URLs mit-learn hands out are unsigned, as they are from S3 deployed.
+MIT_LEARN_BUCKETS = ("ol-mitlearn-app-local",)
+
 # Warehouse bucket for the local data lake (lakehouse.py). Not public: every
 # reader goes through StarRocks or the Iceberg catalog with the keys above.
 LAKE_BUCKET = "ol-data-lake-local"
@@ -76,6 +81,7 @@ class AppBuckets:
 OBJECT_STORE_BUCKETS = {
     "ocw-studio": AppBuckets(public=OCW_STUDIO_BUCKETS, versioned=VERSIONED_BUCKETS),
     "data-platform": AppBuckets(private=(LAKE_BUCKET,)),
+    "mit-learn": AppBuckets(public=MIT_LEARN_BUCKETS),
 }
 OBJECT_STORE_APPS = tuple(OBJECT_STORE_BUCKETS)
 

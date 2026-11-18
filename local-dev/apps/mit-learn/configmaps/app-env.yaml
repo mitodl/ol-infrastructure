@@ -75,9 +75,21 @@ data:
   AUTHORIZATION_URL: "https://sso.ol.mit.test/realms/olapps/protocol/openid-connect/auth"
   USERINFO_URL: "https://sso.ol.mit.test/realms/olapps/protocol/openid-connect/userinfo"
 
-  # ── Storage (local — no S3) ────────────────────────────────────────────────
-  MITOL_USE_S3: "False"
-  AWS_STORAGE_BUCKET_NAME: ""
+  # ── Storage (RustFS) ───────────────────────────────────────────────────────
+  # Default file storage (OCR figure crops and other uploads) goes to the
+  # in-cluster RustFS bucket, so every pod sees the same files and the browser
+  # loads them from s3.mit.test. Local filesystem storage left each file in
+  # the one container that wrote it, usually a Celery worker, where nothing
+  # served it. Pod-side boto3 uses the Service address; the URLs handed out
+  # use the custom domain. Storage takes its own keys (secrets.yaml) through
+  # AWS_S3_ACCESS_KEY_ID, so AWS_ACCESS_KEY_ID can still hold real AWS keys
+  # for the OCW ETL. Needs mit-learn's settings.py to read AWS_S3_ENDPOINT_URL,
+  # AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY and AWS_S3_ADDRESSING_STYLE.
+  MITOL_USE_S3: "True"
+  AWS_STORAGE_BUCKET_NAME: "ol-mitlearn-app-local"
+  AWS_S3_ENDPOINT_URL: "http://rustfs.local-infra.svc.cluster.local:9000"
+  AWS_S3_CUSTOM_DOMAIN: "s3.mit.test/ol-mitlearn-app-local"
+  AWS_S3_ADDRESSING_STYLE: "path"
 
   # ── Email (Mailpit) ────────────────────────────────────────────────────────
   MITOL_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
