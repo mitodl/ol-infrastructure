@@ -312,8 +312,8 @@ a store cannot be relocated with `mv`/`cp` — only rebuilt via `export` →
 `init`/`load`. That constraint drives the design:
 
 **Rebuild under a new storage root, keeping every graph id identical.** Clients
-address graphs by id (`WITAN_MEMORY_GRAPH=council`; witan-code's `graph_id()`
-for `code-<repo>`), never by storage path, so a new root is invisible to them.
+address graphs by id (`WITAN_MEMORY_GRAPH=council`; witan-core's
+`witan_core.graph_ids.code_graph_id()` for `code-<repo>`), never by storage path, so a new root is invisible to them.
 The old root stays byte-for-byte intact, making rollback a config change rather
 than a restore.
 
