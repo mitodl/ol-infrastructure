@@ -1722,7 +1722,8 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
             # thousands of IPs at a few a minute per IP. Lightpanda sends no
             # Origin header, so it never matches a browser-* route, where the
             # limiter lives. These rules sit on the shared list so they cover
-            # every route group. Both crawlers connect to the gateway
+            # every mit_learn route group on this host (not learn_ai's /ai/*
+            # or mitxonline's /mitxonline/*). Both crawlers connect to the gateway
             # directly, so remote_addr is the crawler's own address. In four
             # 6h windows from 2026-11-12 to 2026-11-18, neither source sent a
             # request with an OIDC session.
