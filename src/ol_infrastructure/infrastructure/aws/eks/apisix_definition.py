@@ -431,6 +431,42 @@ def _spread_across_zones_and_nodes(match_labels: dict[str, str]) -> dict[str, An
 
 
 def _high_availability_values(ha: ApisixHighAvailability) -> dict[str, Any]:
+    # Spread gateway pods across availability zones and nodes to reduce
+    # the likelihood that an AZ-level failure takes out multiple pods and
+    # to lower the probability that a rolling update places consecutive pods
+    # on the same node (which shrinks the window where a pod with a stale
+    # services_conf_version can block ADC sidecar syncs on a freshly
+    # restarted ingress controller).
+    placement = _spread_across_zones_and_nodes(
+        {
+            "app.kubernetes.io/name": APISIX_RELEASE_NAME,
+            "app.kubernetes.io/component": "gateway",
+        }
+    )
+    # Keep the gateway off spot capacity. A spot interruption gives two
+    # minutes' notice, which the 90 s preStop plus 120 s grace period below
+    # can't fit, and the PDB rejects the eviction outright whenever another
+    # gateway pod is already disrupted. The node termination handler logged
+    # rejected evictions for 37 gateway pods in Production over the 14 days
+    # to 2026-11-16. A pod that is never evicted dies with its node and
+    # resets the client connections it holds. NotIn matches nodes
+    # without the label too, so this admits the on-demand core node groups
+    # and steers Karpenter to on-demand capacity when it provisions.
+    placement["affinity"]["nodeAffinity"] = {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+                {
+                    "matchExpressions": [
+                        {
+                            "key": "karpenter.sh/capacity-type",
+                            "operator": "NotIn",
+                            "values": ["spot"],
+                        }
+                    ]
+                }
+            ]
+        }
+    }
     return {
         "autoscaling": {
             "enabled": True,
@@ -438,18 +474,7 @@ def _high_availability_values(ha: ApisixHighAvailability) -> dict[str, Any]:
             "maxReplicas": ha.max_replicas,
             "targetCPUUtilizationPercentage": ha.target_cpu_utilization_percentage,
         },
-        # Spread gateway pods across availability zones and nodes to reduce
-        # the likelihood that an AZ-level failure takes out multiple pods and
-        # to lower the probability that a rolling update places consecutive pods
-        # on the same node (which shrinks the window where a pod with a stale
-        # services_conf_version can block ADC sidecar syncs on a freshly
-        # restarted ingress controller).
-        **_spread_across_zones_and_nodes(
-            {
-                "app.kubernetes.io/name": APISIX_RELEASE_NAME,
-                "app.kubernetes.io/component": "gateway",
-            }
-        ),
+        **placement,
         # --- Rolling Update Strategy and Pod Lifecycle ---
         # maxSurge: 0 / maxUnavailable: 1 (drain-first) ensures that an old
         # pod -- which may hold a high services_conf_version accumulated over

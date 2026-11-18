@@ -105,12 +105,15 @@ INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
 # fits no existing node (32 of the 53 indexer pods scheduled in operations-qa
 # in the 7 days to 2026-10-28 waited for Karpenter to launch one), and a fresh
 # spot node often receives an EC2 rebalance recommendation within its first
-# minute. aws-node-termination-handler drains on those
-# (`enableRebalanceDraining`), evicting the indexer mid-clone. All 26 indexer
-# pod evictions in operations-qa in that window were that drain, and every
-# failed QA Job had both of its attempts evicted. Same selector, and the same
-# do-not-disrupt annotation on the pod, as open_metadata's `long_running`
-# workflow pods.
+# minute. aws-node-termination-handler drained on those at the time, evicting
+# the indexer mid-clone: all 26 indexer pod evictions in operations-qa in that
+# window were that drain, and every failed QA Job had both of its attempts
+# evicted. Rebalance draining has since been turned off
+# (`enableRebalanceMonitoring`/`enableRebalanceDraining` in
+# infrastructure/aws/eks/aws_utils.py), but a spot interruption still evicts
+# the pod with two minutes' notice, and do-not-disrupt does not stop that.
+# Same selector, and the same do-not-disrupt annotation on the pod, as
+# open_metadata's `long_running` workflow pods.
 INDEX_NODE_SELECTOR = {"karpenter.sh/capacity-type": "on-demand"}
 
 
