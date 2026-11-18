@@ -43,10 +43,6 @@ MARIMO_OPERATOR_NAMESPACE = "marimo-operator-system"
 # dagster Job pods. Only the limit is patched -- the upstream request is left
 # alone so this does not reserve capacity the operator never uses at rest.
 MARIMO_OPERATOR_MEMORY_LIMIT = "512Mi"
-# The release manifest runs the controller from the mutable `main` tag, so the
-# controller code changes on any reschedule without a version bump. Upstream
-# also publishes an image tag per release, which this pins to instead.
-MARIMO_OPERATOR_IMAGE = f"ghcr.io/marimo-team/marimo-operator:{MARIMO_OPERATOR_VERSION}"
 
 
 def _patch_controller(doc: dict[str, Any]) -> dict[str, Any]:
@@ -66,7 +62,12 @@ def _patch_controller(doc: dict[str, Any]) -> dict[str, Any]:
     )
     for container in containers:
         if container.get("name") == "manager":
-            container["image"] = MARIMO_OPERATOR_IMAGE
+            # The release manifest runs the controller from the mutable `main`
+            # tag, so the controller code changes on any reschedule without a
+            # version bump. Upstream also publishes an image tag per release;
+            # keep the manifest's repository and swap in that tag.
+            repository = container["image"].rsplit(":", 1)[0]
+            container["image"] = f"{repository}:{MARIMO_OPERATOR_VERSION}"
             limits = container.setdefault("resources", {}).setdefault("limits", {})
             limits["memory"] = MARIMO_OPERATOR_MEMORY_LIMIT
     return doc
