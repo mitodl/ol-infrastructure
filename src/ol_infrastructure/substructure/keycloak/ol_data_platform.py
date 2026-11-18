@@ -7,8 +7,10 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
     MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
+    REALM_DEFAULT_OPTIONAL_SCOPES,
     create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -462,6 +464,15 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ],
         opts=resource_options,
     )
+    # Optional, not default: this client also signs users in, and their tokens
+    # should not carry the Admin API audience. The service account requests it.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-data-platform-superset-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_superset_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
 
     keycloak.openid.ClientDefaultScopes(
         "ol-data-platform-superset-cli-client-default-scopes",
@@ -847,6 +858,14 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "roles",
             "web-origins",
         ],
+        opts=resource_options,
+    )
+    # Optional for the same reason as the Superset client above.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-data-platform-starrocks-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
         opts=resource_options,
     )
 

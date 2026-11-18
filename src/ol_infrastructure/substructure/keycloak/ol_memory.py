@@ -25,7 +25,11 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Input, InvokeOptions, Output, ResourceOptions
 
-from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+    MANAGED_CLIENT_ARGS,
+    REALM_DEFAULT_OPTIONAL_SCOPES,
+)
 
 AUDIENCE_CLIENT_ID = "ol-memory-client"
 AUDIENCE_SCOPE_NAME = "ol-memory-audience"
@@ -35,16 +39,6 @@ FORGET_LOOKUP_CLIENT_ID = "ol-memory-forget-lookup-client"
 LEARN_AI_AUDIENCE_SCOPE_NAME = "ol-learn-ai-audience"
 MITLEARN_MEMORY_CLIENT_ID = "ol-mitlearn-memory-client"
 MITLEARN_MEMORY_AUDIENCE_SCOPE_NAME = "ol-mitlearn-memory-audience"
-
-# What the olapps app clients carry as optional scopes today (Keycloak's realm
-# defaults, read from QA on 2026-10-16). ClientOptionalScopes replaces the whole
-# set, so these are kept alongside the memory audience.
-REALM_DEFAULT_OPTIONAL_SCOPES = [
-    "address",
-    "phone",
-    "offline_access",
-    "microprofile-jwt",
-]
 
 
 @dataclass(frozen=True)
@@ -254,8 +248,9 @@ def create_ol_memory_resources(
         realm_id=realm_id,
         client_id=forget_lookup_client.id,
         # basic carries sub, without which the admin API cannot tell whose
-        # token it is.
-        default_scopes=["basic"],
+        # token it is. roles carries the realm-management roles and
+        # kc-admin-api the audience the admin API requires since 26.8.2.
+        default_scopes=["basic", "roles", ADMIN_API_SCOPE_NAME],
         opts=resource_options,
     )
     realm_management_client = keycloak.openid.get_client_output(
