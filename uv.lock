@@ -58,6 +58,7 @@ ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", spa
 ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+witan-core = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
 [manifest]
 members = [
@@ -1667,6 +1668,7 @@ dependencies = [
     { name = "pyjwt", extra = ["crypto"] },
     { name = "pyyaml" },
     { name = "requests" },
+    { name = "witan-core" },
 ]
 
 [package.dev-dependencies]
@@ -1728,6 +1730,7 @@ requires-dist = [
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9,<3" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "requests", specifier = ">=2.32,<3" },
+    { name = "witan-core", specifier = ">=0.57.0,<1" },
 ]
 
 [package.metadata.requires-dev]
@@ -2958,6 +2961,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d8/cb/a5abcc2891249f393827c650c6296660ce40374ac22d99ab9aea41f9d2a2/websocket_client-1.9.2.tar.gz", hash = "sha256:0fcb57545848be86992e128218fd96dd87a6769ffdb1a968dff79632b85604d0", size = 84110, upload-time = "2026-08-31T14:08:40.964Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d5/d2/cc4dc1271e464942db7ee278baae2daa99ee77cb2af744025c04da585a3e/websocket_client-1.9.2-py3-none-any.whl", hash = "sha256:e1a673830a9c7bfa47b1cd3d5e4178f4c9651d80a4eab02c9c23a1c3ec6250ce", size = 95786, upload-time = "2026-08-31T14:08:39.899Z" },
+]
+
+[[package]]
+name = "witan-core"
+version = "0.57.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/86/1c/b31a5826f04ddf63ef640db3cf4b08351e9eba541434359975eec7783a50/witan_core-0.57.0.tar.gz", hash = "sha256:060cd5420c651d22ed1337f3cde4fa7cd3773672805dd2a759acb1b12b49f075", size = 412290, upload-time = "2026-11-16T23:46:20.064Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/35/ba/7e2b312396a1aa628cc1c6ba9b8a06388a041a26e3bf189a89dafd1e3dc0/witan_core-0.57.0-py3-none-any.whl", hash = "sha256:034b7c4be9306474cc451764d80c9c91b1878c6df56ac95008858acddaddc87f", size = 217648, upload-time = "2026-11-16T23:46:18.248Z" },
 ]
 
 [[package]]
