@@ -1345,6 +1345,7 @@ class LLMUnavailable(LLMError): ...
 
 class LLMRejected(LLMError):
     status_code: int | None
+    original_status_code: int | None  # a Bedrock 424's originalStatusCode (§6.3)
 
 
 class LLMContentFiltered(LLMError): ...
@@ -1632,7 +1633,8 @@ online scoring rules, access control (Keycloak, the bearer route), retention, an
    the §4 attribution become OTel spans and attributes (`gen_ai.*` where defined, an `ol.`
    namespace for the rest), exported over OTLP to destinations configured by name. Opik is the
    first. A named destination with no instance configured is left out rather than defaulted,
-   so Opik with no `OPIK_URL_OVERRIDE` sends nothing to Comet (§2.2). Tempo becomes possible
+   so Opik with neither `OPIK_URL_OVERRIDE` nor `OPIK_API_KEY` set sends nothing to Comet
+   (§2.2). Tempo becomes possible
    as a second destination, which is the fix
    `tk-ol-llm-the-library-s-model-spans-reach-opik-only-63c31a` needs. §4.1 records that Opik's
    OTLP mapping has no rule for the trace environment field, so the work starts by listing
