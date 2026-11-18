@@ -9,12 +9,13 @@ Production keycloak substructure writes each one to ``secret-opik/sdk-<app>`` in
 environment's Vault, so a credential can be revoked without touching another app or
 environment, and the gateway and Keycloak logs say which one wrote.
 
-The credentials get their own KV mount rather than ``secret-operations``, which some
-application policies read wholesale (e.g. odl_video_service's
-``secret-operations/*``). A token from any of these clients can read every Production
-trace and edit the Prompt Library, so among applications only each app's own policy
-can read its path. The developer (``secret-*``) and Concourse (``*``) policies still
-can, as they can ``secret-operations``.
+The credentials get their own KV mount rather than ``secret-operations``, so an
+application policy with a broad ``secret-operations`` grant (odl_video_service's
+``secret-operations/*`` was one) cannot reach them. A token from any of these
+clients can read every Production trace and edit the Prompt Library, so among
+applications only each app's own policy can read its path. The developer
+(``secret-*``) and Concourse (``*``) policies still can, as they can
+``secret-operations``.
 """
 
 from functools import cache

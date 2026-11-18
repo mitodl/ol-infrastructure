@@ -1,8 +1,12 @@
-path "secret-operations/*" {
+path "secret-operations/global/cloudfront-private-key" {
   capabilities = ["read"]
 }
 
-path "secret-operations" {
+path "secret-operations/global/mailgun-api-key" {
+  capabilities = ["read"]
+}
+
+path "secret-operations/sso/ovs" {
   capabilities = ["read"]
 }
 
