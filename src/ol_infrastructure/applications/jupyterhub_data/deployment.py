@@ -155,21 +155,25 @@ c.GenericOAuthenticator.client_secret = os.environ.get("OAUTH_CLIENT_SECRET", ""
 # is fixed for its lifetime.
 #
 # auth_state is None for a user with no stored state, e.g. one an admin spawns
-# before they have logged in. KubeSpawner runs environment values through
-# str.format, so braces are doubled.
+# before they have logged in. A claim that is absent or null becomes "", which
+# the postStart step skips. The value is escaped twice: KubeSpawner runs
+# environment values through str.format (braces doubled), and Kubernetes
+# expands $(VAR) in an env value and reduces $$ to $ (each $ doubled).
 _GIT_IDENTITY_HOOK = """
 def set_git_identity_env(spawner, auth_state):
     if auth_state is None:
         return
     userinfo = auth_state["oauth_user"]
     identity = {
-        "OL_GIT_USER_NAME": userinfo.get("name", ""),
-        "OL_GIT_USER_EMAIL": userinfo.get("email", ""),
+        "OL_GIT_USER_NAME": userinfo.get("name") or "",
+        "OL_GIT_USER_EMAIL": userinfo.get("email") or "",
     }
     spawner.environment = {
         **spawner.environment,
         **{
-            key: value.replace("{", "{{").replace("}", "}}")
+            key: value.replace("{", "{{")
+            .replace("}", "}}")
+            .replace("$", "$$")
             for key, value in identity.items()
         },
     }
