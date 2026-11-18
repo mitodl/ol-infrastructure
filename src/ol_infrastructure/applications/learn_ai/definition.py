@@ -78,6 +78,14 @@ __all__ = [
 NAMESPACE = "learn-ai"
 WEBAPP_SERVICE_NAME = "learn-ai-webapp"
 WEBAPP_SERVICE_PORT_NAME = "http"
+# Every webapp route resolves to pod IPs, so the webapp's ApisixUpstream
+# (retries=1, in __main__.py) can retry a refused or reset connection on
+# another pod.
+_WEBAPP_BACKEND: dict[str, Any] = {
+    "backend_service_name": WEBAPP_SERVICE_NAME,
+    "backend_service_port": WEBAPP_SERVICE_PORT_NAME,
+    "backend_resolve_granularity": "endpoint",
+}
 # The MIT Learn API host serves this application under /ai/*.
 API_PATH_PREFIX = "ai"
 CANVAS_AGENT_CONSUMER_NAME = "canvas-agent"
@@ -448,9 +456,7 @@ def _canvas_route(
         ],
         hosts=hosts,
         paths=[path],
-        backend_service_name=WEBAPP_SERVICE_NAME,
-        backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        backend_resolve_granularity="service",
+        **_WEBAPP_BACKEND,
     )
 
 
@@ -476,9 +482,7 @@ def direct_route_configs(
             ],
             hosts=hosts,
             paths=["/*"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         # Strip trailing slash from logout redirect. This route's `redirect`
         # overrides the shared config's (http_to_https) rather than merging.
@@ -498,9 +502,7 @@ def direct_route_configs(
             ],
             hosts=hosts,
             paths=["/logout/*"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="reqauth",
@@ -514,9 +516,7 @@ def direct_route_configs(
                 "/admin/login/*",
                 "/http/login/*",
             ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="websocket",
@@ -530,9 +530,7 @@ def direct_route_configs(
             paths=[
                 "/ws/*",
             ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         # 204 is the EFF Do Not Track convention for "no policy published".
         # Without this route passauth sends every crawl to a Django 404.
@@ -542,9 +540,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             hosts=hosts,
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -584,8 +580,7 @@ def prefixed_route_configs(
             passauth_priority=2,
             shared_plugin_config_name=shared_plugin_config_name,
             rewrite_plugins=[proxy_rewrite_plugin()],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="websocket",
@@ -598,9 +593,7 @@ def prefixed_route_configs(
             ],
             hosts=route_group.hosts,
             paths=[f"/{API_PATH_PREFIX}/ws/*"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
     ]
 

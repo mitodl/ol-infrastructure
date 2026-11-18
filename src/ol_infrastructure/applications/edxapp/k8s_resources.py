@@ -2557,8 +2557,25 @@ def create_k8s_resources(  # noqa: C901
                 timeout_send="600s",
                 backend_service_name=lms_webapp_deployment_name,
                 backend_service_port="http",
+                # Pod IPs rather than the ClusterIP, so the upstream below can
+                # retry a connection refused or reset by a pod that just died
+                # (OOMKill, crash, spot interruption) on another pod.
+                backend_resolve_granularity="endpoint",
             ),
         ],
+    )
+
+    # retries=1 caps the extra attempts at one instead of APISIX's default of
+    # one per remaining pod. proxy_next_upstream is "error" cluster-wide, so
+    # the 600s read timeout above is never retried.
+    lms_apisix_upstream = OLApisixUpstream(
+        name=f"ol-{stack_info.env_prefix}-edxapp-lms-apisix-upstream-{stack_info.env_suffix}",
+        upstream_config=OLApisixUpstreamConfig(
+            service_name=lms_webapp_deployment_name,
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            retries=1,
+        ),
     )
 
     cms_apisixroute = OLApisixRoute(
