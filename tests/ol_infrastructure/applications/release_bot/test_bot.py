@@ -623,13 +623,48 @@ async def test_release_status_explains_a_cut_release_waiting_for_its_issue(
 
     said = slack.said
     assert "2026.11.18.2>" in said
-    assert "no release issue yet (QA opens one after deploying it, superseding " in said
-    assert (
+    assert said.endswith(
+        "no release issue yet: QA opens one after deploying it, superseding "
         "<https://github.com/mitodl/my-app/issues/7|"
-        "Release my-app infrastructure @ 2026.11.16.1>)" in said
+        "Release my-app infrastructure @ 2026.11.16.1>"
     )
     assert "🟡" not in said
     assert "checked" not in said
+
+
+async def test_release_status_keeps_the_superseded_issue_s_progress_and_state(
+    repos, slack, monkeypatch
+):
+    old = {
+        "number": 6,
+        "title": "Release my-app 2026.11.16.1",
+        "url": "https://github.com/mitodl/my-app/issues/6",
+        "body": (
+            "## Release 2026.11.16.1\n- [x] **A** (#1) by a@x\n"
+            "- [ ] **B** (#2) by b@x\n"
+        ),
+        "labels": ["ops:release", "ops:consumed", "ops:refused"],
+    }
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[old])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    monkeypatch.setattr(
+        bot.github, "release_issue_for_version", AsyncMock(return_value=None)
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert slack.said.endswith(
+        "superseding <https://github.com/mitodl/my-app/issues/6|"
+        "Release my-app 2026.11.16.1> (1/2 checked) · ⛔ refused by Production"
+    )
 
 
 async def test_release_status_links_the_in_flight_release_s_closed_issue(
@@ -661,16 +696,24 @@ async def test_release_status_links_the_in_flight_release_s_closed_issue(
 
     said = slack.said
     assert "🟡 <https://github.com/mitodl/my-app/issues/7|" in said
-    assert "<https://github.com/mitodl/my-app/issues/9|Release issue> · taken" in said
+    # Named and bracketed, so its state cannot read as the open issue's.
+    assert said.endswith(
+        "<https://github.com/mitodl/my-app/issues/9|its release issue>"
+        " (taken by Production)"
+    )
     assert "no release issue yet" not in said
 
 
+@pytest.mark.parametrize(
+    "title",
+    ["Release my-app 2026.11.18.2", "Release my-app"],
+)
 async def test_release_status_does_not_look_up_the_issue_it_already_shows(
-    repos, slack, monkeypatch
+    repos, slack, monkeypatch, title
 ):
     issue = {
         "number": 8,
-        "title": "Release my-app 2026.11.18.2",
+        "title": title,
         "url": "https://github.com/mitodl/my-app/issues/8",
         "body": "## Release 2026.11.18.2\n- [ ] **A** (#1) by a@x\n",
         "labels": ["ops:release"],
