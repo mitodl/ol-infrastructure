@@ -60,6 +60,7 @@ from ol_infrastructure.infrastructure.aws.eks.vault_secrets_operator import (
 from ol_infrastructure.infrastructure.aws.eks.vpa import setup_vpa
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
+    DISABLE_SCTP_USER_DATA,
     access_entry_opts,
     get_cluster_version,
     get_eks_addon_version,
@@ -716,6 +717,7 @@ for ng_name, ng_config in configured_node_groups.items():
             node_root_volume_size=ng_config["disk_size_gb"] or 250,
             node_root_volume_delete_on_termination=True,
             node_root_volume_type="gp3",
+            node_user_data=DISABLE_SCTP_USER_DATA,
             cluster_ingress_rule=node_group_sec_group.security_group_rule,
             desired_capacity=ng_config["scaling"]["desired"] or 3,
             max_size=ng_config["scaling"]["max"] or 5,

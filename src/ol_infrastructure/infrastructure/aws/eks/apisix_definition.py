@@ -834,7 +834,7 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
         },
         # requests.memory != limits.memory deliberately: a transient
         # buffering spike (e.g. several concurrent large course-CSV/
-        # JupyterHub-bundle downloads pinned to one pod via HTTP/2)
+        # JupyterHub-bundle downloads landing on one pod)
         # needs burst headroom above the steady-state baseline.  With
         # requests == limits (the prior config), the pod was OOMKilled
         # the instant usage crossed the request value, well before the
@@ -920,6 +920,12 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
             # Chart default is true, which sends "Server: APISIX/<version>"
             # on every response (hq#14079).
             "enableServerTokens": False,
+            # Chart default is true. nginx's HTTP/2 code up to 1.31.8 has a
+            # remote code execution bug (CVE-2026-123007, CVE-2026-123633,
+            # "nginx2root"), and every APISIX runtime so far bundles an affected
+            # nginx. Turn it back on once APISIX ships a runtime on nginx 1.31.9+.
+            # Clients fall back to HTTP/1.1; no route serves gRPC.
+            "enableHTTP2": False,
             # Enable comprehensive per-phase request lifecycle tracing
             # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
             # Available since chart 2.16.0; without it OpenTelemetry only

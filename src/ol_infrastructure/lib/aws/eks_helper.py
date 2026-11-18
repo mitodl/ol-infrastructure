@@ -29,6 +29,14 @@ def eks_client() -> Any:
 # so each instance selects its own GatewayClass by this label.
 GATEWAY_CLASS_LABEL = "ol.mit.edu/gateway-controller"
 
+# The "nginx2root" chain uses a use-after-free in the kernel's SCTP send path to go
+# from code execution in a container to root on the node. Nothing we run speaks
+# SCTP, and its module loads on demand at the first SCTP socket, so never let it
+# load. Node user data for both node groups and Karpenter nodes.
+DISABLE_SCTP_USER_DATA = """#!/bin/bash
+echo "install sctp /bin/false" > /etc/modprobe.d/disable-sctp.conf
+"""
+
 
 def ecr_dockerhub_registry() -> str:
     """Build the address of the ECR pull-through cache of DockerHub.
