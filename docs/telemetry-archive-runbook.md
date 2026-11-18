@@ -1,28 +1,29 @@
 # Telemetry archive runbook
 
-The self-hosted Loki (and, from Phase 2, Mimir) archive on the operations EKS
-cluster that keeps 13 months of logs and metrics beside Grafana Cloud's 31 days.
+The self-hosted Loki and Mimir archive on the operations EKS cluster that keeps
+13 months of logs and metrics beside Grafana Cloud's 31 days.
 Design: `docs/adr/0014-self-hosted-lgtm-long-term-telemetry-retention.md`.
 Build order and decisions: `docs/plans/telemetry-archive-implementation-plan.md`.
 Code: `src/ol_infrastructure/applications/observability_archive/`.
 
 ## What it is, in one paragraph
 
-Every log writer ships twice: once to Grafana Cloud, once to the archive at
-`telemetry-archive[-qa].ol.mit.edu` over an internal NLB with basic auth. The
-archive is **best effort**: each writer's archive leg has a bounded queue and
-drops rather than waits, so a broken archive never delays Cloud. Grafana Cloud
-reads the archive over Private Data Source Connect through the `pdc-agent`
-Deployment in namespace `observability-archive`, as the datasources
-`Loki (archive, 13mo)` (uid `archive-loki`) and later `Mimir (archive, 13mo)`.
-Alerts about the archive are tickets (`channel=devops-warnings`), and no alert
-rule may read from it.
+Every log and metric writer ships twice: once to Grafana Cloud, once to the
+archive at `telemetry-archive[-qa].ol.mit.edu` over an internal NLB with basic
+auth. The archive is **best effort**: each writer's archive leg has a bounded
+queue and drops rather than waits, so a broken archive never delays Cloud.
+Grafana Cloud reads the archive over Private Data Source Connect through the
+`pdc-agent` Deployment in namespace `observability-archive`, as the datasources
+`Loki (archive, 13mo)` (uid `archive-loki`) and `Mimir (archive, 13mo)` (uid
+`archive-mimir`). Alerts about the archive are tickets
+(`channel=devops-warnings`), and no alert rule may read from it.
 
 | | QA | Production |
 |---|---|---|
 | Cluster | `operations-qa` | `operations-production` |
 | Retention | 30 days (canary) | 395 days |
 | Loki bucket | `ol-telemetry-archive-loki-qa` | `ol-telemetry-archive-loki-production` |
+| Mimir bucket | `ol-telemetry-archive-mimir-qa` | `ol-telemetry-archive-mimir-production` (`blocks/` and `ruler/` prefixes) |
 | Grafana Cloud stack | `mitolqa` | `mitolproduction` |
 
 ## Writers and where their drops show
@@ -31,13 +32,35 @@ rule may read from it.
 |---|---|---|
 | k8s-monitoring collectors (every cluster) | `archive-otlp` destination in `substructure/aws/eks/grafana.py` | `otelcol_exporter_send_failed_log_records_total`, `otelcol_exporter_enqueue_failed_log_records_total` with `exporter=~".*archive.*"` |
 | vector-log-proxy (Fastly, Heroku) | `archive.yaml` in its ConfigMap | `vector_buffer_discarded_events_total` (buffer full) and `vector_component_discarded_events_total` (retries exhausted) with `component_id=~"archive_.*"` |
-| EC2 Vector (Concourse, Consul, Vault) | `/etc/vector/archive_logs.yaml`, written by cloud-init | journald on the host only |
-| EC2 Alloy (Concourse web) | `/etc/alloy/archive.alloy`, written by cloud-init | journald on the host only |
+| k8s-monitoring collectors, scraped metrics | `archive-metrics` destination in `substructure/aws/eks/grafana.py` | `prometheus_remote_storage_samples_dropped_total`, `prometheus_remote_storage_samples_failed_total` with `url=~".*telemetry-archive.*"` |
+| EC2 Vector (Concourse, Consul, Vault) | `/etc/vector/archive_logs.yaml` and `/etc/vector/archive_metrics.yaml`, written by cloud-init | journald on the host only |
+| EC2 Alloy (Concourse web) | `/etc/alloy/archive.alloy` (`log_sink` and `metric_sink`), written by cloud-init | journald on the host only |
 
 The EC2 files come from `ol_infrastructure/lib/telemetry_archive.py` through
 each stack's user-data, so a change there needs a `pulumi up` of the Concourse,
 Consul or Vault stack **and** an instance roll. The image ships a discarding
 `archive.alloy`, so a host that has not been through cloud-init still starts.
+
+## Recording rules
+
+Mimir reads raw samples over the whole query range, so every 13-month trend is
+pre-aggregated by the ruler. The rules are a `PrometheusRule` named
+`telemetry-archive-recording-rules` in `observability-archive`, declared in
+`applications/observability_archive/recording_rules.py`; the operations
+cluster's `alloy-metrics` syncs it into the ruler every 5 minutes
+(`mimir.rules.kubernetes`, namespace prefix `ol-infrastructure`). To see what
+the ruler holds:
+
+```sh
+kubectl -n observability-archive port-forward svc/mimir-ruler 8080:8080
+curl -s http://localhost:8080/prometheus/config/v1/rules
+```
+
+Mimir runs with `multitenancy_enabled: false`, so no tenant header is needed.
+A rule that fails to evaluate raises `TelemetryArchiveRulerEvaluationFailing`;
+the ruler's logs name the expression. Fixing the expression in
+`recording_rules.py` and applying the archive stack is the whole fix; the sync
+replaces the group on its next pass. Recorded series exist only in the archive.
 
 ## Erasure: deleting log lines from the archive
 
@@ -148,11 +171,15 @@ compactor.
 - **Write endpoint**: from a pod in a writer cluster,
   `curl -i https://telemetry-archive-qa.ol.mit.edu/ready` should return 200;
   `curl -i -u <push creds> -X POST .../loki/api/v1/push` with an empty body
-  should return 400 from Loki, not 401 from Traefik.
+  should return 400 from Loki, and the same against `.../api/v1/push` a 4xx
+  from Mimir, not 401 from Traefik.
 - **Read path**: `kubectl -n observability-archive get deploy pdc-agent`
-  shows 2/2; the datasource health check in Grafana Cloud passes.
-- **Compactor**: `loki_compactor_apply_retention_last_successful_run_timestamp_seconds`
-  is within the last 24 h.
+  shows 2/2; both datasource health checks in Grafana Cloud pass.
+- **Compactors**: `loki_compactor_apply_retention_last_successful_run_timestamp_seconds`
+  and `cortex_compactor_last_successful_run_timestamp_seconds` are within the
+  last 24 h.
+- **Series in the archive**: `cortex_ingester_active_series` summed over the
+  Mimir ingesters is within a few percent of the Cloud stack's active series.
 
 Further sections (ingester restart, compactor stuck, PDC reconnect) land with
 Phase 3.
