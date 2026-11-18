@@ -20,6 +20,7 @@ merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: smoot-design
 required_status_checks:
+- javascript-tests
 - prek
 squash_merge_commit_message: BLANK
 squash_merge_commit_title: PR_TITLE
