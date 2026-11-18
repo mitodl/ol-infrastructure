@@ -21,6 +21,9 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+)
 from ol_infrastructure.substructure.keycloak.ol_memory import (
     ADMIN_CLIENT_ID,
     AUDIENCE_CLIENT_ID,
@@ -203,6 +206,16 @@ def test_admin_client_is_client_credentials_only(mocks):
     assert defaults.inputs["defaultScopes"] == ["basic", AUDIENCE_SCOPE_NAME]
     optional = mocks.named("olapps-ol-memory-admin-client-optional-scopes")
     assert optional.inputs["optionalScopes"] == []
+
+
+def test_forget_lookup_client_carries_admin_api_scope(mocks):
+    """Keycloak 26.8.2 rejects admin API tokens without the kc-admin-api scope."""
+    defaults = mocks.named("olapps-ol-memory-forget-lookup-client-default-scopes")
+    assert defaults.inputs["defaultScopes"] == [
+        "basic",
+        "roles",
+        ADMIN_API_SCOPE_NAME,
+    ]
 
 
 @pytest.mark.parametrize(
