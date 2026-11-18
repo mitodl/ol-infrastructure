@@ -49,6 +49,12 @@ class OLFastlyTLSConfig(BaseModel):
     tls_protocols: list[str] = ["1.2", "1.3"]
     # Lets the subscription be changed while its domains serve traffic.
     force_update: bool | None = None
+    # Keeps an existing subscription on the configuration it already has. Fastly
+    # rejects a configuration change on a subscription with active domains unless
+    # force_update is set, so a subscription whose live configuration differs from
+    # the looked-up one fails every other apply. Moving it means a new subscription
+    # (a new resource name) and a DNS cutover.
+    pin_configuration: bool = False
     dns_records: list[OLFastlyDNSRecordConfig] = []
 
 
@@ -98,7 +104,12 @@ class OLFastlyTLS(pulumi.ComponentResource):
             domains=tls_config.domains,
             configuration_id=self.tls_configuration.id,
             force_update=tls_config.force_update,
-            opts=resource_options,
+            opts=pulumi.ResourceOptions.merge(
+                resource_options,
+                pulumi.ResourceOptions(ignore_changes=["configuration_id"])
+                if tls_config.pin_configuration
+                else None,
+            ),
         )
 
         # Left unparented. The challenge records are created inside an apply, so

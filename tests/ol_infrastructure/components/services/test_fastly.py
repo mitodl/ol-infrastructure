@@ -54,6 +54,9 @@ pulumi.runtime.set_mocks(mocks)
 
 import pytest  # noqa: E402
 
+from ol_infrastructure.components.services import (  # noqa: E402
+    fastly as fastly_component,
+)
 from ol_infrastructure.components.services.fastly import (  # noqa: E402
     OLFastlyDNSRecordConfig,
     OLFastlyTLS,
@@ -237,3 +240,24 @@ def test_subdomain_record_is_a_cname():
 @pulumi.runtime.test
 def test_no_dns_records_by_default():
     assert _tls("no-dns").dns_records == []
+
+
+@pytest.mark.parametrize(
+    ("pin", "ignored"),
+    [(True, ["configuration_id"]), (False, None)],
+)
+def test_pin_configuration_controls_ignore_changes(monkeypatch, pin, ignored):
+    """Only a pinned subscription ignores configuration_id drift; the rest keep
+    following the lookup.
+    """
+    seen: list[pulumi.ResourceOptions] = []
+    real = fastly_component.fastly.TlsSubscription
+
+    def spy(name, *args, opts: pulumi.ResourceOptions, **kwargs):
+        seen.append(opts)
+        return real(name, *args, opts=opts, **kwargs)
+
+    monkeypatch.setattr(fastly_component.fastly, "TlsSubscription", spy)
+    _tls(f"pinned-{pin}", pin_configuration=pin)
+
+    assert seen[0].ignore_changes == ignored
