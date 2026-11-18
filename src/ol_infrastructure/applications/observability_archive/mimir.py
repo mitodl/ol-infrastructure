@@ -316,6 +316,15 @@ def build(  # noqa: PLR0913
                     # OTLP series carry more labels than scraped ones once the
                     # resource attributes below are promoted.
                     "max_label_names_per_series": 60,
+                    # Unset, both are unlimited. A bare selector such as
+                    # {cluster="operations-qa"} over 30 days fetched 145k
+                    # series per split, and with remote execution the
+                    # query-frontend's engine merges all 31 daily splits in
+                    # its own heap, OOM-killing it at 1.5Gi and taking every
+                    # PDC query down with it. Capped, it is rejected with an
+                    # error the Grafana user can read.
+                    "max_fetched_series_per_query": 50_000,
+                    "max_estimated_memory_consumption_per_query": 512 * 1024 * 1024,
                     # A writer that drains its queue after an archive outage
                     # replays samples up to sample_age_limit (1h) old, in
                     # order per series but possibly older than the head
