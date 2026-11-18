@@ -1,34 +1,35 @@
 ---
-encryptionsalt: v1:tpn96ot40Z4=:v1:Jwj0tmffGMlWJzIu:RJQDvm+3deBu6011y3tjtI+3wLlMiw==
 config:
   mailgun:apiKey:
-    secure: v1:nWcIY984Q+9bMOWB:fuboWRtkQpIcC7y0ND4m3FOHCPLonHmkt0FMm2O1QqyW2D5tt5+WHqHZbJPTUbyfbG4NYtFqKU1VqoVm+ZyQTPux
+    secure: v1:GIcl1wpJRVjWXBgp:22BWY2KsKql4XginrbCIbumMdiHWCJbSRyfnayjgSX2DaNzpx6nr7b/YkNUicjiGNt6iOtvMgeHaItJYR2tzt7Or
   ol_mailgun:domains:
   - name: mail-rc.learn.mit.edu
     managed: true
     smtp_password:
-      secure: v1:ZR4lHftkNOhHXSyo:cmYnynFV9t5KGGwCK04G7mhBrqUti+ZQFvKPm4r+6BlRhYEKAiYcbP6fHsIQvJwL
+      secure: v1:CwiioSCw84P43OQx:t88JK5NXWO28aou1ql5y4YrMpPVxynnvCyIEN2zXeCrYJYwDyvf3hfY0PC8KiC8l
     credentials:
     - login: no-reply
       smtp_password:
-        secure: v1:ulE82Q/Lb1kEfJbC:PURoZD0pOdAYOJSlPp2ZI9n5CYckG+s8jsoEa9R4n5qgMHI6SHyF5+VQf9PHpKay
+        secure: v1:doIdC9qIpB9g4mz/:/r0fNpu8nGdQLcDvb8UeUqg5OIIjJVI8kzDdMECIcs3Vst/SoNNjS6RziNFYcQLd
   - name: mail.sso-qa.ol.mit.edu
     managed: true
     smtp_password:
-      secure: v1:HD6nU74Fw4Nf7YEM:yKlyytz0XlnlpdVv58nsC8Tnz7E5u1t32iRx7zTZLDENyGvrTf8oFXWWOUCGhSFloCHk7UgV8wsYswyc/4TtFuRH
+      secure: v1:OWpPvq8T5tB7GIiv:CDToPWeyhc+KqP6gBu1h3gKl3wmol50Do5skor6WTIN97KCT6uRI6qlCtCUn6WPArxSEbo5quWIXsRfQmtBAFyqe
   - name: micromasters-rc-mail.odl.mit.edu
     managed: true
     smtp_password:
-      secure: v1:G8/cgENX7pbgctwq:Ji8PsBKFVacT1CH+lHQJxxsGUA9UUrNB8M3ghrdPfJ2sS043GFqm4bKPaHwyCEPcPKRwmocO6mDEf4Px+yDkoCLI
+      secure: v1:PNApFNERDlrcY62z:Y7nmUle9SFptA7JUhQv5C8pEy5Sv1k0IMRsy8jigc0LtXxLA1fvYfSsZD9/6dX7zhFhhBKRs08DwDH37ECD7wc8E
   - name: mitxonline-rc-mail.mitxonline.mit.edu
     managed: true
     smtp_password:
-      secure: v1:EqI98E0/fo+UdL7i:AAcXlfLa3NZt7Ci9v8d7Kv567864ayNac7fv9774cwUjAZCDMgC+XhzW+TU/5jXlenzO42hpOstzGDrEZ0l8aE3S
+      secure: v1:7q7W22Nsa6BVl0hm:YmQivypFVjQoWmcgF6uZy0IDIlPGX6SyPLz7/tOKt+ArBmAT8rPmxADzu/Ia3UthsuJLwJgQYc923bKIjnT/CS6h
   - name: ocw-rc.mail.odl.mit.edu
     managed: true
     smtp_password:
-      secure: v1:jjnNuHJFeCgh2pAr:7xkcDZou8lPIN5zXyij8DGDcdvoI/WiBR1yb0EoECV6oTlkaLXu8f+NgG5mL42jRMY590nz35lT5z6W8cSNtsXVk
+      secure: v1:CJXn2BLZzTfnQGl8:/xj3p3qc+Ee3XwjlENoCtRXoAC7KIvlOtZSTRomD3va9FlrGll8NCDK3A7N/xIRZgnZDGyyiKQccX5uuP3y+o+zr
   - name: xpro-rc-mail.odl.mit.edu
     managed: true
     smtp_password:
-      secure: v1:HdZvG7Cx9zOx/eFN:X6DwFs12fUpsfbKOOmBhaHARv6f0jJx4Y4BuFSxGrjs37tVhyyfmmNfd1J/1dPjcPEf87CTPU2A8Pn3xYWClj4v1
+      secure: v1:6Qvk+agobXflynwK:oRKuKANzTwEs7PwRR4l/kr+XBuHlDWSIUJ5pt0G4z8zXf4tO5odLs2p1AHmDRfl1qX+nL73PqmXRCg9fyI6qOdO9
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgFgl3Tp/c/Z5Lf1Z6bH87SRAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMuTvN8B2mnidgbbW4AgEQgDtZQz/KrI8XpJmnyXp1NUPAScBESrGIdmpAcI+Rj+mCH5+Op1y8lpe3qrNG1V4p8bI6rI9hepJs3deswQ==
