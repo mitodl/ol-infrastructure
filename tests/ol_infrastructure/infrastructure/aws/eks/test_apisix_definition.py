@@ -68,6 +68,12 @@ def test_http_redirects_go_to_443_everywhere():
         assert values["apisix"]["pluginAttrs"]["redirect"] == {"https_port": 443}
 
 
+def test_http2_is_off_everywhere():
+    # CVE-2026-123007 / CVE-2026-123633: the chart turns HTTP/2 on by default.
+    for config in (_single_pod(), _fleet()):
+        assert apisix_helm_values(config)["apisix"]["enableHTTP2"] is False
+
+
 def test_single_pod_has_no_fleet_settings():
     values = apisix_helm_values(_single_pod())
 
