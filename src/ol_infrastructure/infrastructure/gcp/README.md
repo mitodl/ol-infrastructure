@@ -511,7 +511,7 @@ Stop if that printed an error rather than writing an empty value. Write
 | SSO CI and RC (`ol-data-platform`) | `sso-rc` | `substructure/keycloak/Pulumi.{CI,QA}.yaml` `keycloak_realm:captcha_site_key`/`captcha_secret_key` (Pulumi secrets) |
 | MITx Online Production | `mitxonline-production` | `src/bridge/secrets/mitxonline/secrets.production.yaml`, same fields as RC |
 | MITxPro Production | `xpro-production` | `src/bridge/secrets/xpro/secrets.production.yaml`, same fields as RC |
-| Learn Production (`mit-open`) | `learn-production` | `src/bridge/secrets/mitlearn/secrets.production.yaml`, same fields as RC |
+| Learn Production (`mit-open`) | `learn-production` | `src/bridge/secrets/mitlearn/secrets.production.yaml`, same fields as RC. Restart both `mit_learn` and `mit_learn_nextjs` pods at cutover: Next.js reads the site key from `mitopen-static-secret` at pod start, so it keeps rendering the old key until it restarts. |
 | SSO Production (`ol-data-platform`) | `sso-production` | `substructure/keycloak/Pulumi.Production.yaml`, same keys as RC |
 
 Open Discussions is being retired, so its two legacy keys (Prod and

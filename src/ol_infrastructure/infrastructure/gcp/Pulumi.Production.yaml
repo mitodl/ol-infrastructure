@@ -173,12 +173,14 @@ config:
       protect: true
       # Replacements for the legacy reCAPTCHA keys in
       # recaptcha-migrated-075600d5919, ol-data-platform and mit-open, one per
-      # legacy key and covering the same hosts, so each old key can be deleted
-      # once its replacement is live. Every consumer renders the v2 checkbox
+      # legacy key that keeps a consumer, so each old key can be deleted once
+      # its replacement is live. The legacy keys with no replacement (Open
+      # Discussions, Bootcamp, MIT Open RC) are listed in README.md, and a
+      # replacement that drops a legacy host says so on its entry. Every
+      # consumer renders the v2 checkbox
       # through www.google.com/recaptcha/api.js (or www.recaptcha.net for
       # Keycloak) and verifies through classic siteverify, which needs the
-      # key's legacy secret (README.md). Open Discussions is being retired, so
-      # its legacy keys are deletions with no replacement here.
+      # key's legacy secret (README.md).
     recaptcha_keys:
       # mitxonline QA and CI: SOPS mitxonline/secrets.{qa,ci}.yaml.
     - key_name: mitxonline-rc
@@ -213,9 +215,8 @@ config:
       allowed_domains:
       - sso-qa.ol.mit.edu
       - sso-ci.ol.mit.edu
-      # Production, one per legacy production key and covering the same
-      # hosts. Each consumer reads it from the production counterpart of the
-      # RC store above.
+      # Production, one per legacy production key. Each consumer reads it from
+      # the production counterpart of the RC store above.
     - key_name: mitxonline-production
       display_name: MITx Online Production
       integration_type: CHECKBOX
