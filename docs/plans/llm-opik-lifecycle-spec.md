@@ -89,7 +89,8 @@ Item 3 as built: the Production keycloak stack declares `opik-<app>-<env>` in th
 realm for each application and environment in `OPIK_APP_ENVIRONMENTS` (`lib/opik.py`), each
 with the `ol-opik-client` audience mapper item 2 needs, and writes it to
 `secret-opik/sdk-<app>`, a KV v1 mount of its own in that environment's Vault (kept off
-`secret-operations`, which some application policies read wholesale). Each app's policy
+`secret-operations`, so a broad `secret-operations` grant such as odl-video-service's
+former `secret-operations/*` cannot reach it). Each app's policy
 grants only its own path. mitodl/ol-infrastructure#6621 first shipped a single client shared
 by every app and environment; it was replaced before it was deployed, and the owner confirmed
 item 3 on 2026-10-27. The CI prompt-sync and evaluation jobs get clients of their own; so far
