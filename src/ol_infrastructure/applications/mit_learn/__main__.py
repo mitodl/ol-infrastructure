@@ -2141,6 +2141,8 @@ mitlearn_oidc_credentials = OLApisixOIDCVaultCredentials(
     path=LearnSession.vault_path,
     vaultauth=vault_k8s_resources.auth_name,
 )
+# mit-learn exchanges the forwarded X-Access-Token for its memory token
+# (profiles/memory.py), so only a stack with memory enabled receives it.
 mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
     f"ol-mitlearn-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
     oidc_config=learn_session_oidc_config(
@@ -2150,6 +2152,7 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
         k8s_labels=application_labels,
         k8s_namespace=learn_namespace,
         credentials=mitlearn_oidc_credentials,
+        set_access_token_header=memory_enabled,
     ),
 )
 mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
@@ -2161,6 +2164,7 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
         k8s_labels=application_labels,
         k8s_namespace=learn_namespace,
         credentials=mitlearn_oidc_credentials,
+        set_access_token_header=memory_enabled,
     ),
 )
 

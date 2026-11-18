@@ -71,6 +71,7 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     DEFAULT_SERVER_MEMORY_LIMIT,
     DEFAULT_SERVER_MEMORY_REQUEST,
     OMNIGRAPH_SERVER_SERVICE_NAME,
+    WITAN_CI_ACTOR_ID,
     create_data_tier,
     omnigraph_server_addr,
 )
@@ -544,7 +545,6 @@ ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 # token. Its value must match the "svc-witan-ci" entry of the actor-tokens map
 # above; both come from the same SOPS source record below so they can't drift.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
-WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
 # The break-glass maintenance principal (agent-kit ADR-0005 path b, ADR-0002 D4
 # as amended). Same shape as the CI token above — a raw single-actor token

@@ -34,8 +34,13 @@ config:
   # CPU the pod is guaranteed and one requested core stays shared.
   # Keep CN pods uniformly sized (applications/starrocks starrocks:cn_config)
   # and revisit this when they change. mem_limit is a fraction of each CN's
-  # query pool (90% of the CN's mem_limit, itself 90% of the pod memory
-  # limit); big_query_mem_limit is bytes per CN (6Gi).
+  # query pool, 0.729 of the pod memory limit (three 90% factors; QA measured
+  # it). Batch is not memory-capped below the CN (mem_limit 1, no
+  # big_query_mem_limit): StarRocks has to run the builds Trino runs, and the
+  # tracking-log scale spike's mitxpro build peaked at 9.9 GB per CN
+  # (2026-11-10).
+  # Cap it again only once a measured conflict with interactive queries shows
+  # the need.
   starrocks:resource_groups:
     interactive:
       exclusive_cpu_cores: 3
@@ -43,8 +48,7 @@ config:
       concurrency_limit: 0
     batch:
       cpu_weight_percent: 100
-      mem_limit: 0.6
-      big_query_mem_limit: 6442450944
+      mem_limit: 1.0
       # Queries past this wait in the FE queue. Sized for one dbt build (4
       # threads, ol_dbt profiles.yml) plus as many again for OpenMetadata, the
       # mit-learn pull and Iceberg maintenance.

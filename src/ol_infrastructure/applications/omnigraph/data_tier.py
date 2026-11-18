@@ -54,6 +54,8 @@ import yaml
 from pulumi import Output, ResourceOptions
 
 from ol_infrastructure.applications.omnigraph.cluster_config import (
+    BRIDGE_SCHEMA_FILE,
+    CODE_SCHEMA_FILE,
     build_cluster_graphs,
     build_cluster_policies,
     require_withheld_graphs_removable,
@@ -117,6 +119,10 @@ ACTOR_TOKENS_FILENAME = "tokens.json"  # pragma: allowlist secret
 # than silently writing as nobody. Matches the break-glass identity in
 # agent-kit ADR-0005 path (b).
 CLUSTER_APPLY_ACTOR = "svc-witan-admin"
+# The witan CI indexer's and view reaper's actor. The plan gate and the boot
+# also delete code-graph branch views as this actor, because the code-graph
+# and bridge policies grant `branch_delete` to witan-ci and not witan-admin.
+WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
 # ── Server resource envelope ─────────────────────────────────────────────────
 #
@@ -143,6 +149,14 @@ DEFAULT_SERVER_MEMORY_LIMIT = "2Gi"
 # grace around that. See termination_grace_period_seconds on the Deployment.
 SERVER_SHUTDOWN_GRACE_SECONDS = 120
 SERVER_TERMINATION_GRACE_SECONDS = SERVER_SHUTDOWN_GRACE_SECONDS + 5
+# How much longer than that grace a booting pod waits for another server pod to
+# exit (OMNIGRAPH_PEER_WAIT_SECONDS): the time the kubelet takes to remove the
+# pod object. A ReplicaSet starts the replacement for a deleted or evicted pod
+# while that pod is still terminating, so the wait has to cover the whole grace
+# (agent-kit `docker/omnigraph_server_entrypoint.py` peer_wait_seconds). The
+# wait runs before the converge, inside the startupProbe's budget.
+PEER_EXIT_MARGIN_SECONDS = 15
+SERVER_PEER_WAIT_SECONDS = SERVER_TERMINATION_GRACE_SECONDS + PEER_EXIT_MARGIN_SECONDS
 
 # The startupProbe's timing. See startup_probe on the Deployment for how the
 # default budget (135s) was sized.
@@ -158,29 +172,35 @@ DEFAULT_BOOT_BUDGET_SECONDS = (
 BOOT_ROLLOUT_SLACK_SECONDS = 300
 
 
-def startup_probe_failure_threshold(boot_budget_seconds: int | None) -> int:
+def startup_probe_failure_threshold(
+    boot_budget_seconds: int | None, peer_wait_seconds: int
+) -> int:
     """Return the startupProbe failure threshold that gives a boot this long.
 
     The Nth failure lands at initial_delay + (N-1) x period, so this is the
-    smallest N whose kill comes at or after ``boot_budget_seconds``.
+    smallest N whose kill comes at or after the peer wait plus the boot.
 
     :param boot_budget_seconds: ``omnigraph:boot_budget_seconds``, or ``None``
         for the default budget.
+    :param peer_wait_seconds: how long the entrypoint may wait for another
+        server pod to exit before it boots; 0 where it does not wait.
     :raises ValueError: when the budget is shorter than the default, which
         would kill a healthy boot.
     :returns: the probe's ``failure_threshold``.
     :rtype: int
     """
     if boot_budget_seconds is None:
-        return DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD
-    if boot_budget_seconds < DEFAULT_BOOT_BUDGET_SECONDS:
+        boot_budget_seconds = DEFAULT_BOOT_BUDGET_SECONDS
+    elif boot_budget_seconds < DEFAULT_BOOT_BUDGET_SECONDS:
         msg = (
             f"omnigraph:boot_budget_seconds={boot_budget_seconds} is shorter "
             f"than the default {DEFAULT_BOOT_BUDGET_SECONDS}s. It exists to "
             "lengthen a boot, e.g. one whose cluster apply deletes a graph."
         )
         raise ValueError(msg)
-    after_first_probe = boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    after_first_probe = (
+        peer_wait_seconds + boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    )
     # Integer ceiling division: exact for any budget, unlike float division.
     return (
         after_first_probe + STARTUP_PROBE_PERIOD_SECONDS - 1
@@ -593,6 +613,17 @@ def create_data_tier(  # noqa: PLR0913
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
     cluster_graphs = build_cluster_graphs(managed_repos, withheld_graphs)
+    # Graphs whose non-main branches are derived views (witan-code's per-writer
+    # branch indexes, which the next index rebuilds), so the boot may delete
+    # them when omnigraph refuses a schema change on a graph with branches.
+    # Derived from the declared graphs rather than configured, so a withheld
+    # graph never reaches the entrypoint, which refuses an id cluster.yaml does
+    # not declare. Never the council graph: its branches hold data.
+    branch_drop_graphs = sorted(
+        graph
+        for graph, spec in cluster_graphs.items()
+        if spec["schema"] in (CODE_SCHEMA_FILE, BRIDGE_SCHEMA_FILE)
+    )
     removable_graphs = validate_graph_removal_allowlist(
         [] if graph_removal_allowlist is None else graph_removal_allowlist,
         list(cluster_graphs),
@@ -710,6 +741,12 @@ def create_data_tier(  # noqa: PLR0913
     # deploy. The entrypoint applies instead, on every boot, under the lock it
     # has just taken over (lock_handoff.py). `plan_gate_job` below takes this
     # slot there.
+    #
+    # No OMNIGRAPH_BRANCH_DROP_ALLOWLIST here: only the entrypoint and the plan
+    # gate read it, and this Job runs `omnigraph` directly. Nor can it meet a
+    # 0.15 binary's branch refusal: 0.15 opens formats 14 and up, so
+    # validate_image_internal_schema refuses it against the pre-14 root this
+    # Job is limited to.
     cluster_apply_job = (
         None
         if migration_armed or persisted_lock
@@ -820,6 +857,9 @@ def create_data_tier(  # noqa: PLR0913
             actor_tokens_file=f"{ACTOR_TOKENS_MOUNT_PATH}/{ACTOR_TOKENS_FILENAME}",
             apply_actor=CLUSTER_APPLY_ACTOR,
             graph_removal_allowlist=removable_graphs,
+            branch_drop_allowlist=branch_drop_graphs,
+            view_drop_actor=WITAN_CI_ACTOR_ID,
+            server_url=omnigraph_server_addr(namespace),
             config_hash=cluster_apply_hash,
             depends_on=[
                 cluster_configmap,
@@ -848,14 +888,28 @@ def create_data_tier(  # noqa: PLR0913
             pod_selector=omnigraph_pod_selector,
             apply_actor=CLUSTER_APPLY_ACTOR,
             graph_removal_allowlist=removable_graphs,
+            branch_drop_allowlist=branch_drop_graphs,
+            view_drop_actor=WITAN_CI_ACTOR_ID,
+            termination_grace_seconds=SERVER_TERMINATION_GRACE_SECONDS,
+            peer_wait_seconds=SERVER_PEER_WAIT_SECONDS,
         )
         if persisted_lock
         else None
     )
-    startup_failure_threshold = startup_probe_failure_threshold(boot_budget_seconds)
-    # The old pod's termination grace (Recreate) plus the new pod's boot.
+    # Only the lock-handoff entrypoint waits for other server pods to exit, and
+    # it does so before it converges, so the probe has to outlast the wait too.
+    # A boot that hangs is then killed that much later.
+    peer_wait_seconds = SERVER_PEER_WAIT_SECONDS if persisted_lock else 0
+    startup_failure_threshold = startup_probe_failure_threshold(
+        boot_budget_seconds, peer_wait_seconds
+    )
+    # The old pod's termination grace (Recreate) plus the new pod's probe
+    # budget. Without a raised boot budget that is at most 125 + 140 + 135 =
+    # 400s, inside Kubernetes' default 600s progress deadline and Pulumi's
+    # default 10 minute wait, so the spec stays unchanged.
     boot_rollout_seconds = (
         SERVER_TERMINATION_GRACE_SECONDS
+        + peer_wait_seconds
         + boot_budget_seconds
         + BOOT_ROLLOUT_SLACK_SECONDS
         if boot_budget_seconds is not None
@@ -1105,6 +1159,11 @@ def create_data_tier(  # noqa: PLR0913
                             # before it needs revisiting — and a boot that
                             # blows it is killed, which is correct: that is a
                             # stuck start, not a slow one.
+                            #
+                            # With the lock handoff (format 14 on), the
+                            # threshold also covers SERVER_PEER_WAIT_SECONDS
+                            # in front of that boot (52 failures, 275s), so a
+                            # hung boot is killed 140s later than this.
                             #
                             # Liveness and readiness then carry NO initial
                             # delay, deliberately: they cannot run until

@@ -99,7 +99,6 @@ class OpenEdxVars(BaseModel):
     enable_jumpnav: Literal["true", "false"] | None = None
     enable_ai_drawer_slot: Literal["true", "false"] | None = None
     feedback_csrf_cookie_name: str | None = None
-    appzi_url: str | None = None
     # Not derived from mit_learn_api_url like FEEDBACK_SUBMIT_URL: that URL is
     # set on mitxonline CI too, so deriving would enable CI.
     contact_us_support_api_url: str | None = None
@@ -185,7 +184,6 @@ def mfe_params(
         "PARAGON_THEME_URLS": "{}",
         "ENABLE_JUMPNAV": open_edx.enable_jumpnav,
         "ENABLE_AI_DRAWER_SLOT": open_edx.enable_ai_drawer_slot,
-        "APPZI_URL": open_edx.appzi_url,
         "CONTACT_US_SUPPORT_API_URL": open_edx.contact_us_support_api_url,
         "FEEDBACK_CSRF_COOKIE_NAME": open_edx.feedback_csrf_cookie_name,
         "FEEDBACK_SUBMIT_URL": (

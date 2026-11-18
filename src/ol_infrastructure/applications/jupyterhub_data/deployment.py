@@ -183,11 +183,15 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     # This role's policy covers JupyterHub hub secrets (OIDC creds, crypt key, DB
     # creds) and must not be shared with other namespaces. The marimo namespace
     # has its own dedicated Vault policy and auth role in the marimo_data stack.
+    # Only VSO's ServiceAccount, which OLVaultK8SResources names
+    # f"{application_name}-vault", logs in here. Single-user pods share this
+    # namespace, so binding "*" would leave the role open to any SA in it that
+    # is ever granted system:auth-delegator.
     vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
         f"ol-{base_name}-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
         role_name=base_name,
         backend=cluster_stack.require_output("vault_auth_endpoint"),
-        bound_service_account_names=["*"],
+        bound_service_account_names=[f"{base_name}-vault"],
         bound_service_account_namespaces=[namespace],
         token_policies=[vault_policy.name],
     )

@@ -137,7 +137,7 @@ raw_env_vars = {
     # analytics dashboard as unavailable rather than erroring when unset.
     "NEXT_PUBLIC_ANALYTICS_API_BASE_URL": nextjs_config.get("analytics_api_base_url")
     or "",
-    "NEXT_PUBLIC_APPZI_URL": nextjs_config.require("appzi_url"),
+    "NEXT_PUBLIC_APPZI_URL": nextjs_config.get("appzi_url") or "",
     # CDN TTL for HTML pages. Read on both the server (Cache-Control s-maxage)
     # and the client (React Query staleTime) -- see getCacheSMaxageSeconds in
     # mit-learn's frontends/main/src/common/config.ts -- so it must carry the

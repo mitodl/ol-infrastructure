@@ -48,7 +48,7 @@ repos:
     entry: python bin/falco-vcl
     language: python
     additional_dependencies:
-    - cyclopts==5.3.3
+    - cyclopts==5.4.0
     files: |
       (?x)(
         \.vcl$|
@@ -145,7 +145,7 @@ repos:
     - src/ol_infrastructure/infrastructure/gcp/legacy-credential-baseline.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-  rev: "v0.17.3"
+  rev: "v0.17.4"
   hooks:
   - id: ruff-format
   - id: ruff-check
@@ -181,7 +181,7 @@ repos:
     name: actionlint
     description: Runs actionlint to lint GitHub Actions workflow files
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
-  rev: v1.31.1
+  rev: v1.32.0
   hooks:
   - id: zizmor
     args: [--no-progress, --min-severity=high, --min-confidence=medium]
