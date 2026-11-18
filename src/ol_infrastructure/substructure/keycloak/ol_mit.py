@@ -17,7 +17,9 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
     MANAGED_CLIENT_ARGS,
+    REALM_DEFAULT_OPTIONAL_SCOPES,
     create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
@@ -390,6 +392,18 @@ def create_ol_mit_realm(  # noqa: PLR0913
         ),
         web_origins=keycloak_realm_config.get_object("ol-mit-ovs-web-origins"),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Optional, not default: this client also signs users in, and their tokens
+    # should not carry the Admin API audience. The service account requests it
+    # with scope=kc-admin-api. It declared no scopes before, so the optional set
+    # keeps the realm defaults alongside it.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-mit-ovs-client-optional-scopes",
+        realm_id=ol_mit_realm.id,
+        client_id=ol_mit_ovs_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
 
     # OVS looks up users by email and reads groups, a user's groups, group members

@@ -19,6 +19,20 @@ MANAGED_MARKER_VALUE = "pulumi"
 # Admin API audience, and its service account requests it with scope=kc-admin-api.
 ADMIN_API_SCOPE_NAME = "kc-admin-api"
 
+# The default scopes Keycloak gives a client it creates with a service account.
+# ClientDefaultScopes replaces the whole set, and Keycloak rejects a token request
+# naming a scope the client lacks (invalid_scope), so a client whose app requests
+# e.g. "openid profile email" keeps these alongside kc-admin-api.
+CLIENT_CREATION_DEFAULT_SCOPES = [
+    "acr",
+    "basic",
+    "email",
+    "profile",
+    "roles",
+    "service_account",
+    "web-origins",
+]
+
 # What clients carry as optional scopes when none are declared (Keycloak's realm
 # defaults, read from QA on 2026-10-16). ClientOptionalScopes replaces the whole
 # set, so a client that adds an optional scope keeps these alongside it.

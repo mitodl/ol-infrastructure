@@ -8,6 +8,8 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+    CLIENT_CREATION_DEFAULT_SCOPES,
     MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
     create_client_policies,
@@ -708,6 +710,16 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             valid_redirect_uris=[],
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
+        # Service account only, so kc-admin-api is a default scope (the Admin
+        # API audience required since Keycloak 26.8.2). The creation defaults
+        # stay so any scope the app already requests is still valid.
+        keycloak.openid.ClientDefaultScopes(
+            "olapps-mitlearn-admin-client-default-scopes",
+            realm_id=ol_apps_realm.id,
+            client_id=olapps_mitlearn_admin_client.id,
+            default_scopes=[*CLIENT_CREATION_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+            opts=resource_options,
+        )
         mitlearn_realm_management_client = keycloak.openid.get_client(
             realm_id=ol_apps_realm.id,
             client_id="realm-management",
@@ -849,6 +861,17 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
+    # Service account only, so kc-admin-api is a default scope (the Admin API
+    # audience required since Keycloak 26.8.2). mitxonline requests "openid
+    # profile email" (KEYCLOAK_ADMIN_CLIENT_SCOPES), so the creation defaults stay.
+    keycloak.openid.ClientDefaultScopes(
+        "olapps-mitxonline-b2b-client-default-scopes",
+        realm_id=ol_apps_realm.id,
+        client_id=olapps_mitxonline_b2b_client.id,
+        default_scopes=[*CLIENT_CREATION_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
+
     # Get realm-management client to assign roles
     realm_management_client = keycloak.openid.get_client(
         realm_id=ol_apps_realm.id,
@@ -941,6 +964,14 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         service_accounts_enabled=True,
         valid_redirect_uris=[],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    keycloak.openid.ClientDefaultScopes(
+        "olapps-mitxonline-b2b-membership-client-default-scopes",
+        realm_id=ol_apps_realm.id,
+        client_id=olapps_mitxonline_b2b_membership_client.id,
+        # Same KEYCLOAK_ADMIN_CLIENT_SCOPES request as the b2b client above.
+        default_scopes=[*CLIENT_CREATION_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
     for role in ("manage-organizations", "manage-users"):
         keycloak.openid.ClientServiceAccountRole(

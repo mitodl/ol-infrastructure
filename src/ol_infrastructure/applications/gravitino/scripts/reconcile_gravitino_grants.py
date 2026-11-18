@@ -660,6 +660,8 @@ class KeycloakToken:
                 "grant_type": "client_credentials",
                 "client_id": client_id,
                 "client_secret": client_secret,
+                # Keycloak 26.8.2 rejects admin API calls without this audience.
+                "scope": "kc-admin-api",
             }
         ).encode()
         self._token = ""
