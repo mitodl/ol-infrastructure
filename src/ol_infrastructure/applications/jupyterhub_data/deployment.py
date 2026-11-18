@@ -70,6 +70,11 @@ from ol_infrastructure.lib.vault import postgres_role_statements
 # the username, which is the username itself when it's a valid DNS label.
 _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
+# PVC names for homes on efs-jovyan-sc, distinct from KubeSpawner's default
+# claim-{user_server} for the efs-sc homes they replace.
+# bin/migrate-jupyterhub-data-homes maps claim-<x> to home-<x>.
+JOVYAN_HOME_PVC_NAME_TEMPLATE = "home-{user_server}"
+
 # uv's cache, which also holds every notebook's sandbox environment. The image
 # builds the shipped templates' environments into a seed directory
 # (UV_CACHE_SEED_DIR, set by the image), and an init container copies that into
@@ -233,6 +238,23 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         jupyterhub_data_config.get("trino_catalog") or "ol_data_lake_production"
     )
     aws_region = Config("aws").require("region")
+    # Homes on efs-sc show every file as the access point's uid (50000), not
+    # jovyan's 1000, so git refuses every repository in them as "dubious
+    # ownership". efs-jovyan-sc homes are owned by jovyan. The shared notebooks
+    # volume stays on efs-sc on purpose: git must keep refusing other users'
+    # repositories under shared_nb, since trusting one would let its config
+    # (e.g. core.fsmonitor) run commands as whoever browses into it.
+    #
+    # A new PVC name keeps the efs-sc homes intact for rollback. An environment
+    # turns this on only after bin/migrate-jupyterhub-data-homes has copied its
+    # existing homes, since a user's next server start gets the new PVC.
+    if jupyterhub_data_config.get_bool("home_owned_by_jovyan"):
+        home_storage = {
+            "storageClass": cluster_stack.require_output("efs_jovyan_storageclass"),
+            "pvcNameTemplate": JOVYAN_HOME_PVC_NAME_TEMPLATE,
+        }
+    else:
+        home_storage = {"storageClass": "efs-sc"}
     # A cross-Region inference profile ID (e.g. us.anthropic.claude-sonnet-5);
     # newer models can't be invoked on demand by bare foundation-model ID.
     bedrock_model = f"bedrock/{jupyterhub_data_config.require('bedrock_chat_model')}"
@@ -800,9 +822,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "storage": {
                         "type": "dynamic",
                         "capacity": "5Gi",
-                        "dynamic": {
-                            "storageClass": "efs-sc",
-                        },
+                        "dynamic": home_storage,
                         "extraVolumes": [
                             {
                                 "name": "shared-notebooks",

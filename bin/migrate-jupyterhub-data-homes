@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""Copy JupyterHub data homes from efs-sc onto efs-jovyan-sc.
+
+Homes on efs-sc show every file as the access point's uid (50000), not
+jovyan's 1000, so git refuses every repository in them as "dubious
+ownership". Access points on efs-jovyan-sc are owned by jovyan. An access
+point's owner can't be changed, so each home is copied to a new PVC.
+
+For every claim-<x> PVC in the namespace this:
+
+1. refuses to touch it while a pod mounts it (stop that user's server from the
+   hub's admin page first);
+2. sets its PV's reclaim policy to Retain, so deleting the old claim later
+   keeps the data for rollback;
+3. creates home-<x> on efs-jovyan-sc with the old claim's labels, username
+   annotation, access modes and size (JOVYAN_HOME_PVC_NAME_TEMPLATE in
+   applications/jupyterhub_data/deployment.py);
+4. runs a Job that copies the files, then compares the two trees and fails on
+   any difference.
+
+Then set jupyterhub_data:home_owned_by_jovyan for the stack and deploy it
+before anyone starts a server again: a server started in between writes to
+the old home, and that change is not copied.
+
+Without --apply this only prints what it would do.
+"""
+
+import time
+from typing import Annotated, Any
+
+import cyclopts
+from kubernetes import client, config
+
+from bridge.lib.versions import MARIMO_JUPYTERLAB_VERSION
+
+OLD_PREFIX = "claim-"
+NEW_PREFIX = "home-"
+TARGET_STORAGE_CLASS = "efs-jovyan-sc"
+JOVYAN_UID = 1000
+JOVYAN_GID = 100
+COPY_IMAGE = f"ghcr.io/mitodl/marimo-jupyterlab:{MARIMO_JUPYTERLAB_VERSION}"
+PULL_SECRET = "jupyterhub-data-ghcr-pull-secret"  # noqa: S105  # pragma: allowlist secret
+USERNAME_ANNOTATION = "hub.jupyter.org/username"
+JOB_TIMEOUT_SECONDS = 1800
+POLL_SECONDS = 5
+
+# Directory sizes differ between filesystems' metadata, so only regular
+# files carry a size; directories and symlinks are compared by path/target.
+COPY_SCRIPT = r"""
+set -eu
+if [ "${WIPE_DESTINATION}" = "true" ]; then
+  find /dst -mindepth 1 -delete
+fi
+cp -R --preserve=mode,timestamps,links /src/. /dst/
+listing() {
+  cd "$1"
+  {
+    find . -type d -printf 'd %p\n'
+    find . -type f -printf 'f %p %s\n'
+    find . -type l -printf 'l %p -> %l\n'
+  } | LC_ALL=C sort
+}
+listing /src > /tmp/src.txt
+listing /dst > /tmp/dst.txt
+diff /tmp/src.txt /tmp/dst.txt
+echo "copied and verified $(wc -l < /tmp/src.txt) entries"
+"""
+
+app = cyclopts.App(help=__doc__)
+
+
+def _mounting_pods(core: client.CoreV1Api, namespace: str, claim: str) -> list[str]:
+    pods = core.list_namespaced_pod(namespace).items
+    return [
+        pod.metadata.name
+        for pod in pods
+        if pod.status.phase in {"Pending", "Running"}
+        and any(
+            volume.persistent_volume_claim
+            and volume.persistent_volume_claim.claim_name == claim
+            for volume in pod.spec.volumes or []
+        )
+    ]
+
+
+def _new_claim(old: client.V1PersistentVolumeClaim, name: str) -> dict[str, Any]:
+    annotations = old.metadata.annotations or {}
+    return {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "metadata": {
+            "name": name,
+            "labels": old.metadata.labels or {},
+            "annotations": {USERNAME_ANNOTATION: annotations[USERNAME_ANNOTATION]},
+        },
+        "spec": {
+            "accessModes": old.spec.access_modes,
+            "storageClassName": TARGET_STORAGE_CLASS,
+            "resources": {"requests": old.spec.resources.requests},
+        },
+    }
+
+
+def _copy_job(
+    name: str, source: str, destination: str, *, wipe: bool
+) -> dict[str, Any]:
+    return {
+        "apiVersion": "batch/v1",
+        "kind": "Job",
+        "metadata": {"name": name, "labels": {"app": "migrate-jupyterhub-data-homes"}},
+        "spec": {
+            "backoffLimit": 0,
+            "ttlSecondsAfterFinished": 86400,
+            "template": {
+                "spec": {
+                    "restartPolicy": "Never",
+                    "imagePullSecrets": [{"name": PULL_SECRET}],
+                    "automountServiceAccountToken": False,
+                    "securityContext": {
+                        "runAsUser": JOVYAN_UID,
+                        "runAsGroup": JOVYAN_GID,
+                        "runAsNonRoot": True,
+                        "seccompProfile": {"type": "RuntimeDefault"},
+                    },
+                    "containers": [
+                        {
+                            "name": "copy",
+                            "image": COPY_IMAGE,
+                            "command": ["sh", "-c", COPY_SCRIPT],
+                            "env": [
+                                {
+                                    "name": "WIPE_DESTINATION",
+                                    "value": "true" if wipe else "false",
+                                }
+                            ],
+                            "securityContext": {
+                                "allowPrivilegeEscalation": False,
+                                "capabilities": {"drop": ["ALL"]},
+                            },
+                            "volumeMounts": [
+                                {"name": "src", "mountPath": "/src", "readOnly": True},
+                                {"name": "dst", "mountPath": "/dst"},
+                            ],
+                        }
+                    ],
+                    "volumes": [
+                        {
+                            "name": "src",
+                            "persistentVolumeClaim": {
+                                "claimName": source,
+                                "readOnly": True,
+                            },
+                        },
+                        {
+                            "name": "dst",
+                            "persistentVolumeClaim": {"claimName": destination},
+                        },
+                    ],
+                }
+            },
+        },
+    }
+
+
+def _wait_for_job(
+    batch: client.BatchV1Api, core: client.CoreV1Api, namespace: str, name: str
+) -> bool:
+    deadline = time.monotonic() + JOB_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        status = batch.read_namespaced_job_status(name, namespace).status
+        if status.succeeded or status.failed:
+            pods = core.list_namespaced_pod(
+                namespace, label_selector=f"job-name={name}"
+            ).items
+            for pod in pods:
+                print(core.read_namespaced_pod_log(pod.metadata.name, namespace))
+            return bool(status.succeeded)
+        time.sleep(POLL_SECONDS)
+    msg = f"Job {name} did not finish within {JOB_TIMEOUT_SECONDS}s"
+    raise TimeoutError(msg)
+
+
+@app.default
+def migrate(
+    *,
+    context: Annotated[str, cyclopts.Parameter(help="kubectl context, e.g. data-qa")],
+    namespace: str = "jupyter-data",
+    apply: bool = False,
+    recopy: Annotated[
+        bool,
+        cyclopts.Parameter(
+            help="Wipe and re-copy a home- PVC that already exists. Only for a "
+            "stack whose flag is still off; otherwise it erases the user's new home."
+        ),
+    ] = False,
+) -> None:
+    """Copy every claim-<x> home in NAMESPACE onto efs-jovyan-sc.
+
+    :param context: kubectl context of the cluster to migrate.
+    :param namespace: namespace of the JupyterHub release.
+    :param apply: make changes; without it, only print the plan.
+    :param recopy: wipe and re-copy existing home-<x> PVCs.
+    """
+    config.load_kube_config(context=context)
+    core = client.CoreV1Api()
+    batch = client.BatchV1Api()
+
+    claims = [
+        pvc
+        for pvc in core.list_namespaced_persistent_volume_claim(namespace).items
+        if pvc.metadata.name.startswith(OLD_PREFIX)
+    ]
+    existing = {
+        pvc.metadata.name
+        for pvc in core.list_namespaced_persistent_volume_claim(namespace).items
+    }
+    failures = []
+    for old in claims:
+        source = old.metadata.name
+        destination = NEW_PREFIX + source.removeprefix(OLD_PREFIX)
+        busy = _mounting_pods(core, namespace, source)
+        if busy:
+            print(f"SKIP {source}: mounted by {', '.join(busy)}; stop that server")
+            failures.append(source)
+            continue
+        if destination in existing and not recopy:
+            print(f"SKIP {source}: {destination} already exists (--recopy to redo)")
+            continue
+        print(f"{'COPY' if apply else 'WOULD COPY'} {source} -> {destination}")
+        if not apply:
+            continue
+
+        core.patch_persistent_volume(
+            old.spec.volume_name,
+            {"spec": {"persistentVolumeReclaimPolicy": "Retain"}},
+        )
+        if destination not in existing:
+            core.create_namespaced_persistent_volume_claim(
+                namespace, _new_claim(old, destination)
+            )
+        # A suffix per run, since a finished Job is kept for a day.
+        job_name = f"migrate-{int(time.time())}-{destination}"[:63].rstrip("-")
+        batch.create_namespaced_job(
+            namespace,
+            _copy_job(job_name, source, destination, wipe=destination in existing),
+        )
+        if not _wait_for_job(batch, core, namespace, job_name):
+            print(f"FAILED {source}: see Job {job_name}")
+            failures.append(source)
+
+    if failures:
+        msg = f"not migrated: {', '.join(failures)}"
+        raise SystemExit(msg)
+
+
+if __name__ == "__main__":
+    app()
