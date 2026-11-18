@@ -248,13 +248,19 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     # A new PVC name keeps the efs-sc homes intact for rollback. An environment
     # turns this on only after bin/migrate-jupyterhub-data-homes has copied its
     # existing homes, since a user's next server start gets the new PVC.
+    #
+    # KubeSpawner saves each server's PVC name in its state and reuses it over
+    # pvc_name_template (remember_pvc_name, on by default), so without turning
+    # that off every existing user would keep mounting their claim-<x> home.
     if jupyterhub_data_config.get_bool("home_owned_by_jovyan"):
         home_storage = {
             "storageClass": cluster_stack.require_output("efs_jovyan_storageclass"),
             "pvcNameTemplate": JOVYAN_HOME_PVC_NAME_TEMPLATE,
         }
+        home_hub_config = "\nc.KubeSpawner.remember_pvc_name = False\n"
     else:
         home_storage = {"storageClass": "efs-sc"}
+        home_hub_config = ""
     # A cross-Region inference profile ID (e.g. us.anthropic.claude-sonnet-5);
     # newer models can't be invoked on demand by bare foundation-model ID.
     bedrock_model = f"bedrock/{jupyterhub_data_config.require('bedrock_chat_model')}"
@@ -646,7 +652,10 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     ],
                     "extraConfig": {
                         "hubDataConfig.py": (
-                            _COMMON_HUB_CONFIG + _PROFILE_LIST + _GIT_IDENTITY_HOOK
+                            _COMMON_HUB_CONFIG
+                            + _PROFILE_LIST
+                            + _GIT_IDENTITY_HOOK
+                            + home_hub_config
                         ),
                     },
                     "config": auth_config,

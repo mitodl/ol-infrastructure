@@ -6,26 +6,36 @@ jovyan's 1000, so git refuses every repository in them as "dubious
 ownership". Access points on efs-jovyan-sc are owned by jovyan. An access
 point's owner can't be changed, so each home is copied to a new PVC.
 
-For every claim-<x> PVC in the namespace this:
+Procedure for one environment:
 
-1. refuses to touch it while a pod mounts it (stop that user's server from the
-   hub's admin page first);
-2. sets its PV's reclaim policy to Retain, so deleting the old claim later
-   keeps the data for rollback;
-3. creates home-<x> on efs-jovyan-sc with the old claim's labels, username
-   annotation, access modes and size (JOVYAN_HOME_PVC_NAME_TEMPLATE in
-   applications/jupyterhub_data/deployment.py);
-4. runs a Job that copies the files, then compares the two trees and fails on
-   any difference.
+1. Stop every user's server from the hub's admin page.
+2. Scale the hub to zero so nobody can start one:
+   kubectl --context <ctx> -n jupyter-data scale deploy/hub --replicas=0
+3. Run this with --apply. It refuses while the hub has replicas.
+4. Set jupyterhub_data:home_owned_by_jovyan for the stack and deploy it. The
+   deploy brings the hub back (Helm resets the replica count), and users'
+   next server starts mount home-<x>. If the deploy fails, scale the hub
+   back to 1 by hand: servers then still use the old homes.
 
-Then set jupyterhub_data:home_owned_by_jovyan for the stack and deploy it
-before anyone starts a server again: a server started in between writes to
-the old home, and that change is not copied.
+For each claim-<x> PVC this:
+
+- refuses it while a pod mounts it;
+- sets its PV's reclaim policy to Retain, so deleting the old claim later
+  keeps the data for rollback;
+- creates home-<x> on efs-jovyan-sc with the old claim's labels, username
+  annotation, access modes and size (JOVYAN_HOME_PVC_NAME_TEMPLATE in
+  applications/jupyterhub_data/deployment.py);
+- runs a Job that copies the files, then compares paths, symlink targets and
+  sha256 sums of the two trees and fails on any difference;
+- checks again that nothing mounted the old claim while it copied;
+- only then marks home-<x> verified. A rerun skips verified homes and wipes
+  and re-copies any home-<x> that is not verified.
 
 Without --apply this only prints what it would do.
 """
 
 import time
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import cyclopts
@@ -36,16 +46,18 @@ from bridge.lib.versions import MARIMO_JUPYTERLAB_VERSION
 OLD_PREFIX = "claim-"
 NEW_PREFIX = "home-"
 TARGET_STORAGE_CLASS = "efs-jovyan-sc"
+HUB_DEPLOYMENT = "hub"
 JOVYAN_UID = 1000
 JOVYAN_GID = 100
 COPY_IMAGE = f"ghcr.io/mitodl/marimo-jupyterlab:{MARIMO_JUPYTERLAB_VERSION}"
 PULL_SECRET = "jupyterhub-data-ghcr-pull-secret"  # noqa: S105  # pragma: allowlist secret
 USERNAME_ANNOTATION = "hub.jupyter.org/username"
-JOB_TIMEOUT_SECONDS = 1800
+VERIFIED_ANNOTATION = "ol.mit.edu/home-migration-verified"
+JOB_TIMEOUT_SECONDS = 3600
 POLL_SECONDS = 5
 
-# Directory sizes differ between filesystems' metadata, so only regular
-# files carry a size; directories and symlinks are compared by path/target.
+# Directories are compared by path only, since their sizes are filesystem
+# metadata; symlinks by target; regular files by sha256.
 COPY_SCRIPT = r"""
 set -eu
 if [ "${WIPE_DESTINATION}" = "true" ]; then
@@ -56,8 +68,8 @@ listing() {
   cd "$1"
   {
     find . -type d -printf 'd %p\n'
-    find . -type f -printf 'f %p %s\n'
     find . -type l -printf 'l %p -> %l\n'
+    find . -type f -exec sha256sum {} +
   } | LC_ALL=C sort
 }
 listing /src > /tmp/src.txt
@@ -110,6 +122,7 @@ def _copy_job(
         "metadata": {"name": name, "labels": {"app": "migrate-jupyterhub-data-homes"}},
         "spec": {
             "backoffLimit": 0,
+            "activeDeadlineSeconds": JOB_TIMEOUT_SECONDS,
             "ttlSecondsAfterFinished": 86400,
             "template": {
                 "spec": {
@@ -165,8 +178,12 @@ def _copy_job(
 def _wait_for_job(
     batch: client.BatchV1Api, core: client.CoreV1Api, namespace: str, name: str
 ) -> bool:
-    deadline = time.monotonic() + JOB_TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
+    """Wait for the Job to finish, print its log, and say whether it succeeded.
+
+    activeDeadlineSeconds fails the Job itself on timeout, so this never
+    returns while it is still running.
+    """
+    while True:
         status = batch.read_namespaced_job_status(name, namespace).status
         if status.succeeded or status.failed:
             pods = core.list_namespaced_pod(
@@ -176,8 +193,50 @@ def _wait_for_job(
                 print(core.read_namespaced_pod_log(pod.metadata.name, namespace))
             return bool(status.succeeded)
         time.sleep(POLL_SECONDS)
-    msg = f"Job {name} did not finish within {JOB_TIMEOUT_SECONDS}s"
-    raise TimeoutError(msg)
+
+
+def _migrate_one(
+    core: client.CoreV1Api,
+    batch: client.BatchV1Api,
+    namespace: str,
+    old: client.V1PersistentVolumeClaim,
+    new: client.V1PersistentVolumeClaim | None,
+) -> bool:
+    source = old.metadata.name
+    destination = NEW_PREFIX + source.removeprefix(OLD_PREFIX)
+    core.patch_persistent_volume(
+        old.spec.volume_name,
+        {"spec": {"persistentVolumeReclaimPolicy": "Retain"}},
+    )
+    if new is None:
+        core.create_namespaced_persistent_volume_claim(
+            namespace, _new_claim(old, destination)
+        )
+    # A suffix per run, since a finished Job is kept for a day.
+    job_name = f"migrate-{int(time.time())}-{destination}"[:63].rstrip("-")
+    batch.create_namespaced_job(
+        namespace,
+        _copy_job(job_name, source, destination, wipe=new is not None),
+    )
+    if not _wait_for_job(batch, core, namespace, job_name):
+        print(f"FAILED {source}: see Job {job_name}")
+        return False
+    # The Job's own pod has finished by now, so it isn't counted.
+    busy = _mounting_pods(core, namespace, source)
+    if busy:
+        print(f"FAILED {source}: {', '.join(busy)} mounted it during the copy")
+        return False
+    core.patch_namespaced_persistent_volume_claim(
+        destination,
+        namespace,
+        {
+            "metadata": {
+                "annotations": {VERIFIED_ANNOTATION: datetime.now(UTC).isoformat()}
+            }
+        },
+    )
+    print(f"VERIFIED {source} -> {destination}")
+    return True
 
 
 @app.default
@@ -185,67 +244,73 @@ def migrate(
     *,
     context: Annotated[str, cyclopts.Parameter(help="kubectl context, e.g. data-qa")],
     namespace: str = "jupyter-data",
+    only: Annotated[
+        str | None, cyclopts.Parameter(help="Migrate only this claim- PVC.")
+    ] = None,
     apply: bool = False,
     recopy: Annotated[
         bool,
         cyclopts.Parameter(
-            help="Wipe and re-copy a home- PVC that already exists. Only for a "
-            "stack whose flag is still off; otherwise it erases the user's new home."
+            help="Also wipe and re-copy verified home- PVCs. Only while the "
+            "stack's flag is off; otherwise it erases users' new homes."
         ),
     ] = False,
 ) -> None:
-    """Copy every claim-<x> home in NAMESPACE onto efs-jovyan-sc.
+    """Copy every claim- home in the namespace onto efs-jovyan-sc.
 
     :param context: kubectl context of the cluster to migrate.
     :param namespace: namespace of the JupyterHub release.
+    :param only: name of a single claim- PVC to migrate.
     :param apply: make changes; without it, only print the plan.
-    :param recopy: wipe and re-copy existing home-<x> PVCs.
+    :param recopy: wipe and re-copy home- PVCs already marked verified.
     """
     config.load_kube_config(context=context)
     core = client.CoreV1Api()
     batch = client.BatchV1Api()
+    apps = client.AppsV1Api()
 
-    claims = [
-        pvc
-        for pvc in core.list_namespaced_persistent_volume_claim(namespace).items
-        if pvc.metadata.name.startswith(OLD_PREFIX)
-    ]
-    existing = {
-        pvc.metadata.name
+    hub_replicas = apps.read_namespaced_deployment(
+        HUB_DEPLOYMENT, namespace
+    ).spec.replicas
+    if apply and hub_replicas:
+        msg = (
+            f"deploy/{HUB_DEPLOYMENT} has {hub_replicas} replica(s); scale it to 0 "
+            "first so no server can start during or after the copy"
+        )
+        raise SystemExit(msg)
+
+    pvcs = {
+        pvc.metadata.name: pvc
         for pvc in core.list_namespaced_persistent_volume_claim(namespace).items
     }
+    claims = [
+        pvc
+        for name, pvc in pvcs.items()
+        if name.startswith(OLD_PREFIX) and only in {None, name}
+    ]
+    if only and not claims:
+        msg = f"no PVC named {only} in {namespace}"
+        raise SystemExit(msg)
+
     failures = []
     for old in claims:
         source = old.metadata.name
         destination = NEW_PREFIX + source.removeprefix(OLD_PREFIX)
+        new = pvcs.get(destination)
+        verified = new is not None and VERIFIED_ANNOTATION in (
+            new.metadata.annotations or {}
+        )
         busy = _mounting_pods(core, namespace, source)
         if busy:
             print(f"SKIP {source}: mounted by {', '.join(busy)}; stop that server")
             failures.append(source)
             continue
-        if destination in existing and not recopy:
-            print(f"SKIP {source}: {destination} already exists (--recopy to redo)")
+        if verified and not recopy:
+            print(f"SKIP {source}: {destination} already verified (--recopy to redo)")
             continue
-        print(f"{'COPY' if apply else 'WOULD COPY'} {source} -> {destination}")
-        if not apply:
-            continue
-
-        core.patch_persistent_volume(
-            old.spec.volume_name,
-            {"spec": {"persistentVolumeReclaimPolicy": "Retain"}},
-        )
-        if destination not in existing:
-            core.create_namespaced_persistent_volume_claim(
-                namespace, _new_claim(old, destination)
-            )
-        # A suffix per run, since a finished Job is kept for a day.
-        job_name = f"migrate-{int(time.time())}-{destination}"[:63].rstrip("-")
-        batch.create_namespaced_job(
-            namespace,
-            _copy_job(job_name, source, destination, wipe=destination in existing),
-        )
-        if not _wait_for_job(batch, core, namespace, job_name):
-            print(f"FAILED {source}: see Job {job_name}")
+        action = "RECOPY" if new is not None else "COPY"
+        print(f"{action if apply else 'WOULD ' + action} {source} -> {destination}")
+        if apply and not _migrate_one(core, batch, namespace, old, new):
             failures.append(source)
 
     if failures:
