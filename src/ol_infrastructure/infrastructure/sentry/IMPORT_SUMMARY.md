@@ -140,13 +140,8 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   and `bin/import-sentry-config` is re-run, diff the regenerated
   `key_witan_default_*` block against this one before accepting it -- a
   `pulumi state rename` may be needed to converge onto the live key's id.
-- `issue_alert_witan_new_or_regressed_production`: added by hand. It emails
-  the devops team on the first event of a new witan issue, or a regression,
-  in the `production` environment. `pulumi up` creates it. It uses
-  `sentry_issue_alert_opts` like the generated rules, so later edits to its
-  conditions, filters or actions are not applied by Pulumi. To change them,
-  either drop those fields from `ignore_changes` for one `pulumi up`, or
-  `pulumi state unprotect` its URN and replace it (`protect=True` refuses the
-  delete half of a replace), or edit it in Sentry. A `bin/import-sentry-config` re-run
-  will list it as a live rule with a numeric suffix. Drop the regenerated
-  block or `pulumi state rename` onto it.
+- The witan "new or regressed issue in production" email alert is not in
+  Pulumi. `POST /projects/<org>/witan/rules/` returned 404 from the sentry
+  provider (0.0.9) even though the project exists, so it has to be created in
+  Sentry directly. A later `bin/import-sentry-config` run will list that rule;
+  drop the generated block unless the provider can manage it by then.
