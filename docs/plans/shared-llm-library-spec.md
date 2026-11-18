@@ -230,6 +230,15 @@ Consequences:
   once the translation plugins drop their `litellm==1.83.0` pin, which adoption does anyway.
 - The library calls `os.environ.setdefault("OPIK_SENTRY_ENABLE", "false")` in its package
   `__init__` before importing opik, so no consumer can repeat the learn-ai Sentry bug.
+- The Opik SDK's default instance is Comet's hosted Opik (`url_override` defaults to
+  `https://www.comet.com/opik/api/`), so the library uses Opik only when an instance is named:
+  `OPIK_URL_OVERRIDE` set to a non-blank value (in the environment or `~/.opik.config`) or a
+  non-blank `OPIK_API_KEY`. Without one, the `opik` trace destination is left out with one
+  warning per process, and the other named destinations keep their spans (none left means
+  runs are untraced). Explicit Opik operations through `opik_client()` (prompt sync, datasets,
+  experiments) raise `OpikNotConfiguredError`, a `ValueError`; `get_prompt` treats it as Opik
+  being unavailable and returns the embedded default marked degraded. Decided 2026-11-18,
+  shipped in ol-llm 0.0.16 (mitodl/ol-llm#90).
 - Evaluation and LLM-judge metrics need litellm, so `ol_llm.eval` runs only where the
   overrides are absent: CI eval jobs and developer machines, as a separate uv project.
 - The library pins opik exactly, and its CI runs the import-and-trace smoke test in the
@@ -1064,7 +1073,9 @@ The retry rows are the §3.2 statuses, an in-stream 424, and the transport error
 answer came back. PydanticAI 2.59 gives Bedrock's in-stream `modelStreamErrorException` status
 424 and sets `in_stream`, and Bedrock says to retry it; before 2.59 it arrived as a
 `ModelAPIError` with no status. Bedrock's 424 before a stream opens is a `ModelErrorException`,
-which it gives no retry advice for, so it is rejected like any other status. Like every retry
+which it gives no retry advice for, so it is rejected like any other status; it carries the
+model's own status as `originalStatusCode`, which the library keeps as
+`LLMRejected.original_status_code` for the batch helpers (§6.7). Like every retry
 row, an in-stream 424 is retried only when it is the stream's first event (the library reads
 Bedrock's first event while the stream can still be retried); after the first event it reaches
 the caller unretried (§6.4).
@@ -1212,8 +1223,12 @@ type, and an exception it raises reaches the caller unchanged.
 For the batch helpers (§3.2 rule 7): `LLMRejected` with a 400, 413, or 422 rejects one row's
 input (too long, malformed, or refused by a provider's input moderation that answers with a
 400) and is a failure of that row only, not retried under the same key (a hash of the row's
-input, the prompt name and template, and the use case's primary model); ten of them with no
-accepted request between them open the circuit, because then the request itself is wrong (e.g.
+input, the prompt name and template, and the use case's primary model). A Bedrock
+`ModelErrorException` (424 before a stream opens) whose `originalStatusCode` is 400, 413, or
+422 is the same rejection of that row's input; any other or missing original code leaves it
+with the other `LLMRejected` below, and every such 424 is logged with its
+`originalStatusCode` and `resourceName` (decided 2026-11-18, mitodl/ol-llm#89). Ten row
+rejections with no accepted request between them open the circuit, because then the request itself is wrong (e.g.
 a parameter the model no longer takes). Any other `LLMRejected` (401, 403, 404, other
 statuses, or a transport error with no status) opens the circuit at once. `LLMRateLimited` and
 `LLMUnavailable` count toward a separate threshold of three in a row, and `LLMInvalidOutput`,
@@ -1330,6 +1345,7 @@ class LLMUnavailable(LLMError): ...
 
 class LLMRejected(LLMError):
     status_code: int | None
+    original_status_code: int | None  # a Bedrock 424's originalStatusCode (§6.3)
 
 
 class LLMContentFiltered(LLMError): ...
@@ -1616,7 +1632,10 @@ online scoring rules, access control (Keycloak, the bearer route), retention, an
 3. Tracing, `tk-ol-llm-tracing-as-opentelemetry-first-with-the-l-aee37d`. The root trace and
    the §4 attribution become OTel spans and attributes (`gen_ai.*` where defined, an `ol.`
    namespace for the rest), exported over OTLP to destinations configured by name. Opik is the
-   first. Tempo becomes possible as a second destination, which is the fix
+   first. A named destination with no instance configured is left out rather than defaulted,
+   so Opik with neither `OPIK_URL_OVERRIDE` nor `OPIK_API_KEY` set sends nothing to Comet
+   (§2.2). Tempo becomes possible
+   as a second destination, which is the fix
    `tk-ol-llm-the-library-s-model-spans-reach-opik-only-63c31a` needs. §4.1 records that Opik's
    OTLP mapping has no rule for the trace environment field, so the work starts by listing
    which of Opik's native trace fields OTLP reaches; anything the Opik backend still needs
