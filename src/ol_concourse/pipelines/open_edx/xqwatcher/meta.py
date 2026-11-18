@@ -109,8 +109,9 @@ if __name__ == "__main__":
         user_data={
             "description": (
                 "Regenerates and applies the per-release xqwatcher pipelines "
-                "(`docker-pulumi-xqwatcher-{release}`) for every "
-                "`OpenEdxSupportedRelease`, plus this meta pipeline itself."
+                "(`docker-pulumi-xqwatcher-{release}`) for each "
+                "`OpenEdxSupportedRelease` that deploys xqwatcher, plus this "
+                "meta pipeline itself."
             ),
             "team": "main",
             "category": "meta",
