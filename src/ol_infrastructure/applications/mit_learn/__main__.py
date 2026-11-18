@@ -1718,14 +1718,14 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
                 session_cookie_names=[learn_session.cookie_name],
             ),
             # Two crawlers that the per-IP limiter on the browser variant
-            # can't catch, because each spreads its requests across thousands
-            # of IPs at a few requests a minute per IP. Both connect to the
-            # gateway directly, so remote_addr is the crawler's own address.
-            # They sit on the shared list so they also cover the fastly-* and
-            # unmatched routes: Lightpanda sends no Origin header, so its
-            # requests never match a browser-* route. In four 6h windows from
-            # 2026-11-12 to 2026-11-18, neither source sent a request with an
-            # OIDC session.
+            # doesn't catch. The 43.172/43.173 one spreads its requests across
+            # thousands of IPs at a few a minute per IP. Lightpanda sends no
+            # Origin header, so it never matches a browser-* route, where the
+            # limiter lives. These rules sit on the shared list so they cover
+            # every route group. Both crawlers connect to the gateway
+            # directly, so remote_addr is the crawler's own address. In four
+            # 6h windows from 2026-11-12 to 2026-11-18, neither source sent a
+            # request with an OIDC session.
             OLApisixPluginConfig(
                 name="ip-restriction",
                 # ACEVILLE PTE.LTD. (ACEVILLEPTELTD-SG), a hosting range. The
