@@ -7,8 +7,9 @@ named after the notebook.  There is no central gateway — individual notebooks
 are accessed through their own Service.
 
 The operator is installed from the upstream ``deploy/install.yaml`` manifest
-so that the version is pinned precisely and Renovate can track releases via
-the ``github-releases`` datasource in ``bridge/lib/versions.py``.
+of the release in ``bridge/lib/versions.py``, which Renovate tracks via the
+``github-releases`` datasource. The controller image is pinned to the same
+release, because the manifest itself points at the mutable ``main`` tag.
 
 Refs:
   https://docs.marimo.io/guides/deploying/deploying_kubernetes/
@@ -42,16 +43,21 @@ MARIMO_OPERATOR_NAMESPACE = "marimo-operator-system"
 # dagster Job pods. Only the limit is patched -- the upstream request is left
 # alone so this does not reserve capacity the operator never uses at rest.
 MARIMO_OPERATOR_MEMORY_LIMIT = "512Mi"
+# The release manifest runs the controller from the mutable `main` tag, so the
+# controller code changes on any reschedule without a version bump. Upstream
+# also publishes an image tag per release, which this pins to instead.
+MARIMO_OPERATOR_IMAGE = f"ghcr.io/marimo-team/marimo-operator:{MARIMO_OPERATOR_VERSION}"
 
 
-def _patch_controller_memory_limit(doc: dict[str, Any]) -> dict[str, Any]:
-    """Raise the operator controller's memory limit above the upstream default.
+def _patch_controller(doc: dict[str, Any]) -> dict[str, Any]:
+    """Pin the controller image to the release and raise its memory limit.
 
     Args:
         doc: A single Kubernetes resource dict from the install manifest.
 
     Returns:
-        The same dict, with the controller container's memory limit raised.
+        The same dict, with the controller container's image pinned and memory
+        limit raised.
     """
     if doc.get("kind") != "Deployment":
         return doc
@@ -60,6 +66,7 @@ def _patch_controller_memory_limit(doc: dict[str, Any]) -> dict[str, Any]:
     )
     for container in containers:
         if container.get("name") == "manager":
+            container["image"] = MARIMO_OPERATOR_IMAGE
             limits = container.setdefault("resources", {}).setdefault("limits", {})
             limits["memory"] = MARIMO_OPERATOR_MEMORY_LIMIT
     return doc
@@ -74,7 +81,7 @@ def _fetch_operator_manifests() -> list[dict[str, Any]]:
     with urllib.request.urlopen(MARIMO_OPERATOR_MANIFEST_URL) as response:  # noqa: S310
         content = response.read().decode("utf-8")
     return [
-        _patch_controller_memory_limit(doc)
+        _patch_controller(doc)
         for doc in pyyaml.safe_load_all(content)
         if doc is not None
     ]
