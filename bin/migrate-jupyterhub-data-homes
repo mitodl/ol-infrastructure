@@ -352,6 +352,12 @@ def migrate(
             print(f"SKIP {source}: mounted by {', '.join(busy)}; stop that server")
             failures.append(source)
             continue
+        # efs-sc binds on first consumer, so a claim whose server never
+        # scheduled has no volume and holds no data; the new template gives
+        # that user a fresh home-<x> on their next start.
+        if old.spec.volume_name is None:
+            print(f"SKIP {source}: never bound to a volume, nothing to copy")
+            continue
         if verified and not recopy:
             print(f"SKIP {source}: {destination} already verified (--recopy to redo)")
             continue
