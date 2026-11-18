@@ -63,8 +63,8 @@ GATEWAY_SSL_CIPHERS = (
 )
 
 # APISIX's default enabled-plugins list for the version shipped by the pinned
-# chart (chart 2.17.x => APISIX 3.18.x), taken from
-# https://github.com/apache/apisix/blob/3.18.0/apisix/cli/config.lua
+# chart (chart 2.19.x => APISIX 3.20.x), taken from
+# https://github.com/apache/apisix/blob/3.20.0/apisix/cli/config.lua
 #
 # Setting ``apisix.plugins`` in the Helm values REPLACES this default list
 # rather than extending it, so the full list must be reproduced here.  We do
@@ -73,16 +73,18 @@ GATEWAY_SSL_CIPHERS = (
 #
 # ``server-info`` is absent here because upstream comments it out of its own
 # default list ("deprecated and will be removed in a future release") in both
-# 3.17 and 3.18.  This list is the active set, so it stays out -- no local
+# 3.17 through 3.20.  This list is the active set, so it stays out -- no local
 # exception to carry forward on the next upgrade.
 #
 # 3.18 adds ``ai-cache``, ``ai-lakera-guard`` and ``ldap-auth-advanced`` to the
-# defaults and removes none.
+# defaults and removes none.  3.19 adds ``openapi-to-mcp`` and
+# ``websocket-proxy``.  3.20 adds ``request-decompress`` and removes
+# ``mcp-bridge``, whose module no longer ships.
 #
 # IMPORTANT: revisit this list on every APISIX major/minor upgrade.  If it
 # drifts from the APISIX default for the running version, plugins omitted here
 # will stop loading.  ``opentelemetry`` is appended at the end below.
-APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
+APISIX_DEFAULT_PLUGINS_3_20: list[str] = [
     "real-ip",
     "ai",
     "client-control",
@@ -100,6 +102,7 @@ APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
     "referer-restriction",
     "csrf",
     "uri-blocker",
+    "request-decompress",
     "request-validation",
     "chaitin-waf",
     "multi-auth",
@@ -152,10 +155,11 @@ APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
     "traffic-split",
     "redirect",
     "response-rewrite",
+    "openapi-to-mcp",
     "oas-validator",
-    "mcp-bridge",
     "degraphql",
     "kafka-proxy",
+    "websocket-proxy",
     "grpc-transcode",
     "grpc-web",
     "http-dubbo",
@@ -195,7 +199,7 @@ APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
 # Full enabled-plugins list applied via the Helm chart: APISIX defaults plus the
 # opentelemetry plugin, which emits OTLP traces (not metrics) for every request.
 APISIX_ENABLED_PLUGINS: list[str] = [
-    *APISIX_DEFAULT_PLUGINS_3_18,
+    *APISIX_DEFAULT_PLUGINS_3_20,
     "opentelemetry",
 ]
 
