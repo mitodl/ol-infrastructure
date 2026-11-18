@@ -1180,6 +1180,31 @@ if eks_config.get_bool("efs_csi_provisioner"):
             depends_on=[efs_csi_driver_role, *node_groups],
         ),
     )
+    # Access points that present their files as jovyan (uid 1000, gid 100), the
+    # user Jupyter docker-stacks images run as. On efs-sc every file shows the
+    # driver-assigned uid instead (50000 and up), so tools that compare file
+    # ownership with the running user refuse to work, e.g. git's "dubious
+    # ownership" check.
+    kubernetes.storage.v1.StorageClass(
+        resource_name=f"{cluster_name}-efs-jovyan-storageclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="efs-jovyan-sc",
+            labels=k8s_global_labels,
+        ),
+        provisioner="efs.csi.aws.com",
+        volume_binding_mode="WaitForFirstConsumer",
+        parameters={
+            "provisioningMode": "efs-ap",
+            "fileSystemId": efs_filesystem.id,
+            "directoryPerms": "700",
+            "uid": "1000",
+            "gid": "100",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[efs_csi_driver_role, *node_groups],
+        ),
+    )
     aws_efs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-efs-cni-driver-addon",
         cluster=cluster,
@@ -1223,6 +1248,7 @@ if eks_config.get_bool("efs_csi_provisioner"):
         ),
     )
     export("efs_storageclass", "efs-sc")
+    export("efs_jovyan_storageclass", "efs-jovyan-sc")
 
 
 setup_vault_secrets_operator(
