@@ -219,7 +219,6 @@ mitxonline = [
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
         enable_ai_drawer_slot="true",
-        appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
         enable_auto_language_selection="true",
         enable_tagging_taxonomy_pages="true",
         enable_course_import_in_library="true",
