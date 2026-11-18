@@ -35,9 +35,14 @@ config:
   # dedicates any threads and stays within CPU the pod is guaranteed.
   # Keep CN pods uniformly sized (applications/starrocks starrocks:cn_config)
   # and revisit this when they change. mem_limit is a fraction of each CN's
-  # query pool, which scales with the pod memory limit: on the 6Gi CN the CN
-  # reported batch's limit as 2817928042 bytes (0.6 x 0.729 x pod), so on
-  # 12Gi it is about 5.25Gi. big_query_mem_limit is bytes per CN (4Gi).
+  # query pool, 0.729 of the pod memory limit (measured on the 6Gi CN), so
+  # batch's 1.0 is about 8.75Gi on the 12Gi CN. Batch is not memory-capped
+  # below the CN, and has no big_query_mem_limit. With 0.6 and a 4Gi
+  # big-query limit it refused dim_course_content (a 4294967296-byte request
+  # with 1955247216 used, against a 5635856085-byte group limit) and a mitx
+  # tracking-log test (at the 4Gi big-query limit) on 2026-11-13. Cap it
+  # again only once a measured conflict with interactive queries shows the
+  # need.
   starrocks:resource_groups:
     interactive:
       exclusive_cpu_cores: 1
@@ -45,8 +50,7 @@ config:
       concurrency_limit: 0
     batch:
       cpu_weight_percent: 100
-      mem_limit: 0.6
-      big_query_mem_limit: 4294967296
+      mem_limit: 1.0
       # Queries past this wait in the FE queue. Sized for one dbt build (4
       # threads, ol_dbt profiles.yml).
       concurrency_limit: 4

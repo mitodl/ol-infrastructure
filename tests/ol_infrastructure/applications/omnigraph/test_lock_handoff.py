@@ -81,6 +81,10 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
         pod_selector={"app.kubernetes.io/name": "omnigraph-server"},
         apply_actor="svc-witan-admin",
         graph_removal_allowlist=["code-a", "code-b"],
+        branch_drop_allowlist=["code-c"],
+        view_drop_actor="svc-witan-ci",
+        termination_grace_seconds=125,
+        peer_wait_seconds=140,
     )
 
     def check(_: object) -> None:
@@ -134,19 +138,31 @@ def test_the_env_is_what_the_entrypoint_reads() -> None:
         pod_selector={"app.kubernetes.io/name": "omnigraph-server"},
         apply_actor="svc-witan-admin",
         graph_removal_allowlist=[],
+        branch_drop_allowlist=["code-a", "code-bridge"],
+        view_drop_actor="svc-witan-ci",
+        termination_grace_seconds=125,
+        peer_wait_seconds=140,
     )
 
     assert [e.name for e in handoff.env] == [
         "OMNIGRAPH_UNLOCK_LEASE",
         "OMNIGRAPH_POD_SELECTOR",
         "POD_NAME",
+        "OMNIGRAPH_TERMINATION_GRACE_SECONDS",
+        "OMNIGRAPH_PEER_WAIT_SECONDS",
         "OMNIGRAPH_APPLY_ACTOR",
         "OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST",
+        "OMNIGRAPH_BRANCH_DROP_ALLOWLIST",
+        "OMNIGRAPH_VIEW_DROP_ACTOR",
     ]
     values = {e.name: e.value for e in handoff.env}
     assert values["OMNIGRAPH_UNLOCK_LEASE"] == "omnigraph-unlock"
     assert values["OMNIGRAPH_POD_SELECTOR"] == "app.kubernetes.io/name=omnigraph-server"
     assert values["OMNIGRAPH_APPLY_ACTOR"] == "svc-witan-admin"
     assert values["OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST"] == ""
+    assert values["OMNIGRAPH_BRANCH_DROP_ALLOWLIST"] == "code-a,code-bridge"
+    assert values["OMNIGRAPH_VIEW_DROP_ACTOR"] == "svc-witan-ci"
+    assert values["OMNIGRAPH_TERMINATION_GRACE_SECONDS"] == "125"
+    assert values["OMNIGRAPH_PEER_WAIT_SECONDS"] == "140"
     pod_name = next(e for e in handoff.env if e.name == "POD_NAME")
     assert pod_name.value_from.field_ref.field_path == "metadata.name"

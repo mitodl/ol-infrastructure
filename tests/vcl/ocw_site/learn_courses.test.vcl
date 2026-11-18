@@ -90,6 +90,15 @@ sub test_department_index_stays {
 }
 
 // @scope: recv
+// @suite: a course's sitemap stays on OCW
+sub test_course_sitemap_stays {
+  set req.http.host = "live-qa.ocw.mit.edu";
+  set req.url = "/courses/18-06-linear-algebra-spring-2010/sitemap.xml";
+  testing.call_subroutine("vcl_recv");
+  assert.not_error();
+}
+
+// @scope: recv
 // @suite: a pre-2021 section URL is left to the 404 rewrite
 sub test_legacy_section_not_redirected_in_recv {
   set req.http.host = "live-qa.ocw.mit.edu";

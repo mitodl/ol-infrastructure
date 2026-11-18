@@ -205,6 +205,36 @@ def test_release_pipeline_image_kwargs_reach_the_component(monkeypatch):
     assert config.application_version == "2026.10.28.1"
 
 
+@pytest.mark.parametrize(
+    "bindings",
+    [_local_bindings(), _deployed_bindings()],
+    ids=["merged", "per-queue"],
+)
+def test_deployment_names_are_the_deployments_the_component_creates(bindings):
+    """The deployed program names these as restart targets before the
+    component exists, so they have to be the ones it goes on to create.
+    """
+    app = OLApplicationK8s(definition.application_config(bindings))
+
+    assert (
+        definition.deployment_names(
+            bindings.sizing, celery_topology=bindings.celery_topology
+        )
+        == app.all_deployment_names
+    )
+
+
+def test_deployed_deployment_names_are_the_four_production_deployments():
+    assert definition.deployment_names(
+        definition.LearnAiSizing(), celery_topology="per-queue"
+    ) == [
+        "learn-ai-app",
+        "learn-ai-default-celery-worker",
+        "learn-ai-edx-content-celery-worker",
+        "learn-ai-celery-beat",
+    ]
+
+
 def test_bindings_reject_a_misspelled_field():
     with pytest.raises(ValidationError, match="granian_reload"):
         _local_bindings(granian_reload=True)

@@ -67,7 +67,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
         "GRAVITINO_VERSION",
     ],
     "applications/gwarek/": [],
-    "applications/hindsight/": ["HINDSIGHT_VERSION"],
+    "applications/hindsight/": ["HINDSIGHT_VERSION", "UV_IMAGE_TAG"],
     "applications/jupyterhub/": ["JUPYTERHUB_CHART_VERSION"],
     "applications/jupyterhub_data/": [
         "JUPYTERHUB_CHART_VERSION",
@@ -76,6 +76,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/keycloak/": ["KEYCLOAK_OPERATOR_CRD_VERSION"],
     "applications/kubewatch/": ["KUBEWATCH_CHART_VERSION"],
     "applications/kubewatch_webhook_handler/": [],
+    "applications/label_studio/": ["LABEL_STUDIO_CHART_VERSION"],
     "applications/learn_ai/": ["NGINX_VERSION"],
     "applications/mailgun/": [],
     "applications/marimo_data/": [],
@@ -203,10 +204,6 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
 # Packer image directory name (under src/bilder/images/) -> version constants
 # baked into that AMI.
 IMAGE_VERSIONS: dict[str, list[str]] = {
-    "codejail": [
-        "CONSUL_VERSION",
-        "VAULT_VERSION",
-    ],
     "concourse": [
         "CONCOURSE_VERSION",
         "CONSUL_VERSION",
@@ -217,12 +214,6 @@ IMAGE_VERSIONS: dict[str, list[str]] = {
         "CONSUL_VERSION",
         "TRAEFIK_VERSION",
     ],
-    "docker_baseline_ami": [
-        "CONSUL_TEMPLATE_VERSION",
-        "CONSUL_VERSION",
-        "VAULT_VERSION",
-    ],
-    "edxapp_v2": [],
     "vault": [
         "CONSUL_VERSION",
         "TRAEFIK_VERSION",
@@ -290,7 +281,7 @@ def image_version_paths(image_name: str) -> list[str]:
     """Return the watched version-pin paths for a Packer image.
 
     :param image_name: Directory name under ``src/bilder/images/``, e.g.
-        ``"docker_baseline_ami"``.
+        ``"vault"``.
     :returns: Repo-relative paths under ``src/bridge/lib/version_pins/``.
     :raises KeyError: If the image has never been audited -- add it to
         :data:`IMAGE_VERSIONS` (an empty list is a valid answer).

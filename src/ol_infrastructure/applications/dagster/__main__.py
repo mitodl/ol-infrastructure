@@ -144,6 +144,7 @@ DATA_LOADING_DB_SOURCES = (
     ("MITLEARN_APP_DB_HOST", projects.MIT_LEARN, "mit_learn"),
     ("LEARN_AI_APP_DB_HOST", projects.LEARN_AI, "learn_ai"),
     ("OCW_STUDIO_APP_DB_HOST", projects.OCW_STUDIO, "ocw_studio"),
+    ("MICROMASTERS_APP_DB_HOST", projects.MICROMASTERS, "micromasters"),
 )
 data_loading_db_stacks = (
     [
@@ -2965,8 +2966,12 @@ code_locations: list[dict[str, str | int]] = [
 
 # Build deployments list for user code
 # Code locations that run 2 replicas for resilience. Criteria: OOM-prone,
-# slow-starting (making restarts expensive), or high sensor-tick frequency.
-multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading"}
+# slow-starting (making restarts expensive), high sensor-tick frequency, or
+# running long asset backfills. The backfill daemon fails a backfill and
+# cancels its queued runs when it evaluates it while the location is down:
+# ml lost a 7,363-partition Learn embeddings backfill to the minute its one
+# replica took to come back after a node termination on 2026-11-18.
+multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading", "ml"}
 
 deployments = []
 for location in code_locations:
@@ -3422,6 +3427,16 @@ dagster_event_log_max_overflow = dagster_config.get_int("event_log_max_overflow"
 if dagster_event_log_max_overflow is None:
     dagster_event_log_max_overflow = 10
 
+# learn_embeddings/model_calls tag limit, sized against each environment's
+# dagster-ml text-embedding-3-large deployment. QA's is 300K TPM, above one
+# run's largest (250K-token) request but not several, so stacks that set
+# nothing keep one run at a time.
+dagster_learn_embeddings_run_limit = dagster_config.get_int(
+    "learn_embeddings_run_limit"
+)
+if dagster_learn_embeddings_run_limit is None:
+    dagster_learn_embeddings_run_limit = 1
+
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
 dagster_instance_yaml = (
@@ -3431,6 +3446,7 @@ dagster_instance_yaml = (
     .replace("MAX_CONCURRENT_RUNS", str(dagster_max_concurrent_runs))
     .replace("EVENT_LOG_POOL_SIZE", str(dagster_event_log_pool_size))
     .replace("EVENT_LOG_MAX_OVERFLOW", str(dagster_event_log_max_overflow))
+    .replace("LEARN_EMBEDDINGS_RUN_LIMIT", str(dagster_learn_embeddings_run_limit))
 )
 # The daemon and webserver mount dagster.yaml from the dagster-instance
 # ConfigMap via subPath, which kubelet never live-refreshes, and the chart's

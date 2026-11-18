@@ -515,12 +515,16 @@ MAINTENANCE_WINDOW_SECONDS = 1500
 COMMAND_TIMEOUT_SECONDS = 600
 WINDOW_ACTIVE_DEADLINE_SECONDS = 2160
 WINDOW_STARTING_DEADLINE_SECONDS = 60
-# Stop one command (the image allows 30s), unlock, restore the replica count.
-# The image documents 120 as what its close needs.
+# Stop one command, unlock, restore the replica count. Passed to the image as
+# OMNIGRAPH_TERMINATION_GRACE_SECONDS, which fits that close inside it: at most
+# 10s for the stop, and everything done 40s before the kubelet's SIGKILL. At
+# 50 or below the image refuses to open a window.
 TERMINATION_GRACE_SECONDS = 120
 # How much longer than the server's termination grace the window waits for its
 # pods to exit: the time the kubelet and the Deployment controller take to act
-# on the scale-down. The image's own default of 90 is a 35s grace plus this.
+# on the scale-down. The image's own default adds the same margin to the
+# server's default grace (agent-kit `docker/omnigraph_maintenance.py`
+# DEFAULT_SERVER_STOP_SECONDS).
 SERVER_STOP_MARGIN_SECONDS = 55
 # optimize folds a lagging BTree index by rebuilding it, and Lance sorts the
 # column through one DataFusion memory pool shared by the whole process: 150 MiB
@@ -757,6 +761,10 @@ def create_maintenance_window(  # noqa: PLR0913
                                                 server_termination_grace_seconds
                                                 + SERVER_STOP_MARGIN_SECONDS
                                             ),
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_TERMINATION_GRACE_SECONDS",
+                                            value=str(TERMINATION_GRACE_SECONDS),
                                         ),
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="LANCE_MEM_POOL_SIZE",
