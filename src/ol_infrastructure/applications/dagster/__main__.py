@@ -2966,8 +2966,12 @@ code_locations: list[dict[str, str | int]] = [
 
 # Build deployments list for user code
 # Code locations that run 2 replicas for resilience. Criteria: OOM-prone,
-# slow-starting (making restarts expensive), or high sensor-tick frequency.
-multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading"}
+# slow-starting (making restarts expensive), high sensor-tick frequency, or
+# running long asset backfills. The backfill daemon fails a backfill and
+# cancels its queued runs when it evaluates it while the location is down:
+# ml lost a 7,363-partition Learn embeddings backfill to the minute its one
+# replica took to come back after a node termination on 2026-11-18.
+multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading", "ml"}
 
 deployments = []
 for location in code_locations:
