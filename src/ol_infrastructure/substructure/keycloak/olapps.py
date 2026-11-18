@@ -9,7 +9,6 @@ from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
     ADMIN_API_SCOPE_NAME,
-    CLIENT_CREATION_DEFAULT_SCOPES,
     MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
     create_client_policies,
@@ -44,6 +43,20 @@ from ol_infrastructure.substructure.keycloak.registration_flow import (
 # keeps the stack deployable while that partner's endpoint is down. Refresh a
 # copy when a run warns that it differs from the live document.
 SAVED_IDP_METADATA_DIR = Path(__file__).parent.joinpath("files/olapps")
+
+# Default scopes for the service-account clients that call the Admin API, before
+# kc-admin-api is added. ClientDefaultScopes replaces the whole set, and Keycloak
+# rejects a token request naming a scope the client lacks (invalid_scope), so
+# these keep what the apps request (e.g. mitxonline's "openid profile email").
+# service_account is left out: it is not a default scope in this realm.
+SERVICE_ACCOUNT_DEFAULT_SCOPES = [
+    "acr",
+    "basic",
+    "email",
+    "profile",
+    "roles",
+    "web-origins",
+]
 
 
 def _saved_idp_metadata(filename: str) -> str:
@@ -711,13 +724,12 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
         )
         # Service account only, so kc-admin-api is a default scope (the Admin
-        # API audience required since Keycloak 26.8.2). The creation defaults
-        # stay so any scope the app already requests is still valid.
+        # API audience required since Keycloak 26.8.2).
         keycloak.openid.ClientDefaultScopes(
             "olapps-mitlearn-admin-client-default-scopes",
             realm_id=ol_apps_realm.id,
             client_id=olapps_mitlearn_admin_client.id,
-            default_scopes=[*CLIENT_CREATION_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+            default_scopes=[*SERVICE_ACCOUNT_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
             opts=resource_options,
         )
         mitlearn_realm_management_client = keycloak.openid.get_client(
@@ -863,12 +875,12 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
     # Service account only, so kc-admin-api is a default scope (the Admin API
     # audience required since Keycloak 26.8.2). mitxonline requests "openid
-    # profile email" (KEYCLOAK_ADMIN_CLIENT_SCOPES), so the creation defaults stay.
+    # profile email" (KEYCLOAK_ADMIN_CLIENT_SCOPES).
     keycloak.openid.ClientDefaultScopes(
         "olapps-mitxonline-b2b-client-default-scopes",
         realm_id=ol_apps_realm.id,
         client_id=olapps_mitxonline_b2b_client.id,
-        default_scopes=[*CLIENT_CREATION_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+        default_scopes=[*SERVICE_ACCOUNT_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
         opts=resource_options,
     )
 
@@ -970,7 +982,7 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         realm_id=ol_apps_realm.id,
         client_id=olapps_mitxonline_b2b_membership_client.id,
         # Same KEYCLOAK_ADMIN_CLIENT_SCOPES request as the b2b client above.
-        default_scopes=[*CLIENT_CREATION_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+        default_scopes=[*SERVICE_ACCOUNT_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
         opts=resource_options,
     )
     for role in ("manage-organizations", "manage-users"):
