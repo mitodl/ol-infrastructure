@@ -11,6 +11,12 @@ PKCE_MARKER_VALUE = "required"
 MANAGED_MARKER_ATTRIBUTE = "ol.managed"
 MANAGED_MARKER_VALUE = "pulumi"
 
+# Keycloak 26.8.2 rejects Admin REST API tokens (401) unless the client carries this
+# built-in scope, which adds the Admin API audience. admin-cli and the admin console
+# get it on upgrade; any other client whose service account calls /admin/realms/...
+# must list it among its default scopes.
+ADMIN_API_SCOPE_NAME = "kc-admin-api"
+
 # Spread into the arguments of every OpenID client Pulumi declares. The marker and the
 # two flags travel together because a marked client with either grant on fails its
 # next update with ``invalid_client_metadata``. The flags are not repeated at the call

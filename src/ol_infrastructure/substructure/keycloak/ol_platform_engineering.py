@@ -7,6 +7,7 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
     MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
     create_client_policies,
@@ -447,6 +448,15 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         realm_id="ol-platform-engineering",
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
+    )
+    # basic carries sub, roles carries the realm-management roles, and
+    # kc-admin-api carries the audience the Admin API requires since 26.8.2.
+    keycloak.openid.ClientDefaultScopes(
+        "ol-platform-engineering-witan-token-sync-default-scopes",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_witan_token_sync_client.id,
+        default_scopes=["basic", "roles", ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
     keycloak.openid.ClientServiceAccountRole(
         "ol-platform-engineering-witan-token-sync-view-users",

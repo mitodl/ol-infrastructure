@@ -25,7 +25,10 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Input, InvokeOptions, Output, ResourceOptions
 
-from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+    MANAGED_CLIENT_ARGS,
+)
 
 AUDIENCE_CLIENT_ID = "ol-memory-client"
 AUDIENCE_SCOPE_NAME = "ol-memory-audience"
@@ -254,8 +257,9 @@ def create_ol_memory_resources(
         realm_id=realm_id,
         client_id=forget_lookup_client.id,
         # basic carries sub, without which the admin API cannot tell whose
-        # token it is.
-        default_scopes=["basic"],
+        # token it is. roles carries the realm-management roles and
+        # kc-admin-api the audience the admin API requires since 26.8.2.
+        default_scopes=["basic", "roles", ADMIN_API_SCOPE_NAME],
         opts=resource_options,
     )
     realm_management_client = keycloak.openid.get_client_output(
