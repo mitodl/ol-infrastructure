@@ -512,8 +512,8 @@ async def _cmd_release_notes(repos, ack, respond, command, _context):
     await respond(f"*Release notes for `{app_name}`*\n" + "\n".join(lines))
 
 
-async def _in_flight_status(name, cfg, *, has_open_issue: bool) -> str:
-    """Render the in-flight release suffix of a release-status line, or ""."""
+async def _release_status_line(name, cfg, issues: list[dict[str, Any]]) -> str:
+    """Render one app's release-status line from its open gate issues."""
     # A release branch outliving its production deploy means the finish
     # step never completed. That used to be invisible -- and it froze the
     # release version until someone noticed -- so report it here.
@@ -521,17 +521,48 @@ async def _in_flight_status(name, cfg, *, has_open_issue: bool) -> str:
         in_flight = await github.in_flight_release(cfg.repo)
     except Exception:
         log.exception("Failed to fetch in-flight release for %s", name)
-        return ""
+        in_flight = None
+    issue = issues[0] if issues else None
+    if issue is None:
+        status = "✅ no open release"
+    else:
+        title = _slack_escape(issue["title"])
+        status = f"🟡 <{issue['url']}|{title}>"
+        checked, total = github.checklist_status(issue["body"])
+        # An infrastructure-only gate has no checklist; "0/0 checked" is noise.
+        if total:
+            status += f" ({checked}/{total} checked)"
+        status += _release_state_suffix(issue)
     if not in_flight:
-        return ""
-    status = f" · 🚧 in flight: {_describe_in_flight(in_flight)}"
-    # Promotion closes the issue, so a release stuck after production has no
-    # open one linked earlier in the line.
-    if not has_open_issue and (
-        issue := await _find_release_issue(name, cfg, in_flight["version"])
-    ):
-        status += f" <{issue['url']}|Release issue>{_release_state_suffix(issue)}"
-    return status
+        return status
+    in_flight_text = f"🚧 in flight: {_describe_in_flight(in_flight)}"
+    version = in_flight["version"]
+    open_version = _gate_version(issue["title"]) if issue else None
+    if open_version == version:
+        return f"{status} · {in_flight_text}"
+    # The newest open issue is not the in-flight release's. Either promotion
+    # closed it (a release stuck after production), or the release was cut
+    # and QA has not opened its issue yet. QA opens it only after deploying
+    # the release, and then supersedes every older open gate issue, so until
+    # then the old one (often an infrastructure-only gate for the live
+    # version) is still the open issue. Shown side by side without saying so,
+    # the two read as a mismatch.
+    try:
+        release_issue = await github.release_issue_for_version(cfg.repo, version)
+    except Exception:
+        log.exception("Failed to find the release issue for %s %s", name, version)
+        return f"{status} · {in_flight_text}"
+    if release_issue:
+        return (
+            f"{status} · {in_flight_text} <{release_issue['url']}|Release issue>"
+            f"{_release_state_suffix(release_issue)}"
+        )
+    pending = (
+        f"{in_flight_text} · no release issue yet (QA opens one after deploying it"
+    )
+    if issue is None:
+        return f"{pending})"
+    return f"{pending}, superseding <{issue['url']}|{_slack_escape(issue['title'])}>)"
 
 
 # How release-status describes each label-derived state of a release issue.
@@ -578,15 +609,7 @@ async def _cmd_release_status(repos, ack, respond, command, _context):
             log.exception("Failed to fetch release status for %s", name)
             lines.append(f"• *{name}*: ⚠️ error fetching status")
             continue
-        if issues:
-            checked, total = github.checklist_status(issues[0]["body"])
-            title = _slack_escape(issues[0]["title"])
-            status = f"🟡 <{issues[0]['url']}|{title}> ({checked}/{total} checked)"
-            status += _release_state_suffix(issues[0])
-        else:
-            status = "✅ no open release"
-        status += await _in_flight_status(name, cfg, has_open_issue=bool(issues))
-        lines.append(f"• *{name}*: {status}")
+        lines.append(f"• *{name}*: {await _release_status_line(name, cfg, issues)}")
     if legacy and not app_filter:
         # Naming them keeps a silently short list from reading as "everything
         # is quiet" during the rollout, when most apps are still on Doof.
