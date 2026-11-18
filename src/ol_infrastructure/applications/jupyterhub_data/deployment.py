@@ -70,6 +70,30 @@ from ol_infrastructure.lib.vault import postgres_role_statements
 # the username, which is the username itself when it's a valid DNS label.
 _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
+# uv's cache, which also holds every notebook's sandbox environment. The image
+# builds the shipped templates' environments into a seed directory
+# (UV_CACHE_SEED_DIR, set by the image), and an init container copies that into
+# the node-local volume mounted here. The path must match the one the image
+# built with: uv environments hold their own absolute path.
+_UV_CACHE_DIR = "/var/cache/uv"
+_UV_CACHE_VOLUME = "uv-cache"
+# The seed is about 1Gi. Each further notebook environment hardlinks into the
+# wheel cache, so it adds only the packages that notebook is first to use. The
+# kubelet evicts the pod if the volume grows past this.
+_UV_CACHE_SIZE_LIMIT = "10Gi"
+# One cp call, so hardlinks between the wheel cache and the environments
+# survive (without them the copy is 2.4x the size and uv recompiles every
+# module). It copies the seed's entries rather than the directory itself:
+# `cp -a seed/. cache/` also tries to set the times of the mount point, which
+# the notebook user doesn't own, and exits non-zero.
+#
+# KubeSpawner runs every init container string through str.format to expand
+# {username} and friends, so the command has no ${VAR} braces and find's
+# placeholder is written {{}}.
+_UV_CACHE_SEED_COMMAND = (
+    'find "$UV_CACHE_SEED_DIR" -mindepth 1 -maxdepth 1 '
+    '-exec cp -a -t "$UV_CACHE_DIR" {{}} +'
+)
 _MARIMO_AI_DEFAULTS_SCRIPT = "/etc/marimo/marimo_ai_defaults.py"
 _MARIMO_AI_DEFAULTS_JSON = "/etc/marimo/ai_defaults.json"
 # JupyterLab reads overrides.json from <sys.prefix>/share/jupyter/lab/settings,
@@ -571,12 +595,38 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "image": {
                         "name": "ghcr.io/mitodl/marimo-jupyterlab",
                         "tag": MARIMO_JUPYTERLAB_VERSION,
-                        # Use Always while MARIMO_JUPYTERLAB_VERSION is "latest";
-                        # switch to IfNotPresent once pinned to a versioned tag.
-                        "pullPolicy": "Always",
+                        "pullPolicy": "IfNotPresent",
                         "pullSecrets": [ghcr_pull_secret_name],
                     },
                     "cmd": ["jupyterhub-singleuser"],
+                    # A postStart hook would race the first notebook open, and
+                    # uv would then build the environment the seed already has.
+                    "initContainers": [
+                        {
+                            "name": "seed-uv-cache",
+                            "image": (
+                                "ghcr.io/mitodl/marimo-jupyterlab:"
+                                f"{MARIMO_JUPYTERLAB_VERSION}"
+                            ),
+                            "command": [
+                                "sh",
+                                "-c",
+                                _UV_CACHE_SEED_COMMAND,
+                            ],
+                            "env": [{"name": "UV_CACHE_DIR", "value": _UV_CACHE_DIR}],
+                            "securityContext": {
+                                "runAsUser": 1000,
+                                "runAsGroup": 100,
+                                "allowPrivilegeEscalation": False,
+                            },
+                            "volumeMounts": [
+                                {
+                                    "name": _UV_CACHE_VOLUME,
+                                    "mountPath": _UV_CACHE_DIR,
+                                },
+                            ],
+                        },
+                    ],
                     # The postStart hook below re-seeds any missing template on
                     # every server start, so this file exists even for a user
                     # who deleted it.
@@ -621,9 +671,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # which the image installs and an ad hoc uvx environment
                     # doesn't have. --sandbox is still passed, so each notebook
                     # still runs in its own uv environment built from its
-                    # `/// script` PEP 723 header. UV_CACHE_DIR points to the EFS
-                    # home volume so those environments persist across pod
-                    # restarts. timeout=120 covers building one on first open.
+                    # `/// script` PEP 723 header. timeout=120 covers building one
+                    # on first open.
                     "extraFiles": {
                         "jupyter-server-config": {
                             "mountPath": "/etc/jupyter/jupyter_server_config.py",
@@ -667,8 +716,13 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         "JUPYTERHUB_SINGLEUSER_APP": (
                             "jupyter_server.serverapp.ServerApp"
                         ),
-                        # uv cache on EFS so per-notebook venvs survive pod restarts
-                        "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
+                        # Node-local, not the EFS home volume. uv builds each
+                        # notebook's environment inside its cache, and on EFS
+                        # that took 161s for a template against 37.5s on local
+                        # disk (marimo 0.25.0, data-qa, 2026-10-01). The cost is
+                        # that environments for a user's own notebooks are
+                        # rebuilt after a pod restart.
+                        "UV_CACHE_DIR": _UV_CACHE_DIR,
                         # marimo writes a session cache (cell outputs) to a
                         # __marimo__/ directory next to each notebook it opens.
                         # A viewer's copy of someone else's shared_nb folder is
@@ -705,10 +759,18 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "claimName": shared_notebooks_pvc.metadata.name,
                                 },
                             },
+                            {
+                                "name": _UV_CACHE_VOLUME,
+                                "emptyDir": {"sizeLimit": _UV_CACHE_SIZE_LIMIT},
+                            },
                         ],
                         # kubelet creates the subPath directory on first mount.
                         # {username} is expanded by KubeSpawner, not Helm.
                         "extraVolumeMounts": [
+                            {
+                                "name": _UV_CACHE_VOLUME,
+                                "mountPath": _UV_CACHE_DIR,
+                            },
                             {
                                 "name": "shared-notebooks",
                                 "mountPath": _SHARED_NOTEBOOKS_MOUNT_PATH,
@@ -727,6 +789,15 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # Resource defaults; overridden per-user by KubeSpawner profile_list
                     "memory": {"limit": "8G", "guarantee": "2G"},
                     "cpu": {"guarantee": 0.5},
+                    # The uv cache volume counts against the pod's ephemeral
+                    # storage. Requesting about the seed's size keeps the
+                    # scheduler from packing more of these onto a node than its
+                    # disk holds. There is no pod-level limit: one would also
+                    # cap what notebooks write to /tmp and /opt/conda, which
+                    # nothing caps today. The volume's sizeLimit bounds the cache.
+                    "extraResource": {
+                        "guarantees": {"ephemeral-storage": "2Gi"},
+                    },
                 },
             },
             skip_await=False,

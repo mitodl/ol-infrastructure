@@ -129,11 +129,12 @@ KEYCLOAK_OPERATOR_CRD_VERSION = "26.8.1"
 JUPYTERHUB_CHART_VERSION = "4.4.5"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
 MARIMO_OPERATOR_VERSION = "v0.3.0"
-# TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
-# The custom manager's regex requires the marker to sit on the line directly
-# above the assignment, so any explanation has to go above the marker.
+# Tags are YYYY.MM.DD.<run>.<attempt> from ol-data-platform's
+# build_marimo_jupyterlab workflow. The custom manager's regex requires the
+# marker to sit on the line directly above the assignment, so any explanation
+# has to go above the marker.
 # renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
-MARIMO_JUPYTERLAB_VERSION = "latest"
+MARIMO_JUPYTERLAB_VERSION = "2026.11.16.283.1"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.6.0"
 # renovate: datasource=helm depName=loki packageName=loki registryUrl=https://grafana.github.io/helm-charts
