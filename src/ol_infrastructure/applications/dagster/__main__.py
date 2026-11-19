@@ -3621,15 +3621,18 @@ dagster_helm_values = {
             },
             {
                 # Without this, an asset backfill evaluated while its code
-                # location is unloadable fails and cancels every queued run. With
-                # it, the daemon skips that tick and resumes once the location
-                # loads again (dagster _core/execution/asset_backfill.py,
+                # location is unloadable fails and cancels its queued and running
+                # runs. With it, the daemon skips that tick, logs a warning, and
+                # resumes once the location loads again (dagster
+                # _core/execution/asset_backfill.py,
                 # _check_validity_of_asset_backfill_data_and_should_process_backfill).
-                # A real definition change with every location loaded still
-                # fails. A deploy restarts the daemon and the locations together,
-                # which multi_replica_locations doesn't cover: the 3,298 queued
-                # runs of a Learn embeddings backfill were canceled that way on
-                # 2026-11-19.
+                # The gate is "any location unloadable", not the backfill's own,
+                # so a real definition change only fails the backfill once every
+                # location loads, and a location that never loads leaves the
+                # backfill waiting. A deploy restarts the daemon and the
+                # locations together, which multi_replica_locations doesn't
+                # cover: the 3,298 queued runs of a Learn embeddings backfill
+                # were canceled that way on 2026-11-19.
                 "name": "DAGSTER_BACKFILL_RETRY_DEFINITION_CHANGED_ERROR",
                 "value": "true",
             },
