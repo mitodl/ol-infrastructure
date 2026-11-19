@@ -13,7 +13,9 @@ Required environment variables:
 
 The ol-starrocks-client service account holds view-realm and view-users on the
 realm-management client (see substructure/keycloak/ol_data_platform.py), so
-its client credentials are sufficient to enumerate role memberships.
+its client credentials are sufficient to enumerate role memberships, provided
+the token request asks for the optional kc-admin-api scope (Keycloak 26.8.2
+rejects admin API tokens without it).
 
 Two ways to write the ConfigMap:
   default        kubectl apply, from the Pulumi runner (the bootstrap run).
@@ -53,6 +55,7 @@ _GOVERNANCE_ROLES: tuple[str, ...] = (
 
 
 _PAGE_SIZE = 100
+ADMIN_API_SCOPE = "kc-admin-api"
 # groups.txt is "role:user1,user2" per line, so a principal carrying ":", "," or
 # a newline would corrupt the file or smuggle in a group entry.
 _PRINCIPAL_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
@@ -308,6 +311,42 @@ def write_configmap_in_cluster(namespace: str, configmap: str, group_file: str) 
     return True
 
 
+def _fetch_admin_token(issuer: str, client_id: str, client_secret: str) -> str:
+    """Get a client_credentials token that Keycloak's Admin REST API will accept.
+
+    Keycloak 26.8.2 answers 401 to admin API calls unless the token carries the
+    built-in kc-admin-api scope. ol-starrocks-client also signs users in, so the
+    scope is optional on the client and only issued when requested here.
+
+    :param issuer: Keycloak realm issuer URL.
+    :param client_id: OAuth2 client ID.
+    :param client_secret: OAuth2 client secret.
+    :returns: The access token.
+    :rtype: str
+    """
+    token_body = urllib.parse.urlencode(
+        {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": ADMIN_API_SCOPE,
+        }
+    ).encode()
+    try:
+        with urllib.request.urlopen(  # noqa: S310
+            urllib.request.Request(  # noqa: S310
+                f"{issuer}/protocol/openid-connect/token",
+                data=token_body,
+                method="POST",
+            )
+        ) as resp:
+            return json.loads(resp.read())["access_token"]
+    except urllib.error.HTTPError as exc:
+        sys.exit(f"Token request failed: {exc.code} {exc.read().decode()}")
+    except urllib.error.URLError as exc:
+        sys.exit(f"Keycloak token endpoint unreachable at {issuer}: {exc.reason}")
+
+
 def main() -> None:
     """Fetch Keycloak role memberships and apply them to a Kubernetes ConfigMap."""
     parser = argparse.ArgumentParser(
@@ -337,26 +376,7 @@ def main() -> None:
     realm = realm_path.rstrip("/")
     admin_base = f"{base_url}/admin/realms/{realm}"
 
-    token_body = urllib.parse.urlencode(
-        {
-            "grant_type": "client_credentials",
-            "client_id": client_id,
-            "client_secret": client_secret,
-        }
-    ).encode()
-    try:
-        with urllib.request.urlopen(  # noqa: S310
-            urllib.request.Request(  # noqa: S310
-                f"{issuer}/protocol/openid-connect/token",
-                data=token_body,
-                method="POST",
-            )
-        ) as resp:
-            access_token = json.loads(resp.read())["access_token"]
-    except urllib.error.HTTPError as exc:
-        sys.exit(f"Token request failed: {exc.code} {exc.read().decode()}")
-    except urllib.error.URLError as exc:
-        sys.exit(f"Keycloak token endpoint unreachable at {issuer}: {exc.reason}")
+    access_token = _fetch_admin_token(issuer, client_id, client_secret)
 
     headers = {"Authorization": f"Bearer {access_token}"}
 

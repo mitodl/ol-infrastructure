@@ -34,6 +34,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sConfig,
     OLApplicationK8sKedaWebappScalingConfig,
+    application_deployment_names,
 )
 from ol_infrastructure.lib.app_bindings import (
     ClusterCapabilities,
@@ -62,6 +63,7 @@ __all__ = [
     "application_config",
     "canvas_agent_consumer_spec",
     "cors_allow_origins",
+    "deployment_names",
     "direct_oidc_config",
     "direct_route_configs",
     "environment_variables",
@@ -76,6 +78,14 @@ __all__ = [
 NAMESPACE = "learn-ai"
 WEBAPP_SERVICE_NAME = "learn-ai-webapp"
 WEBAPP_SERVICE_PORT_NAME = "http"
+# Every webapp route resolves to pod IPs, so the webapp's ApisixUpstream
+# (retries=1, in __main__.py) can retry a refused or reset connection on
+# another pod.
+_WEBAPP_BACKEND: dict[str, Any] = {
+    "backend_service_name": WEBAPP_SERVICE_NAME,
+    "backend_service_port": WEBAPP_SERVICE_PORT_NAME,
+    "backend_resolve_granularity": "endpoint",
+}
 # The MIT Learn API host serves this application under /ai/*.
 API_PATH_PREFIX = "ai"
 CANVAS_AGENT_CONSUMER_NAME = "canvas-agent"
@@ -208,6 +218,39 @@ def environment_variables(bindings: LearnAiBindings) -> dict[str, Any]:
     return env_vars
 
 
+def _celery_beat_config(sizing: LearnAiSizing) -> OLApplicationK8sCeleryBeatConfig:
+    return OLApplicationK8sCeleryBeatConfig(
+        scheduler="celery.beat.PersistentScheduler",
+        resource_requests=sizing.celery_beat.requests,
+        resource_limits=sizing.celery_beat.limits,
+    )
+
+
+def deployment_names(
+    sizing: LearnAiSizing,
+    *,
+    celery_topology: Literal["per-queue", "merged"],
+) -> list[str]:
+    """Return the Deployments ``application_config`` has ``OLApplicationK8s`` create.
+
+    Every one of them mounts the bindings' Secrets with ``envFrom``. The deployed
+    program needs the names as VSO restart targets for the Secrets it creates
+    before the bindings exist, since the bindings carry those Secrets' names.
+
+    :param sizing: The bindings' ``sizing``.
+    :param celery_topology: The bindings' ``celery_topology``.
+    :returns: The names, as ``OLApplicationK8s.all_deployment_names`` lists them.
+    :rtype: list[str]
+    """
+    return application_deployment_names(
+        application_name="learn-ai",
+        celery_worker_configs=celery_worker_configs(
+            CELERY_QUEUE_NAMES, celery_topology, sizing.celery_queues
+        ),
+        celery_beat_config=_celery_beat_config(sizing),
+    )
+
+
 def application_config(bindings: LearnAiBindings) -> OLApplicationK8sConfig:
     """Return the ``OLApplicationK8s`` config for these bindings."""
     cluster = bindings.cluster
@@ -267,11 +310,7 @@ def application_config(bindings: LearnAiBindings) -> OLApplicationK8sConfig:
         celery_worker_configs=celery_worker_configs(
             CELERY_QUEUE_NAMES, bindings.celery_topology, sizing.celery_queues
         ),
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            scheduler="celery.beat.PersistentScheduler",
-            resource_requests=sizing.celery_beat.requests,
-            resource_limits=sizing.celery_beat.limits,
-        ),
+        celery_beat_config=_celery_beat_config(sizing),
         webapp_keda_config=bindings.webapp_keda,
         manage_webapp_autoscaler=cluster.autoscalers,
         manage_celery_autoscalers=cluster.autoscalers,
@@ -317,7 +356,10 @@ def direct_oidc_config(bindings: LearnAiBindings) -> OLApisixOIDCConfig:
     """
     return OLApisixOIDCConfig(
         application_name="learn-ai",
+        # learn-ai is the upstream the forwarded access token is kept for: the
+        # ol-memory exchange (ol_llm.memory.tokens) swaps it at Keycloak.
         oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
+        oidc_set_access_token_header=True,
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
         # The component default adds organization:*; this host's session is not
@@ -355,6 +397,7 @@ def prefixed_oidc_config(bindings: LearnAiBindings) -> OLApisixOIDCConfig:
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
         credentials=_oidc_credentials(bindings),
+        set_access_token_header=True,
     )
 
 
@@ -413,9 +456,7 @@ def _canvas_route(
         ],
         hosts=hosts,
         paths=[path],
-        backend_service_name=WEBAPP_SERVICE_NAME,
-        backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        backend_resolve_granularity="service",
+        **_WEBAPP_BACKEND,
     )
 
 
@@ -441,9 +482,7 @@ def direct_route_configs(
             ],
             hosts=hosts,
             paths=["/*"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         # Strip trailing slash from logout redirect. This route's `redirect`
         # overrides the shared config's (http_to_https) rather than merging.
@@ -463,9 +502,7 @@ def direct_route_configs(
             ],
             hosts=hosts,
             paths=["/logout/*"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="reqauth",
@@ -479,9 +516,7 @@ def direct_route_configs(
                 "/admin/login/*",
                 "/http/login/*",
             ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="websocket",
@@ -495,9 +530,7 @@ def direct_route_configs(
             paths=[
                 "/ws/*",
             ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
         # 204 is the EFF Do Not Track convention for "no policy published".
         # Without this route passauth sends every crawl to a Django 404.
@@ -507,9 +540,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             hosts=hosts,
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -549,8 +580,7 @@ def prefixed_route_configs(
             passauth_priority=2,
             shared_plugin_config_name=shared_plugin_config_name,
             rewrite_plugins=[proxy_rewrite_plugin()],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="websocket",
@@ -563,9 +593,7 @@ def prefixed_route_configs(
             ],
             hosts=route_group.hosts,
             paths=[f"/{API_PATH_PREFIX}/ws/*"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-            backend_resolve_granularity="service",
+            **_WEBAPP_BACKEND,
         ),
     ]
 

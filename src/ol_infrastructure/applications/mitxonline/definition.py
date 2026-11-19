@@ -94,6 +94,14 @@ __all__ = [
 NAMESPACE = "mitxonline"
 WEBAPP_SERVICE_NAME = "mitxonline-webapp"
 WEBAPP_SERVICE_PORT_NAME = "http"
+# Every webapp route resolves to pod IPs, so the webapp's ApisixUpstream
+# (retries=1, in __main__.py) can retry a refused or reset connection on
+# another pod.
+_WEBAPP_BACKEND: dict[str, Any] = {
+    "backend_service_name": WEBAPP_SERVICE_NAME,
+    "backend_service_port": WEBAPP_SERVICE_PORT_NAME,
+    "backend_resolve_granularity": "endpoint",
+}
 # The MIT Learn API host serves this application under /mitxonline/*.
 API_PATH_PREFIX = "mitxonline"
 WEB_MEMORY_CEILING = "3Gi"
@@ -448,6 +456,9 @@ def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCC
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
+        # ApisixRemoteUserOrgBackend reads auth_time from X-ID-Token so
+        # reconcile_user_orgs can skip org data older than the session.
+        oidc_set_id_token_header=True,
         **settings,
     )
 
@@ -540,6 +551,8 @@ def prefixed_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
         credentials=_oidc_credentials(bindings),
+        # See _oidc_config.
+        set_id_token_header=True,
     )
 
 
@@ -662,8 +675,7 @@ def direct_route_configs(
             oidc,
             shared_plugin_config_name=shared_plugin_config_name,
             extra_plugins=[frame_ancestors, stale_session_cleanup],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         # Entry point for hand-offs from MIT Learn (hq#12763).  Learn's session
         # and this host's are separate cookies on separate parent domains, so a
@@ -684,8 +696,7 @@ def direct_route_configs(
             paths=["/switch-session", "/switch-session/"],
             plugins=[frame_ancestors, session_reset],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="cart",
@@ -702,8 +713,7 @@ def direct_route_configs(
                 stale_session_cleanup,
             ],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         # The `location` blocks that used to live in the nginx sidecar
         # (docs/plans/remove-nginx-sidecar.md, stage 5). nginx resolved
@@ -717,8 +727,7 @@ def direct_route_configs(
             hosts=hosts,
             paths=["/static/hash.txt"],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
             plugins=[_uncached_hash_plugin()],
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
@@ -736,8 +745,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             hosts=hosts,
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -792,8 +800,7 @@ def prefixed_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             rewrite_plugins=[strip_prefix],
             extra_plugins=[frame_ancestors, stale_session_cleanup],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         # Static assets requested through this prefix (frontend references
         # like /mitxonline/static/...) rewrite through "passauth" the same way,
@@ -810,8 +817,7 @@ def prefixed_route_configs(
             paths=[f"/{API_PATH_PREFIX}/static/hash.txt"],
             shared_plugin_config_name=shared_plugin_config_name,
             plugins=[strip_prefix, _uncached_hash_plugin()],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
     ]
 

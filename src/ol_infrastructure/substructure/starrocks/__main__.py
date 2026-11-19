@@ -113,6 +113,33 @@ db_admin_password = applications_stack.require_output("root_password_secret")
 db_port = starrocks_config.get_int("fe_mysql_port") or STARROCKS_MYSQL_PORT
 db_admin_username = starrocks_config.require("db_admin_username")
 
+# Session variables for the users of the roles the batch resource group takes by
+# role (admin, batch_readonly), set as user properties when Vault creates the user.
+# Only a new user gets them: Vault renews a lease in place, under the same user.
+# Dagster's dbt build asks Vault for a new admin user on every build, so it picks
+# a change up on its next build. The batch_readonly users OpenMetadata and the
+# mit-learn pull hold through VaultDynamicSecrets are renewed until the role's
+# max TTL (6 months), so they keep the old values until their leases are revoked
+# and reissued.
+#   enable_spill: lets aggregations, joins and sorts spill to the CN's disk
+#     instead of failing at the process memory limit. QA's dim_course_content
+#     asked for 8 GiB on top of 7.9 GB against a 10.4 GB process limit on
+#     2026-11-17.
+#   new_planner_optimize_timeout: 3000 ms by default. Planning dbt's
+#     information_schema read of the Glue raw schema (2,744 tables on QA) took
+#     8-15 s on 2026-11-17. dbt reads it whenever it looks up a relation in a
+#     source schema.
+BATCH_SESSION_PROPERTIES = {
+    "session.enable_spill": "true",
+    "session.new_planner_optimize_timeout": "30000",
+}
+_batch_session_properties_sql = ", ".join(
+    f'"{key}" = "{value}"' for key, value in BATCH_SESSION_PROPERTIES.items()
+)
+_SET_BATCH_SESSION_PROPERTIES = (
+    f"ALTER USER '{{{{name}}}}'@'%' SET PROPERTIES ({_batch_session_properties_sql});"
+)
+
 # StarRocks-compatible SQL role statements for Vault dynamic credentials.
 # Each list entry is executed as a separate statement in the same connection.
 #
@@ -140,6 +167,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT batch_readonly TO USER '{{name}}'@'%';",
             "ALTER USER '{{name}}'@'%' DEFAULT ROLE batch_readonly;",
+            _SET_BATCH_SESSION_PROPERTIES,
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -160,6 +188,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT admin TO USER '{{name}}'@'%';",
             "ALTER USER '{{name}}'@'%' DEFAULT ROLE admin;",
+            _SET_BATCH_SESSION_PROPERTIES,
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -691,7 +720,9 @@ if gravitino_catalog_enabled:
         opts=InvokeOptions(provider=_vault_provider),
     )
     _gravitino_catalog: pulumi.Output[GravitinoCatalog] = pulumi.Output.all(
-        _gravitino, _gravitino_client.data
+        _gravitino,
+        _gravitino_client.data,
+        applications_stack.require_output("gravitino_catalog_tls"),
     ).apply(
         lambda args: GravitinoCatalog(
             name=catalog_name(stack_info.env_suffix),
@@ -699,15 +730,15 @@ if gravitino_catalog_enabled:
             warehouse=args[0]["catalog"],
             oauth2_server_uri=f"{args[1]['url']}/protocol/openid-connect/token",
             aws_region=aws_region,
+            tls_configurer_impl=args[2]["configurer_impl"],
+            tls_ca_file=args[2]["ca_file"],
         )
     )
     _bootstrap_credential: pulumi.Output[str] = pulumi.Output.secret(
         _gravitino_client.data.apply(lambda d: f"{d['client_id']}:{d['client_secret']}")
     )
     _gravitino_create_hash = _gravitino_catalog.apply(
-        lambda c: hashlib.sha256(
-            c.create_sql(CREDENTIAL_PLACEHOLDER).encode()
-        ).hexdigest()
+        lambda c: hashlib.sha256(c.create_trigger_sql().encode()).hexdigest()
     )
     gravitino_catalog_setup = command.local.Command(
         f"starrocks-{stack_info.env_suffix}-gravitino-catalog-setup",

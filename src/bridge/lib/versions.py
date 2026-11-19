@@ -2,20 +2,18 @@
 AWS_CLI_VERSION = "2.39.6"
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
 CONCOURSE_VERSION = "8.3.3"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
-# renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
-CONSUL_TEMPLATE_VERSION = "0.43.1"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "2.1.0"
 # renovate: datasource=github-releases depName=dagger packageName=dagger/dagger
 DAGGER_VERSION = "v0.21.11"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
-KEYCLOAK_VERSION = "26.7.4"
+KEYCLOAK_VERSION = "26.8.1"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
 # renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
-MEILISEARCH_VERSION = "v1.56.1"
+MEILISEARCH_VERSION = "v1.56.2"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "2.0.7"
+OPEN_METADATA_VERSION = "2.0.8"
 # renovate: datasource=docker depName=openapi-generator-cli packageName=openapitools/openapi-generator-cli
 OPENAPI_GENERATOR_VERSION = "v7.27.0"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
@@ -23,7 +21,7 @@ TRAEFIK_VERSION = "3.7.17"
 # renovate: datasource=docker depName=typesense packageName=typesense/typesense
 TYPESENSE_VERSION = "30.2"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "2.2.1"
+VAULT_VERSION = "2.2.2"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
 
@@ -45,7 +43,7 @@ TIKA_CHART_VERSION = "3.2.2"
 PAYPAL_ADAPTER_VERSION = "2.4.2"
 PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:89ef36f0a06aa83788c1a465f95ffabd9b5b1a1e9e8e99eef57e484d67c28ba8"  # pragma: allowlist secret
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
-APISIX_CHART_VERSION = "2.18.2"
+APISIX_CHART_VERSION = "2.19.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
 AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION = "3.6.2"
 # renovate: datasource=helm depName=aws-node-termination-handler packageName=aws-node-termination-handler registryUrl=https://aws.github.io/eks-charts
@@ -53,7 +51,7 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager registryUrl=https://charts.jetstack.io
 CERT_MANAGER_CHART_VERSION = "v1.21.3"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.13.29"
+DAGSTER_CHART_VERSION = "1.13.30"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
 EBS_CSI_DRIVER_VERSION = "v1.66.0-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
@@ -82,6 +80,8 @@ KARPENTER_CHART_VERSION = "1.15.1"
 KEDA_CHART_VERSION = "2.21.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
+# renovate: datasource=helm depName=label-studio packageName=label-studio registryUrl=https://charts.heartex.com
+LABEL_STUDIO_CHART_VERSION = "2.0.12"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.42.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
@@ -90,6 +90,8 @@ OPIK_CHART_VERSION = "2.2.143"
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.8"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_CHART_VERSION = "1.11.8"
+# The FE entrypoint compiles applications/starrocks/files/CaFileTLSConfigurer.java
+# against this image, which needs javac and Iceberg's TLSConfigurer in it.
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
 STARROCKS_VERSION = "4.1.7"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
@@ -112,7 +114,7 @@ CLICKHOUSE_SERVER_VERSION = "26.3.60.10002.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.8-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "42.3.1"
+TRAEFIK_CHART_VERSION = "42.3.2"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.10.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
@@ -120,22 +122,23 @@ VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.6.2"
 # renovate: datasource=docker depName=nginx
 NGINX_VERSION = "1.31.8"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
-PROMETHEUS_OPERATOR_CRD_VERSION = "v0.95.1"
+PROMETHEUS_OPERATOR_CRD_VERSION = "v0.95.2"
 # renovate: datasource=github-tags depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
-KEYCLOAK_OPERATOR_CRD_VERSION = "26.7.4"
+KEYCLOAK_OPERATOR_CRD_VERSION = "26.8.1"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.4.5"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
 MARIMO_OPERATOR_VERSION = "v0.3.0"
-# TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
-# The custom manager's regex requires the marker to sit on the line directly
-# above the assignment, so any explanation has to go above the marker.
+# Tags are YYYY.MM.DD.<run>.<attempt> from ol-data-platform's
+# build_marimo_jupyterlab workflow. The custom manager's regex requires the
+# marker to sit on the line directly above the assignment, so any explanation
+# has to go above the marker.
 # renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
-MARIMO_JUPYTERLAB_VERSION = "latest"
+MARIMO_JUPYTERLAB_VERSION = "2026.11.18.286.1"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.6.0"
 # renovate: datasource=helm depName=loki packageName=loki registryUrl=https://grafana.github.io/helm-charts
-LOKI_CHART_VERSION = "7.5.0"
+LOKI_CHART_VERSION = "7.6.0"
 # renovate: datasource=helm depName=mimir-distributed packageName=mimir-distributed registryUrl=https://grafana.github.io/helm-charts
 MIMIR_DISTRIBUTED_CHART_VERSION = "6.2.2"
 # renovate: datasource=docker depName=pdc-agent packageName=grafana/pdc-agent
@@ -155,17 +158,17 @@ SQL_EXPORTER_VERSION = "0.24.13"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.37"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
-QDRANT_VERSION = "v1.20.0"
+QDRANT_VERSION = "v1.20.1"
 # renovate: datasource=helm depName=typesense-operator packageName=typesense-operator registryUrl=https://akyriako.github.io/typesense-operator
 TYPESENSE_OPERATOR_CHART_VERSION = "0.4.2"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
 VPA_CHART_VERSION = "0.16.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
-TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.63.0"
+TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.65.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
-TOOLHIVE_OPERATOR_CHART_VERSION = "0.63.0"
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.65.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
-MCP_GRAFANA_VERSION = "2.2.0"
+MCP_GRAFANA_VERSION = "2.3.0"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
@@ -207,10 +210,15 @@ LITELLM_VERSION = "v1.108.3"
 RUSTFS_VERSION = "1.0.4"
 # renovate: datasource=docker depName=loki packageName=grafana/loki
 LOKI_VERSION = "3.7.9"
+# renovate: datasource=docker depName=mimir packageName=grafana/mimir
+MIMIR_VERSION = "3.2.3"
 # renovate: datasource=docker depName=alloy packageName=grafana/alloy
 ALLOY_VERSION = "v1.21.3"
 # renovate: datasource=docker depName=grafana packageName=grafana/grafana
 GRAFANA_VERSION = "13.3.0"
 # The -slim variant: no bundled local models. Embeddings come from Bedrock.
 # renovate: datasource=docker depName=hindsight-api packageName=ghcr.io/vectorize-io/hindsight-api
-HINDSIGHT_VERSION = "1.2.0-slim"
+HINDSIGHT_VERSION = "1.2.1-slim"
+# The stock uv image the Hindsight forget job runs its locked script on.
+# renovate: datasource=docker depName=uv packageName=ghcr.io/astral-sh/uv
+UV_IMAGE_TAG = "0.12.24-python3.13-trixie-slim"

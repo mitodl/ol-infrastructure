@@ -177,6 +177,9 @@ config:
   # load spreads evenly across replicas, and measured distribution is heavily
   # skewed, so the binding limit is whichever replica saturates first.
   dagster:max_concurrent_runs: 80
+  # learn_embeddings/model_calls runs at once, against dagster-ml's 1M TPM
+  # text-embedding-3-large deployment (azure/openai Pulumi.Production.yaml).
+  dagster:learn_embeddings_run_limit: 4
   # event_log_storage's QueuePool ceiling, sized after the daemon logged
   # 1000+ "QueuePool limit" timeouts in 41 minutes on 2026-08-18 under
   # automation_condition_evaluator load. See the full derivation, including

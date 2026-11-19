@@ -105,12 +105,15 @@ INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
 # fits no existing node (32 of the 53 indexer pods scheduled in operations-qa
 # in the 7 days to 2026-10-28 waited for Karpenter to launch one), and a fresh
 # spot node often receives an EC2 rebalance recommendation within its first
-# minute. aws-node-termination-handler drains on those
-# (`enableRebalanceDraining`), evicting the indexer mid-clone. All 26 indexer
-# pod evictions in operations-qa in that window were that drain, and every
-# failed QA Job had both of its attempts evicted. Same selector, and the same
-# do-not-disrupt annotation on the pod, as open_metadata's `long_running`
-# workflow pods.
+# minute. aws-node-termination-handler drained on those at the time, evicting
+# the indexer mid-clone: all 26 indexer pod evictions in operations-qa in that
+# window were that drain, and every failed QA Job had both of its attempts
+# evicted. Rebalance draining has since been turned off
+# (`enableRebalanceMonitoring`/`enableRebalanceDraining` in
+# infrastructure/aws/eks/aws_utils.py), but a spot interruption still evicts
+# the pod with two minutes' notice, and do-not-disrupt does not stop that.
+# Same selector, and the same do-not-disrupt annotation on the pod, as
+# open_metadata's `long_running` workflow pods.
 INDEX_NODE_SELECTOR = {"karpenter.sh/capacity-type": "on-demand"}
 
 
@@ -174,8 +177,8 @@ def create_ci_indexer(  # noqa: PLR0913
         # The data tier, addressed directly. `code_server` being set is what
         # selects the `--server <url> --graph <id>` path in
         # `witan_code.store.store_for_repo`; the graph id per repo is derived
-        # client-side by `witan_code.config.graph_id`, which the omnigraph
-        # stack's `code_graph_id` mirrors when it declares those graphs.
+        # client-side by `witan_core.graph_ids.code_graph_id`, the function the
+        # omnigraph stack imports to declare those graphs.
         kubernetes.core.v1.EnvVarArgs(
             name="WITAN_CODE_SERVER", value=omnigraph_server_addr
         ),

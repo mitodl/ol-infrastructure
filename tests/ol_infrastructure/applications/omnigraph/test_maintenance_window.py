@@ -186,6 +186,8 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS": str(COMMAND_TIMEOUT_SECONDS),
             # A server draining writes for its whole grace is not stuck.
             "OMNIGRAPH_SERVER_STOP_SECONDS": "180",
+            # The close after SIGTERM is fitted to this pod's own grace.
+            "OMNIGRAPH_TERMINATION_GRACE_SECONDS": str(TERMINATION_GRACE_SECONDS),
             "LANCE_MEM_POOL_SIZE": str(LANCE_MEM_POOL_BYTES),
         }
         assert container["resources"]["limits"]["memory"] == MAINTENANCE_MEMORY_LIMIT
@@ -282,6 +284,9 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
         actor_tokens_file="/etc/omnigraph/tokens/tokens.json",
         apply_actor="svc-witan-admin",
         graph_removal_allowlist=["code-a"],
+        branch_drop_allowlist=["code-b", "code-bridge"],
+        view_drop_actor="svc-witan-ci",
+        server_url="http://omnigraph-server.omnigraph.svc.cluster.local:8080",
         config_hash=pulumi.Output.from_input("abc123"),
         depends_on=[],
     )
@@ -301,8 +306,13 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
             "AWS_REGION": "us-east-1",
             "OMNIGRAPH_CLUSTER_DIR": "/etc/omnigraph/cluster",
             "OMNIGRAPH_SERVER_BEARER_TOKENS_FILE": "/etc/omnigraph/tokens/tokens.json",
+            "OMNIGRAPH_VIEW_DROP_SERVER_URL": (
+                "http://omnigraph-server.omnigraph.svc.cluster.local:8080"
+            ),
             "OMNIGRAPH_APPLY_ACTOR": "svc-witan-admin",
             "OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST": "code-a",
+            "OMNIGRAPH_BRANCH_DROP_ALLOWLIST": "code-b,code-bridge",
+            "OMNIGRAPH_VIEW_DROP_ACTOR": "svc-witan-ci",
         }
         mounts = {m["name"]: m["mountPath"] for m in container["volumeMounts"]}
         assert mounts == {

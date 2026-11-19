@@ -473,6 +473,11 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             },
         },
         "startOptimized": stack_info.name != "CI",
+        # CI starts non-optimized and re-augments at startup, so it does not
+        # inherit --features-disabled=scim-api from the image build
+        # (ol-keycloak#317). Repeat it here so CI serves SCIM from the plugin
+        # alone, as QA and Production do.
+        **({"features": {"disabled": ["scim-api"]}} if stack_info.name == "CI" else {}),
         "http": {
             "tlsSecret": keycloak_tls_secret_name,
         },
@@ -558,6 +563,17 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             {
                 "name": "spi-events-listener--jboss-logging--success-level",
                 "value": "info",
+            },
+            # 26.8 deprecates "Full scope allowed" and logs a WARN on every
+            # token issuance for each client that has it on, which is every
+            # client we manage. Silence that category until the clients move to
+            # explicit scope mappings.
+            {
+                "name": (
+                    "log-level-org.keycloak.protocol.oidc.endpoints"
+                    ".TokenEndpoint.full-scope-allowed"
+                ),
+                "value": "error",
             },
         ],
         "tracing": tracing_config,

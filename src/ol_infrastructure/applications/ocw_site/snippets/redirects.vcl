@@ -89,8 +89,10 @@ if (table.lookup_bool(learn_course_redirects, req.http.host, false)) {
   if (var.path ~ "^/courses/([^/]+)/(((pages|resources|download|external-resources|video_galleries|lists)/.*|[^/]+\.[a-zA-Z0-9]+)?)$") {
     set var.course = re.group.1;
     set var.course_path = re.group.2;
-    # A department index page is not a course
-    if (!table.lookup_bool(departments, var.course, false)) {
+    # A department index page is not a course. A course's sitemap.xml stays on
+    # OCW, so search engines keep reading the old URLs it lists and find their
+    # redirects.
+    if (!table.lookup_bool(departments, var.course, false) && var.course_path != "sitemap.xml") {
       set var.location = var.learn + "/courses/o/" + var.course + "/" + var.course_path;
     }
   }

@@ -57,9 +57,12 @@ config:
         node_size: m8i-flex.xlarge
         ol.mit.edu/archive_node: "true"
       disk_size_gb: 250
+      # Loki, the archive ingress and the node daemons already request ~5.4 of
+      # the 7.8 vCPU two nodes offer; Mimir adds ~3 more even at QA's trimmed
+      # requests, and nothing autoscales this group.
       scaling:
-        desired: 2
-        min: 2
+        desired: 3
+        min: 3
         max: 3
       version:
       tags: {}

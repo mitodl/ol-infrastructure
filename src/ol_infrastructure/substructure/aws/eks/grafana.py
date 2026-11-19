@@ -13,7 +13,12 @@ from ol_infrastructure.lib.ol_types import (
     cluster_addon_labels,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
-from ol_infrastructure.lib.telemetry_archive import push_target
+from ol_infrastructure.lib.telemetry_archive import (
+    ARCHIVE_NAMESPACE,
+    MIMIR_RULER_URL,
+    MIMIR_RULES_LABEL,
+    push_target,
+)
 
 # The K8sGlobalLabels keys that alert rules join on to tier and route a
 # workload's alerts. kube-state-metrics surfaces each as a label_ol_mit_edu_*
@@ -22,6 +27,43 @@ _OL_ROUTING_LABEL_KEYS = ",".join(
     f"ol.mit.edu/{field}"
     for field in ("service", "component", "alert_tier", "environment")
 )
+
+# Processors every OTLP destination runs, so the Cloud and archive copies of a
+# metric are the same series.
+#
+# Second half of the unmatched-path collapse in
+# applicationObservability.metrics.transforms below. That rewrite leaves one
+# datapoint per original path, all with the same labels; sent as-is, each pod
+# would push several cumulative histograms into one Mimir series. Summing
+# them here yields a single valid cumulative series. It has to live in the
+# destination's processor: the chart renders a transform's metric context
+# before its datapoint context, so the feature's own transform cannot
+# aggregate after it sets.
+_OTLP_DESTINATION_METRIC_TRANSFORMS = [
+    'aggregate_on_attributes("sum") where IsMatch(name, "^http[.]server[.]")',
+]
+# Traefik's tracing.otlp exporter (see traefik.py) runs with traceVerbosity:
+# detailed on the websecure entrypoint, which spans every internal middleware
+# Traefik invokes per request -- including the "Metrics" middleware, which
+# does no request-handling work of its own -- it only records Prometheus
+# counters/histograms. That made "Metrics" Traefik's single highest-volume
+# span, ahead of real GET/POST traffic, with no server.address or other
+# diagnostic value (confirmed via Tempo: entry_point is exclusively
+# "websecure" on these spans -- they are not the separate :9100
+# Prometheus-scrape entrypoint, which carries zero trace volume).
+#
+# Traefik has no per-middleware trace toggle -- traceVerbosity is
+# all-or-nothing for internal middlewares -- so the span has to be dropped
+# downstream instead. Traefik's own Prometheus metrics (what this middleware
+# actually produces) are unaffected; only the trace span is dropped.
+_OTLP_DESTINATION_FILTERS = {
+    "enabled": True,
+    "traces": {
+        "span": [
+            'resource.attributes["service.name"] == "traefik" and name == "Metrics"',
+        ],
+    },
+}
 
 
 def _apisix_cookie_metrics_alloy_config() -> str:
@@ -322,9 +364,10 @@ def setup_grafana(
     grafana_vault_secrets = read_yaml_secrets(
         Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
     )
-    # The self-hosted telemetry archive (ADR-0014). Logs are dual-shipped to it
-    # over an OTLP destination of its own; environments without an archive ship
-    # to Grafana Cloud alone.
+    # The self-hosted telemetry archive (ADR-0014). Logs and OTLP metrics are
+    # dual-shipped to it over an OTLP destination of its own, scraped metrics
+    # over a second remote write; environments without an archive ship to
+    # Grafana Cloud alone.
     archive = push_target(stack_info.env_suffix)
 
     # Every feature names its destinations (plan D11). Left implicit, the chart
@@ -334,6 +377,7 @@ def setup_grafana(
     logs_destinations = ["grafana-cloud-logs"]
     otlp_destinations = ["gc-otlp-endpoint"]
     if archive:
+        metrics_destinations.append("archive-metrics")
         logs_destinations.append("archive-otlp")
         otlp_destinations.append("archive-otlp")
 
@@ -597,21 +641,8 @@ def setup_grafana(
                             # it hides no failure. This runs on the receiver,
                             # ahead of the loadbalancing hop to the sampler.
                             "transform": {
-                                # Second half of the unmatched-path collapse in
-                                # applicationObservability.metrics.transforms
-                                # below. That rewrite leaves one datapoint per
-                                # original path, all with the same labels; sent
-                                # as-is, each pod would push several cumulative
-                                # histograms into one Mimir series. Summing
-                                # them here yields a single valid cumulative
-                                # series. It has to live in this processor: the
-                                # chart renders a transform's metric context
-                                # before its datapoint context, so the feature's
-                                # own transform cannot aggregate after it sets.
                                 "metrics": {
-                                    "metric": [
-                                        'aggregate_on_attributes("sum") where IsMatch(name, "^http[.]server[.]")',
-                                    ],
+                                    "metric": _OTLP_DESTINATION_METRIC_TRANSFORMS,
                                 },
                                 "traces": {
                                     "span": [
@@ -620,61 +651,35 @@ def setup_grafana(
                                     ],
                                 },
                             },
-                            # Traefik's tracing.otlp exporter (see traefik.py)
-                            # runs with traceVerbosity: detailed on the
-                            # websecure entrypoint, which spans every internal
-                            # middleware Traefik invokes per request --
-                            # including the "Metrics" middleware, which does
-                            # no request-handling work of its own -- it only
-                            # records Prometheus counters/histograms. That
-                            # made "Metrics" Traefik's single highest-volume
-                            # span, ahead of real GET/POST traffic, with no
-                            # server.address or other diagnostic value
-                            # (confirmed via Tempo:
-                            # entry_point is exclusively "websecure" on these
-                            # spans -- they are not the separate :9100
-                            # Prometheus-scrape entrypoint, which carries zero
-                            # trace volume).
-                            #
-                            # Traefik has no per-middleware trace toggle --
-                            # traceVerbosity is all-or-nothing for internal
-                            # middlewares -- so the span has to be dropped
-                            # downstream instead. Traefik's own Prometheus
-                            # metrics (what this middleware actually produces)
-                            # are unaffected; only the trace span is dropped.
-                            "filters": {
-                                "enabled": True,
-                                "traces": {
-                                    "span": [
-                                        'resource.attributes["service.name"] == "traefik" and name == "Metrics"',
-                                    ],
-                                },
-                            },
+                            "filters": _OTLP_DESTINATION_FILTERS,
                         },
                     },
                     **(
                         {
-                            # Logs only in Phase 1; metrics.enabled flips in Phase 2
-                            # and traces stay off for good (the plan's "Not
-                            # planned"). An OTLP destination rather than a second
-                            # loki one (plan D10): the chart renders an
-                            # otelcol.receiver.loki bridge in front of
-                            # otelcol.exporter.otlphttp for Loki-sourced logs, and
-                            # that exporter's sending_queue is a real non-blocking
-                            # queue. loki.write's wal and queue_config are
-                            # experimental in Alloy, so a loki destination could
-                            # only be made non-blocking by running the production
-                            # collectors at the experimental stability level.
+                            # Logs and OTLP metrics; traces stay off for good
+                            # (the plan's "Not planned"). An OTLP destination
+                            # rather than a second loki one (plan D10): the
+                            # chart renders an otelcol.receiver.loki bridge in
+                            # front of otelcol.exporter.otlphttp for Loki-sourced
+                            # logs, and that exporter's sending_queue is a real
+                            # non-blocking queue. loki.write's wal and
+                            # queue_config are experimental in Alloy, so a loki
+                            # destination could only be made non-blocking by
+                            # running the production collectors at the
+                            # experimental stability level.
                             #
                             # block_on_overflow is not set because its default is
                             # false and the chart only renders it when true; the
                             # rendered config carries no block_on_overflow line.
                             # queue_size is in batches of up to 8192 records, so
                             # 200 bounds the queue at ~1.6M records per collector.
-                            # OTLP logs go to <url>/v1/logs, Loki's native OTLP
-                            # path, and the destination's logToResource defaults
-                            # promote service_name, namespace, pod and container
-                            # to resource attributes, which Loki indexes.
+                            # OTLP logs go to <url>/v1/logs and metrics to
+                            # <url>/v1/metrics, Loki's and Mimir's native OTLP
+                            # paths; the destination's logToResource and
+                            # datapointToResource defaults promote service_name,
+                            # namespace, pod and container to resource
+                            # attributes, which Loki indexes and Mimir promotes
+                            # back to labels (observability_archive/mimir.py).
                             "archive-otlp": {
                                 "type": "otlp",
                                 "protocol": "http",
@@ -686,7 +691,7 @@ def setup_grafana(
                                     # previews and encrypted in state.
                                     "password": Output.secret(archive.password),
                                 },
-                                "metrics": {"enabled": False},
+                                "metrics": {"enabled": True},
                                 "logs": {"enabled": True},
                                 "traces": {"enabled": False},
                                 "retryOnFailure": {
@@ -699,7 +704,72 @@ def setup_grafana(
                                     "enabled": True,
                                     "queueSize": 200,
                                 },
-                            }
+                                # The same collapse and drop as the Cloud
+                                # destination, so the archive holds one valid
+                                # series where Cloud does.
+                                "processors": {
+                                    "transform": {
+                                        "metrics": {
+                                            "metric": _OTLP_DESTINATION_METRIC_TRANSFORMS,
+                                        },
+                                    },
+                                    "filters": _OTLP_DESTINATION_FILTERS,
+                                },
+                            },
+                            # Scraped metrics' second remote write (plan D10).
+                            # Each prometheus.remote_write has its own WAL and
+                            # shard queue on the alloy-metrics StatefulSet, so a
+                            # stalled archive fills this one and never Cloud's.
+                            # sampleAgeLimit drops what is older than an hour
+                            # instead of replaying a long outage into Mimir
+                            # when it returns; maxShards caps the catch-up
+                            # burst; no 429 retries because the archive's rate
+                            # limit is the archive's problem, not the
+                            # collector's. The WAL keeps two hours, not the
+                            # chart's eight: an hour past the age limit is
+                            # all a replay can ever use.
+                            "archive-metrics": {
+                                "type": "prometheus",
+                                "url": archive.remote_write_url,
+                                "auth": {
+                                    "type": "basic",
+                                    "username": archive.username,
+                                    "password": Output.secret(archive.password),
+                                },
+                                "queueConfig": {
+                                    "sampleAgeLimit": "1h",
+                                    "maxShards": 10,
+                                    "retryOnHttp429": False,
+                                },
+                                "writeAheadLog": {"maxKeepaliveTime": "2h"},
+                                **(
+                                    {
+                                        # The archive's recording rules are
+                                        # PrometheusRule objects in its own
+                                        # namespace, synced into Mimir's ruler
+                                        # by this cluster's alloy-metrics
+                                        # (mimir.rules.kubernetes). Only the
+                                        # cluster that hosts the archive runs
+                                        # the sync: two syncers against one
+                                        # tenant would each delete the other's
+                                        # rule groups. The ruler is reached by
+                                        # its in-cluster Service because the
+                                        # archive ingress routes push paths
+                                        # only; the chart reuses the push
+                                        # credential, which the ruler ignores.
+                                        "rules": {
+                                            "enabled": True,
+                                            "collector": "alloy-metrics",
+                                            "address": MIMIR_RULER_URL,
+                                            "namespaces": [ARCHIVE_NAMESPACE],
+                                            "labelSelectors": MIMIR_RULES_LABEL,
+                                            "mimirNamespacePrefix": "ol-infrastructure",
+                                        },
+                                    }
+                                    if stack_info.env_prefix == "operations"
+                                    else {}
+                                ),
+                            },
                         }
                         if archive
                         else {}
@@ -987,6 +1057,7 @@ def setup_grafana(
                                             # enqueue_failed, which is what a full
                                             # non-blocking queue increments, is not.
                                             "otelcol_exporter_enqueue_failed_log_records_total",
+                                            "otelcol_exporter_enqueue_failed_metric_points_total",
                                             # alloy-logs' APISix cookie histograms, from
                                             # the stage.metrics above. The default list
                                             # keeps only loki_process_dropped_lines_total.
@@ -1146,6 +1217,11 @@ def setup_grafana(
                 "collectors": {
                     "alloy-metrics": {
                         "presets": ["clustered", "statefulset"],
+                        # See alloy-singleton below for why a request and no
+                        # limit. The second remote write (archive-metrics)
+                        # is a second WAL and shard queue over the same
+                        # series; measured in the QA soak.
+                        "alloy": {"resources": {"requests": {"memory": "1Gi"}}},
                     },
                     "alloy-singleton": {
                         "presets": ["singleton"],

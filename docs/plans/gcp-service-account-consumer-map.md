@@ -186,8 +186,8 @@ across all 20 visible projects, 42-day window.
 | idle | ovs-youtube-qa | API key 1 | 2019-12-19 | NONE |
 
 Seven keys carried **no restriction of any kind**, including the only unrestricted key that is
-actually live. The six idle ones were restricted on 2026-10-20 (see below). Server key 1
-moves off when edxapp MITx Residential takes the mitol01 key.
+actually live. The six idle ones were restricted on 2026-10-20 and later deleted (see below).
+Server key 1 was deleted on 2026-11-10 after edxapp took the mitol01 key.
 
 **OAuth clients — 3 genuinely live.** (`32555940559.apps.googleusercontent.com` also appears
 in the data; that is the gcloud CLI's own public client — our own queries, not a consumer.
@@ -281,6 +281,22 @@ do not act on it without checking what ran that day.
 they are exactly the ones the first triage would have kept. Disable keys before deleting,
 and watch for errors for one cycle.
 
+**Retired 2026-11-16.** The owner confirmed UA is not needed (answer 4 below), so the
+disable-and-watch stage was skipped. OVS dropped its GA code and env vars on 2026-10-27
+(mitodl/odl-video-service#1628, #6470). None of the five authenticated after that (latest:
+`video-ci-odl-mit-edu@` 2026-10-26, `video-odl-mit-edu@` 2026-10-19). All five were deleted,
+and `analytics.googleapis.com` was disabled on `mit-open`, `odl-video-service` and
+`micromasters-153213`. `gcloud iam service-accounts undelete <unique-id>` restores one until
+2026-12-16:
+
+| Service account | Unique id |
+|---|---|
+| `bi-odl-mit-edu@mit-open` | 113174352434747479758 |
+| `bi-odl-mit-edu@odl-video-service` | 108863629681170396096 |
+| `video-ci-odl-mit-edu@odl-video-service` | 117529220196253489956 |
+| `video-odl-mit-edu@odl-video-service` | 102466262924987442001 |
+| `micromasters-google-analytics@micromasters-153213` | 111099158147452208882 |
+
 ## Owner answers, 2026-08-10
 
 Five open questions closed by the project owner. These narrow the scope substantially.
@@ -339,7 +355,8 @@ Five open questions closed by the project owner. These narrow the scope substant
    Manageability differs per type and must be designed per type:
    - **Service accounts, IAM, enabled APIs** — fully Pulumi-manageable.
    - **API keys** — Pulumi-manageable (`gcp.projects.ApiKey`). Bring them under IaC *with*
-     restrictions. Only `mitx-residential` "Server key 1" still has none (2026-10-20).
+     restrictions. No unrestricted key remains: the last one, `mitx-residential`
+     "Server key 1", was deleted on 2026-11-10.
    - **reCAPTCHA keys** — Pulumi-manageable (`gcp.recaptcha.EnterpriseKey`), but the site
      key is embedded in production frontends, so a change is a coordinated app deploy.
    - **Generic OAuth clients** — not manageable by any API or IaC tool
@@ -366,7 +383,7 @@ authenticated. Deletion is held for now
 | `mit-odl-open-discussions-rc` | same as `-ci`, plus `telemetry` | same as `-ci` |
 | `ol-engineers` | BigQuery, Dataform, Dataplex and storage APIs enabled, created 2025-04-04 | 0 datasets, 0 buckets, 0 SAs, 0 keys, one Owner |
 | `ovs-youtube-prod` | `youtube.googleapis.com`, default quota, no keys | OVS YouTube sync needs no preservation (owner answer 5) |
-| `ovs-youtube-qa` | idle key "API key 1" (restricted 2026-10-20, see below), quota 0 | `ocw_studio/Pulumi.CI.yaml` sets `YT_PROJECT_ID: ovs-youtube-qa`, so OCW Studio CI's YouTube OAuth client probably lives here. With quota 0 it can't call YouTube today. Give CI a mitol01 client if CI publishing is ever wanted. |
+| `ovs-youtube-qa` | quota 0; its idle key "API key 1" was deleted 2026-11-16 (see below) | `ocw_studio/Pulumi.CI.yaml` sets `YT_PROJECT_ID: ovs-youtube-qa`, so OCW Studio CI's YouTube OAuth client probably lives here. With quota 0 it can't call YouTube today. Give CI a mitol01 client if CI publishing is ever wanted. |
 | `open-learning-analytics` | `analytics`, `policyanalyzer`, `telemetry`; two SAs that never authenticated | Universal Analytics only, which is retired (owner answer 4) |
 
 Not deletable, despite the 2026-07-21 list:
@@ -384,37 +401,40 @@ These six keys had no restriction of any kind and zero calls in the 45 days befo
 change. Each now allows only `apikeys.googleapis.com`, the key-management API. An API key
 carries no principal, so it can't authorize key management, and the keys no longer work
 against any real API. Each carries the annotations `ol-restricted-on` and
-`ol-restricted-reason`. A consumer we missed would get HTTP 403s. It is unverified whether
-`bin/gcp-credential-usage report` attributes a key-restriction rejection to that key, so
-before deleting, look for any 403 in each key's project, whatever credential it is attributed
-to. After about two weeks with none, delete them.
+`ol-restricted-reason`. A consumer we missed would have gotten HTTP 403s. It was unverified
+whether `bin/gcp-credential-usage report` attributes a key-restriction rejection to that key,
+so the gate for deletion was no 403 of any kind in each key's project, whatever credential it
+was attributed to, for about two weeks.
 
-The 403 check does not cover "Geocoding LTI Module". The Geocoding API reports a rejected key
+The 403 check did not cover "Geocoding LTI Module". The Geocoding API reports a rejected key
 in the response body, as `status: REQUEST_DENIED` on an HTTP 200. That was observed on
 2026-11-05 with an invalid key and with no key; a key restricted away from Geocoding was not
-tested. A consumer of that key could fail for the whole window without a single 403. Before
-deleting it, look for any `geocoding-backend.googleapis.com` call in `mitx-residential`,
-whatever its response code, and check the LTI module's own logs if its deployment can be found.
+tested. A consumer of that key could have failed for the whole window without a single 403,
+so its gate was no `geocoding-backend.googleapis.com` call in `mitx-residential` at any
+response code. The report below shows no API traffic of any kind in `mitx-residential` since
+the restriction.
 
-| Project | Key | Created |
-|---|---|---|
-| `mitx-residential` | API key 4 | 2017-11-30 |
-| `mitx-residential` | API key 5 | 2017-11-30 |
-| `mitx-residential` | Geocoding LTI Module | 2016-03-23 |
-| `micromasters-153213` | Development | 2016-12-21 |
-| `ocw-studio-qa` | OCW Studio RC | 2021-10-13 |
-| `ovs-youtube-qa` | API key 1 | 2019-12-19 |
+All six are now deleted. A key can be restored for 30 days after its delete time. Find its uid
+with `gcloud services api-keys list --show-deleted --project <project>`, then run
+`gcloud services api-keys undelete <uid> --project <project>`.
 
-To revert one, point it at the API the consumer needs:
-`gcloud services api-keys update <uid> --project <project> --api-target=service=<api>.googleapis.com`.
-gcloud has no flag that clears restrictions. To drop them entirely, send a `PATCH` to
-`https://apikeys.googleapis.com/v2/projects/<project>/locations/global/keys/<uid>?updateMask=restrictions`
-with an empty JSON body.
+| Project | Key | Created | Deleted |
+|---|---|---|---|
+| `mitx-residential` | API key 4 | 2017-11-30 | 2026-11-10 |
+| `mitx-residential` | API key 5 | 2017-11-30 | 2026-11-10 |
+| `mitx-residential` | Geocoding LTI Module | 2016-03-23 | 2026-11-10 |
+| `micromasters-153213` | Development | 2016-12-21 | 2026-11-16 |
+| `ocw-studio-qa` | OCW Studio RC | 2021-10-13 | 2026-11-16 |
+| `ovs-youtube-qa` | API key 1 | 2019-12-19 | 2026-11-16 |
 
-`mitx-residential` "Server key 1" is still unrestricted and live (about 700 to 1,500
-`Videos.List` calls/day). mitxonline moved to the mitol01 key on 2026-10-14. MITx Residential
-and mitx-staging move when their Production edxapp stacks next apply. The edxapp pipeline
-deploys Production only on a manual trigger.
+Before the 2026-11-16 deletions, `bin/gcp-credential-usage report --days 27` over the four
+projects (the whole window since the restriction) showed no API-key traffic. The only 403s
+were in `ocw-studio-qa`: OCW Studio's YouTube OAuth client, plus one unattributed
+`CaptionService.Update`, a write an API key cannot authorize.
+
+The other two `mitx-residential` keys, "Server key 1" and "bi.odl.mit.edu test", were also
+deleted on 2026-11-10, after edxapp moved its YouTube calls to the mitol01 key.
+`mitx-residential` shows no API traffic of any kind in the 27 days to 2026-11-16.
 
 ## Operational findings (not migration-blocking)
 
@@ -442,8 +462,9 @@ deploys Production only on a manual trigger.
    edx.org-owned GCS bucket via `GCSConnection`, and no `storage.googleapis.com` traffic
    appears. Confirm separately before assuming anything about GCS-only paths.
 4. **`ol-data-platform-production@`'s Sheets source** is unidentified (2,540 calls/30d).
-5. **What authenticated three GA SAs on 2026-07-15?** Determines whether the zombie cohort
-   is truly zombie or has a real monthly consumer.
+5. ~~What authenticated three GA SAs on 2026-07-15?~~ **Moot, 2026-11-16.** The owner
+   confirmed UA is not needed and all five GA SAs were deleted (see the zombie GA cohort
+   section), so whether the cohort had a monthly consumer no longer matters.
 6. Vault was not reachable this session (stale token; `vault login -method=oidc` needed), so
    the Vault-side half of the credential map is inferred from `k8s_secrets.py` templates and
    policy files rather than read directly.

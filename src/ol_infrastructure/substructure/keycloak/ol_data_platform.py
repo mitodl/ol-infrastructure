@@ -7,8 +7,10 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
     MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
+    REALM_DEFAULT_OPTIONAL_SCOPES,
     create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -343,27 +345,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ).apply(json.dumps),
     )
 
-    # Provision service account with necessary roles for API operations
-    # This enables users calling the Superset API to have their tokens validated
-    # and user details looked up via Keycloak admin API
     realm_mgmt_client = keycloak.openid.get_client(
         realm_id="ol-data-platform",
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
     )
-
-    for resource_name, role in [
-        ("ol-superset-service-account-view-realm", "view-realm"),
-        ("ol-superset-service-account-view-users", "view-users"),
-    ]:
-        keycloak.openid.ClientServiceAccountRole(
-            resource_name,
-            realm_id=ol_data_platform_realm.id,
-            service_account_user_id=ol_data_platform_superset_client.service_account_user_id,
-            client_id=realm_mgmt_client.id,
-            role=role,
-            opts=resource_options,
-        )
 
     # Grant the service account the ol_platform_admin Superset client role so that
     # client_credentials JWTs include it in the role_keys claim (via the
@@ -460,6 +446,14 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "roles",
             "web-origins",
         ],
+        opts=resource_options,
+    )
+    # No kc-admin-api: Superset never calls the Keycloak Admin API.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-data-platform-superset-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_superset_client.id,
+        optional_scopes=REALM_DEFAULT_OPTIONAL_SCOPES,
         opts=resource_options,
     )
 
@@ -849,6 +843,14 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ],
         opts=resource_options,
     )
+    # Optional for the same reason as the Superset client above.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-data-platform-starrocks-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
 
     # StarRocks 4.x rejects '@' in usernames.  Expose the Kerberos short username
     # stored in the "saml_uid" user attribute (populated by the Touchstone eppn
@@ -971,6 +973,17 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    # Optional, not default: a default list would replace the scopes Gravitino
+    # reads this token through (preferred_username for the principal, the
+    # catalog audience), so the optional set is the one that leaves them alone.
+    # The reconciler requests it with scope=kc-admin-api.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-gravitino-admin-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_gravitino_admin_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
     for resource_name, role in [
         ("ol-gravitino-admin-service-account-view-users", "view-users"),
@@ -1189,6 +1202,45 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
     # MARIMO [END] # noqa: ERA001
+
+    # LABEL STUDIO [START]
+    # Label Studio Community has no SSO, so the APISIX openid-connect plugin
+    # gates it with this client and annotators sign in to Label Studio itself
+    # behind the gateway (see the label_studio application stack).
+    # Only stacks that set the redirect URIs (QA, where Label Studio deploys)
+    # create the client and its Vault secret.
+    ol_data_platform_label_studio_redirect_uris = keycloak_realm_config.get_object(
+        "ol-data-platform-label-studio-redirect-uris"
+    )
+    if ol_data_platform_label_studio_redirect_uris:
+        ol_data_platform_label_studio_client = keycloak.openid.Client(
+            "ol-data-platform-label-studio-client",
+            name="ol-data-platform-label-studio-client",
+            realm_id=ol_data_platform_realm.id,
+            client_id="ol-label-studio-client",
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            service_accounts_enabled=False,
+            valid_redirect_uris=ol_data_platform_label_studio_redirect_uris,
+            **MANAGED_CLIENT_ARGS,
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        vault.generic.Secret(
+            "ol-data-platform-label-studio-client-vault-oidc-credentials",
+            path="secret-operations/sso/label-studio",
+            data_json=Output.all(
+                url=ol_data_platform_label_studio_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=ol_data_platform_label_studio_client.client_id,
+                client_secret=ol_data_platform_label_studio_client.client_secret,
+                secret=session_secret,
+                realm_id=ol_data_platform_label_studio_client.realm_id,
+                realm_name="ol-data-platform",
+            ).apply(json.dumps),
+        )
+    # LABEL STUDIO [END]
 
     # OL Data Platform Realm - Authentication Flows[START]
     # OL - browser flow [START]
