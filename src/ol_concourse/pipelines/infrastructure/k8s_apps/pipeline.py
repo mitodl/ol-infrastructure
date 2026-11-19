@@ -2190,6 +2190,7 @@ def _build_release_resource_app_pipeline(
         ),
     ]
     release_marker_slack = _release_marker_slack(app_name)
+    production_tag_slack = _production_tag_slack(app_name)
     prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
         _release_marker_task(app_name, ol_infra_repo, release_marker_slack),
         # Mark the Production GitHub Deployment as successful, and say so on the
@@ -2243,6 +2244,21 @@ def _build_release_resource_app_pipeline(
         additional_post_steps[1].append(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
+    # Last in Production, once the release is live, recorded as live, finished
+    # and its cache purged: tag the release `production/<version>`, as a
+    # tag-only release's Production job does. Consumers that want only what
+    # Production runs follow these tags; the app's API-client pipeline
+    # publishes a stable client from them (libraries/configuration.py). A
+    # re-run of an infrastructure-only promotion finds the tag in place and
+    # changes nothing. A re-run of an old build that rolls Production back
+    # gets no tag, because a newer version already has one, so no client is
+    # published for it; ALLOW_OLDER keeps that from failing a deploy that
+    # succeeded (and from the job's Slack alert calling it a failed deploy).
+    # Any other failure is a Slack alert rather than a red job, for the same
+    # reason; see _production_tag_task.
+    additional_post_steps[1].append(
+        _production_tag_task(app_name, github_repo, release_res, production_tag_slack)
+    )
     # Last in QA, after the RC deployment is marked and the cache purged, so
     # a GitHub failure here leaves the job red without misreporting either.
     additional_post_steps[0].append(
@@ -2380,6 +2396,7 @@ def _build_release_resource_app_pipeline(
         ol_infra_repo,
         pulumi_resource,
         release_marker_slack,
+        production_tag_slack,
         app_ci_image,  # Needed for CI deployment trigger
         app_rc_image,  # Needed for QA/Prod deployment trigger
         docker_ci_image,
@@ -2444,15 +2461,21 @@ CHECK_PROMOTE_TAG_TASK_NAME = "check-promote-tag"
 
 
 def _promote_tag_task(
-    github_repo: str, release_res: Resource, *, check_only: bool = False
+    github_repo: str,
+    release_res: Resource,
+    *,
+    check_only: bool = False,
+    allow_older: bool = False,
 ) -> TaskStep:
     """Create the release's ``production/<version>`` tag at its release tag.
 
     Retried: re-running finds the tag already at the commit and changes
     nothing. With *check_only* the task runs the script's checks (the release
     tag is there, no newer version has a Production tag, and this version's
-    tag is absent or already at the commit) and creates nothing. See the
-    script's docstring.
+    tag is absent or already at the commit) and creates nothing. With
+    *allow_older* a version older than the newest Production tag (a k8s
+    rollback) is left untagged instead of failing the task. See the script's
+    docstring.
     """
     params = {
         "VERSION_FILE": f"{release_res.name}/version",
@@ -2464,6 +2487,8 @@ def _promote_tag_task(
     }
     if check_only:
         params["CHECK_ONLY"] = "true"
+    if allow_older:
+        params["ALLOW_OLDER"] = "true"
     return TaskStep(
         task=Identifier(
             CHECK_PROMOTE_TAG_TASK_NAME if check_only else PROMOTE_TAG_TASK_NAME
@@ -2477,6 +2502,57 @@ def _promote_tag_task(
             run=Command(path="python3", args=["-c", _PROMOTE_TAG_SCRIPT]),
         ),
     )
+
+
+def _production_tag_slack(app_name: str) -> Resource:
+    """Return the Slack resource the Production tag step alerts on failure."""
+    return slack_notification(
+        name=Identifier(f"slack-alert-{app_name}-production-tag"),
+        url="((eks.slack_url))",
+    )
+
+
+def _production_tag_task(
+    app_name: str, github_repo: str, release_res: Resource, slack_resource: Resource
+) -> TryStep:
+    """Tag a k8s release that reached Production, alerting instead of failing.
+
+    Wrapped in a ``try`` for the same reason as ``_release_marker_task``: the
+    release is live, finished and purged by the time this runs, so a red
+    Production job would read as a failed deploy. It would also withhold the
+    deployment from any job that takes it ``passed:`` this one, such as
+    learn-ai's Production frontend (static_frontend.py). The task's own hooks
+    say what was lost instead: no tag means no API client for this release.
+    Concourse runs them once, after the last attempt.
+    """
+    alert_body = (
+        f"{app_name} ((.:image_tag)) is live in Production and its release"
+        f" finished; the deploy needs nothing. The {PROMOTE_TAG_TASK_NAME} step"
+        f" did not create {PRODUCTION_TAG_PREFIX}<version>, so no API client is"
+        " published for this release. If a newer release has reached Production"
+        " since, do nothing: its tag and client include this one's changes."
+        " Otherwise create the tag by hand at the release tag's commit (the"
+        " release tag is annotated, so use its object's commit sha, not the tag"
+        " sha). Re-running the Production build also works, but it redeploys and"
+        " comments on the release issue again. If the log says the tag already"
+        " names another commit, someone created it by hand: tags are never moved."
+    )
+
+    def alert(outcome: str) -> PutStep:
+        step = notification(
+            resource=slack_resource,
+            title=f"{app_name} deployed to Production; Production tag step {outcome}",
+            body=alert_body,
+            alert_type=outcome,
+        )
+        # As in _release_marker_task: nothing reads the put's implicit get.
+        step.no_get = True
+        return step
+
+    task = _promote_tag_task(github_repo, release_res, allow_older=True)
+    task.on_failure = alert("failed")
+    task.on_error = alert("errored")
+    return TryStep(try_=task)
 
 
 def _build_tag_release_pipeline(app_name: str) -> Pipeline:
