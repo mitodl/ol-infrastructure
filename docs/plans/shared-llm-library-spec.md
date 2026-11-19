@@ -624,10 +624,15 @@ Proposed:
   app, and readers ask for kinds (`list(kinds=...)`, `search(..., kinds=...)`) rather than
   keys.
 - Each note carries its kind; its source, one of `stated` (the learner said it), `observed` (an
-  app saw it happen) or `inferred` (a model concluded it from other notes or evidence); when it
-  was written; when what it describes happened, if that differs; and an optional course tag.
-- Readers reconcile with the kind, source and time in hand, not with a ranking. Within one
-  kind, the newer note replaces the older. Across kinds there is no precedence: a learner's
+  app saw it happen) or `inferred` (a model concluded it from other notes or evidence); a
+  subject, for kinds that hold many notes (e.g. the course and topic of a performance
+  observation); when it was written; when what it describes happened; and an optional course
+  tag. The event time is required, not defaulted: an observed note takes the time of the
+  event, and an inferred note the time of the oldest evidence it used. The consent check
+  (§5.6) depends on it.
+- Readers reconcile with the kind, source and time in hand, not with a ranking. A newer note
+  replaces an older one only when both have the same kind and subject, so observations of
+  different topics accumulate into a profile. Across kinds there is no precedence: a learner's
   stated self-assessment and the observed results that disagree with it are both evidence,
   and the rendering helper (§5.4 item 3) presents them together. A system of record decides
   only the facts it records (an enrollment, a grade), not a preference a learner stated
@@ -637,9 +642,15 @@ Hindsight holds this without a fork. Retain already takes a timestamp, tags and 
 recall returns `mentioned_at` and `occurred_start` and filters by tags (`tags`, `tags_match`)
 and by `temporal_window` (`MemoryItem`, `RecallRequest` and `RecallResult` in hindsight-client
 1.2.1). Kind, source and course become namespaced tags: `kind:<name>`, `source:<source>`,
-`course:<id>`. Tags are not redacted (Memory Defense covers content, context, metadata and
-entities), so every tag value comes from a closed set: kinds and sources from the registry,
-course ids matching the platform's course-key pattern.
+`course:<id>`, plus `run:<id>` on working notes only (§5.8). Tags are not redacted (Memory
+Defense covers content, context, metadata and entities), so every tag value comes from a
+closed set: kinds and sources from the registry, course ids matching the platform's course-key
+pattern, and run ids in the engine's id format. The subject goes in the document id after the
+app prefix, so a note on the same subject replaces the earlier one, and it is built only from
+registry and course values, never learner text, because document ids are not redacted either.
+Hindsight defaults an omitted retain `timestamp` to now and stores none for the string
+`unset` (`RetainRequest.timestamp` in Hindsight's `api/http.py`), so the validator refuses
+both and requires an explicit event time.
 
 That needs extension changes, and widening the write tag scope is not enough on its own.
 `LearnerBankValidator.resolve_write_tag_scope` lets an app write exactly `app:<name>` and no
@@ -649,7 +660,8 @@ pattern; it cannot require the app tag to be present. With `kind:*` allowed, an 
 store a note with no app tag, or retag its own note to drop it, and the note would have no
 writer. So `validate_retain` and the retag path check each item themselves: exactly one app
 tag, equal to the caller's; a kind the registry lists for the caller; the source that kind
-fixes; and a well-formed course id.
+fixes; a well-formed course id; a run id only on the `working` kind; and an explicit event
+time.
 
 ### 5.6 Consent and learner control
 
@@ -664,19 +676,27 @@ Proposed, enforced by the service rather than by each app:
 - One memory record per learner, in the extension's own table keyed on the learner. It holds
   the setting (on or off) and the time of the learner's last clear. It cannot live in the bank
   or the fence table: clear deletes the bank row, and `_raise_fence` prunes expired fence rows
-  so a forgotten learner's id does not outlive the fence.
-- Off refuses writes from every app, service writers included, and stops reads, so apps stop
-  injecting notes a learner asked not to be used. The validator checks it when a request
+  so a forgotten learner's id does not outlive the fence. The platform forget on account
+  deletion deletes the record with the bank, so no id outlives the account; protecting a
+  forgotten learner from writes in flight is the fence's job, and from a restore the deletion
+  ledger's (§5.13).
+- Off refuses writes from every app, service writers included, and stops apps' reads, so apps
+  stop injecting notes a learner asked not to be used. Two reads stay allowed: the
+  learner-facing view below, so a learner can see and delete what is stored while memory is
+  off, and the forget sequence's own operation reads. The validator checks off when a request
   arrives and again when a worker task starts, as it does the fence, because worker tasks
   skip the other checks.
 - Clear runs the forget sequence on the learner's own bank, started with the learner's own
   token from the client that hosts the settings page. Today only the admin client can forget,
   so this is a new, narrow grant. For the hour the fence holds, writes get 409, and apps treat
   that as "skip", not "retry".
-- Every write carries when what it describes happened, and the service refuses a note whose
-  event time is before the learner's last clear. That closes the race for every writer without
-  app-side locks, including session-less writers that never read first: a retried Open edX task
-  or a batch re-derived from old grades cannot bring a cleared observation back.
+- Every write carries its event time (§5.5: required, and for an inferred note the time of
+  its oldest evidence), and the service refuses a note whose event time is before the
+  learner's last clear. That closes the race for every writer without app-side locks,
+  including session-less writers that never read first: a retried Open edX task cannot bring
+  a cleared observation back, and neither can an inference drawn partly from evidence older
+  than the clear. A writer can still lie about the time, so this protects against honest
+  races, not against a compromised writer (§5.7 covers that).
 - One place where a learner sees what is remembered, with each note's writer, kind and time,
   and deletes single notes whatever app wrote them. mit-learn's dashboard is the natural host.
   This needs a learner-scoped delete across app tags, which the validator does not allow
@@ -711,7 +731,11 @@ there into every app's prompts.
   up.
 - A platform operation that deletes every note one app wrote, across every bank, run by the
   platform. Detection alone does not recover from a leaked writer secret: the admin client is
-  limited to forgetting whole learners, and no other app can touch the writer's notes.
+  limited to forgetting whole learners, and no other app can touch the writer's notes. The
+  operation runs in order: disable the client in Keycloak and in `hindsight:app_clients`;
+  refuse that app's queued tasks when a worker starts them, since worker tasks skip every
+  check but the fence and the learner's setting; wait for its processing tasks to drain; then
+  delete. Purging first would let retains already queued land afterwards.
 
 How an Open edX user maps to a Keycloak user id is unverified and differs by deployment.
 edxapp runs for mitxonline, MITx residential, MITx staging and xPro (one
@@ -775,11 +799,19 @@ Proposed, for working memory:
 
 - A run acting for a learner keeps its working memory in that learner's bank, as a `working`
   kind tagged with the run id. Isolation, off, clear and forget are then the learner's, with
-  no new bank type. The run deletes those notes when it ends, and a sweep deletes any older
-  than a fixed TTL, for runs that crash.
+  no new bank type. Working notes hold intermediate results, including tool output such as
+  fetched pages, so they are not memory for anyone else: a read returns them only to a caller
+  that names their run id, and every other read (an app's `list` or `search`, a load-all
+  prompt) leaves them out. The validator enforces that, not the readers. The run deletes its
+  notes when it ends, and a sweep deletes any older than a fixed TTL, for runs that crash. The
+  sweep crosses every learner bank, so it is one more platform principal, limited the way the
+  forget job is (it lists bank ids and deletes only `working` notes).
 - A run acting for itself keeps working memory in a bank of its own (`a-<app>-<run>`),
   reachable only by the service client that created it, deleted at the end of the run or by
-  the same sweep. It holds no learner content.
+  the same sweep. Nothing enforces that it holds no learner content, and staff tooling (support
+  tickets, cohort analysis) is where learner content turns up, while forget and clear never
+  reach `a-` banks. So until that is designed (§5.13), an autonomous run that handles learner
+  content does not keep working memory in Hindsight.
 - The content rule applies to working memory as to any note.
 
 The gateway (`llm-gateway-requirements.md`) is still evaluated, at unchanged priority. If one
@@ -1275,9 +1307,10 @@ owner decides it. Each open item names where it is tracked.
    `tk-open-edx-writes-learner-performance-observations-efd73d`.
 8. Autoscaling, the API and worker split, and a service SLO (§5.8), on
    `tk-autoscale-the-hindsight-memory-service-and-size--7222ae`.
-9. Agent principals: fresh learner tokens for runs longer than 300 s, and working memory for
-   delegated and autonomous runs (§5.8). Tied to the durable execution evaluation
-   (`tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78`).
+9. Agent principals: fresh learner tokens for runs longer than 300 s, the run-id read rule and
+   the cross-bank sweep for delegated runs' working notes, and how an autonomous run's `a-`
+   bank is kept free of learner content or reached by forget (§5.8). Tied to the durable
+   execution evaluation (`tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78`).
 10. Conversation retention and per-learner deletion in learn-ai, and the forget job reaching
     conversations (§5.9). Retention waits on the data-handling policy
     (`llm-usage-policies-spec.md` §3); no task covers learn-ai's per-learner delete yet.
@@ -1290,7 +1323,8 @@ owner decides it. Each open item names where it is tracked.
 13. A restore resurrects forgotten learners. In the PoC, `hindsight-admin` restore brought back
     a learner forgotten after the backup, and an RDS snapshot restore would do the same. Forget
     needs a permanent deletion ledger replayed after any restore, which does not exist. No task
-    yet.
+    yet. The ledger also has to cover the per-learner consent record (§5.6), which the forget
+    deletes with the bank.
 14. Hindsight fixes the vector column to the model's dimension once a bank holds data, so
     changing the embedding model means re-embedding every bank through export and import,
     which is untested (`tk-test-hindsight-export-import-re-embedding-before-1f636a`).
