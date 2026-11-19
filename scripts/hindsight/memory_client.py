@@ -1,6 +1,6 @@
 """The learner-scoped get/put/search/delete interface over the Hindsight API.
 
-The shape ol-llm exposes (shared-llm-library-spec.md section 5.3), kept here
+The shape ol-llm exposes (shared-llm-library-spec.md section 5.4 item 7), kept here
 as the tests' client. A learner has one bank, shared by every app; each note
 is stamped with the app that wrote it, and its key is its document id, so
 ``put`` with an existing key replaces the note.

@@ -9,7 +9,7 @@ decision task and stays Proposed until the decision is recorded here.
 | §2 Packaging, home, footprint | `tk-decide-the-shared-library-s-packaging-home-repo--451af4` | Decided: home 2026-09-11 (`mitodl/ol-llm`); SDK-based Opik integration and translation-plugin adoption 2026-10-01 (§2.3) |
 | §3 Error contract | `tk-policy-error-contract-for-llm-calls-d27bd1` | Decided 2026-09-11 |
 | §4 Attribution schema | `tk-define-the-attribution-schema-shared-by-gateway--d6f26b` | Decided 2026-10-01, with a platform-wide key for anonymous ids (§4.3) |
-| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange. Scope revised 2026-11-19: memory holds what apps learn from interactions, not data with a system of record, and Hindsight is the substrate for agentic workloads; the note contract, consent and the session-less grant are proposed (§5.12, §5.13) |
+| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange. Scope revised 2026-11-19: memory holds what apps learn from interactions, not data with a system of record, and Hindsight is the substrate for agentic workloads; the note contract, consent, the session-less grant and agent working memory are proposed (§5.5 to §5.8; decisions in §5.12, open items in §5.13) |
 | §6 Call contract | `tk-specify-the-library-s-call-contract-timeouts-ret-badb39` | Specified 2026-10-01 from the §3 decision |
 | §7 Durable execution | `tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78` | Direction set 2026-10-01; nothing decided |
 | §8 LLMOps backend portability | `tk-record-the-llmops-portability-decision-as-shared-478015` | Decided 2026-11-12; amends §2.3 item 1, §4.1, and the lifecycle spec's §2.3 item 5, §3 items 1, 3 and 4, and §5.1 item 8 |
@@ -537,7 +537,10 @@ memory would be a `u-<sub>` bank like any learner's, since the bank keys on the 
 General memory has no writer and no definition of its contents. The examples the 2026-10-16
 decision gave, product and course facts, already have a system of record in the catalog, so
 under §5.1 they are context, not memory. General memory stays unused until a use case in §5.3
-needs something no system of record holds.
+needs something no system of record holds. Every app reads every general bank, so nothing
+derived from a learner's interactions is ever written to one, and no code acting on a
+learner's request holds the general grant. Otherwise one learner's injected text would reach
+every learner's prompt.
 
 ### 5.3 Use cases
 
@@ -549,6 +552,7 @@ Production. A new row also registers the note kinds it writes (§5.5).
 | Recommendation, syllabus and video bots remember what a learner tells them | learn-ai | Stated preference, instruction | The learner's request: a gate call, then a rewrite call, through ol-llm | All of the learner's notes, ahead of the system prompt | learn-ai#201, back in draft until this revision settles |
 | The tutor personalizes instruction | learn-ai | Reads performance observations and knowledge state | Open: see the state column | The learner's notes for the course | mbertrand ruled on 2026-11-17 that the tutor never writes, because problem text and answers appear in tutor chats. The 2026-11-19 content rule (§5.4 item 2) allows derived observations, so the ruling goes back to him |
 | A knowledge profile from graded work | Open edX | Performance observation | Server-side grading, with no Keycloak session | | `tk-open-edx-writes-learner-performance-observations-efd73d`, blocked on this revision and the session-less grant (§5.7) |
+| Knowledge state | Unassigned | Knowledge state | | The tutor and recommendation bots | No producer. Hindsight's consolidation is a candidate, but its output does not fit the note contract yet (§5.8, condition 6) |
 | Behavioral records | ol-data-platform | To be decided per item | Batch jobs | | Named as a writer on 2026-10-20. Aggregates of records the warehouse holds are context under §5.1; only inferences that exist nowhere else belong in memory |
 | Enrollments | mitxonline | None | | | Named as a possible writer on 2026-10-20. Enrollments are context (§5.1), so mitxonline does not write memory |
 | Profile and onboarding fields | mit-learn | None | | | mit-learn#4326 writes them as notes, in QA only; being removed under §5.1 |
@@ -568,9 +572,12 @@ Production. A new row also registers the note kinds it writes (§5.5).
    read from it, not stored. Observations derived from performance are allowed, so bots such
    as the tutor can personalize instruction: "misses base cases on recursion problems" is a
    note, and the problem and the learner's answer are not. The library provides the
-   enforcement point (the gate) and its evaluation cases. Neither is built: nothing in
+   enforcement point (the gate) and its evaluation cases, and the gate runs in ol-llm's `put`,
+   so service writers (§5.7) pass it as apps do. Neither is built: nothing in
    `python/src/ol_llm` implements the rule at ol-llm 31e03d2, and learn-ai#201's gate is
-   learn-ai's own prompt. Whether performance observations are education records under
+   learn-ai's own prompt. A derivation call treats problem text as untrusted input, since
+   course authors write it, and instructions in a problem must not come out as an
+   observation. Whether performance observations are education records under
    institutional policy is a question for the owners of the data-handling policy
    (`llm-usage-policies-spec.md` §3), and no Open edX write reaches Production before it is
    answered.
@@ -579,13 +586,23 @@ Production. A new row also registers the note kinds it writes (§5.5).
    delimited data carrying their writer, kind and time, never as instructions, and a reader
    chooses which kinds it loads. The rendering helper is not built.
 4. Memory reaches traces. Notes injected into prompts appear in trace content, so
-   `include_content` and Opik access and retention follow the data-handling policy.
-5. Forget is one call and complete. A supported backend deletes everything for one learner in
-   one call, reaching every store it wrote to, and neither work in flight nor a restore brings
-   it back (the restore gap is open, §5.13). The forget runs on the platform, not in an app
-   (decided 2026-11-13, §5.11).
+   `include_content` and Opik access and retention follow the data-handling policy. A
+   derivation call's input is worse: it holds the problem and the learner's answer, which the
+   content rule keeps out of memory. `include_content` is one setting per process in ol-llm
+   (`include_content()` in `python/src/ol_llm/tracing.py`), so a derivation runs in a process
+   with content off, or under a per-use-case override that does not exist yet.
+5. Forget is one call and complete. That is the requirement: a supported backend deletes
+   everything for one learner in one call, reaching every store it wrote to, and work in
+   flight does not bring it back. The forget runs on the platform, not in an app (decided
+   2026-11-13, §5.11). Two gaps are known and open (§5.13): a restore brings forgotten
+   learners back, and neither forget nor clear reaches trace content in Opik, which follows
+   Opik's own retention.
 6. Identity matches §4. Memory is keyed on the Keycloak user id from the authenticated token,
-   never from a request body or model output.
+   never from a request body or model output. There are two exceptions, both service
+   identities and never an app acting on a learner's request: the platform forget (§5.11)
+   and the session-less write grant (§5.7). Each names the learner in the request, so the id
+   it sends must come from an authoritative identity join, never a heuristic match or model
+   output.
 7. One interface, with a contract. The interface (put, get, search, delete and list for apps;
    forget for the platform) keeps call sites independent of the backend, and §5.5 defines what
    a note carries so readers do not depend on other apps' key names.
@@ -602,25 +619,37 @@ Proposed:
 
 - A registry of note kinds in ol-llm, one data file like the model catalog. Each entry names
   the kind, the apps allowed to write it, what it means, its source, whether it takes a course
-  tag, and a length limit. `put` refuses a kind the registry does not list for the writing app,
-  and readers ask for kinds (`list(kinds=...)`, `search(..., kinds=...)`) rather than keys.
+  tag, a length limit, and a retention. The kind fixes the source, so a writer cannot label
+  its own output `stated`. `put` refuses a kind the registry does not list for the writing
+  app, and readers ask for kinds (`list(kinds=...)`, `search(..., kinds=...)`) rather than
+  keys.
 - Each note carries its kind; its source, one of `stated` (the learner said it), `observed` (an
   app saw it happen) or `inferred` (a model concluded it from other notes or evidence); when it
   was written; when what it describes happened, if that differs; and an optional course tag.
-- One platform rule resolves conflicts, instead of per-app prompt text: context from a system
-  of record beats any note; within a kind, `stated` beats `observed`, which beats `inferred`,
-  and newer beats older.
+- Readers reconcile with the kind, source and time in hand, not with a ranking. Within one
+  kind, the newer note replaces the older. Across kinds there is no precedence: a learner's
+  stated self-assessment and the observed results that disagree with it are both evidence,
+  and the rendering helper (§5.4 item 3) presents them together. A system of record decides
+  only the facts it records (an enrollment, a grade), not a preference a learner stated
+  since.
 
 Hindsight holds this without a fork. Retain already takes a timestamp, tags and metadata;
 recall returns `mentioned_at` and `occurred_start` and filters by tags (`tags`, `tags_match`)
 and by `temporal_window` (`MemoryItem`, `RecallRequest` and `RecallResult` in hindsight-client
 1.2.1). Kind, source and course become namespaced tags: `kind:<name>`, `source:<source>`,
-`course:<id>`. That does need an extension change. `LearnerBankValidator.resolve_write_tag_scope`
-lets an app write exactly `app:<name>` and no other tag
-(`applications/hindsight/ol_memory_ext/__init__.py:652-665`), so it has to accept the
-registry's namespaced tags beside the app tag while still refusing another app's tag. Memory
-Defense redacts metadata values, so the contract keeps kind and source in tags rather than
-metadata.
+`course:<id>`. Tags are not redacted (Memory Defense covers content, context, metadata and
+entities), so every tag value comes from a closed set: kinds and sources from the registry,
+course ids matching the platform's course-key pattern.
+
+That needs extension changes, and widening the write tag scope is not enough on its own.
+`LearnerBankValidator.resolve_write_tag_scope` lets an app write exactly `app:<name>` and no
+other tag (`applications/hindsight/ol_memory_ext/__init__.py:652-665`). Hindsight's check,
+`tags_writable` in `engine/search/tags.py`, only requires every tag to match some allowed
+pattern; it cannot require the app tag to be present. With `kind:*` allowed, an app could
+store a note with no app tag, or retag its own note to drop it, and the note would have no
+writer. So `validate_retain` and the retag path check each item themselves: exactly one app
+tag, equal to the caller's; a kind the registry lists for the caller; the source that kind
+fixes; and a well-formed course id.
 
 ### 5.6 Consent and learner control
 
@@ -632,15 +661,22 @@ no conditional write. Every other writer would need the same lock.
 
 Proposed, enforced by the service rather than by each app:
 
-- One memory setting per learner (on or off), held by the memory service and checked by the
-  validator on every retain. Off refuses writes from every app, service writers included.
-  Reads still return what exists until the learner clears it.
+- One memory record per learner, in the extension's own table keyed on the learner. It holds
+  the setting (on or off) and the time of the learner's last clear. It cannot live in the bank
+  or the fence table: clear deletes the bank row, and `_raise_fence` prunes expired fence rows
+  so a forgotten learner's id does not outlive the fence.
+- Off refuses writes from every app, service writers included, and stops reads, so apps stop
+  injecting notes a learner asked not to be used. The validator checks it when a request
+  arrives and again when a worker task starts, as it does the fence, because worker tasks
+  skip the other checks.
 - Clear runs the forget sequence on the learner's own bank, started with the learner's own
   token from the client that hosts the settings page. Today only the admin client can forget,
-  so this is a new, narrow grant.
-- A generation number per bank that clear increments. A write carries the generation its
-  request read when it began, and the service refuses a stale one. That closes the race for
-  every writer without app-side locks.
+  so this is a new, narrow grant. For the hour the fence holds, writes get 409, and apps treat
+  that as "skip", not "retry".
+- Every write carries when what it describes happened, and the service refuses a note whose
+  event time is before the learner's last clear. That closes the race for every writer without
+  app-side locks, including session-less writers that never read first: a retried Open edX task
+  or a batch re-derived from old grades cannot bring a cleared observation back.
 - One place where a learner sees what is remembered, with each note's writer, kind and time,
   and deletes single notes whatever app wrote them. mit-learn's dashboard is the natural host.
   This needs a learner-scoped delete across app tags, which the validator does not allow
@@ -660,13 +696,22 @@ Proposed: build the service grant in `tk-grant-for-services-to-write-per-learner
 held tightly, since a leaked writer secret could put text into any learner's memory and from
 there into every app's prompts.
 
-- One service-account client per writer, its secret held only by that writer.
+- One service-account client per writer and per deployment (each edxapp deployment gets its
+  own), its secret held only by that writer.
 - Retain only, under the writer's own app tag and document-id prefix, and only for the kinds
-  the registry lists for that writer.
-- The learner's memory setting (§5.6) and the forget fence apply unchanged, so off and clear
+  the registry lists for that writer. Writes go through ol-llm's `put`, so they pass the gate
+  (§5.4 item 2).
+- The learner id comes from an authoritative identity join, never a heuristic match (§5.4
+  item 6). A wrong join writes one learner's observations into another learner's memory, and
+  the service cannot tell.
+- The learner's memory record (§5.6) and the forget fence apply unchanged, so off and clear
   hold against service writes too.
-- A per-client write rate limit and per-client counts on `/metrics`, so a runaway or leaked
-  writer shows up.
+- A per-client write rate limit kept in shared state (Postgres), so it does not multiply as
+  the API scales out, and per-client counts on `/metrics`, so a runaway or leaked writer shows
+  up.
+- A platform operation that deletes every note one app wrote, across every bank, run by the
+  platform. Detection alone does not recover from a leaked writer secret: the admin client is
+  limited to forgetting whole learners, and no other app can touch the writer's notes.
 
 How an Open edX user maps to a Keycloak user id is unverified and differs by deployment.
 edxapp runs for mitxonline, MITx residential, MITx staging and xPro (one
@@ -705,19 +750,37 @@ scoped rule (§5.4 item 1), a use case may turn one on when all of these hold:
    and the two-phase forget reach it, shown by a case in `scripts/hindsight/test_isolation.py`
    before the feature is enabled.
 5. It runs only on the caller's own bank. No feature reads across learners.
+6. Its output fits the note contract (§5.5) and passes the content rule (§5.4 item 2). Today
+   consolidation does not: in the default combined mode an observation takes the tags of the
+   notes it came from (`_resolve_obs_tags_list` in Hindsight's
+   `engine/consolidation/consolidator.py`), so a model-merged inference would read as
+   `kind:performance-observation` with `source:observed`. It needs its output labelled as
+   knowledge state with `source:inferred`, and an evaluation of that output, before it is
+   enabled. Background consolidation also runs outside any app's request, so its model calls
+   need attribution other than the calling app.
 
 MCP stays off until it sits behind the same tenant extension as the HTTP API, because
-Hindsight's MCP endpoint is unauthenticated by default (§5.10).
+Hindsight's MCP endpoint is unauthenticated by default (§5.10). Agents will want it, so it is
+an open item (§5.13), not a settled refusal.
 
 Agent principals. An agent acting for a learner uses the learner's exchanged token, as an app
 does. Exchanged tokens last 300 s, so a run longer than that needs a way to get a fresh one
 without the learner present. That depends on the durable execution engine (§7) and is open.
 An agent acting for itself (back-office or staff tooling) uses a service identity and its own
-app tag, and reaches a learner bank only through the session-less grant (§5.7).
+app tag and never writes to a learner's bank. The session-less grant (§5.7) is for named
+writers with an identity join, not for an agent that picks a learner from its own reasoning,
+where injected input could steer the write into another learner's memory.
 
-Proposed: an agent run's working memory lives in a bank of its own (`a-<app>-<run>`), deleted
-when the run ends or after a fixed TTL, so it never mixes with a learner's long-term memory.
-Anything worth keeping is written to the learner's bank as a registered kind.
+Proposed, for working memory:
+
+- A run acting for a learner keeps its working memory in that learner's bank, as a `working`
+  kind tagged with the run id. Isolation, off, clear and forget are then the learner's, with
+  no new bank type. The run deletes those notes when it ends, and a sweep deletes any older
+  than a fixed TTL, for runs that crash.
+- A run acting for itself keeps working memory in a bank of its own (`a-<app>-<run>`),
+  reachable only by the service client that created it, deleted at the end of the run or by
+  the same sweep. It holds no learner content.
+- The content rule applies to working memory as to any note.
 
 The gateway (`llm-gateway-requirements.md`) is still evaluated, at unchanged priority. If one
 is adopted, Hindsight's model calls can route through it; nothing here waits on it.
@@ -728,10 +791,12 @@ Conversation state holds more learner content than memory will. learn-ai's check
 full prompts and replies (`DjangoCheckpoint` and `DjangoCheckpointWrite` in
 `ai_chatbots/models.py`). Its cleanup task deletes anonymous sessions older than
 `AI_CHATBOTS_SESSION_EXPIRY_DAYS`, and search-summary sessions with no follow-up after 7 days;
-an authenticated learner's sessions are never deleted (`delete_stale_sessions` in
+it never deletes an authenticated learner's sessions by age (`delete_stale_sessions` in
 `ai_chatbots/tasks.py`, learn-ai 40932de). The expiry is 36,500 days in Production
-(`applications/learn_ai/Pulumi.Production.yaml:20`). Nothing deletes one learner's
-conversations when their account is deleted.
+(`applications/learn_ai/Pulumi.Production.yaml:20`). A learner's sessions go only if their
+learn-ai user row is deleted, since `UserChatSession.user` cascades
+(`ai_chatbots/models.py`). Whether deleting an account in Keycloak, or through learn-ai's SCIM
+endpoint, deletes that row has not been checked.
 
 Proposed: conversation retention and per-learner deletion come before any new memory writer
 goes to Production. The forget job (§5.11) also removes the learner's conversations in each app
@@ -1185,18 +1250,21 @@ Decided by the project owner:
 
 ### 5.13 Open, with owners
 
-Proposals in §5.4 to §5.9 stay proposals until the owner decides them; each open item names
-where it is tracked.
+What §5.12 records is decided. Everything else in §5.4 to §5.9 (the gate placement, the
+derivation trace rule, and all of §5.5 to §5.8 marked "proposed") stays a proposal until the
+owner decides it. Each open item names where it is tracked.
 
 1. The note contract: the kind registry in ol-llm, the new `Note` fields and kind filters, and
-   the `resolve_write_tag_scope` change in `ol_memory_ext` (§5.5). No task yet.
+   the validator checks in `ol_memory_ext` (§5.5). No task yet.
 2. The gate, its evaluation cases, and the note rendering helper in ol-llm (§5.4 items 2 and
-   3). Item 2 of `tk-bring-rfc-13314-s-learner-memory-onto-the-shared-853c25` covers the gate;
-   nothing covers rendering yet.
-3. Consent enforced by the service: the per-learner setting, learner-started clear, the
-   generation check, and the learner-facing view (§5.6). Whether memory is on by default or
-   opt-in needs a privacy review. No task yet.
-4. The session-less write grant, with the limits in §5.7
+   3), plus content off for derivation calls (§5.4 item 4). Item 2 of
+   `tk-bring-rfc-13314-s-learner-memory-onto-the-shared-853c25` covers the gate; nothing
+   covers rendering or the derivation trace setting yet.
+3. Consent enforced by the service: the per-learner record, off stopping reads and writes,
+   learner-started clear, the event-time check against the last clear, and the learner-facing
+   view (§5.6). Whether memory is on by default or opt-in needs a privacy review. No task yet.
+4. The session-less write grant, with the limits in §5.7, including the platform operation
+   that deletes every note one app wrote
    (`tk-grant-for-services-to-write-per-learner-memory-w-f03a14`).
 5. Whether performance observations are education records under institutional policy (§5.4
    item 2), for the owners of the data-handling policy
@@ -1207,8 +1275,8 @@ where it is tracked.
    `tk-open-edx-writes-learner-performance-observations-efd73d`.
 8. Autoscaling, the API and worker split, and a service SLO (§5.8), on
    `tk-autoscale-the-hindsight-memory-service-and-size--7222ae`.
-9. Agent principals: fresh learner tokens for runs longer than 300 s, and run-scoped agent
-   banks (§5.8). Tied to the durable execution evaluation
+9. Agent principals: fresh learner tokens for runs longer than 300 s, and working memory for
+   delegated and autonomous runs (§5.8). Tied to the durable execution evaluation
    (`tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78`).
 10. Conversation retention and per-learner deletion in learn-ai, and the forget job reaching
     conversations (§5.9). Retention waits on the data-handling policy
@@ -1230,6 +1298,20 @@ where it is tracked.
     1 s left and the exchange then fails. learn-ai's route sets 60 s
     (`FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS`, `applications/learn_ai/definition.py:361`);
     any other app that exchanges a forwarded token needs the same before it writes.
+16. Retention for memory notes. Each kind gets a retention in the registry (§5.5); without one,
+    performance observations accumulate for every graded problem and a load-all reader's
+    prompt grows without bound. Nothing sets one yet; ties to the data-handling policy.
+17. Trace content outside forget and clear. Notes rendered into prompts, and derivation inputs
+    if content is on, stay in Opik after a learner is forgotten (§5.4 items 4 and 5). Opik
+    retention for these traces belongs to the data-handling policy
+    (`tk-policy-data-handling-and-retention-for-prompts-c-76830f`).
+18. Turning on Hindsight's server-side features: the first one needs a §5.3 row and must meet
+    the six conditions in §5.8; consolidation fails the sixth today. Whether Hindsight's pod
+    exports OTel spans anywhere (cluster-wide injection was not checked) decides condition 3.
+19. MCP for agents, behind the tenant extension (§5.8). No task yet.
+20. What general memory is for (§5.2), and which of the data platform's records, if any, are
+    memory rather than context (§5.3). Decided when a use case or the data platform's work
+    starts.
 
 ## 6. Call contract
 
