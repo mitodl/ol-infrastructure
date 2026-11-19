@@ -517,11 +517,13 @@ async def _release_status_line(name, cfg, issues: list[dict[str, Any]]) -> str:
     # A release branch outliving its production deploy means the finish
     # step never completed. That used to be invisible -- and it froze the
     # release version until someone noticed -- so report it here.
+    in_flight_failed = False
     try:
         in_flight = await github.in_flight_release(cfg.repo)
     except Exception:
         log.exception("Failed to fetch in-flight release for %s", name)
         in_flight = None
+        in_flight_failed = True
     issue = issues[0] if issues else None
     issue_text = ""
     if issue is None:
@@ -534,16 +536,19 @@ async def _release_status_line(name, cfg, issues: list[dict[str, Any]]) -> str:
             issue_text += f" ({checked}/{total} checked)"
         issue_text += _release_state_suffix(issue)
         status = f"🟡 {issue_text}"
+    if in_flight_failed:
+        # Not "nothing in flight": a stuck release would be hidden.
+        return f"{status} · ⚠️ could not check for an in-flight release"
     if not in_flight:
         return status
     in_flight_text = f"🚧 in flight: {_describe_in_flight(in_flight)}"
     version = in_flight["version"]
-    # The title names the version, except the legacy bare `Release <app>`
-    # title, whose version is only in the checklist header.
-    if issue is not None and version in (
-        _gate_version(issue["title"]),
-        github.extract_version(issue["body"]),
-    ):
+    # Match on the checklist header, not the title. Versioned and legacy bare
+    # `Release <app>` issues both carry `## Release <version>`. An
+    # infrastructure-only gate has no checklist, but its title can name the
+    # in-flight version: a release stuck after Production, re-gated by an
+    # infra merge. That gate is not the release's own issue.
+    if issue is not None and github.extract_version(issue["body"]) == version:
         return f"{status} · {in_flight_text}"
     return await _unmatched_in_flight_status(
         name, cfg, version, status, in_flight_text, issue_text
@@ -583,12 +588,16 @@ async def _unmatched_in_flight_status(  # noqa: PLR0913
             f"<{release_issue['url']}|its release issue>"
             + (f" ({state})" if state else "")
         )
+    # A miss is not proof that QA has yet to open it: the lookup scans only
+    # the newest issues, so a long-stuck release's issue can fall outside it.
+    # Say what was found, and the usual reason, without asserting it.
     pending = (
-        f"{in_flight_text} · no release issue yet: QA opens one after deploying it"
+        f"{in_flight_text} · no release issue found for it"
+        " (QA opens one after deploying a release)"
     )
     if not issue_text:
         return pending
-    return f"{pending}, superseding {issue_text}"
+    return f"{pending} · open: {issue_text}"
 
 
 # How release-status describes each label-derived state of a release issue.

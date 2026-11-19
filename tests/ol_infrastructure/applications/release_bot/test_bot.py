@@ -624,8 +624,8 @@ async def test_release_status_explains_a_cut_release_waiting_for_its_issue(
     said = slack.said
     assert "2026.11.18.2>" in said
     assert said.endswith(
-        "no release issue yet: QA opens one after deploying it, superseding "
-        "<https://github.com/mitodl/my-app/issues/7|"
+        "no release issue found for it (QA opens one after deploying a release)"
+        " · open: <https://github.com/mitodl/my-app/issues/7|"
         "Release my-app infrastructure @ 2026.11.16.1>"
     )
     assert "🟡" not in said
@@ -662,7 +662,7 @@ async def test_release_status_keeps_the_superseded_issue_s_progress_and_state(
     )
 
     assert slack.said.endswith(
-        "superseding <https://github.com/mitodl/my-app/issues/6|"
+        "open: <https://github.com/mitodl/my-app/issues/6|"
         "Release my-app 2026.11.16.1> (1/2 checked) · ⛔ refused by Production"
     )
 
@@ -701,7 +701,91 @@ async def test_release_status_links_the_in_flight_release_s_closed_issue(
         "<https://github.com/mitodl/my-app/issues/9|its release issue>"
         " (taken by Production)"
     )
-    assert "no release issue yet" not in said
+    assert "no release issue found" not in said
+
+
+async def test_release_status_does_not_take_a_same_version_infra_gate_for_the_release(
+    repos, slack, monkeypatch
+):
+    """A release stuck after Production, re-gated by an infrastructure merge.
+
+    The infra gate's title names the in-flight version, but it is not the
+    release's own issue, so that issue is still looked up and linked.
+    """
+    gate = {**_INFRA_GATE, "title": "Release my-app infrastructure @ 2026.11.18.2"}
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[gate])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    lookup = AsyncMock(
+        return_value={
+            "url": "https://github.com/mitodl/my-app/issues/9",
+            "labels": ["ops:release", "ops:consumed"],
+        }
+    )
+    monkeypatch.setattr(bot.github, "release_issue_for_version", lookup)
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    lookup.assert_awaited_once()
+    assert slack.said.endswith(
+        "<https://github.com/mitodl/my-app/issues/9|its release issue>"
+        " (taken by Production)"
+    )
+
+
+@pytest.mark.parametrize("issues", [[], [_INFRA_GATE]])
+async def test_release_status_flags_a_failed_in_flight_check(
+    repos, slack, monkeypatch, issues
+):
+    """A failed branch lookup must not read as nothing in flight."""
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=issues)
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(side_effect=RuntimeError("GitHub is down")),
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert slack.said.endswith(" · ⚠️ could not check for an in-flight release")
+
+
+async def test_release_status_falls_back_when_the_issue_lookup_fails(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_INFRA_GATE])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "release_issue_for_version",
+        AsyncMock(side_effect=RuntimeError("GitHub is down")),
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    said = slack.said
+    assert "🟡 <https://github.com/mitodl/my-app/issues/7|" in said
+    assert "no release issue found" not in said
+    assert "🚧 in flight: " in said
 
 
 @pytest.mark.parametrize(
