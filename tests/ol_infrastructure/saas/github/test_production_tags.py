@@ -73,7 +73,10 @@ def test_only_the_release_bot_and_org_owners_may_write_them():
     assert inputs["target"] == "tag"
     assert inputs["enforcement"] == "active"
     assert inputs["conditions"]["refName"] == {
-        "includes": [f"refs/tags/{PRODUCTION_TAG_PREFIX}*"],
+        "includes": [
+            f"refs/tags/{PRODUCTION_TAG_PREFIX.rstrip('/')}",
+            f"refs/tags/{PRODUCTION_TAG_PREFIX}**/*",
+        ],
         "excludes": [],
     }
     assert inputs["rules"] == {"creation": True, "update": True, "deletion": True}

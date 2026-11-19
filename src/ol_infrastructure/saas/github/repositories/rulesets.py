@@ -391,7 +391,15 @@ def build_production_tags(repo: dict[str, Any], repository: github.Repository) -
         bypass_actors=_PRODUCTION_TAGS_BYPASS,
         conditions=github.RepositoryRulesetConditionsArgs(
             ref_name=github.RepositoryRulesetConditionsRefNameArgs(
-                includes=[f"refs/tags/{PRODUCTION_TAG_PREFIX}*"],
+                # The bare tag too: git cannot hold both refs/tags/production and
+                # refs/tags/production/<version>, so an unprotected `production`
+                # tag would block every Production tag. `**/` matches zero or
+                # more directories (File.fnmatch with FNM_PATHNAME), so the second
+                # entry covers production/<version> and anything nested under it.
+                includes=[
+                    f"refs/tags/{PRODUCTION_TAG_PREFIX.rstrip('/')}",
+                    f"refs/tags/{PRODUCTION_TAG_PREFIX}**/*",
+                ],
                 excludes=[],
             ),
         ),
