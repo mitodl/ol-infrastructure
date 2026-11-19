@@ -246,11 +246,12 @@ def build(repo: dict[str, Any]) -> github.Repository:
     # and only a 403 "archived" response is treated as already gone. Confirmed against
     # archived edx-api-client on 2026-10-26. Dropping the resource from state loses
     # nothing, because GitHub will not let security updates be on while alerts are
-    # off. A third way out, deleting the repo's file from data/repos/, leaves alerts
-    # on, and retaining then leaves security updates as they are, which matches the
-    # `Repository` retain policy above. The option has to be in state before a delete
-    # can use it, so it ships ahead of the PR that archives the repos that still carry
-    # this resource.
+    # off. A third way out, deleting the repo's file from data/repos/, also deletes
+    # `mitodl-repo-vulnerability-alerts-<repo>`, which is not retained: its delete
+    # turns alerts off, so security updates end up off on that path too. The option
+    # only takes effect once it is in state, so a resource has to go through one
+    # deploy with it before it is dropped. (The 11-repo archive in #6656 merged before
+    # this did; none of its repos still has this resource in state.)
     if repo.get("vulnerability_alerts"):
         github.RepositoryDependabotSecurityUpdates(
             f"mitodl-repo-dependabot-security-updates-{name}",
