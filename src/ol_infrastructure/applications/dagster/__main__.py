@@ -3620,6 +3620,20 @@ dagster_helm_values = {
                 "value": "120",
             },
             {
+                # Without this, an asset backfill evaluated while its code
+                # location is unloadable fails and cancels every queued run. With
+                # it, the daemon skips that tick and resumes once the location
+                # loads again (dagster _core/execution/asset_backfill.py,
+                # _check_validity_of_asset_backfill_data_and_should_process_backfill).
+                # A real definition change with every location loaded still
+                # fails. A deploy restarts the daemon and the locations together,
+                # which multi_replica_locations doesn't cover: the 3,298 queued
+                # runs of a Learn embeddings backfill were canceled that way on
+                # 2026-11-19.
+                "name": "DAGSTER_BACKFILL_RETRY_DEFINITION_CHANGED_ERROR",
+                "value": "true",
+            },
+            {
                 # A run status sensor processes at most this many runs per tick,
                 # and run_failure_notification_sensor sets
                 # monitor_all_code_locations=True, which pins its *fetch* limit
