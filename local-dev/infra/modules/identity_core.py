@@ -191,9 +191,16 @@ def create_identity_core(  # noqa: PLR0913
                 {"name": "spi-email-smtp-ssl", "value": "false"},
                 {"name": "spi-email-smtp-starttls", "value": "false"},
             ],
+            # Without a CPU request Keycloak gets the smallest CPU share on its
+            # node and the gateway's 3s token exchange times out whenever the
+            # LMS or Studio is busy. The default liveness tolerance (3 misses of
+            # a 1s check) then restarts it under the same load, and a restart
+            # costs ~1.5 cores and every sign-in until it is back.
             "resources": {
+                "requests": {"cpu": "500m", "memory": "1700Mi"},
                 "limits": {"memory": "2Gi"},
             },
+            "livenessProbe": {"periodSeconds": 10, "failureThreshold": 12},
             "env": [
                 # Image has OTel compiled in at build time. Without a
                 # receiver, SDK init timeouts destabilise the pod.
