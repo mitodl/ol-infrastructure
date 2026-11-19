@@ -4,7 +4,7 @@
 # mitodl/learn-ai-app image runs (latest, or the prebuilt_tags pin).
 # With a checkout it also serves the sandbox (frontend-demo); see sandbox.yaml.
 
-load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain", "prebuilt_image_tags_env")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "learn-ai")
@@ -81,13 +81,15 @@ k8s_resource(
 # rendered by local-dev/apps/learn-ai/pulumi (pulumi up as a custom deploy).
 # The apply timeout this resource needs (its apply includes the migrate Job)
 # is session-wide, so the root Tiltfile sets it.
-prebuilt_tags = os.environ.get('LOCAL_DEV_PREBUILT_IMAGE_TAGS', '')
+prebuilt_tags = prebuilt_image_tags_env(IMAGE)
 k8s_custom_deploy(
     DEPLOY_NAME,
     apply_cmd=[APPLY, 'learn-ai', 'up'],
     delete_cmd=[APPLY, 'learn-ai', 'down'],
     # The pin and the root domain reach the program through the environment;
     # naming them here makes a change re-apply, which os.putenv alone would not.
+    # Only this app's pin is passed, so toggling another pinned app does not
+    # re-apply this.
     apply_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
     delete_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
     # Everything the render reads; .tiltignore keeps __pycache__ out of these.
