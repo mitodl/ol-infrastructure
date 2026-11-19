@@ -95,11 +95,22 @@ def source_tag(source_dir: Path, tag_regex: str) -> str:
 
 
 def _release_key(version: str) -> tuple[int, int, int] | None:
-    """Return a ``X.Y.Z`` version's numbers, ignoring any prerelease suffix."""
+    """Return a ``X.Y.Z`` version's numbers, ignoring any prerelease suffix.
+
+    A legacy bumpver ``YYYY.M.D`` version (minor 1-12) is read as the release
+    scheme's ``YYYY.MDD.0``, the first client of that day. The two cannot be
+    confused, because a release-scheme minor is at least 101. Without this,
+    every release-scheme version sorts above a legacy one, so the first
+    client after the cutover could publish an older release's API (a
+    Production rollback re-run before any ``production/*`` tag exists) above
+    the newer one bumpver published at cut time.
+    """
     match = _RELEASE.match(version)
     if match is None:
         return None
     major, minor, patch = (int(part) for part in match[0].split("."))
+    if 1 <= minor <= _MAX_MONTH and 1 <= patch <= _MAX_DAY:
+        return major, minor * 100 + patch, 0
     return major, minor, patch
 
 

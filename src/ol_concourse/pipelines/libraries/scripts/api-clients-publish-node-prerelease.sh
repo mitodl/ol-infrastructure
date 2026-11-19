@@ -11,7 +11,9 @@
 #
 # Published only when the built client differs from both the current `next`
 # and `latest` packages, so a spec edit that leaves the generated client as it
-# was publishes nothing.
+# was publishes nothing. When it matches `latest` but not `next` (main reverted
+# an API change that `next` still has), `next` is moved to the `latest`
+# version, so `@next` never serves an API main no longer has.
 set -euo pipefail
 
 export YARN_NPM_PUBLISH_REGISTRY=https://registry.npmjs.org/
@@ -37,6 +39,13 @@ for channel in next latest; do
 		tar -xzf "$published"/*.tgz -C "$published" &&
 		diff -r -q dist "$published/package/dist" >/dev/null; then
 		echo "This client is the one already published as $name@$channel: publishing nothing."
+		if [ "$channel" = latest ]; then
+			# The version of the tarball just compared, not a fresh `npm view`,
+			# so the tag lands on the contents that matched.
+			latest_version="$(node -p "require('$published/package/package.json').version")"
+			echo "Moving $name@next to $latest_version."
+			yarn npm tag add "$name@$latest_version" next
+		fi
 		exit 0
 	fi
 done

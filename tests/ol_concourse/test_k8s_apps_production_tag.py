@@ -4,7 +4,8 @@ The tag records that a release reached Production. The API-client pipelines of
 mitxonline and ol-analytics-api watch it, so a stable client is published only
 for a promoted release (libraries/configuration.py). These tests pin that every
 k8s release-resource app writes it, last in the Production job and only after
-the deploy is recorded and the release finished, and that a legacy app does not.
+the deploy is recorded and the release finished, inside a ``try`` that alerts
+Slack rather than failing a deploy that succeeded, and that a legacy app does not.
 ``promote_tag.py`` itself is tested in test_k8s_apps_tag_release.py.
 """
 
@@ -78,14 +79,29 @@ def test_production_tags_the_release_last(app_name):
     assert plan[recorded]["params"]["state"] == "success"
     assert plan[finished]["params"]["action"] == "finish"
     assert recorded < finished < len(names) - 1
-    # Not in a `try`: a tag that cannot be written means no client for the
-    # release, and the job should say so.
-    assert "try" not in plan[-1]
+
+
+@pytest.mark.parametrize("app_name", K8S_RELEASE_APPS)
+def test_a_failed_production_tag_alerts_instead_of_failing_the_deploy(app_name):
+    """The release is live by then. A red job would read as a failed deploy
+    and withhold the deployment from jobs that take it ``passed:`` this one
+    (learn-ai's Production frontend). The inner task's hooks say a client
+    will not be published.
+    """
+    step = _production_plan(app_name)[-1]
+    inner = step["try"]
+
+    assert inner["task"] == PROMOTE_TAG_TASK_NAME
+    for hook in ("on_failure", "on_error"):
+        alert = inner[hook]
+        assert alert["put"] == f"slack-alert-{app_name}-production-tag"
+        assert alert["no_get"] is True
+        assert "no API client is published" in alert["params"]["text"]
 
 
 @pytest.mark.parametrize("app_name", K8S_RELEASE_APPS)
 def test_production_tags_the_version_it_deployed(app_name):
-    task = _production_plan(app_name)[-1]
+    task = _production_plan(app_name)[-1]["try"]
     params = task["config"]["params"]
 
     assert params == {
