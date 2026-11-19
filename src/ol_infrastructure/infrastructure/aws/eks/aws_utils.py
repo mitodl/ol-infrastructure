@@ -18,6 +18,11 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+# How long the node termination handler waits for a drain to finish before giving
+# up. The node group termination lifecycle hooks in __main__.py are sized from
+# this, so the instance stays up for the whole drain.
+NTH_NODE_TERMINATION_GRACE_PERIOD_SECONDS = 120
+
 
 def setup_aws_integrations(
     aws_account,
@@ -484,6 +489,7 @@ def setup_aws_integrations(
                 "enableRebalanceMonitoring": False,
                 "enableRebalanceDraining": False,
                 "emitKubernetesEvents": True,
+                "nodeTerminationGracePeriod": NTH_NODE_TERMINATION_GRACE_PERIOD_SECONDS,
                 "podTerminationGracePeriod": 30,
                 # 24Mi (set in #3560, never revisited) is fine for idle
                 # steady-state -- 5 of 6 daemonset pods are healthy at
