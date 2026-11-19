@@ -843,7 +843,11 @@ env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 # whose id and secret (and the olapps token endpoint) arrive as OL_LLM_MEMORY_*
 # from the VSO secret below. A config switch, because the Hindsight stack exists
 # only in some environments and a StackReference to a missing stack fails the
-# preview. The CHAT_MEMORY feature flag still decides per learner.
+# preview. The CHAT_MEMORY feature flag still decides per learner. Turn it on only
+# where the keycloak substructure sets keycloak_realm:olapps-ol-memory-enabled:
+# that is what lets ol-learn-ai-client exchange tokens and puts its audience on
+# mit-learn's tokens, so without it every exchange fails and learn-ai runs with
+# no memory.
 memory_enabled = learn_ai_config.get_bool("enable_memory") or False
 memory_secret_names: list[str] = []
 memory_secret_resources: list[OLVaultK8SSecret] = []
