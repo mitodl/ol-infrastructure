@@ -9,7 +9,7 @@ decision task and stays Proposed until the decision is recorded here.
 | §2 Packaging, home, footprint | `tk-decide-the-shared-library-s-packaging-home-repo--451af4` | Decided: home 2026-09-11 (`mitodl/ol-llm`); SDK-based Opik integration and translation-plugin adoption 2026-10-01 (§2.3) |
 | §3 Error contract | `tk-policy-error-contract-for-llm-calls-d27bd1` | Decided 2026-09-11 |
 | §4 Attribution schema | `tk-define-the-attribution-schema-shared-by-gateway--d6f26b` | Decided 2026-10-01, with a platform-wide key for anonymous ids (§4.3) |
-| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange (§5.5) |
+| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange. Scope revised 2026-11-19: memory holds what apps learn from interactions, not data with a system of record, and Hindsight is the substrate for agentic workloads; the note contract, consent and the session-less grant are proposed (§5.12, §5.13) |
 | §6 Call contract | `tk-specify-the-library-s-call-contract-timeouts-ret-badb39` | Specified 2026-10-01 from the §3 decision |
 | §7 Durable execution | `tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78` | Direction set 2026-10-01; nothing decided |
 | §8 LLMOps backend portability | `tk-record-the-llmops-portability-decision-as-shared-478015` | Decided 2026-11-12; amends §2.3 item 1, §4.1, and the lifecycle spec's §2.3 item 5, §3 items 1, 3 and 4, and §5.1 item 8 |
@@ -19,7 +19,8 @@ that are not in this repository, and `tk-` ids are tasks in the team's internal 
 taken from them are attributed to them; they could not be re-read by a reviewer of this file.
 
 Settled inputs (2026-09-10): every LLM call site goes through the shared library, which owns
-the Opik integration. PydanticAI is the default construction path but not mandatory, and a
+the Opik integration. (Scoped 2026-11-19 to call sites in code we own: a third-party service
+may make its own model calls, §5.8.) PydanticAI is the default construction path but not mandatory, and a
 thin traced-completion path covers single calls. Opik is the platform investment, LangSmith is
 retired, and production Opik becomes the shared instance.
 
@@ -154,7 +155,7 @@ Packages
 | `ol-llm[pydantic-ai]` | | `pydantic-ai-slim` | Model factory, the §6 call contract's retry wrapper, both entry points (agent and traced completion) |
 | `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra, so each also installs PydanticAI | Provider SDKs, chosen per consumer |
 | `ol-llm[harness]` | | `pydantic-ai-harness` (0.x, pinned to a minor series) | In-session memory and compaction (§5 categories A and B). Each harness release pins `pydantic-ai-slim` exactly, so this extra fixes the PydanticAI version |
-| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.5), which runs Hindsight 1.0.0. The extra still pins `hindsight-client>=0.10,<0.11`, and the PoC shim used raw httpx, so the client is untested against the 1.0.0 server and its token auth. Re-pinning it is a follow-up |
+| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.11), which runs Hindsight 1.2.0. The extra pins `hindsight-client>=1.2,<1.3` (ol-llm `python/pyproject.toml` at 31e03d2) |
 | `ol_llm.eval` (module) | `ol_llm.eval` | the full opik install, including litellm | Datasets, experiments, `evaluate(prompts=…)`, LLM-judge metrics. Runs in CI eval jobs and on developer machines, never in slimmed runtime images |
 | `ol-llm[django]` | `ol_llm.django` | Django | Settings reader, app-ready tracer setup, Celery helpers. Add only when the Django glue outgrows a settings reader |
 
@@ -467,22 +468,283 @@ library's own metrics carry the same labels.
 
 ## 5. Memory
 
-Added 2026-09-15: memory is part of the platform capability set, so the supported storage and
-retrieval paths are decided here and encoded in the library rather than left to each app. The
-Repository facts in this part carry file references. The claims about third-party products
-in §5.4 (cognee, graphiti, zep, letta, mem0, Hindsight, upstream Omnigraph) were read from
-their repositories and documentation on the dates given and are not individually cited.
+Added 2026-09-15 and revised 2026-11-19. Memory is part of the platform capability set, so what
+it is for, what the library owns, and which backend serves it are decided here rather than left
+to each app. Repository facts carry file references and the commit they were read at. The
+claims about third-party products in the backend evaluation (§5.10) were read from their
+repositories and documentation on the dates given and are not individually cited.
 
-The only prior statement of intent is a one-word bullet, "memory", in the planning repo's
-`epics/llmops/platform_investment.md`, a 14-line file in a repo with no commits. The
-requirements below are therefore written from scratch.
+The 2026-09-15 text started from a one-word bullet in the planning repo and took its shape from
+the first concrete proposal, RFC mitodl/hq#13314 (three short notes per learner for learn-ai's
+bots), and then from the backend PoC. A review on 2026-11-19 found that nothing stated what
+memory is for. As a result, mit-learn, the first app to write, copied profile fields that
+already had a home into it, and the design treated today's apps as the whole scope. The
+owner's decisions that day (§5.12) reframe it: memory holds what the platform learns from a
+learner's interactions, and Hindsight is the substrate for agentic workloads to come, not a
+store sized for two writers.
 
-### 5.1 The five things called "memory"
+The revision renumbered this part, and tasks written before it cite the old numbers. The old
+§5.3 (what the library owns) is now §5.4, the old §5.4 (backend options and PoC results) is
+§5.10, and the old §5.5 (decisions, the deployed design and open items) is split across §5.11
+to §5.13.
 
-They have different storage paths, lifetimes, and privacy obligations, and conflating them is
-how this decision goes wrong.
+### 5.1 What memory is for: what the platform learns from interactions
 
-| | Category | Lifetime | Today |
+Three kinds of learner data end up in an LLM prompt, and only one of them is memory.
+
+- Learner context is data with a system of record: profile fields and onboarding answers
+  (mit-learn), enrollments (mitxonline), grades and certificates (Open edX and mitxonline), and
+  aggregates computed from records the warehouse already holds. A prompt that needs it reads it
+  from that system, through its API or a tool, when the prompt is built. It is never copied
+  into memory. A copy has to be kept in sync, deleted and consented to a second time, and it
+  tells a model nothing the source does not. mit-learn's profile notes (mit-learn#4326) are
+  being removed for this reason (decided 2026-11-19).
+- Learner memory is what apps observe or infer from a learner's interactions that exists
+  nowhere else: goals and preferences a learner states in conversation, how they want to be
+  taught, what they get right and wrong over time (a knowledge profile built from performance
+  observations, e.g. by Open edX), and summaries of earlier sessions. It is shared across apps
+  (one memory per learner, decided 2026-10-15) because the interactions happen across apps.
+- Conversation state is the transcript of one thread and the compacted view of it that a
+  request sends. It belongs to the app holding the conversation, under that app's retention
+  and deletion, and it is not memory (§5.9).
+
+Corpus retrieval (course content and catalog search over mit-learn's Qdrant collections) is not
+learner data and stays out of scope; it belongs to
+`tk-policy-scope-of-embeddings-and-mcp-tool-access-i-3d8034`.
+
+### 5.2 Kinds of memory and the scopes they live in
+
+The 2026-09-15 split was by lifetime: in-session state (A), compaction (B), cross-session recall
+(C), durable user-scoped facts (D) and corpus retrieval (E). It still describes conversation
+state. For memory it leaves out what a reader needs to know, which is what kind of thing a note
+is and whose it is.
+
+| Kind | Example | Source | Scope |
+| --- | --- | --- | --- |
+| Stated preference or goal | "wants examples in Python", "preparing for a data science job" | The learner said it in an interaction | Learner |
+| Instruction for a bot | "keep answers short in the recommendation bot" | The learner said it | Learner |
+| Performance observation | "misses base cases on recursion problems in unit 3" | An app saw it in graded work | Learner, tagged with the course |
+| Knowledge state | "comfortable with loops, unsure of recursion" | Inferred from many observations | Learner, tagged with the course |
+| Episode | "worked through the recursion problem set with the tutor on 2026-11-12" | An app saw it happen | Learner |
+| Agent working memory | Intermediate findings of a long-running task | Written by the agent | One agent run |
+| General memory | Facts an agent learned that belong to no learner | Written under the general grant | Platform (`g-<name>` banks) |
+
+The scopes in place are the learner bank (`u-<sub>`) and general banks (`g-<name>`), §5.11. A
+course or cohort is a tag on a learner note, not a bank of its own, so the learner's one-call
+forget still reaches it. An agent run is not a scope yet; §5.8 proposes one. A staff user's
+memory would be a `u-<sub>` bank like any learner's, since the bank keys on the Keycloak user.
+
+General memory has no writer and no definition of its contents. The examples the 2026-10-16
+decision gave, product and course facts, already have a system of record in the catalog, so
+under §5.1 they are context, not memory. General memory stays unused until a use case in §5.3
+needs something no system of record holds.
+
+### 5.3 Use cases
+
+Every writer and reader of memory is a row here, owned by its app's team, before it writes in
+Production. A new row also registers the note kinds it writes (§5.5).
+
+| Use case | App | Kinds | Writes from | Reads | State on 2026-11-19 |
+| --- | --- | --- | --- | --- | --- |
+| Recommendation, syllabus and video bots remember what a learner tells them | learn-ai | Stated preference, instruction | The learner's request: a gate call, then a rewrite call, through ol-llm | All of the learner's notes, ahead of the system prompt | learn-ai#201, back in draft until this revision settles |
+| The tutor personalizes instruction | learn-ai | Reads performance observations and knowledge state | Open: see the state column | The learner's notes for the course | mbertrand ruled on 2026-11-17 that the tutor never writes, because problem text and answers appear in tutor chats. The 2026-11-19 content rule (§5.4 item 2) allows derived observations, so the ruling goes back to him |
+| A knowledge profile from graded work | Open edX | Performance observation | Server-side grading, with no Keycloak session | | `tk-open-edx-writes-learner-performance-observations-efd73d`, blocked on this revision and the session-less grant (§5.7) |
+| Behavioral records | ol-data-platform | To be decided per item | Batch jobs | | Named as a writer on 2026-10-20. Aggregates of records the warehouse holds are context under §5.1; only inferences that exist nowhere else belong in memory |
+| Enrollments | mitxonline | None | | | Named as a possible writer on 2026-10-20. Enrollments are context (§5.1), so mitxonline does not write memory |
+| Profile and onboarding fields | mit-learn | None | | | mit-learn#4326 writes them as notes, in QA only; being removed under §5.1 |
+| Agentic workloads | None built | Agent working memory, plus the learner kinds above | | | No agent runs today. §5.8 sets what the substrate supports before the first one does |
+
+### 5.4 What the library owns, whatever the backend
+
+1. Our call sites go through ol-llm. Memory extraction, the gate, and rendering notes into
+   prompts are code we own, so they take the §3 call contract, carry §4 attribution with a use
+   case such as `memory-extraction`, are traced, and count against budgets. The rule covers
+   code we own, not every model call anywhere (scoped 2026-11-19). A third-party service such
+   as Hindsight may make its own model calls, today its embeddings and later any server-side
+   feature §5.8 turns on, under the visibility requirements in §5.8.
+2. Content rules are platform policy (revised 2026-11-19). Never store problem text, answers,
+   hints or solutions; names, email addresses or other identifiers; or instructions aimed at
+   a bot's own rules, tools or permissions. Grades are context with a system of record and are
+   read from it, not stored. Observations derived from performance are allowed, so bots such
+   as the tutor can personalize instruction: "misses base cases on recursion problems" is a
+   note, and the problem and the learner's answer are not. The library provides the
+   enforcement point (the gate) and its evaluation cases. Neither is built: nothing in
+   `python/src/ol_llm` implements the rule at ol-llm 31e03d2, and learn-ai#201's gate is
+   learn-ai's own prompt. Whether performance observations are education records under
+   institutional policy is a question for the owners of the data-handling policy
+   (`llm-usage-policies-spec.md` §3), and no Open edX write reaches Production before it is
+   answered.
+3. Notes are untrusted data in every prompt that reads them. A note one app derived from a
+   learner's words lands in every other app's prompt, so the library renders notes as
+   delimited data carrying their writer, kind and time, never as instructions, and a reader
+   chooses which kinds it loads. The rendering helper is not built.
+4. Memory reaches traces. Notes injected into prompts appear in trace content, so
+   `include_content` and Opik access and retention follow the data-handling policy.
+5. Forget is one call and complete. A supported backend deletes everything for one learner in
+   one call, reaching every store it wrote to, and neither work in flight nor a restore brings
+   it back (the restore gap is open, §5.13). The forget runs on the platform, not in an app
+   (decided 2026-11-13, §5.11).
+6. Identity matches §4. Memory is keyed on the Keycloak user id from the authenticated token,
+   never from a request body or model output.
+7. One interface, with a contract. The interface (put, get, search, delete and list for apps;
+   forget for the platform) keeps call sites independent of the backend, and §5.5 defines what
+   a note carries so readers do not depend on other apps' key names.
+
+### 5.5 The note contract
+
+Today a note is a key, text, the writing app, string metadata and a search score (`Note` in
+ol-llm `python/src/ol_llm/memory/interface.py` at 31e03d2). It has no kind, no time and no
+source. With one writer that was enough. With several, every reader has to know each writer's
+key names (learn-ai#201 special-cases mit-learn's) and cannot tell a fresh statement from a
+stale inference.
+
+Proposed:
+
+- A registry of note kinds in ol-llm, one data file like the model catalog. Each entry names
+  the kind, the apps allowed to write it, what it means, its source, whether it takes a course
+  tag, and a length limit. `put` refuses a kind the registry does not list for the writing app,
+  and readers ask for kinds (`list(kinds=...)`, `search(..., kinds=...)`) rather than keys.
+- Each note carries its kind; its source, one of `stated` (the learner said it), `observed` (an
+  app saw it happen) or `inferred` (a model concluded it from other notes or evidence); when it
+  was written; when what it describes happened, if that differs; and an optional course tag.
+- One platform rule resolves conflicts, instead of per-app prompt text: context from a system
+  of record beats any note; within a kind, `stated` beats `observed`, which beats `inferred`,
+  and newer beats older.
+
+Hindsight holds this without a fork. Retain already takes a timestamp, tags and metadata;
+recall returns `mentioned_at` and `occurred_start` and filters by tags (`tags`, `tags_match`)
+and by `temporal_window` (`MemoryItem`, `RecallRequest` and `RecallResult` in hindsight-client
+1.2.1). Kind, source and course become namespaced tags: `kind:<name>`, `source:<source>`,
+`course:<id>`. That does need an extension change. `LearnerBankValidator.resolve_write_tag_scope`
+lets an app write exactly `app:<name>` and no other tag
+(`applications/hindsight/ol_memory_ext/__init__.py:652-665`), so it has to accept the
+registry's namespaced tags beside the app tag while still refusing another app's tag. Memory
+Defense redacts metadata values, so the contract keeps kind and source in tags rather than
+metadata.
+
+### 5.6 Consent and learner control
+
+A learner has one memory across apps, but consent is per app today. learn-ai#201 checks a
+`CHAT_MEMORY` flag, the RFC plans a clear action, and the RFC asks whether "off" in one app
+covers notes another app wrote. learn-ai's answer to the race between turning memory off and an
+extraction already in flight is a per-learner Redis lock around its own save, because `put` has
+no conditional write. Every other writer would need the same lock.
+
+Proposed, enforced by the service rather than by each app:
+
+- One memory setting per learner (on or off), held by the memory service and checked by the
+  validator on every retain. Off refuses writes from every app, service writers included.
+  Reads still return what exists until the learner clears it.
+- Clear runs the forget sequence on the learner's own bank, started with the learner's own
+  token from the client that hosts the settings page. Today only the admin client can forget,
+  so this is a new, narrow grant.
+- A generation number per bank that clear increments. A write carries the generation its
+  request read when it began, and the service refuses a stale one. That closes the race for
+  every writer without app-side locks.
+- One place where a learner sees what is remembered, with each note's writer, kind and time,
+  and deletes single notes whatever app wrote them. mit-learn's dashboard is the natural host.
+  This needs a learner-scoped delete across app tags, which the validator does not allow
+  today.
+- Whether memory is on by default or opt-in is open. The RFC lists it, with a privacy review,
+  as blocking before Production.
+
+### 5.7 Writes with no learner session
+
+Open edX grading and data platform jobs hold no Keycloak session, so under the 2026-10-15 rule
+they have no token to exchange. An Open edX request does carry a learner session, but it is
+the LMS's own session, not a Keycloak token. The 2026-11-19 review suggested an outbox, where
+the learner's request records the write while its token is valid and a worker completes it.
+That does not help either named writer, because neither ever holds a Keycloak token.
+
+Proposed: build the service grant in `tk-grant-for-services-to-write-per-learner-memory-w-f03a14`,
+held tightly, since a leaked writer secret could put text into any learner's memory and from
+there into every app's prompts.
+
+- One service-account client per writer, its secret held only by that writer.
+- Retain only, under the writer's own app tag and document-id prefix, and only for the kinds
+  the registry lists for that writer.
+- The learner's memory setting (§5.6) and the forget fence apply unchanged, so off and clear
+  hold against service writes too.
+- A per-client write rate limit and per-client counts on `/metrics`, so a runaway or leaked
+  writer shows up.
+
+How an Open edX user maps to a Keycloak user id is unverified and differs by deployment.
+edxapp runs for mitxonline, MITx residential, MITx staging and xPro (one
+`edxapp_*_policy.hcl` per deployment in `applications/edxapp`), and how each logs learners in
+has not been checked. The Open edX task settles the mapping for each deployment it writes
+from.
+
+### 5.8 Hindsight as the memory substrate for agentic workloads
+
+Decided 2026-11-19: Hindsight scales automatically and is planned as the memory substrate for
+agentic workloads, not sized for today's writers. That commits us to the following.
+
+Scale. Hindsight runs as a hand-written Deployment with `hindsight:api_replicas: "1"` in both
+stacks and no HPA (`applications/hindsight/__main__.py:379-417`), and the PoC's throughput was
+bound by its one API process. `tk-autoscale-the-hindsight-memory-service-and-size--7222ae` adds
+an HPA and a PDB, checks worker ids, the split between API and worker, and the Postgres
+connection budget, and load-tests past one replica. A service SLO for availability and recall
+latency belongs with it; none is defined.
+
+Server-side features. Everything that makes Hindsight more than a note store is off:
+`LLM_PROVIDER=none`, observations and consolidation off, and reflect, mental models and
+directives refused (§5.11). They were turned off to keep every model call in ol-llm. Under the
+scoped rule (§5.4 item 1), a use case may turn one on when all of these hold:
+
+1. A row in §5.3 needs it. The likely first candidates are consolidation, which merges many
+   performance observations into a knowledge state and records `proof_count` and
+   `source_memory_ids`, and a mental model per learner, a maintained summary that keeps a
+   load-all reader's prompt bounded as writers grow.
+2. Its model calls go to a provider approved for learner content (data-handling policy)
+   through the pod's IRSA role, on a Bedrock application inference profile tagged for cost,
+   with per-app counts on `/metrics`, the way decision 6 in §5.12 handles embeddings.
+3. Its traces go only where learner content may go. Hindsight's LLM spans always carry prompt
+   content (PoC, §5.10). `LLM_TRACE_ENABLED` stays false, because `llm_requests` survives a
+   bank delete.
+4. Forget stays complete. Whatever the feature writes carries the bank id, so the fence trigger
+   and the two-phase forget reach it, shown by a case in `scripts/hindsight/test_isolation.py`
+   before the feature is enabled.
+5. It runs only on the caller's own bank. No feature reads across learners.
+
+MCP stays off until it sits behind the same tenant extension as the HTTP API, because
+Hindsight's MCP endpoint is unauthenticated by default (§5.10).
+
+Agent principals. An agent acting for a learner uses the learner's exchanged token, as an app
+does. Exchanged tokens last 300 s, so a run longer than that needs a way to get a fresh one
+without the learner present. That depends on the durable execution engine (§7) and is open.
+An agent acting for itself (back-office or staff tooling) uses a service identity and its own
+app tag, and reaches a learner bank only through the session-less grant (§5.7).
+
+Proposed: an agent run's working memory lives in a bank of its own (`a-<app>-<run>`), deleted
+when the run ends or after a fixed TTL, so it never mixes with a learner's long-term memory.
+Anything worth keeping is written to the learner's bank as a registered kind.
+
+The gateway (`llm-gateway-requirements.md`) is still evaluated, at unchanged priority. If one
+is adopted, Hindsight's model calls can route through it; nothing here waits on it.
+
+### 5.9 Conversation state
+
+Conversation state holds more learner content than memory will. learn-ai's checkpointer keeps
+full prompts and replies (`DjangoCheckpoint` and `DjangoCheckpointWrite` in
+`ai_chatbots/models.py`). Its cleanup task deletes anonymous sessions older than
+`AI_CHATBOTS_SESSION_EXPIRY_DAYS`, and search-summary sessions with no follow-up after 7 days;
+an authenticated learner's sessions are never deleted (`delete_stale_sessions` in
+`ai_chatbots/tasks.py`, learn-ai 40932de). The expiry is 36,500 days in Production
+(`applications/learn_ai/Pulumi.Production.yaml:20`). Nothing deletes one learner's
+conversations when their account is deleted.
+
+Proposed: conversation retention and per-learner deletion come before any new memory writer
+goes to Production. The forget job (§5.11) also removes the learner's conversations in each app
+that holds them, or triggers that app's own delete. Whether `pydantic-ai-harness` provides
+history and compaction, and whether learn-ai keeps its checkpointer, stay open (§5.13).
+
+### 5.10 Backend evaluation (2026-09-15 to 2026-10-29)
+
+This is the record of how the backend was chosen, kept as written apart from updated section
+references. Its proposal for categories C and D, three notes per learner stored in learn-ai's
+database, was superseded by the decisions in §5.12. It used these lifetime categories:
+
+| | Category | Lifetime | On 2026-09-15 |
 | --- | --- | --- | --- |
 | A | In-session conversation state | One thread | learn-ai only: LangGraph `AsyncDjangoSaver` writes `DjangoCheckpoint` / `DjangoCheckpointWrite` rows holding full prompts and replies (`checkpointers.py:281,327`) |
 | B | Context compaction | One request | learn-ai's `MessageTruncationNode` keeps the last 6 human messages (`api.py:305-384`); mit-learn does tiktoken truncation on a single prompt (`learning_resources/utils.py:807-815`) |
@@ -490,7 +752,7 @@ how this decision goes wrong.
 | D | Durable user-scoped facts | Until deleted | None LLM-derived. MIT Learn profile fields are the source of truth in the RFC |
 | E | Corpus retrieval (RAG) | Corpus lifetime | mit-learn's Qdrant collections. Out of scope here; it belongs to `tk-policy-scope-of-embeddings-and-mcp-tool-access-i-3d8034` |
 
-### 5.2 Current state (verified 2026-09-15)
+Starting conditions, verified 2026-09-15:
 
 - Nothing to migrate. No integration stores user profiles, preferences, or learned facts.
   learn-ai carries a `langmem` dependency and summarization prompts with no node wired to them
@@ -507,37 +769,10 @@ how this decision goes wrong.
   for mit-learn alone (the in-cluster `qdrant` namespace is empty), OpenSearch, ClickHouse
   (multi-tenant, Opik), S3, and a Glue plus Starburst lakehouse. No graph database runs in
   production. CNPG is local-dev only.
-
-### 5.3 What the library owns, whatever the backend
-
-1. Memory extraction is an LLM call site. The RFC's design makes two model calls per batch
-   (a gate model and an extraction model) through `ChatLiteLLM`. Under the settled rule that
-   every call site is wrapped, those calls take the §3 contract (timeout, retry classes,
-   structured output), carry §4 attribution with a `memory-extraction` use case, are traced in
-   Opik, and count against the budgets policy. A memory feature that calls models outside the
-   library is the same gap the library exists to close.
-2. Content rules are platform policy, not one app's prompt. Never store names, email
-   addresses, assessment content (problem statements, answers, hints, grades, identifiers), or
-   instructions aimed at the bot's own rules, tools, or permissions. The library provides the
-   enforcement point and the evaluation cases; the RFC's list is the starting text.
-3. Memory reaches traces. Notes injected into prompts appear in trace content, so
-   `InstrumentationSettings.include_content` and Opik access and retention follow the
-   data-handling policy. The RFC states this of LangSmith, which is being retired; it
-   transfers to Opik unchanged.
-4. Deletion is a requirement of the interface. Any supported backend must delete
-   everything for one user in one call, and that delete must reach every store it wrote to.
-   Cross-service account deletion (mit-learn to learn-ai) is an existing gap and is owned by
-   the data-handling policy.
-5. Identity matches §4. Memory is keyed on the same pseudonymous user identifier the
-   attribution schema uses, taken from the authenticated identity, never from a request body
-   or model output.
-6. One narrow interface. The library exposes user-scoped get, put, and search so the
-   backend can change without touching call sites. The RFC already built that seam as a
-   LangGraph `BaseStore` adapter (`DjangoMemoryStore`, namespace `("memories", global_id)`,
-   value `{"text": …}`), whose deletion guarantee comes from a Postgres foreign key and whose
-   search is deliberately inert, with no embedding index.
-
-### 5.4 Backend options
+- The RFC's seam. Its prototype built the narrow interface (§5.4 item 7) as a LangGraph
+  `BaseStore` adapter (`DjangoMemoryStore`, namespace `("memories", global_id)`, value
+  `{"text": …}`), whose deletion guarantee came from a Postgres foreign key and whose search
+  was deliberately inert, with no embedding index.
 
 The project owner's stated preference (2026-09-15) is to incorporate
 [cognee](https://www.cognee.ai/) for general-purpose memory. Evaluated 2026-09-15 against
@@ -561,7 +796,7 @@ What it costs us.
 | Prompt cost | `search` defaults to `top_k=15`, and graph completion returns expanded triplets and chunks: realistically thousands of tokens per request, against the RFC's ~1,100-token budget for three notes |
 | Telemetry | Posts to `https://test.prometh.ai` with user and tenant ids, a machine-persistent id, and a hash derived from the LLM API key, unless `TELEMETRY_DISABLED` is set (`shared/utils.py:21,251,362`) |
 | Operational | Migrations auto-run on FastAPI startup and on the first `remember()`/`cognify()` call in an SDK process, across relational, graph, and vector stores. Backup and restore are undocumented. The Helm chart is thin (`replicaCount: 1`, no graph database, `appVersion` 1.16.0 against a 1.5.4 release). 173 PyPI releases since 2024, dev versions published out of order, and LLM-generated changelogs that claim no breaking changes: pin exact versions |
-| Fit behind §5.3 | Poor. There is no namespaced key/value get and put. A `put` becomes `add()` plus a `cognify()` run (LLM calls, seconds), and `get` has no equivalent; `search` returns graph-expanded text rather than the value stored. An adapter would be lossy and slow |
+| Fit behind the narrow interface | Poor. There is no namespaced key/value get and put. A `put` becomes `add()` plus a `cognify()` run (LLM calls, seconds), and `get` has no equivalent; `search` returns graph-expanded text rather than the value stored. An adapter would be lossy and slow |
 | Evidence at our scale | Vendor-published only (Bayer, Knowunity, Wyoming). Their own evaluation report is self-labelled preliminary and concedes the 10M configuration was tuned on the questions it was scored on. Nothing independent at hundreds of memories across tens of thousands of learners |
 
 What it does not do, so these stay ours either way: in-session transcript storage, rolling
@@ -675,7 +910,7 @@ What we would have to close ourselves, none of it vendor-blocked:
    extension is a single shared key that authenticates the app rather than the learner.
    Enforcement at our scale means writing a custom `TenantExtension`.
 4. The LangGraph `BaseStore` adapter was removed in `hindsight-langgraph` 0.2.0; the
-   published docs still describe it and are stale. The §5.3 shim becomes our code, thin but
+   published docs still describe it and are stale. The narrow-interface shim becomes our code, thin but
    ours. Note also that `retain` is not a plain write: it runs asynchronous LLM extraction
    unless `retain_extraction_mode: chunks` is used or notes are stored as mental models.
 5. Chart defaults are unsafe: a bundled `ankane/pgvector:latest` with the password
@@ -694,7 +929,7 @@ Hindsight PoC results (2026-10-15, `tk-hindsight-poc-self-hosted-per-learner-mem
 Run locally against Hindsight 1.0.0 (released 2026-10-13; the v0.10.0 details above predate
 it) on the slim image, with pgvector 0.8.1 on Postgres 17 and Ollama for
 embeddings. It passed. The shape that works is storage only: ol-llm makes the gate and
-extraction calls (§5.3 item 1) and Hindsight stores the notes it is handed, in chunks mode
+extraction calls (§5.4 item 1) and Hindsight stores the notes it is handed, in chunks mode
 with observations and consolidation off. Server-side extraction would bypass the library:
 Hindsight's provider factory is hard-coded with no pluggable LLM client, and its OTel LLM spans
 always carry prompt content with no off switch.
@@ -707,20 +942,20 @@ Against the five items above:
    extension allows no per-bank config change.
 2. The race is real. With stock delete, an in-flight retain wrote 40 memory units with no bank
    row after the delete returned success, and the bank delete had cascaded away the operation
-   rows that would have shown the work in flight. A fence plus a two-phase forget (§5.5) left 0
+   rows that would have shown the work in flight. A fence plus a two-phase forget (§5.11) left 0
    rows across 10 delays from 0 to 5 s, with 84 queued worker attempts refused by the fence.
-3. Custom extensions enforce isolation (§5.5); the PoC suite passed 55 of 55 against live
+3. Custom extensions enforce isolation (§5.11); the PoC suite passed 55 of 55 against live
    Hindsight and Keycloak 26.7.4. Per-learner Postgres schemas are not viable: 111 migrations
    run per schema at startup and the worker polls every schema. `RequestContext.allowed_bank_ids`
    is never read.
-4. The §5.3 shim is put, get, search, delete and forget over the HTTP API, now the harness
+4. The narrow-interface shim is put, get, search, delete and forget over the HTTP API, now the harness
    client in ol-infrastructure `scripts/hindsight/memory_client.py`. put is a retain with
    `document_id=<app>.<key>`, so a second put replaces the first. Gateway routing of LLM
    calls, Opik over OTLP and the per-conversation call count stop applying, because Hindsight
-   makes no LLM calls. It still makes embedding calls (§5.5, Server settings).
+   makes no LLM calls. It still makes embedding calls (§5.11, Server settings).
    The mental-model recommendation above does not carry over either: the deployed design
    refuses mental model create and refresh, which need an LLM.
-5. Deployed against RDS (§5.5), not the bundled database. The migrations run
+5. Deployed against RDS (§5.11), not the bundled database. The migrations run
    `CREATE EXTENSION vector` themselves and stop when the role cannot, as on RDS, so the Vault
    role statements create it first. Locally, 111 migrations ran in about 2.5 s on an empty
    database.
@@ -763,99 +998,31 @@ memory:
 - A and B (in-session state, compaction): library concerns now, on PydanticAI's message
   history (`ModelMessagesTypeAdapter` round-trips exactly, so it is safe to store) plus
   compaction, with `pydantic-ai-harness` evaluated as the implementation.
-- C and D (cross-session recall, user-scoped facts): ship the RFC's v1 behind the §5.3
+- C and D (cross-session recall, user-scoped facts): ship the RFC's v1 behind the narrow
   interface. cognee is not the right tool for three short notes: it reintroduces the three
   costs the RFC rejected, adds a graph database, and overshoots the token budget. (Amended
-  by §5.5: the RFC's three-notes shape stands, its storage in learn-ai's database does not.)
+  on 2026-10-01: the RFC's three-notes shape stands, its storage in learn-ai's database does
+  not. Superseded on 2026-11-19 by §5.1 to §5.3.)
 - For the richer case (hundreds of memories per learner, relationships, semantic recall),
   Hindsight leads on evidence and cognee is the fallback. Hindsight needs no datastore we do
   not already run, its model calls are redirectable to our gateway by supported configuration,
   and it deletes for real. cognee's PoC gates stay on file, but its graph-database requirement
   and in-process litellm calls make it the weaker of the two unless the Hindsight PoC fails.
   Neither is adopted without a PoC that clears the items listed against it here. (Hindsight
-  cleared its PoC on 2026-10-15 and was adopted, §5.5.)
+  cleared its PoC on 2026-10-15 and was adopted, §5.12.)
 - Omnigraph is not a candidate for learner memory, for the reasons above. Erasure and
   per-learner isolation are the binding constraints, and neither is an engineering gap against
   a known design. It remains the right store for what it does today, which is team-shared agent
   memory where every principal is a staff member and nothing is a learner's to delete.
 
-### 5.5 Decisions and what stays open
+### 5.11 The deployed service
 
-Decided by the project owner on 2026-10-01:
-
-1. The category split in §5.4 is adopted. A and B are library concerns on PydanticAI's
-   message history. C and D sit behind the §5.3 interface. Hindsight's PoC runs first for the
-   richer case and cognee is the fallback, tried only if Hindsight fails its PoC.
-2. Memory is a shared platform service. It is not stored in, deployed with, or coupled to
-   learn-ai or any other application. This answers "where memory lives": one memory service
-   across apps, reached through the library's §5.3 interface, which is a client of that
-   service.
-
-What item 2 changes in this part:
-
-- The RFC's v1 storage, a `DjangoMemoryStore` in learn-ai's database whose deletion guarantee
-  is a Django foreign key, is not the supported path. The RFC's shape (a few short notes per
-  learner, a gate model and an extraction model, the never-remember list) carries over; its
-  store becomes the shared service, and learn-ai consumes it through `ol-llm`
-  (`tk-bring-rfc-13314-s-learner-memory-onto-the-shared-853c25`).
-- It favors a backend that is a service in its own right. Hindsight is one (an API over
-  Postgres with per-bank isolation); `pydantic-ai-harness`'s `PostgresMemoryStore` is a
-  library that would need a service or a shared database put around it.
-- Tenancy has to be designed, not inherited from an app's tables. The Hindsight PoC decides
-  whether a learner has one memory shared by every app or one per app, how a caller proves
-  which learner it is acting for (§5.4 item 3 under Hindsight: isolation is not enforced out
-  of the box), and what one app may read of what another wrote. (Answered 2026-10-15, below.)
-- Deletion gets simpler. One call to the shared service removes a learner's memory for every
-  app, so account deletion in mit-learn has a single place to reach.
-- Memory is keyed on the platform user id from the authenticated identity (§5.3 item 5), not
-  on an app-local user row.
-
-Decided by the project owner since:
-
-3. 2026-10-15: Hindsight is the backend for C and D, used for storage and search only (§5.4,
-   PoC results). A learner has one memory, shared by every app, and every app call on a
-   learner's memory is authorized by a token derived from the learner's own session.
-4. 2026-10-16: the service is deployed from ol-infrastructure (`applications/hindsight`), QA
-   first. General memory that belongs to no learner (e.g. product and course facts) is allowed
-   under a separate grant.
-5. 2026-10-21: embeddings are Cohere Embed v4 on Bedrock (`bedrock/cohere.embed-v4:0`, 1536
-   dimensions), called with the pod's IRSA role. The requirements are multilingual input and a
-   long support window. The first deployment's in-cluster bge-base-en-v1.5 is English-only and
-   truncates past 512 tokens, and Azure text-embedding-3 retires on 2028-02-09. Learner content
-   already goes to OpenAI, so a hosted embedding provider needs no separate approval.
-6. 2026-11-09: Hindsight's own embedding calls stay outside ol-llm and are measured instead of
-   routed through the library (formerly open item 8). Every retained note and every recall
-   query still goes to Bedrock from Hindsight's in-process LiteLLM client.
-   - Dollars: Hindsight invokes a Bedrock application inference profile per environment,
-     copied from `cohere.embed-v4:0` and tagged `Application: hindsight`, through
-     `EMBEDDINGS_LITELLM_SDK_MODEL_ID`. LiteLLM still takes `bedrock/cohere.embed-v4:0` to
-     shape the request, so stored vectors don't change. Cost Explorer splits by that tag only
-     once `Application` is an active cost allocation tag in the payer account, which the
-     linked account cannot check.
-   - Per-app counts: a model call extension, `ol_memory_ext.model_calls.EmbeddingMeter`, adds
-     to `ol_memory_embedding_calls_total`, `ol_memory_embedding_texts_total` and
-     `ol_memory_embedding_estimated_input_tokens_total` on Hindsight's `/metrics`, labelled
-     `app`, `operation`, `model` and `success`. Tokens are characters / 4: Hindsight's
-     LiteLLM SDK embeddings backend never reports provider input tokens, so a call's
-     `input_tokens` is 0 whatever LiteLLM returns. No text, bank, learner or document id is
-     recorded.
-   - The app on a retain is the document id's `<app>.` prefix. On a recall it is the app the
-     validator passed for the request. That relies on Hindsight awaiting `validate_recall`
-     inline before it embeds the query, and the embedding (run under `asyncio.gather`)
-     inheriting the request's context, which holds in the 1.2.0 source
-     (`memory_engine.py` ~9496 and ~9945). Only the QA `/metrics` check will confirm it.
-     Otherwise the app is `unknown`.
-   - Not covered: no §4 attribution beyond the app (no `use_case`, no user), no Opik trace,
-     and no budget count.
-   - Gated per stack by `hindsight:embeddings_metering`: on in QA, off in Production until QA
-     shows the profile and the counters working.
-
-The design as deployed (ol-infrastructure #6423, #6424, #6492):
+As built by ol-infrastructure #6423, #6424, #6492 and #7028.
 
 Identity. An app calls with a token from Keycloak standard token exchange (RFC 8693) of the
 learner's session token, requesting the `ol-memory-audience` scope. Verified on Keycloak 26.7.4
 (our pinned version): the result has `sub` set to the Keycloak user id, the same in every app
-and the value both apps store as `global_id`, so §5.3 item 5 holds; `azp` set to the exchanging
+and the value both apps store as `global_id`, so §5.4 item 6 holds; `azp` set to the exchanging
 client; `aud` set to `ol-memory-client` alone; the user's `sid`; and a 300 s lifetime (the olapps
 realm has no lifespan override). `KeycloakTenantExtension` verifies the signature against JWKS,
 the issuer, audience and expiry, maps `azp` to an app name through the stack's
@@ -883,7 +1050,9 @@ any of them could write as mit-learn. Each app exchanges with a client only it h
 - learn-ai as `ol-learn-ai-client` (Vault `secret-operations/sso/learn-ai`, already in
   learn-ai's policy).
 - mit-learn as `ol-mitlearn-memory-client`, which has no login flow and only exchanges (Vault
-  `secret-operations/sso/mitlearn-memory`, not yet in mit-learn's policy).
+  `secret-operations/sso/mitlearn-memory`, granted in mit-learn's policy by
+  ol-infrastructure#6934). Once its profile notes are removed (§5.1), mit-learn writes nothing
+  until a use case in §5.3 gives it something to write.
 
 `ol-mitlearn-client`'s default scopes name both clients as audiences of its tokens, which is what
 lets them exchange. The Canvas bot routes use key-auth and carry no learner token, so they cannot
@@ -917,16 +1086,25 @@ embeddings timed out inserted 24 notes 45 s after its learner's bank was deleted
 (`scripts/hindsight/test_isolation.py`) passed 84 of 84 on a fresh database on 2026-10-17,
 including a forget racing an async retain.
 
+The forget is platform-owned (decided 2026-11-13): no app holds the admin client, because a
+leaked admin secret can wipe any learner's memory and recovery is a whole-database restore.
+A scheduled job (`applications/hindsight/forget_job.py` and
+`scripts/forget_deleted_learners.py`, #7028) lists learner banks from the database, looks each
+learner up in Keycloak, and forgets those whose account is gone. Its Vault role reads the admin
+client, a Keycloak lookup client, and a database login that can select only `banks.bank_id`, so
+the job never reads a note. A run that would forget more than `hindsight:forget_cap` learners
+(25 in Production) forgets none and fails.
+
 Server settings. `LLM_PROVIDER=none`, `RETAIN_EXTRACTION_MODE=chunks`, observations and
 auto-consolidation off, `LLM_TRACE_ENABLED=false`, `STORE_DOCUMENT_TEXT=false`,
 `VECTOR_INDEX_MIN_ROWS=10000`, MCP off, and the file upload API off with attachments refused
 (attachment bytes sit in a table with no `bank_id`, out of the trigger's reach). Hindsight makes
-no LLM calls, so extraction stays in ol-llm under §5.3 item 1. It does embed every note and every
+no LLM calls, so extraction stays in ol-llm under §5.4 item 1. It does embed every note and every
 recall query itself, calling Bedrock through LiteLLM in-process with the pod's IRSA role
 (decision 6). Before storage, a retain's content, context, metadata keys and values, and entity text
 are redacted with the built-in secret and card screen plus email and phone patterns. Document
 ids, entity types and timestamps are not, so a document-id key must not carry learner content.
-Names and assessment content are not pattern-matchable and stay the ol-llm gate's job (§5.3
+Names, problem text and answers are not pattern-matchable and stay the ol-llm gate's job (§5.4
 item 2).
 
 Where it runs. Hindsight `1.2.0-slim` on the applications EKS cluster, cluster-internal at
@@ -938,39 +1116,120 @@ memory resources was consumed that day, and the next Production preview (2026-10
 of them pending. Not yet exercised: a QA retain and recall with a learn-ai token exchanged from
 a forwarded session.
 
-Still open:
+### 5.12 Decisions
 
-1. Whether `pydantic-ai-harness` (0.x) is acceptable as the implementation for A and B, or
-   whether the library implements compaction and history storage itself
-   (`tk-evaluate-pydantic-ai-harness-for-in-session-stat-926e93`). The same task now has to
-   say where in-session history is stored under item 2: in the shared service, or in the
-   app's own database as conversation state that is not "memory". This was not asked.
-2. Default retention for each category, and who executes deletion when an account is
-   removed. Tied to the data-handling policy, which is on hold
-   (`llm-usage-policies-spec.md` §3).
-3. Whether learn-ai keeps its custom Django LangGraph checkpointer or moves to the official
-   `PostgresSaver` (3.1.2), which adds `delete_thread`, `delete_for_runs`, `copy_thread` and
-   `prune` at the cost of living outside Django migrations.
-4. Writers without a learner session (`tk-grant-for-services-to-write-per-learner-memory-w-f03a14`).
-   The owner named four writers on 2026-10-20: learn-ai, mit-learn, the data platform
-   (aggregated per-learner behavioral records) and possibly mitxonline (enrollments). The last
-   two write from batch or server-side paths that hold no session, so they have no token to
-   exchange, and the admin client is limited to forget. The key-auth Canvas bot routes carry no
-   learner token either. The proposal is a client-credentials
-   scope that lets a service name the learner for retain only, under its own app tag and
-   document-id prefix, with one client per writer. mitxonline logs learners in through
-   `ol-mitlearn-client`, so it needs its own memory client as mit-learn did. Whether the fence
-   and redaction apply unchanged is undecided.
-5. A restore resurrects forgotten learners. In the PoC, `hindsight-admin` restore brought back
-   a learner forgotten after the backup, and an RDS snapshot restore would do the same. Forget
-   needs a permanent deletion ledger replayed after any restore, which does not exist. Who
-   runs it belongs with item 2.
-6. APISIX's `access_token_expires_leeway` defaults to 0, so it can forward a token with about
-   1 s left, and the exchange then fails. It should be about 60 s on learn-ai's and mit-learn's
-   `OLApisixOIDCConfig` before either integrates. Not yet set.
-7. Hindsight fixes the vector column to the model's dimension once a bank holds data, so
-   changing the embedding model means re-embedding every bank through export and import, which
-   is untested.
+Decided by the project owner:
+
+1. 2026-10-01: the category split in §5.10 is adopted. A and B are library concerns on
+   PydanticAI's message history. C and D sit behind the narrow interface. Hindsight's PoC runs
+   first for the richer case and cognee is the fallback, tried only if Hindsight fails its PoC.
+2. 2026-10-01: memory is a shared platform service. It is not stored in, deployed with, or
+   coupled to learn-ai or any other application: one memory service across apps, reached
+   through the library's interface, which is a client of that service. Consequences recorded
+   then: the RFC's `DjangoMemoryStore` in learn-ai's database is not the supported path
+   (`tk-bring-rfc-13314-s-learner-memory-onto-the-shared-853c25`); a backend that is a service
+   in its own right is favored over a library store; tenancy has to be designed rather than
+   inherited from an app's tables; one call to the shared service removes a learner's memory
+   for every app; and memory is keyed on the platform user id from the authenticated identity.
+3. 2026-10-15: Hindsight is the backend, used for storage and search only (§5.10, PoC results).
+   A learner has one memory, shared by every app, and every app call on a learner's memory is
+   authorized by a token derived from the learner's own session.
+4. 2026-10-16: the service is deployed from ol-infrastructure (`applications/hindsight`), QA
+   first. General memory that belongs to no learner is allowed under a separate grant. (§5.2
+   narrows what it is for, since the examples given then have a system of record.)
+5. 2026-10-21: embeddings are Cohere Embed v4 on Bedrock (`bedrock/cohere.embed-v4:0`, 1536
+   dimensions), called with the pod's IRSA role. The requirements are multilingual input and a
+   long support window. The first deployment's in-cluster bge-base-en-v1.5 is English-only and
+   truncates past 512 tokens, and Azure text-embedding-3 retires on 2028-02-09. Learner content
+   already goes to OpenAI, so a hosted embedding provider needs no separate approval.
+6. 2026-11-09: Hindsight's own embedding calls stay outside ol-llm and are measured instead of
+   routed through the library. Every retained note and every recall query still goes to
+   Bedrock from Hindsight's in-process LiteLLM client.
+   - Dollars: Hindsight invokes a Bedrock application inference profile per environment,
+     copied from `cohere.embed-v4:0` and tagged `Application: hindsight`, through
+     `EMBEDDINGS_LITELLM_SDK_MODEL_ID`. LiteLLM still takes `bedrock/cohere.embed-v4:0` to
+     shape the request, so stored vectors don't change. Cost Explorer splits by that tag only
+     once `Application` is an active cost allocation tag in the payer account, which the
+     linked account cannot check.
+   - Per-app counts: a model call extension, `ol_memory_ext.model_calls.EmbeddingMeter`, adds
+     to `ol_memory_embedding_calls_total`, `ol_memory_embedding_texts_total` and
+     `ol_memory_embedding_estimated_input_tokens_total` on Hindsight's `/metrics`, labelled
+     `app`, `operation`, `model` and `success`. Tokens are characters / 4: Hindsight's
+     LiteLLM SDK embeddings backend never reports provider input tokens, so a call's
+     `input_tokens` is 0 whatever LiteLLM returns. No text, bank, learner or document id is
+     recorded.
+   - The app on a retain is the document id's `<app>.` prefix. On a recall it is the app the
+     validator passed for the request. That relies on Hindsight awaiting `validate_recall`
+     inline before it embeds the query, and the embedding (run under `asyncio.gather`)
+     inheriting the request's context, which holds in the 1.2.0 source
+     (`memory_engine.py` ~9496 and ~9945). Only the QA `/metrics` check will confirm it.
+     Otherwise the app is `unknown`.
+   - Not covered: no §4 attribution beyond the app (no `use_case`, no user), no Opik trace,
+     and no budget count.
+   - Gated per stack by `hindsight:embeddings_metering`: on in QA, off in Production until QA
+     shows the profile and the counters working.
+7. 2026-11-13: the forget is platform-owned. No app holds the admin client; a scheduled job
+   forgets learners whose Keycloak account is gone (§5.11).
+8. 2026-11-19, after a review of this part:
+   - Learner context with a system of record is read from its source, not copied into memory.
+     mit-learn stops writing profile notes (§5.1).
+   - Learner memory is the learner's interactions across the system, including Open edX
+     writing performance observations that build a knowledge profile (§5.1, §5.3).
+   - Problem text and answers are never stored; observations derived from performance are, so
+     bots such as the tutor can personalize instruction (§5.4 item 2).
+   - Hindsight scales automatically and is planned as the substrate for agentic workloads
+     (§5.8).
+   - The rule that every call site goes through ol-llm covers code we own. Model calls inside a
+     third-party service are allowed, with the visibility §5.8 requires. The gateway is still
+     evaluated, at unchanged priority.
+
+### 5.13 Open, with owners
+
+Proposals in §5.4 to §5.9 stay proposals until the owner decides them; each open item names
+where it is tracked.
+
+1. The note contract: the kind registry in ol-llm, the new `Note` fields and kind filters, and
+   the `resolve_write_tag_scope` change in `ol_memory_ext` (§5.5). No task yet.
+2. The gate, its evaluation cases, and the note rendering helper in ol-llm (§5.4 items 2 and
+   3). Item 2 of `tk-bring-rfc-13314-s-learner-memory-onto-the-shared-853c25` covers the gate;
+   nothing covers rendering yet.
+3. Consent enforced by the service: the per-learner setting, learner-started clear, the
+   generation check, and the learner-facing view (§5.6). Whether memory is on by default or
+   opt-in needs a privacy review. No task yet.
+4. The session-less write grant, with the limits in §5.7
+   (`tk-grant-for-services-to-write-per-learner-memory-w-f03a14`).
+5. Whether performance observations are education records under institutional policy (§5.4
+   item 2), for the owners of the data-handling policy
+   (`tk-policy-data-handling-and-retention-for-prompts-c-76830f`).
+6. Whether learn-ai's tutor writes derived performance observations, reopening mbertrand's
+   2026-11-17 ruling (§5.3), on `tk-learn-ai-read-and-write-learner-memory-through-o-fd3d0a`.
+7. How an Open edX user maps to a Keycloak user id in each deployment (§5.7), on
+   `tk-open-edx-writes-learner-performance-observations-efd73d`.
+8. Autoscaling, the API and worker split, and a service SLO (§5.8), on
+   `tk-autoscale-the-hindsight-memory-service-and-size--7222ae`.
+9. Agent principals: fresh learner tokens for runs longer than 300 s, and run-scoped agent
+   banks (§5.8). Tied to the durable execution evaluation
+   (`tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78`).
+10. Conversation retention and per-learner deletion in learn-ai, and the forget job reaching
+    conversations (§5.9). Retention waits on the data-handling policy
+    (`llm-usage-policies-spec.md` §3); no task covers learn-ai's per-learner delete yet.
+11. Whether `pydantic-ai-harness` (0.x) implements history and compaction for A and B
+    (`tk-evaluate-pydantic-ai-harness-for-in-session-stat-926e93`). Where history lives is
+    answered by §5.9: in the app's own database, as conversation state.
+12. Whether learn-ai keeps its custom Django LangGraph checkpointer or moves to the official
+    `PostgresSaver` (3.1.2), which adds `delete_thread`, `delete_for_runs`, `copy_thread` and
+    `prune` at the cost of living outside Django migrations.
+13. A restore resurrects forgotten learners. In the PoC, `hindsight-admin` restore brought back
+    a learner forgotten after the backup, and an RDS snapshot restore would do the same. Forget
+    needs a permanent deletion ledger replayed after any restore, which does not exist. No task
+    yet.
+14. Hindsight fixes the vector column to the model's dimension once a bank holds data, so
+    changing the embedding model means re-embedding every bank through export and import,
+    which is untested (`tk-test-hindsight-export-import-re-embedding-before-1f636a`).
+15. APISIX's `access_token_expires_leeway` defaults to 0, so it can forward a token with about
+    1 s left and the exchange then fails. learn-ai's route sets 60 s
+    (`FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS`, `applications/learn_ai/definition.py:361`);
+    any other app that exchanges a forwarded token needs the same before it writes.
 
 ## 6. Call contract
 
@@ -1497,7 +1756,8 @@ decided. This part records the starting facts and what the evaluation has to ans
    completed model request, with the §3 error contract intact.
 5. Waiting on a human (approval, a learner's reply) for hours or days.
 6. Tracing continuity in Opik across a resume.
-7. Whether the engine, if it is a service, is shared across apps the way memory is (§5.5).
+7. Whether the engine, if it is a service, is shared across apps the way memory is (§5.11).
+   §5.8 depends on the answer for agents that run longer than a learner's exchanged token.
 
 Out of scope until that evaluation reports: adding `temporal` or `dbos` extras to `ol-llm`.
 
@@ -1511,7 +1771,7 @@ registries and evaluation is moving fast, and the platform should not be locked 
 vendor. So ol-llm's public interfaces, and every file ol-llm has app repositories commit, are
 defined in ol-llm's terms, with Opik as one backend behind them. Memory already works this
 way: the backend is chosen by name (`hindsight`, `in-memory`, or an entry point in
-`ol_llm.memory_backends`) and call sites do not change when it does (§5.5). Replacing Opik
+`ol_llm.memory_backends`) and call sites do not change when it does (§5.4 item 7). Replacing Opik
 should then mean writing one adapter, importing the exports the repositories already hold,
 and a generated rewrite of each app's version ids (principle 3), not code changes in every
 app.
