@@ -613,7 +613,8 @@ against the QA archive. Loki had been taking writes since about 2026-11-05 and M
 2026-11-18 18:54 UTC. Production is scheduled to be switched on **Monday 2026-11-23**.
 That is five days into the Mimir soak, not the seven the plan asks for. This was a
 deliberate call, because the gates below already pass. Run them again only if the
-archive code changes before then.
+archive code changes before then. The access-log filter that ships with this record
+(finding 2) changes no gate.
 
 | Gate | Result | Evidence |
 |------|--------|----------|
@@ -624,10 +625,10 @@ archive code changes before then.
 | P1/P2 no double send | Pass | Per-namespace Cloud log bytes and Cloud series show no doubling. See finding 2 for the archive's own logs. |
 | P1/P2 transport | Pass | Source-VPC NAT `BytesOutToDestination` stayed flat while NLB `ProcessedBytes` rose 7× when Mimir writers came on. A data-qa NAT spike (8 GB, 2026-11-18 03:00–06:00 UTC) came 16 h before that rollout and is unrelated. |
 | P1 soak | Pass | No restart loops. The Loki compactor's retention pass and the Mimir compactor both ran within the last hour. The Loki bucket grows ~0.85 GB/day, about 15% of QA's 5.7 GB/day raw, consistent with the Production estimate. |
-| P2 CPU parity | Pass | `sum(rate(container_cpu_usage_seconds_total[1h])) by (namespace)` for applications-qa: 20/20 namespaces within 1%, 3.267 cores on both sides. |
+| P2 CPU parity | Pass | `sum(rate(container_cpu_usage_seconds_total[1h])) by (namespace)` for applications-qa, and again with the plan's `[5m]`: 20/20 namespaces within 1%, 3.267 cores on both sides. |
 | P2 series parity | Pass, gate reworded | 179k in the archive against 235k in Cloud. Cloud's count includes ~47k trace-derived series (spanmetrics and servicegraph) and ~15k Asserts series that never reach the archive. Without them it is ~173k against 179k (+3.5%). Compare like with like in Production too. |
 | P2 QA series headroom | Pass | The busiest ingester holds 64.6k of its 200k share of `max_global_series_per_user` (600k at RF1 over 3 ingesters), 32% used. |
-| P1/P2 failure isolation | Pass | Loki and Mimir distributors at 0 from 18:31 to 19:33 UTC, compared with the hour before. Cloud log entries dropped: 0. Cloud remote-write samples failed: 0. Cloud samples/s +3%. Scrape targets up flat. Archive counters rose: 338k OTLP log records failed, 41k metric points failed, 88k vector-log-proxy archive discards. Remote-write WAL lag peaked at 61 min, under the 2 h keepalive. Memory: `alloy-logs` 140 → 222 MB, `alloy-metrics` 0.90 → 1.02 GB, vector-log-proxy and EC2 hosts flat. At 17 min after restore, every archive drop counter had been at 0 for 10 min, WAL lag was back to 8 s, and Loki matched Cloud exactly again (103,552 lines in 10 min). |
+| P1/P2 failure isolation | Pass, gate reworded | The plan asks for Cloud log ingest to "stay flat". It rose 72%, but the rise is the archive's own failure noise (finding 3), not back-pressure on the Cloud path, so the gate is read as "Cloud data path unaffected". Loki and Mimir distributors at 0 on 2026-11-19 from 18:31 to 19:33 UTC, compared with the hour before. Cloud log entries dropped: 0. Cloud remote-write samples failed: 0. Cloud samples/s +3%. Scrape targets up flat. Archive counters rose: 338k OTLP log records failed, 41k metric points failed, 88k vector-log-proxy archive discards. Remote-write WAL lag peaked at 61 min, under the 2 h keepalive. Memory: `alloy-logs` 140 → 222 MB, `alloy-metrics` 0.90 → 1.02 GB, vector-log-proxy and EC2 hosts flat. At 17 min after restore, every archive drop counter had been at 0 for 10 min, WAL lag was back to 8 s, and Loki matched Cloud exactly again (103,552 lines in 10 min). |
 
 Findings to act on:
 
@@ -656,16 +657,17 @@ Findings to act on:
    outage hour, because the OTLP queue gives up after `maxElapsedTime: 1m`. This is
    the best-effort design (D3, D10) working as intended.
 6. **Metrics are not backfilled after an outage either.** The WAL replay on restore
-   ran into the per-tenant `ingestion_rate` limit (QA 30k samples/s, Production 50k
-   against 8.1k normal). One distributor alone logged ~2.5k
+   ran into the per-tenant `ingestion_rate` limit (QA 30k samples/s against ~3.8k
+   normal; Production 50k against 8.1k). One distributor alone logged ~2.5k
    `err-mimir-tenant-max-ingestion-rate` rejections in the 20 min after restore. With `retryOnHttp429: false` those samples were dropped. The archive
    holds 4–45% of the normal samples for the outage hour. Raising `ingestion_rate` and
    `ingestion_burst_size` would let a short outage backfill. Leaving them as they are
    accepts the gap as best-effort.
 
-Still not recorded in this ADR: the retention and privacy sign-off and the Grafana
-Cloud quote (open question 4), and the instance roll of the Concourse, Consul and
-Vault hosts.
+The plan makes the Production switch-on conditional on the retention and privacy
+sign-off and the Grafana Cloud quote (open question 4). Neither is recorded here:
+before Monday, record each one or record that it was waived. The instance roll of the
+Concourse, Consul and Vault hosts is also still outstanding.
 
 ## Related Decisions
 
