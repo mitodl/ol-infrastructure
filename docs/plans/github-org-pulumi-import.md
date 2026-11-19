@@ -1152,8 +1152,8 @@ because the evidence is what makes a decision re-examinable when the estate chan
 ## 10. Proposals for review (drafted 2026-10-26)
 
 These are drafts and nothing here has been applied. Each one needs a team decision before
-any YAML or Pulumi changes. Counts assume the 11 dormant repos are archived in the same
-batch: default-labels-repo, mit-open-bk (a fork), django-cas-mapper, edxcut, mit-moira,
+any YAML or Pulumi changes. Counts are after the 11 dormant repos were archived in #6656
+(merged 2026-10-29): default-labels-repo, mit-open-bk (a fork), django-cas-mapper, edxcut, mit-moira,
 mitx_cas_mapper, realistic-mm-users, reddit-config, template-mit-demo,
 world_geographic_regions and xanalytics. That leaves 62 active non-fork repos, all
 `tier-1`.
@@ -1187,7 +1187,7 @@ using the same pattern as `tiers.py`. A free-form vocabulary can't be enforced a
 | `dev-tooling` | .github, ol-github-workflows, release-script, agent-kit, open-learnix |
 | `org-docs` | handbook, hq, product, open-collaboration, platform-engineering-site, tech-talk-slides, ol-customizations-nytimes-library |
 
-To review: whether `openedx` should fold into the product areas, and the four `?`
+To review: whether `openedx` should fold into the product areas, and the two `?`
 rows. Once it is agreed, rollout is one PR that gives each of the 62 repo files its area
 topic. micromasters, ocw-studio and ol-infrastructure already carry theirs. mitx-theme
 already carries `openedx`, which is also an area name, but is assigned `mitx-residential`,
@@ -1219,18 +1219,18 @@ any that are missing, so nothing is backfilled silently.
 
 Order: agree the values, define both schemas in `organization/custom_properties.py`, then
 add per-repo values. That needs the code change in `repository.py` and the `imports`
-command that §5.2 calls out, because each property is its own
+command listed in §5.1, because each property is its own
 `RepositoryCustomProperty`.
 
 ### 10.3 Renaming `master` on the remaining 16 repos (CON-03)
 
 **Mechanism:** set `default_branch: main` in the repo YAML and pass `rename=True` to that
-repo's `BranchDefault`, behind a per-repo opt-in key. That key does not exist yet:
-`repository.py` builds `BranchDefault` with no `rename` argument. So step 0, before any
-wave, is the code change that adds the key and passes it through. Until that lands,
-setting `default_branch: main` on a `master` repo makes the apply fail, because the
-branch it switches to does not exist. The provider then renames the branch
-instead of switching to a branch that doesn't exist. GitHub [retargets open PRs, moves
+repo's `BranchDefault`, behind a per-repo opt-in key. With `rename=True` the provider
+renames the branch instead of switching to a branch that doesn't exist. That key does not
+exist yet: `repository.py` builds `BranchDefault` with no `rename` argument. So step 0,
+before any wave, is the code change that adds the key and passes it through. Until that
+lands, setting `default_branch: main` on a `master` repo makes the apply fail, because the
+branch it switches to does not exist. GitHub [retargets open PRs, moves
 branch protection and redirects web
 URLs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-branches-in-your-repository/renaming-a-branch).
 It does **not** update workflow files, raw URLs, local clones or external consumers
@@ -1251,7 +1251,7 @@ The waves below are ordered by what has to change outside GitHub. Counts are fro
 | 2 | redux-hammock | 21 | 1 | |
 | 2 | release-script | 15 | 1 | |
 | 2 | vault-raft-backup | 9 | 3 | |
-| 3 | mitx-theme | 1 | 0 | `branch_override="master"` at `bridge/settings/openedx/version_matrix.py:434` and `:506` (not the `release=` field next to it, which names the Open edX release) |
+| 3 | mitx-theme | 1 | 0 | `branch_override="master"` on the two `edxapp_theme` entries (`origin_override` mitx-theme) in `bridge/settings/openedx/version_matrix.py` (lines 290 and 362 on main as of 2026-11-19) (not the `release=` field next to it, which names the Open edX release) |
 | 3 | micromasters | 51 | 3 | `repo_main_branch` in `bridge/settings/apps.py` |
 | 3 | mitxpro | 26 | 2 | `repo_main_branch` in `bridge/settings/apps.py` |
 | 3 | ocw-studio | 30 | 3 | `apps.py`, plus `ocw_course_publisher.py` pipeline |
