@@ -46,7 +46,10 @@ from ol_infrastructure.infrastructure.aws.eks.apisix_official import (
     setup_apisix,
 )
 from ol_infrastructure.infrastructure.aws.eks.aws_backup import setup_eks_backup
-from ol_infrastructure.infrastructure.aws.eks.aws_utils import setup_aws_integrations
+from ol_infrastructure.infrastructure.aws.eks.aws_utils import (
+    NTH_NODE_TERMINATION_GRACE_PERIOD_SECONDS,
+    setup_aws_integrations,
+)
 from ol_infrastructure.infrastructure.aws.eks.cert_manager import setup_cert_manager
 from ol_infrastructure.infrastructure.aws.eks.core_dns import create_core_dns_resources
 from ol_infrastructure.infrastructure.aws.eks.external_dns import setup_external_dns
@@ -663,6 +666,11 @@ def pod_subnet_ids_in_zone(zone: str | None) -> Output[list[str]]:
     )
 
 
+# Headroom past the handler's drain timeout for the delay between the hook firing
+# and the drain starting: the handler polls IMDS every 2 seconds, then cordons
+# and taints the node before it evicts anything.
+NODE_DRAIN_HOOK_MARGIN_SECONDS = 60
+
 for ng_name, ng_config in configured_node_groups.items():
     node_group_subnet_ids = pod_subnet_ids_in_zone(ng_config.get("availability_zone"))
     taint_list = {}
@@ -683,48 +691,66 @@ for ng_name, ng_config in configured_node_groups.items():
     # Even though this is in the loop, it will only export the first one (the 'core nodes')
     export("node_group_security_group_id", node_group_sec_group.security_group.id)
 
-    node_groups.append(
-        eks.NodeGroupV2(
-            f"{cluster_name}-eks-nodegroup-{ng_name}",
-            cluster=eks.CoreDataArgs(
-                cluster=cluster.eks_cluster,
-                cluster_iam_role=cluster_role,
-                endpoint=cluster.eks_cluster.endpoint,
-                instance_roles=[node_role],
-                node_group_options=eks.ClusterNodeGroupOptionsArgs(
-                    node_associate_public_ip_address=False,
-                ),
-                provider=k8s_provider,
-                subnet_ids=node_group_subnet_ids,
-                vpc_id=target_vpc["id"],
+    node_group = eks.NodeGroupV2(
+        f"{cluster_name}-eks-nodegroup-{ng_name}",
+        cluster=eks.CoreDataArgs(
+            cluster=cluster.eks_cluster,
+            cluster_iam_role=cluster_role,
+            endpoint=cluster.eks_cluster.endpoint,
+            instance_roles=[node_role],
+            node_group_options=eks.ClusterNodeGroupOptionsArgs(
+                node_associate_public_ip_address=False,
             ),
-            launch_template_tag_specifications=[
-                aws.ec2.LaunchTemplateTagSpecificationArgs(
-                    resource_type="instance",
-                    tags=aws_config.tags,
-                ),
-                aws.ec2.LaunchTemplateTagSpecificationArgs(
-                    resource_type="volume",
-                    tags=aws_config.tags,
-                ),
-            ],
-            gpu=ng_config.get("gpu") or False,
-            min_refresh_percentage=eks_config.get_int("min_refresh_percentage") or 90,
-            instance_type=ng_config["instance_type"],
-            instance_profile=node_instance_profile,
-            labels=ng_config["labels"] or {},
-            node_security_group=node_group_sec_group.security_group,
-            node_root_volume_size=ng_config["disk_size_gb"] or 250,
-            node_root_volume_delete_on_termination=True,
-            node_root_volume_type="gp3",
-            node_user_data=DISABLE_SCTP_USER_DATA,
-            cluster_ingress_rule=node_group_sec_group.security_group_rule,
-            desired_capacity=ng_config["scaling"]["desired"] or 3,
-            max_size=ng_config["scaling"]["max"] or 5,
-            min_size=ng_config["scaling"]["min"] or 2,
-            taints=taint_list,
-            opts=ResourceOptions(parent=cluster, depends_on=cluster),
-        )
+            provider=k8s_provider,
+            subnet_ids=node_group_subnet_ids,
+            vpc_id=target_vpc["id"],
+        ),
+        launch_template_tag_specifications=[
+            aws.ec2.LaunchTemplateTagSpecificationArgs(
+                resource_type="instance",
+                tags=aws_config.tags,
+            ),
+            aws.ec2.LaunchTemplateTagSpecificationArgs(
+                resource_type="volume",
+                tags=aws_config.tags,
+            ),
+        ],
+        gpu=ng_config.get("gpu") or False,
+        min_refresh_percentage=eks_config.get_int("min_refresh_percentage") or 90,
+        instance_type=ng_config["instance_type"],
+        instance_profile=node_instance_profile,
+        labels=ng_config["labels"] or {},
+        node_security_group=node_group_sec_group.security_group,
+        node_root_volume_size=ng_config["disk_size_gb"] or 250,
+        node_root_volume_delete_on_termination=True,
+        node_root_volume_type="gp3",
+        node_user_data=DISABLE_SCTP_USER_DATA,
+        cluster_ingress_rule=node_group_sec_group.security_group_rule,
+        desired_capacity=ng_config["scaling"]["desired"] or 3,
+        max_size=ng_config["scaling"]["max"] or 5,
+        min_size=ng_config["scaling"]["min"] or 2,
+        taints=taint_list,
+        opts=ResourceOptions(parent=cluster, depends_on=cluster),
+    )
+    node_groups.append(node_group)
+
+    # Without a termination hook the ASG shuts an instance down the moment it
+    # decides to terminate it, and the node termination handler (IMDS mode) only
+    # sees the "Terminated" target lifecycle state after the kubelet has begun
+    # shutting down. Nothing is drained, so a pod with an EBS volume waits out
+    # the attach/detach controller's 6 minute force-detach timeout before it can
+    # start on another node. The hook holds the instance in Terminating:Wait
+    # while the handler drains it. IMDS mode cannot complete a lifecycle action,
+    # so every termination waits the full timeout and then CONTINUEs.
+    aws.autoscaling.LifecycleHook(
+        f"{cluster_name}-eks-nodegroup-{ng_name}-drain-hook",
+        name=f"{cluster_name}-eks-nodegroup-{ng_name}-drain",
+        autoscaling_group_name=node_group.auto_scaling_group.name,
+        lifecycle_transition="autoscaling:EC2_INSTANCE_TERMINATING",
+        default_result="CONTINUE",
+        heartbeat_timeout=NTH_NODE_TERMINATION_GRACE_PERIOD_SECONDS
+        + NODE_DRAIN_HOOK_MARGIN_SECONDS,
+        opts=ResourceOptions(parent=node_group),
     )
 
     allow_all_ingress_from_pod_cidrs = aws.ec2.SecurityGroupRule(
