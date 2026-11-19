@@ -154,7 +154,11 @@ from typing import Any
 import pulumi_github as github
 from pulumi import ResourceOptions
 
-from bridge.settings.apps import RELEASE_BOT_APP_ID, release_workflow_repos
+from bridge.settings.apps import (
+    PRODUCTION_TAG_PREFIX,
+    RELEASE_BOT_APP_ID,
+    release_workflow_repos,
+)
 from ol_infrastructure.saas.github.repositories import archetypes
 
 #: Mirrors the THREE TEAM ENTRIES of `_ADMIN_BYPASS` in organization/org_rulesets.py
@@ -332,6 +336,68 @@ def build_release_branches(repo: dict[str, Any], repository: github.Repository) 
         conditions=_release_branch_conditions(sorted(branches)),
         rules=github.RepositoryRulesetRulesArgs(
             non_fast_forward=True,
+            deletion=True,
+        ),
+        opts=ResourceOptions(protect=True, depends_on=[repository]),
+    )
+
+
+#: The name GitHub shows for the Production-tag ruleset this module creates.
+PRODUCTION_TAGS_RULESET_NAME = "production-tags"
+
+#: Who may create, move or delete a Production tag. ol-release-bot writes them, from
+#: a release's Production job (k8s_apps/scripts/promote_tag.py).
+#: odl-engineering-owners keeps `always`, as in `_BYPASS`, so an owner can still
+#: create one by hand when that job's tag step fails. Not the `pull_request`
+#: teams: a tag is never pushed through a pull request.
+_PRODUCTION_TAGS_BYPASS = [
+    github.RepositoryRulesetBypassActorArgs(
+        actor_type="Team",
+        actor_id=archetypes.TEAM_IDS["odl-engineering-owners"],
+        bypass_mode="always",
+    ),
+    _RELEASE_BOT_BYPASS,
+]
+
+
+def build_production_tags(repo: dict[str, Any], repository: github.Repository) -> None:
+    """Let only ol-release-bot (and odl-engineering-owners) write Production tags.
+
+    A `production/<version>` tag records that a release reached Production, and
+    consumers act on it: a tag-only app's consumers track the newest one, and the
+    mitxonline and ol-analytics-api API-client pipelines are moving to publish a
+    stable npm client for every such tag
+    (https://github.com/mitodl/ol-infrastructure/pull/7036). Without this, anyone
+    with push access could push `production/2099.12.31.1`: a client would be
+    published under that version, and promote_tag.py would treat every real
+    release after it as older than the newest Production tag.
+
+    Built for every repo in `bridge.settings.apps.APPS`, not only those already
+    on the release-resource workflow, for the reason `_required_checks_bypass()`
+    gives: a pipeline flip then needs no ruleset edit alongside it. On a repo with
+    no Production tags yet, the ruleset blocks nothing anyone does. Not on an
+    archived repo, where GitHub refuses ruleset writes.
+    """
+    name = repo["name"]
+    if f"mitodl/{name}" not in _RELEASE_WORKFLOW_REPOS or repo.get("archived"):
+        return
+
+    github.RepositoryRuleset(
+        f"mitodl-repo-production-tags-{name}",
+        name=PRODUCTION_TAGS_RULESET_NAME,
+        repository=name,
+        target="tag",
+        enforcement="active",
+        bypass_actors=_PRODUCTION_TAGS_BYPASS,
+        conditions=github.RepositoryRulesetConditionsArgs(
+            ref_name=github.RepositoryRulesetConditionsRefNameArgs(
+                includes=[f"refs/tags/{PRODUCTION_TAG_PREFIX}*"],
+                excludes=[],
+            ),
+        ),
+        rules=github.RepositoryRulesetRulesArgs(
+            creation=True,
+            update=True,
             deletion=True,
         ),
         opts=ResourceOptions(protect=True, depends_on=[repository]),
