@@ -88,6 +88,36 @@ def vault_secrets(
     ]
 
 
+def memory_exchange_secret() -> VaultSecret:
+    """Describe learn-ai's learner-memory exchange client, read where memory is on.
+
+    ol-learn-ai-client (``secret-operations/sso/learn-ai``, which the keycloak
+    substructure's olapps.py writes) exchanges a learner's forwarded session
+    token for one the memory service accepts (``ol_llm.memory``). It is not in
+    ``vault_secrets``, so environments without the memory service and local dev
+    don't get it.
+    """
+    return VaultSecret(
+        name="learn-ai-memory-exchange",
+        kind="static",
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/learn-ai",
+        env={
+            "OL_LLM_MEMORY_EXCHANGE_CLIENT_ID": Template(
+                '{{ get .Secrets "client_id" }}'
+            ),
+            "OL_LLM_MEMORY_EXCHANGE_CLIENT_SECRET": Template(
+                '{{ get .Secrets "client_secret" }}'
+            ),
+            # The secret's url is the olapps realm's.
+            "OL_LLM_MEMORY_TOKEN_URL": Template(
+                '{{ get .Secrets "url" }}/protocol/openid-connect/token'
+            ),
+        },
+    )
+
+
 def secret_named(secrets: Iterable[VaultSecret], name: str) -> VaultSecret:
     """Return the secret called ``name``.
 
