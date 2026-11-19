@@ -40,8 +40,8 @@ TIKA_CHART_VERSION = "3.2.2"
 # PRs never automerge: run `cosign verify` on the new digest before approving.
 # The two assignments must stay adjacent and in this order for that manager.
 # renovate-digest: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters
-PAYPAL_ADAPTER_VERSION = "2.4.2"
-PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:89ef36f0a06aa83788c1a465f95ffabd9b5b1a1e9e8e99eef57e484d67c28ba8"  # pragma: allowlist secret
+PAYPAL_ADAPTER_VERSION = "2.5.0"
+PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:6c1142f4cd5d004d07b533756fb31d541ad181da74ffa73e4d6321ad96491667"  # pragma: allowlist secret
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.19.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
