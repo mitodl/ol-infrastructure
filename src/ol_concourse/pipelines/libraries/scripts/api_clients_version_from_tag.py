@@ -51,6 +51,8 @@ _RELEASE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 _PACKAGE_VERSION = re.compile(r'^(  "version": ")[^"]*(")', re.MULTILINE)
 _MAX_MONTH = 12
 _MAX_DAY = 31
+# Sorts a legacy YYYY.M.D version above every release number of its day.
+_LEGACY_DAY_END = sys.maxsize
 
 
 def client_version(tag: str) -> str:
@@ -97,20 +99,28 @@ def source_tag(source_dir: Path, tag_regex: str) -> str:
 def _release_key(version: str) -> tuple[int, int, int] | None:
     """Return a ``X.Y.Z`` version's numbers, ignoring any prerelease suffix.
 
-    A legacy bumpver ``YYYY.M.D`` version (minor 1-12) is read as the release
-    scheme's ``YYYY.MDD.0``, the first client of that day. The two cannot be
-    confused, because a release-scheme minor is at least 101. Without this,
-    every release-scheme version sorts above a legacy one, so the first
-    client after the cutover could publish an older release's API (a
-    Production rollback re-run before any ``production/*`` tag exists) above
-    the newer one bumpver published at cut time.
+    A legacy bumpver ``YYYY.M.D[-N]`` version (minor 1-12) is read as sorting
+    above every release-scheme version of that day, ``YYYY.MDD.<any>``. The
+    two cannot be confused, because a release-scheme minor is at least 101.
+    Without this, every release-scheme version sorts above a legacy one, so
+    the first client after the cutover could publish an older release's API
+    (a Production rollback re-run before any ``production/*`` tag exists)
+    above the newer one bumpver published at cut time.
+
+    The legacy version names only the day, not which of that day's releases
+    it was generated from (mitxonline's ``2026.11.18-1`` came from release
+    ``2026.11.18.2``; the ``-1`` counts regenerations, not releases), so a
+    release from the same day may be older than it. Refusing the whole day
+    is the one floor that cannot let an older API through. It costs one day
+    at most, once: a client change from a release on the legacy version's
+    day waits for the next day's release.
     """
     match = _RELEASE.match(version)
     if match is None:
         return None
     major, minor, patch = (int(part) for part in match[0].split("."))
     if 1 <= minor <= _MAX_MONTH and 1 <= patch <= _MAX_DAY:
-        return major, minor * 100 + patch, 0
+        return major, minor * 100 + patch, _LEGACY_DAY_END
     return major, minor, patch
 
 

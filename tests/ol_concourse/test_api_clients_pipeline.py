@@ -444,28 +444,39 @@ def test_set_version_refuses_a_version_that_does_not_sort_higher(tmp_path, curre
     assert not (repo / ".git" / "publish-tag").exists()
 
 
-@pytest.mark.parametrize("current", ["2026.11.18", "2026.11.18-1", "2026.12.1"])
-def test_a_legacy_version_is_a_floor_for_older_releases(tmp_path, current):
-    """Bumpver's YYYY.M.D[-N] reads as that day's YYYY.MDD.0, so the first
-    tag-derived client cannot publish an older release's API above it (a
+@pytest.mark.parametrize(
+    ("current", "version"),
+    [
+        ("2026.11.18", "2026.1110.1"),
+        ("2026.11.18-1", "2026.1110.1"),
+        ("2026.12.1", "2026.1110.1"),
+        # The legacy version names only its day. mitxonline's 2026.11.18-1 came
+        # from release 2026.11.18.2, so 2026.11.18.1 (or any same-day release)
+        # may be an older API than the one it holds.
+        ("2026.11.18-1", "2026.1118.1"),
+        ("2026.11.18", "2026.1118.1"),
+        ("2026.11.18", "2026.1118.99"),
+    ],
+)
+def test_a_legacy_version_is_a_floor_for_its_day_and_older(tmp_path, current, version):
+    """Bumpver's YYYY.M.D[-N] sorts above every release of its day, so the
+    first tag-derived client cannot publish an older release's API above it (a
     Production rollback re-run before any production/* tag exists).
     """
     repo = _client_repo(tmp_path, ["one-api-axios"], current)
 
     with pytest.raises(ValueError, match="does not sort above"):
-        set_version(repo, "2026.1110.1", ["one-api-axios"])
+        set_version(repo, version, ["one-api-axios"])
     assert (repo / "VERSION").read_text() == f"{current}\n"
 
 
 @pytest.mark.parametrize("current", ["2026.11.12", "2026.11.18", "2026.11.18-1"])
-def test_a_release_from_the_legacy_version_s_day_or_later_is_accepted(
-    tmp_path, current
-):
+def test_a_release_from_after_the_legacy_version_s_day_is_accepted(tmp_path, current):
     repo = _client_repo(tmp_path, ["one-api-axios"], current)
 
-    set_version(repo, "2026.1118.1", ["one-api-axios"])
+    set_version(repo, "2026.1119.1", ["one-api-axios"])
 
-    assert (repo / "VERSION").read_text() == "2026.1118.1\n"
+    assert (repo / "VERSION").read_text() == "2026.1119.1\n"
 
 
 def test_the_version_step_does_nothing_for_an_unchanged_client(tmp_path, monkeypatch):
