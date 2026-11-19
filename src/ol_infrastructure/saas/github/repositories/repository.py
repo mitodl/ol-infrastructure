@@ -236,12 +236,31 @@ def build(repo: dict[str, Any]) -> github.Repository:
     # GitHub will not let security updates be on, so there is no second state to assert.
     # Nothing is orphaned by the skip -- no such resource has ever existed for an
     # alerts-off repo, since every one of them failed to create.
+    #
+    # RETAIN_ON_DELETE FOR THE SAME 422. In the two usual ways this resource leaves the
+    # program, alerts are already off by the time Pulumi deletes it. When a
+    # repo is archived, GitHub turns its alerts off. When `vulnerability_alerts` flips
+    # to false, the alerts update runs first. Pulumi deletes removed resources at the
+    # end of a deployment, so the delete reaches GitHub after alerts are off. The
+    # provider deletes by calling `DELETE /automated-security-fixes`, which then 422s,
+    # and only a 403 "archived" response is treated as already gone. Confirmed against
+    # archived edx-api-client on 2026-10-26. Dropping the resource from state loses
+    # nothing, because GitHub will not let security updates be on while alerts are
+    # off. A third way out, deleting the repo's file from data/repos/, also deletes
+    # `mitodl-repo-vulnerability-alerts-<repo>`, which is not retained: its delete
+    # turns alerts off, so security updates end up off on that path too. The option
+    # only takes effect once it is in state, so a resource has to go through one
+    # deploy with it before it is dropped. (The 11-repo archive in #6656 merged before
+    # this did; none of its repos still has this resource in state.)
     if repo.get("vulnerability_alerts"):
         github.RepositoryDependabotSecurityUpdates(
             f"mitodl-repo-dependabot-security-updates-{name}",
             repository=name,
             enabled=bool(repo.get("dependabot_security_updates")),
-            opts=ResourceOptions(depends_on=[repository, vulnerability_alerts]),
+            opts=ResourceOptions(
+                depends_on=[repository, vulnerability_alerts],
+                retain_on_delete=True,
+            ),
         )
 
     _tier_property(name, repo["tier"], repository)
