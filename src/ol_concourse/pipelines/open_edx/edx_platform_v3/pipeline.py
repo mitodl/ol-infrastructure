@@ -288,7 +288,7 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         pulumi_code=edx_pulumi_code,
                     )
                 )
-                job_names.append(target.job_name)
+                job_names.extend(job.name for job in e2e_fragments[-1].jobs)
 
         combined_fragments = PipelineFragment.combine_fragments(
             *container_fragments, *pulumi_fragments, *e2e_fragments

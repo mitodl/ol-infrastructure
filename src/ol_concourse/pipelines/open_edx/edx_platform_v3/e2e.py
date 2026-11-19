@@ -1,9 +1,10 @@
 """Non-blocking end-to-end tests for an edxapp stage.
 
 After a stage's deploy job, and once a night, run `openedx/end-to-end-tests`
-against that stage. Nothing lists the job in `passed`, so a red run holds up no
-promotion: it shows what broke for someone to look at, and Production's preview
-and deploy keep waiting on the stage's deploy job alone.
+against that stage, from two jobs that share a serial group. Nothing lists either
+in `passed`, so a red run holds up no promotion: it shows what broke for someone
+to look at, and Production's preview and deploy keep waiting on the stage's deploy
+job alone.
 """
 
 from ol_concourse.lib.models.fragment import PipelineFragment
@@ -31,7 +32,7 @@ E2E_SUITE_URI = "https://github.com/openedx/end-to-end-tests"
 # commit (or a dependency in its lockfile) should be read before it runs here.
 # Bump it together with E2E_PLAYWRIGHT_IMAGE_TAG, to the image matching that
 # commit's @playwright/test in package-lock.json.
-E2E_SUITE_REF = "08e1a7192b2045eb4f496364d443669c5bb8d2a4"  # pragma: allowlist secret
+E2E_SUITE_REF = "715d8f4f4418d18969f9da9766382fb467e9c95f"  # pragma: allowlist secret
 
 # The suite pins @playwright/test in its own repository, so this tag cannot be
 # derived from a package.json here the way the canaries derive theirs. The run
@@ -80,6 +81,11 @@ class E2ETarget(BaseModel):
         """The job's name, e.g. ``e2e-tests-mitxonline-qa``."""
         return f"e2e-tests-{self.deployment_name}-{self.stage.lower()}"
 
+    @property
+    def nightly_job_name(self) -> str:
+        """The nightly job's name, e.g. ``e2e-tests-mitxonline-qa-nightly``."""
+        return f"{self.job_name}-nightly"
+
 
 E2E_TARGETS: list[E2ETarget] = [
     E2ETarget(
@@ -113,6 +119,11 @@ E2E_TARGETS: list[E2ETarget] = [
             # No learner dashboard MFE: the notifications tray is reached from
             # the course home.
             "NOTIFICATION_TRAY_HOST": "course-home",
+            # edxapp names its JWT cookies per stack (secrets_builder.py's
+            # JWT_AUTH_COOKIE_HEADER_PAYLOAD), not Open edX's default.
+            "JWT_AUTH_COOKIE_HEADER_PAYLOAD": (
+                "mitxonline-qa-edx-jwt-cookie-header-payload"
+            ),
         },
         # The Concourse credential's NAME, not a credential. Resolves from Vault
         # at secret-concourse/infrastructure/e2e_mitxonline_rc for pr-inf.
@@ -193,6 +204,33 @@ def _run_script(target: E2ETarget) -> str:
     )
 
 
+def _run_task(target: E2ETarget) -> TaskStep:
+    """Build the task both jobs run: wait for the stage, then run the pinned suite."""
+    return TaskStep(
+        task=Identifier("run-end-to-end-tests"),
+        timeout=target.timeout,
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=AnonymousResource(
+                type="registry-image",
+                source={
+                    "repository": PLAYWRIGHT_IMAGE_REPOSITORY,
+                    "tag": E2E_PLAYWRIGHT_IMAGE_TAG,
+                },
+            ),
+            params={
+                **target.settings,
+                "WORKERS": str(target.workers),
+                # Resolved by Concourse's Vault credential manager at task start,
+                # so the values never appear in the pipeline definition.
+                "ADMIN_USERNAME": f"(({target.admin_credential}.username))",
+                "ADMIN_PASSWORD": f"(({target.admin_credential}.password))",
+            },
+            run=Command(path="bash", args=["-c", _run_script(target)]),
+        ),
+    )
+
+
 def e2e_fragment(
     target: E2ETarget,
     *,
@@ -200,14 +238,19 @@ def e2e_fragment(
     image: Resource,
     pulumi_code: Resource,
 ) -> PipelineFragment:
-    """Build the job that runs the suite after ``deploy_job``, and nightly.
+    """Build the jobs that run the suite after ``deploy_job``, and nightly.
+
+    Two jobs rather than one with both triggers: a job cannot schedule while any
+    of its inputs has no version, and a time resource with a start/stop window has
+    none until its first window opens, so a schedule get in the post-deploy job
+    would hold every post-deploy run on a new pipeline until that first tick.
 
     :param target: The stage to test.
     :param deploy_job: The stage's deploy job. A run tests what it deployed.
     :param image: The edxapp image resource the deploy job takes.
     :param pulumi_code: The Pulumi code resource the deploy job takes, so a
         configuration-only deploy is tested too.
-    :returns: The job, with the resources it adds.
+    :returns: The two jobs, with the resource they add.
     """
     nightly = schedule(
         name=Identifier(f"e2e-nightly-{target.deployment_name}-{target.stage.lower()}"),
@@ -215,22 +258,14 @@ def e2e_fragment(
         start=target.nightly_start,
         stop=target.nightly_stop,
     )
+    # A nightly run and a deploy-triggered one would share the stage's courses,
+    # users and site-wide switches, and their failures would interleave.
+    serial_groups = [Identifier(f"e2e-{target.deployment_name}-{target.stage.lower()}")]
 
-    task_params = {
-        **target.settings,
-        "WORKERS": str(target.workers),
-        # Resolved by Concourse's Vault credential manager at task start, so the
-        # values never appear in the pipeline definition.
-        "ADMIN_USERNAME": f"(({target.admin_credential}.username))",
-        "ADMIN_PASSWORD": f"(({target.admin_credential}.password))",
-    }
-
-    job = Job(
+    post_deploy = Job(
         name=target.job_name,
         build_log_retention={"builds": 30},
-        # A nightly run and a deploy-triggered one would share the stage's
-        # courses, users and site-wide switches, and their failures interleave.
-        max_in_flight=1,
+        serial_groups=serial_groups,
         plan=[
             InParallelStep(
                 in_parallel=[
@@ -241,26 +276,16 @@ def e2e_fragment(
                         params={"skip_download": True},
                     ),
                     GetStep(get=pulumi_code.name, trigger=True, passed=[deploy_job]),
-                    GetStep(get=nightly.name, trigger=True),
                 ]
             ),
-            TaskStep(
-                task=Identifier("run-end-to-end-tests"),
-                timeout=target.timeout,
-                config=TaskConfig(
-                    platform=Platform.linux,
-                    image_resource=AnonymousResource(
-                        type="registry-image",
-                        source={
-                            "repository": PLAYWRIGHT_IMAGE_REPOSITORY,
-                            "tag": E2E_PLAYWRIGHT_IMAGE_TAG,
-                        },
-                    ),
-                    params=task_params,
-                    run=Command(path="bash", args=["-c", _run_script(target)]),
-                ),
-            ),
+            _run_task(target),
         ],
     )
+    nightly_job = Job(
+        name=target.nightly_job_name,
+        build_log_retention={"builds": 30},
+        serial_groups=serial_groups,
+        plan=[GetStep(get=nightly.name, trigger=True), _run_task(target)],
+    )
 
-    return PipelineFragment(resources=[nightly], jobs=[job])
+    return PipelineFragment(resources=[nightly], jobs=[post_deploy, nightly_job])
