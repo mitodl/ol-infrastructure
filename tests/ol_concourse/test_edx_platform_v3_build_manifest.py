@@ -5,8 +5,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from bridge.settings.openedx.accessors import filter_deployments_by_release
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from ol_concourse.pipelines.open_edx.edx_platform_v3.build_manifest import (
     LEHRER_BUILD_MANIFEST_PATH,
     SUPPORTED_BUILD_MANIFEST_VERSIONS,
@@ -20,30 +18,12 @@ from ol_concourse.pipelines.open_edx.edx_platform_v3.meta import (
 from ol_concourse.pipelines.open_edx.edx_platform_v3.pipeline import (
     build_edx_pipeline,
 )
-
-RELEASES = [release.name for release in OpenEdxSupportedRelease]
-TOPOLOGY = sorted(
-    (release, deployment.deployment_name)
-    for release in RELEASES
-    for deployment in filter_deployments_by_release(release)
+from tests.ol_concourse._build_manifest import (
+    RELEASES,
+    TOPOLOGY,
+    VERSION,
+    write_manifest,
 )
-VERSION = min(SUPPORTED_BUILD_MANIFEST_VERSIONS)
-
-
-def _manifest(
-    tmp_path: Path, cells: list[tuple[str, str]], **top_level: object
-) -> Path:
-    path = tmp_path / "build_manifest.yaml"
-    document = {
-        "version": VERSION,
-        **top_level,
-        "cells": [
-            {"release": release, "deployment": deployment, "packages": ["a==1"]}
-            for release, deployment in cells
-        ],
-    }
-    path.write_text(yaml.safe_dump(document))
-    return path
 
 
 def test_topology_is_not_empty() -> None:
@@ -52,19 +32,19 @@ def test_topology_is_not_empty() -> None:
 
 
 def test_pipeline_builds_from_a_manifest_with_every_cell(tmp_path: Path) -> None:
-    pipeline = build_edx_pipeline(RELEASES, _manifest(tmp_path, TOPOLOGY))
+    pipeline = build_edx_pipeline(RELEASES, write_manifest(tmp_path, TOPOLOGY))
     assert pipeline.jobs
 
 
 def test_extra_cells_are_allowed(tmp_path: Path) -> None:
     """Lehrer may build cells this topology doesn't deploy yet."""
-    manifest = _manifest(tmp_path, [*TOPOLOGY, ("future", "nowhere")])
+    manifest = write_manifest(tmp_path, [*TOPOLOGY, ("future", "nowhere")])
     check_build_manifest(manifest, TOPOLOGY)
 
 
 def test_missing_cell_fails_set_pipeline(tmp_path: Path) -> None:
     dropped = TOPOLOGY[0]
-    manifest = _manifest(tmp_path, TOPOLOGY[1:])
+    manifest = write_manifest(tmp_path, TOPOLOGY[1:])
     with pytest.raises(BuildManifestMismatchError, match="/".join(dropped)):
         build_edx_pipeline(RELEASES, manifest)
 
@@ -82,13 +62,13 @@ def test_missing_cell_fails_set_pipeline(tmp_path: Path) -> None:
 def test_unsupported_schema_version_fails_set_pipeline(
     tmp_path: Path, version: object
 ) -> None:
-    manifest = _manifest(tmp_path, TOPOLOGY, version=version)
+    manifest = write_manifest(tmp_path, TOPOLOGY, version=version)
     with pytest.raises(BuildManifestMismatchError, match="schema version"):
         build_edx_pipeline(RELEASES, manifest)
 
 
 def test_missing_schema_version_fails(tmp_path: Path) -> None:
-    manifest = _manifest(tmp_path, TOPOLOGY)
+    manifest = write_manifest(tmp_path, TOPOLOGY)
     document = yaml.safe_load(manifest.read_text())
     del document["version"]
     manifest.write_text(yaml.safe_dump(document))
@@ -113,7 +93,7 @@ def test_meta_hands_the_generator_the_manifest_the_build_reads() -> None:
 
 
 def test_build_job_reads_the_checked_manifest(tmp_path: Path) -> None:
-    pipeline = build_edx_pipeline(RELEASES, _manifest(tmp_path, TOPOLOGY))
+    pipeline = build_edx_pipeline(RELEASES, write_manifest(tmp_path, TOPOLOGY))
     build_jobs = [job for job in pipeline.jobs if str(job.name).startswith("build-")]
     assert build_jobs
     for job in build_jobs:
@@ -145,7 +125,7 @@ def test_manifest_without_cells_fails(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("key", ["release", "deployment"])
 def test_cell_without_a_coordinate_fails(tmp_path: Path, key: str) -> None:
-    manifest = _manifest(tmp_path, TOPOLOGY)
+    manifest = write_manifest(tmp_path, TOPOLOGY)
     document = yaml.safe_load(manifest.read_text())
     del document["cells"][1][key]
     manifest.write_text(yaml.safe_dump(document))
