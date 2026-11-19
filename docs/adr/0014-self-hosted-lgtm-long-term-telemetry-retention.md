@@ -628,7 +628,7 @@ archive code changes before then. The access-log filter that ships with this rec
 | P2 CPU parity | Pass | `sum(rate(container_cpu_usage_seconds_total[1h])) by (namespace)` for applications-qa, and again with the plan's `[5m]`: 20/20 namespaces within 1%, 3.267 cores on both sides. |
 | P2 series parity | Pass, gate reworded | 179k in the archive against 235k in Cloud. Cloud's count includes ~47k trace-derived series (spanmetrics and servicegraph) and ~15k Asserts series that never reach the archive. Without them it is ~173k against 179k (+3.5%). Compare like with like in Production too. |
 | P2 QA series headroom | Pass | The busiest ingester holds 64.6k of its 200k share of `max_global_series_per_user` (600k at RF1 over 3 ingesters), 32% used. |
-| P1/P2 failure isolation | Pass, gate reworded | The plan asks for Cloud log ingest to "stay flat". It rose 72%, but the rise is the archive's own failure noise (finding 3), not back-pressure on the Cloud path, so the gate is read as "Cloud data path unaffected". Loki and Mimir distributors at 0 on 2026-11-19 from 18:31 to 19:33 UTC, compared with the hour before. Cloud log entries dropped: 0. Cloud remote-write samples failed: 0. Cloud samples/s +3%. Scrape targets up flat. Archive counters rose: 338k OTLP log records failed, 41k metric points failed, 88k vector-log-proxy archive discards. Remote-write WAL lag peaked at 61 min, under the 2 h keepalive. Memory: `alloy-logs` 140 → 222 MB, `alloy-metrics` 0.90 → 1.02 GB, vector-log-proxy and EC2 hosts flat. At 17 min after restore, every archive drop counter had been at 0 for 10 min, WAL lag was back to 8 s, and Loki matched Cloud exactly again (103,552 lines in 10 min). |
+| P1/P2 failure isolation | Pass, gate reworded | The plan asks for Cloud log ingest to "stay flat". It rose 72%, but the rise is the archive's own failure noise (finding 3), not back-pressure on the Cloud path, so the gate is read as "Cloud data path unaffected". Loki and Mimir distributors at 0 on 2026-11-19 from 18:31 to 19:33 UTC, compared with the hour before. Cloud log entries dropped: 0. Cloud remote-write samples failed: 0. Cloud samples/s +3%. Scrape targets up flat. Archive counters rose: 338k OTLP log records failed, 41k metric points failed, 88k vector-log-proxy archive discards. Remote-write WAL lag peaked at 61 min, under the 2 h keepalive. Memory: `alloy-logs` 140 → 222 MB, `alloy-metrics` 0.90 → 1.02 GB, vector-log-proxy and EC2 hosts flat. The plan also asks for collector memory to stay flat. The rise is the bounded archive send queue and WAL filling, and it stays under the 512Mi `alloy-logs` request, with no limit set. At 17 min after restore, every archive drop counter had been at 0 for 10 min, WAL lag was back to 8 s, and Loki matched Cloud exactly again (103,552 lines in 10 min). |
 
 Findings to act on:
 
@@ -657,8 +657,8 @@ Findings to act on:
    outage hour, because the OTLP queue gives up after `maxElapsedTime: 1m`. This is
    the best-effort design (D3, D10) working as intended.
 6. **Metrics are not backfilled after an outage either.** The WAL replay on restore
-   ran into the per-tenant `ingestion_rate` limit (QA 30k samples/s against ~3.8k
-   normal; Production 50k against 8.1k). One distributor alone logged ~2.5k
+   ran into the per-tenant `ingestion_rate` limit (QA 30k samples/s against the ~3.8k
+   Cloud rate measured the hour before the test; Production 50k against 8.1k). One distributor alone logged ~2.5k
    `err-mimir-tenant-max-ingestion-rate` rejections in the 20 min after restore. With `retryOnHttp429: false` those samples were dropped. The archive
    holds 4–45% of the normal samples for the outage hour. Raising `ingestion_rate` and
    `ingestion_burst_size` would let a short outage backfill. Leaving them as they are
