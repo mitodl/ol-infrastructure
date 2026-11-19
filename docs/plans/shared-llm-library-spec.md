@@ -155,7 +155,7 @@ Packages
 | `ol-llm[pydantic-ai]` | | `pydantic-ai-slim` | Model factory, the §6 call contract's retry wrapper, both entry points (agent and traced completion) |
 | `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra, so each also installs PydanticAI | Provider SDKs, chosen per consumer |
 | `ol-llm[harness]` | | `pydantic-ai-harness` (0.x, pinned to a minor series) | In-session memory and compaction (§5 categories A and B). Each harness release pins `pydantic-ai-slim` exactly, so this extra fixes the PydanticAI version |
-| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.11), which runs Hindsight 1.2.0. The extra pins `hindsight-client>=1.2,<1.3` (ol-llm `python/pyproject.toml` at 31e03d2) |
+| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.11), which pins Hindsight `1.2.1-slim`. The extra pins `hindsight-client>=1.2,<1.3` (ol-llm `python/pyproject.toml` at 31e03d2) |
 | `ol_llm.eval` (module) | `ol_llm.eval` | the full opik install, including litellm | Datasets, experiments, `evaluate(prompts=…)`, LLM-judge metrics. Runs in CI eval jobs and on developer machines, never in slimmed runtime images |
 | `ol-llm[django]` | `ol_llm.django` | Django | Settings reader, app-ready tracer setup, Celery helpers. Add only when the Django glue outgrows a settings reader |
 
@@ -645,9 +645,12 @@ and by `temporal_window` (`MemoryItem`, `RecallRequest` and `RecallResult` in hi
 `course:<id>`, plus `run:<id>` on working notes only (§5.8). Tags are not redacted (Memory
 Defense covers content, context, metadata and entities), so every tag value comes from a
 closed set: kinds and sources from the registry, course ids matching the platform's course-key
-pattern, and run ids in the engine's id format. The subject goes in the document id after the
-app prefix, so a note on the same subject replaces the earlier one, and it is built only from
-registry and course values, never learner text, because document ids are not redacted either.
+pattern, and run ids in the engine's id format. The document id is built from the app prefix,
+the kind and the subject (and the run id, for working notes), only from registry and course
+values, never learner text, because document ids are not redacted either. A retain to an
+existing document id replaces the note, so the last retain would win even when it carries an
+older event (a delayed grading retry). The validator replaces a note only when the incoming
+event time is later, checked in the same transaction as the write, and drops an older one.
 Hindsight defaults an omitted retain `timestamp` to now and stores none for the string
 `unset` (`RetainRequest.timestamp` in Hindsight's `api/http.py`), so the validator refuses
 both and requires an explicit event time.
@@ -676,16 +679,20 @@ Proposed, enforced by the service rather than by each app:
 - One memory record per learner, in the extension's own table keyed on the learner. It holds
   the setting (on or off) and the time of the learner's last clear. It cannot live in the bank
   or the fence table: clear deletes the bank row, and `_raise_fence` prunes expired fence rows
-  so a forgotten learner's id does not outlive the fence. The platform forget on account
-  deletion deletes the record with the bank, so no id outlives the account; protecting a
+  so a forgotten learner's id does not outlive the fence. Account deletion deletes the record
+  with the bank, and reaches it even when there is no bank (§5.9), so no id outlives the
+  account; protecting a
   forgotten learner from writes in flight is the fence's job, and from a restore the deletion
   ledger's (§5.13).
 - Off refuses writes from every app, service writers included, and stops apps' reads, so apps
   stop injecting notes a learner asked not to be used. Two reads stay allowed: the
   learner-facing view below, so a learner can see and delete what is stored while memory is
   off, and the forget sequence's own operation reads. The validator checks off when a request
-  arrives and again when a worker task starts, as it does the fence, because worker tasks
-  skip the other checks.
+  arrives and again when a worker task starts, but a retain that passed those checks could
+  still commit after the learner turns memory off. So the final check is in the database, like
+  the fence: a `BEFORE INSERT` trigger on the content tables reads the learner's record with a
+  shared row lock, and changing the setting or recording a clear takes the exclusive lock, so no
+  write commits after off or a clear takes effect.
 - Clear runs the forget sequence on the learner's own bank, started with the learner's own
   token from the client that hosts the settings page. Today only the admin client can forget,
   so this is a new, narrow grant. For the hour the fence holds, writes get 409, and apps treat
@@ -800,9 +807,13 @@ Proposed, for working memory:
 - A run acting for a learner keeps its working memory in that learner's bank, as a `working`
   kind tagged with the run id. Isolation, off, clear and forget are then the learner's, with
   no new bank type. Working notes hold intermediate results, including tool output such as
-  fetched pages, so they are not memory for anyone else: a read returns them only to a caller
-  that names their run id, and every other read (an app's `list` or `search`, a load-all
-  prompt) leaves them out. The validator enforces that, not the readers. The run deletes its
+  fetched pages, so they are not memory for anyone else. A run id the caller names is a
+  selector, not an authorization, so the validator returns working notes only to the app whose
+  token wrote them (taken from the token's `azp`, as the app tag is) and only for the run
+  named; every other read (another app, an app's `list` or `search`, a load-all prompt) leaves
+  them out. That leaves the writing app's own code for the same learner able to read a run it
+  names. If agents come to run outside the app that started them, the run id has to come from a
+  credential bound to the learner, app and run instead (§5.13). The run deletes its
   notes when it ends, and a sweep deletes any older than a fixed TTL, for runs that crash. The
   sweep crosses every learner bank, so it is one more platform principal, limited the way the
   forget job is (it lists bank ids and deletes only `working` notes).
@@ -831,8 +842,13 @@ learn-ai user row is deleted, since `UserChatSession.user` cascades
 endpoint, deletes that row has not been checked.
 
 Proposed: conversation retention and per-learner deletion come before any new memory writer
-goes to Production. The forget job (§5.11) also removes the learner's conversations in each app
-that holds them, or triggers that app's own delete. Whether `pydantic-ai-harness` provides
+goes to Production. Account deletion has to reach conversations whether or not the learner
+ever had a memory bank. The deployed forget job finds deleted learners by listing banks
+(§5.11), so it would miss a learner who chatted but never had a note written, or whose bank a
+clear already removed, and a consent record (§5.6) left without a bank. Deletion is driven
+instead by a durable account-deletion signal (Keycloak's deletion of the user, recorded where
+every store can act on it) that fans out to Hindsight, to the consent table, and to each app
+holding conversations; the bank listing stays as a reconciliation check. Whether `pydantic-ai-harness` provides
 history and compaction, and whether learn-ai keeps its checkpointer, stay open (§5.13).
 
 ### 5.10 Backend evaluation (2026-09-15 to 2026-10-29)
@@ -1204,9 +1220,11 @@ ids, entity types and timestamps are not, so a document-id key must not carry le
 Names, problem text and answers are not pattern-matchable and stay the ol-llm gate's job (§5.4
 item 2).
 
-Where it runs. Hindsight `1.2.0-slim` on the applications EKS cluster, cluster-internal at
-`hindsight.hindsight.svc.cluster.local` with no APISIX route, one API replica, and RDS Postgres
-18 with Vault dynamic credentials. Hindsight reads `DATABASE_URL` once, so rotation restarts the
+Where it runs. Hindsight `1.2.1-slim` (`HINDSIGHT_VERSION` in `src/bridge/lib/versions.py`) on
+the applications EKS cluster, cluster-internal at `hindsight.hindsight.svc.cluster.local` with
+no APISIX route, one API replica, and RDS Postgres 18 (the `OLPostgresDBConfig` default in
+`components/aws/database.py`, which the stack does not override) with Vault dynamic
+credentials. Hindsight reads `DATABASE_URL` once, so rotation restarts the
 pod. QA came up on 2026-10-20 and Production on 2026-10-21. The Keycloak change was applied in
 QA by 2026-10-20 and in Production on 2026-10-22: the Production deploy gate that carried the
 memory resources was consumed that day, and the next Production preview (2026-10-23) shows none
@@ -1293,8 +1311,8 @@ owner decides it. Each open item names where it is tracked.
    `tk-bring-rfc-13314-s-learner-memory-onto-the-shared-853c25` covers the gate; nothing
    covers rendering or the derivation trace setting yet.
 3. Consent enforced by the service: the per-learner record, off stopping reads and writes,
-   learner-started clear, the event-time check against the last clear, and the learner-facing
-   view (§5.6). Whether memory is on by default or opt-in needs a privacy review. No task yet.
+   the database trigger that makes off and clear hold at commit, learner-started clear, the
+   event-time check against the last clear, and the learner-facing view (§5.6). Whether memory is on by default or opt-in needs a privacy review. No task yet.
 4. The session-less write grant, with the limits in §5.7, including the platform operation
    that deletes every note one app wrote
    (`tk-grant-for-services-to-write-per-learner-memory-w-f03a14`).
@@ -1307,12 +1325,14 @@ owner decides it. Each open item names where it is tracked.
    `tk-open-edx-writes-learner-performance-observations-efd73d`.
 8. Autoscaling, the API and worker split, and a service SLO (§5.8), on
    `tk-autoscale-the-hindsight-memory-service-and-size--7222ae`.
-9. Agent principals: fresh learner tokens for runs longer than 300 s, the run-id read rule and
-   the cross-bank sweep for delegated runs' working notes, and how an autonomous run's `a-`
+9. Agent principals: fresh learner tokens for runs longer than 300 s, the read rule for working
+   notes (the writing app and named run today, a run-bound credential if agents run outside
+   the app that started them), the cross-bank sweep for delegated runs' working notes, and how an autonomous run's `a-`
    bank is kept free of learner content or reached by forget (§5.8). Tied to the durable
    execution evaluation (`tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78`).
-10. Conversation retention and per-learner deletion in learn-ai, and the forget job reaching
-    conversations (§5.9). Retention waits on the data-handling policy
+10. Conversation retention and per-learner deletion in learn-ai, and a durable
+    account-deletion signal that reaches conversations and consent records whether or not a
+    bank exists (§5.9). Retention waits on the data-handling policy
     (`llm-usage-policies-spec.md` §3); no task covers learn-ai's per-learner delete yet.
 11. Whether `pydantic-ai-harness` (0.x) implements history and compaction for A and B
     (`tk-evaluate-pydantic-ai-harness-for-in-session-stat-926e93`). Where history lives is
