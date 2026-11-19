@@ -78,8 +78,6 @@ def vault_secrets(
                 "MITX_ONLINE_FASTLY_AUTH_TOKEN": ("fastly", "api_key"),
                 "MITX_ONLINE_FASTLY_SERVICE_ID": ("fastly", "service_id"),
                 "MIT_LEARN_FASTLY_SERVICE_ID": ("fastly", "mit_learn_service_id"),
-                "HUBSPOT_HOME_PAGE_FORM_GUID": ("hubspot", "formId"),
-                "HUBSPOT_PORTAL_ID": ("hubspot", "portalId"),
                 "MITOL_GOOGLE_SHEETS_DRIVE_API_PROJECT_ID": (
                     "google-sheets",
                     "drive-api-project-id",
