@@ -125,6 +125,7 @@ archived:
 - ol-openedx-mfe-overrides
 - ol-rootly-manager
 - open-discussions-client
+- open-resource-blocklists
 - open-widget-framework
 - open-widget-sample-app
 - openedx-course-test
@@ -311,14 +312,12 @@ library:
 - open-edx-plugins
 - open-learnix
 - open-podcast-data
-- open-resource-blocklists
 - open-video-data
 - platform-engineering-site
 - product
 - redux-asserts
 - redux-hammock
 - smoot-design
-- superset-nl-explorer
 - tech-talk-slides
 - vault-plugin-database-starrocks
 - vault-raft-backup

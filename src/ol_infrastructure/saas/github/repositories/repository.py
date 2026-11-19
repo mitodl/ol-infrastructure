@@ -187,7 +187,7 @@ def build(repo: dict[str, Any]) -> github.Repository:
         merge_commit_message=repo.get("merge_commit_message"),
         # NOT `vulnerability_alerts=` -- that input is deprecated in favour of the
         # RepositoryVulnerabilityAlerts resource below, and setting both makes the
-        # provider emit a deprecation warning on every preview for 316 repos.
+        # provider emit a deprecation warning on every preview for every active repo.
         security_and_analysis=_security_and_analysis(repo),
         opts=ResourceOptions(
             retain_on_delete=True,
