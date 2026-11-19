@@ -60,11 +60,16 @@ from ol_infrastructure.substructure.starrocks.gravitino_catalog import (
     CREDENTIAL_PLACEHOLDER,
     GravitinoCatalog,
     catalog_name,
-    governance_grants_sql,
 )
 from ol_infrastructure.substructure.starrocks.group_sync_job import (
     GROUP_PROVIDER_ADMIN_ROLE,
     create_group_sync_job,
+)
+from ol_infrastructure.substructure.starrocks.lake_grants import (
+    governance_grants_sql,
+    layer_scoped_grants_sql,
+    layer_scoped_revokes_sql,
+    revoke_step,
 )
 from ol_infrastructure.substructure.starrocks.resource_groups import (
     Classifier,
@@ -108,6 +113,33 @@ db_admin_password = applications_stack.require_output("root_password_secret")
 db_port = starrocks_config.get_int("fe_mysql_port") or STARROCKS_MYSQL_PORT
 db_admin_username = starrocks_config.require("db_admin_username")
 
+# Session variables for the users of the roles the batch resource group takes by
+# role (admin, batch_readonly), set as user properties when Vault creates the user.
+# Only a new user gets them: Vault renews a lease in place, under the same user.
+# Dagster's dbt build asks Vault for a new admin user on every build, so it picks
+# a change up on its next build. The batch_readonly users OpenMetadata and the
+# mit-learn pull hold through VaultDynamicSecrets are renewed until the role's
+# max TTL (6 months), so they keep the old values until their leases are revoked
+# and reissued.
+#   enable_spill: lets aggregations, joins and sorts spill to the CN's disk
+#     instead of failing at the process memory limit. QA's dim_course_content
+#     asked for 8 GiB on top of 7.9 GB against a 10.4 GB process limit on
+#     2026-11-17.
+#   new_planner_optimize_timeout: 3000 ms by default. Planning dbt's
+#     information_schema read of the Glue raw schema (2,744 tables on QA) took
+#     8-15 s on 2026-11-17. dbt reads it whenever it looks up a relation in a
+#     source schema.
+BATCH_SESSION_PROPERTIES = {
+    "session.enable_spill": "true",
+    "session.new_planner_optimize_timeout": "30000",
+}
+_batch_session_properties_sql = ", ".join(
+    f'"{key}" = "{value}"' for key, value in BATCH_SESSION_PROPERTIES.items()
+)
+_SET_BATCH_SESSION_PROPERTIES = (
+    f"ALTER USER '{{{{name}}}}'@'%' SET PROPERTIES ({_batch_session_properties_sql});"
+)
+
 # StarRocks-compatible SQL role statements for Vault dynamic credentials.
 # Each list entry is executed as a separate statement in the same connection.
 #
@@ -135,6 +167,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT batch_readonly TO USER '{{name}}'@'%';",
             "ALTER USER '{{name}}'@'%' DEFAULT ROLE batch_readonly;",
+            _SET_BATCH_SESSION_PROPERTIES,
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -155,6 +188,7 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
             "CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';",
             "GRANT admin TO USER '{{name}}'@'%';",
             "ALTER USER '{{name}}'@'%' DEFAULT ROLE admin;",
+            _SET_BATCH_SESSION_PROPERTIES,
         ],
         "revoke": ["DROP USER '{{name}}'@'%';"],
         "renew": [],
@@ -187,7 +221,8 @@ starrocks_role_statements: dict[str, dict[str, list[str]]] = {
 #
 # tls=skip-verify encrypts the connection but skips server certificate name
 # verification because Vault connects via the NLB's AWS hostname, which does
-# not match the cert's SAN (lakehouse[.qa].starrocks.ol.mit.edu).
+# not match the cert's SANs (lakehouse[.qa].starrocks.ol.mit.edu and its
+# mysql. name).
 ssl_enabled = starrocks_config.get_bool("ssl_enabled") or False
 _tls_param = "?tls=skip-verify" if ssl_enabled else ""
 connection_url = db_host.apply(
@@ -326,6 +361,15 @@ _exec_delete_sql = (
     f" && printf '%s' \"$STARROCKS_DELETE_SQL\" | {_mysql_client}"
     f"; {_mysql_opts_cleanup}"
 )
+# Runs $STARROCKS_SQL, then the REVOKEs in $STARROCKS_REVOKE_SQL, which fail
+# harmlessly on a grant the role does not hold (see lake_grants.revoke_step).
+# The revokes come second so a role never loses a layer it keeps.
+_exec_sql_then_revokes = (
+    f"{_mysql_opts_setup}"
+    f" && printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}"
+    f" && {revoke_step(_mysql_client, 'STARROCKS_REVOKE_SQL')}"
+    f"; {_mysql_opts_cleanup}"
+)
 
 # Environment shared by all Command resources: credentials never appear in the
 # create/update/delete strings (they are masked as Pulumi secrets in the env dict).
@@ -377,11 +421,23 @@ aws_region = starrocks_config.get("aws_region") or "us-east-1"
 # CREATE DATABASE ... PROPERTIES("location" = ...) fails with a 403 on
 # getFileStatus.  aws.s3.use_aws_sdk_default_behavior names the default chain
 # explicitly so both paths use the IRSA role.
+#
+# enable_iceberg_metadata_cache=false: with the cache on, each FE keeps serving
+# the snapshot it last loaded after another engine (dlt/pyiceberg, Trino)
+# commits, for about 52-58s on QA's Glue catalog, and each FE refreshes on its
+# own. A dbt build that starts inside that window builds on the previous load and
+# its tests pass. With it off, every FE read the new snapshot on its first query.
+# The cost is planning time: EXPLAIN on QA's large raw tables went from about
+# 45 ms to 250-320 ms per query.
 _DATA_LAKE_ACCESS = query_engine_lake_access(stack_info.env_suffix)
 catalog_setups: list[command.local.Command] = []
-_ICEBERG_CATALOG_ROLES = ("readonly", "app", "admin", *GOVERNANCE_ROLES)
-_catalog_mutable_props = {"aws.s3.use_aws_sdk_default_behavior": "true"}
+_MACHINE_ROLES = ("readonly", "app", "admin")
+_catalog_mutable_props = {
+    "aws.s3.use_aws_sdk_default_behavior": "true",
+    "enable_iceberg_metadata_cache": "false",
+}
 _iceberg_roles_sql = ""
+_iceberg_revokes_sql = ""
 if enable_data_lake:
     _catalog_conn_props = (
         f'    "aws.glue.use_instance_profile" = "false",\n'
@@ -440,13 +496,19 @@ if enable_data_lake:
             ],
             opts=ResourceOptions(depends_on=[catalog_setups[-1]]),
         )
+        _iceberg_revokes_sql += "\n" + layer_scoped_revokes_sql(
+            _catalog_name, _catalog_env
+        )
         if _catalog_access == "read":
             _iceberg_roles_sql += "".join(
                 f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE {_role};"
                 f"\nSET CATALOG {_catalog_name};"
                 f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE {_role};"
                 f"\nSET CATALOG default_catalog;"
-                for _role in _ICEBERG_CATALOG_ROLES
+                for _role in _MACHINE_ROLES
+            )
+            _iceberg_roles_sql += "\n" + governance_grants_sql(
+                _catalog_name, _catalog_env
             )
             continue
         _iceberg_roles_sql += (
@@ -465,10 +527,6 @@ if enable_data_lake:
             f"\nSET CATALOG {_catalog_name};"
             f"\nGRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE admin;"
             f"\nSET CATALOG default_catalog;"
-            # Governance roles: all get USAGE on the catalog; full vs. read-only
-            # access is differentiated below.  Database-level scoping within
-            # the catalog (bronze / silver_* / gold_*) should be added once
-            # the Glue catalog database naming is confirmed.
             f"\n"
             f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_platform_admin;"
             f"\nSET CATALOG {_catalog_name};"
@@ -482,26 +540,7 @@ if enable_data_lake:
             f"\nGRANT ALL ON ALL DATABASES TO ROLE ol_data_engineer;"
             f"\nSET CATALOG default_catalog;"
             f"\n"
-            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_data_analyst;"
-            f"\nSET CATALOG {_catalog_name};"
-            f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_analyst;"
-            f"\nSET CATALOG default_catalog;"
-            f"\n"
-            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_researcher;"
-            f"\nSET CATALOG {_catalog_name};"
-            f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_researcher;"
-            f"\nSET CATALOG default_catalog;"
-            f"\n"
-            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_instructor;"
-            f"\nSET CATALOG {_catalog_name};"
-            f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_instructor;"
-            f"\nSET CATALOG default_catalog;"
-            f"\n"
-            f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE ol_business_analyst;"
-            f"\nSET CATALOG {_catalog_name};"
-            "\nGRANT SELECT ON ALL TABLES IN ALL DATABASES"
-            " TO ROLE ol_business_analyst;"
-            f"\nSET CATALOG default_catalog;"
+            f"\n{layer_scoped_grants_sql(_catalog_name, _catalog_env)}"
         )
 
 # --- Native StarRocks roles -------------------------------------------------
@@ -516,10 +555,15 @@ if enable_data_lake:
 # true.  SET CATALOG switches the session context so the subsequent table-level
 # GRANT applies to the Iceberg catalog's databases rather than default_catalog.
 #
-# LIMITATION: these GRANTs are additive.  If enable_data_lake_integration is
-# later set to false the Iceberg catalog grants already on the roles are NOT
-# automatically revoked.  A manual REVOKE USAGE ON CATALOG + REVOKE on tables
-# is required to remove them.
+# The layer-scoped governance roles' lake grants are reconciled whenever
+# roles_setup_cmd runs, which is when its SQL changes (data_lake_access, the
+# layers or the catalogs): it also revokes what lake_grants.py says they may
+# not hold, so narrowing data_lake_access takes effect. An unchanged apply
+# skips it, so a grant restored by hand stays until the next change or a
+# `pulumi up --replace` of the Command. Every other GRANT here is additive. If
+# enable_data_lake_integration is later set to false, or a catalog is dropped
+# from query_engine_lake_access, the grants already on the roles are NOT
+# revoked, and removing them takes a manual REVOKE.
 _base_roles_sql = """\
 -- Machine-access roles assigned to Vault-issued ephemeral service accounts.
 -- These are referenced by the vault.database.SecretBackendRole resources above.
@@ -538,10 +582,8 @@ GRANT SECURITY ON SYSTEM TO ROLE group_provider_admin;
 -- Governance roles for OIDC-authenticated human users.  Names match the
 -- Keycloak ol-starrocks-client roles exactly for 1:1 claim-to-role mapping.
 -- Iceberg catalog grants are appended per-catalog when
--- enable_data_lake_integration is true.  Database-level scoping within the
--- Iceberg catalog (e.g. restricting ol_instructor to gold_analytics /
--- gold_operations) should be layered on top once the Glue catalog database
--- naming is confirmed.
+-- enable_data_lake_integration is true, scoped per layer by
+-- ol_infrastructure.lib.data_lake_access.
 CREATE ROLE IF NOT EXISTS ol_platform_admin;
 CREATE ROLE IF NOT EXISTS ol_data_engineer;
 CREATE ROLE IF NOT EXISTS ol_data_analyst;
@@ -578,12 +620,9 @@ GRANT USAGE ON CATALOG default_catalog TO ROLE ol_data_engineer;
 GRANT ALL ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_engineer;
 GRANT ALL ON ALL DATABASES TO ROLE ol_data_engineer;
 
--- The four read-only roles below are currently granted catalog-wide SELECT
--- (ALL TABLES IN ALL DATABASES).  The per-database governance scoping noted in
--- each "target scope" comment (e.g. restricting analysts to Silver_Analytics +
--- Gold) is NOT yet enforced here; it is deferred until the Glue/Iceberg
--- database naming is confirmed, at which point these grants will be narrowed to
--- the named databases.  Until then all four roles see the same read surface.
+-- The four read-only roles below read every database in default_catalog. It is
+-- for StarRocks-native serving tables and MVs (b2b_analytics); the dbt layers
+-- live in the lake, where their access is per layer (Iceberg catalog grants).
 --
 -- Each also needs SELECT ON ALL MATERIALIZED VIEWS.  MATERIALIZED VIEW is its
 -- own privilege object type in StarRocks, so an ALL TABLES grant does not reach
@@ -592,22 +631,18 @@ GRANT ALL ON ALL DATABASES TO ROLE ol_data_engineer;
 -- surface.  admin, ol_platform_admin and ol_data_engineer need no equivalent:
 -- db_admin already covers every MV.
 --
--- ol_data_analyst: target scope Silver_Analytics + Gold (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_data_analyst;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_analyst;
 GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_data_analyst;
 
--- ol_researcher: target scope Silver_Analytics + Gold_Analytics (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_researcher;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_researcher;
 GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_researcher;
 
--- ol_instructor: target scope Gold_Analytics + Gold_Operations (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_instructor;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_instructor;
 GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_instructor;
 
--- ol_business_analyst: target scope Silver_Operations + Gold (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_business_analyst;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_business_analyst;
 GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_business_analyst;"""
@@ -644,13 +679,17 @@ _OIDC_USERNAME_RE = re.compile(r"^[A-Za-z0-9._%+@-]+$")
 # dropped by hand if that is ever wanted.
 roles_setup_cmd = command.local.Command(
     f"starrocks-{stack_info.env_suffix}-roles-setup",
-    create=_exec_sql,
-    update=_exec_sql,
+    create=_exec_sql_then_revokes,
+    update=_exec_sql_then_revokes,
     environment={
         **_mysql_env,
         "STARROCKS_SQL": _roles_sql,
+        "STARROCKS_REVOKE_SQL": _iceberg_revokes_sql,
     },
-    triggers=[hashlib.sha256(_roles_sql.encode()).hexdigest()],
+    triggers=[
+        hashlib.sha256(_roles_sql.encode()).hexdigest(),
+        hashlib.sha256(_iceberg_revokes_sql.encode()).hexdigest(),
+    ],
     opts=ResourceOptions(depends_on=_role_deps),
 )
 
@@ -669,8 +708,8 @@ roles_setup_cmd = command.local.Command(
 # leaves the old one serving.
 #
 # Unlike the Glue catalogs' grants, these re-run whenever the catalog is
-# re-created (its hash is in their trigger), and they are additive: narrowing
-# data_lake_access does not revoke what was granted here.
+# re-created (its hash is in their trigger). Like them, they revoke what
+# lake_grants.py says a layer-scoped role may not hold.
 if gravitino_catalog_enabled:
     _gravitino = make_stack_reference(
         pulumi_projects.GRAVITINO_APP, stack_info.name
@@ -681,7 +720,9 @@ if gravitino_catalog_enabled:
         opts=InvokeOptions(provider=_vault_provider),
     )
     _gravitino_catalog: pulumi.Output[GravitinoCatalog] = pulumi.Output.all(
-        _gravitino, _gravitino_client.data
+        _gravitino,
+        _gravitino_client.data,
+        applications_stack.require_output("gravitino_catalog_tls"),
     ).apply(
         lambda args: GravitinoCatalog(
             name=catalog_name(stack_info.env_suffix),
@@ -689,15 +730,15 @@ if gravitino_catalog_enabled:
             warehouse=args[0]["catalog"],
             oauth2_server_uri=f"{args[1]['url']}/protocol/openid-connect/token",
             aws_region=aws_region,
+            tls_configurer_impl=args[2]["configurer_impl"],
+            tls_ca_file=args[2]["ca_file"],
         )
     )
     _bootstrap_credential: pulumi.Output[str] = pulumi.Output.secret(
         _gravitino_client.data.apply(lambda d: f"{d['client_id']}:{d['client_secret']}")
     )
     _gravitino_create_hash = _gravitino_catalog.apply(
-        lambda c: hashlib.sha256(
-            c.create_sql(CREDENTIAL_PLACEHOLDER).encode()
-        ).hexdigest()
+        lambda c: hashlib.sha256(c.create_trigger_sql().encode()).hexdigest()
     )
     gravitino_catalog_setup = command.local.Command(
         f"starrocks-{stack_info.env_suffix}-gravitino-catalog-setup",
@@ -742,14 +783,25 @@ if gravitino_catalog_enabled:
     _gravitino_grants_sql = governance_grants_sql(
         catalog_name(stack_info.env_suffix), stack_info.env_suffix
     )
+    _gravitino_revokes_sql = layer_scoped_revokes_sql(
+        catalog_name(stack_info.env_suffix), stack_info.env_suffix
+    )
     # No delete step: dropping the catalog drops its grants.
     command.local.Command(
         f"starrocks-{stack_info.env_suffix}-gravitino-catalog-grants",
-        create=_exec_sql,
-        update=_exec_sql,
-        environment={**_mysql_env, "STARROCKS_SQL": _gravitino_grants_sql},
+        create=_exec_sql_then_revokes,
+        update=_exec_sql_then_revokes,
+        environment={
+            **_mysql_env,
+            "STARROCKS_SQL": _gravitino_grants_sql,
+            "STARROCKS_REVOKE_SQL": _gravitino_revokes_sql,
+        },
         triggers=_gravitino_create_hash.apply(
-            lambda h: [hashlib.sha256(_gravitino_grants_sql.encode()).hexdigest(), h]
+            lambda h: [
+                hashlib.sha256(_gravitino_grants_sql.encode()).hexdigest(),
+                hashlib.sha256(_gravitino_revokes_sql.encode()).hexdigest(),
+                h,
+            ]
         ),
         opts=ResourceOptions(depends_on=[gravitino_catalog_setup, roles_setup_cmd]),
     )
@@ -832,14 +884,14 @@ command.local.Command(
 # match, and a Vault-issued username ends in random characters.
 #
 # Who holds which active role today:
-#   readonly        Superset; OpenMetadata and the mit-learn warehouse pull until
-#                   they move to batch_readonly
+#   readonly        Superset; mitxonline's migrate_edx_data command (Production)
 #   app             ol-analytics-api; `ol-dbt starrocks` from a laptop defaults
 #                   to it too
 #   admin           Dagster: the lakehouse dbt build. Its REFRESH MATERIALIZED
 #                   VIEW does not land here: an MV task run sets its session
 #                   resource_group to the MV's property, else default_mv_wg.
-#   batch_readonly  nothing yet
+#   batch_readonly  OpenMetadata's ingestion jobs and the mit-learn warehouse
+#                   pull
 #   governance      OIDC-authenticated people, from the file group provider
 #
 # Interactive takes only SELECTs, so a write from any of those principals falls
@@ -853,9 +905,10 @@ command.local.Command(
 # request. The values in stack config are sized from the request instead, so the
 # dedicated executor threads have CPU the pod is actually guaranteed.
 #
-# Unverified: that a CN enforces workgroups the same way a BE does. Reading
-# be/src on branch-4.1, the workgroup and executor code has no CN branch (only
-# the heartbeat checks is_cn()), but this needs a concurrent-load test on QA.
+# The FE runs query queue v1 (applications/starrocks fe.conf), so the queue is
+# per group: batch queues against its own concurrency_limit and interactive,
+# with none, never waits. The applications stack exports the FE's setting, and
+# the query queue SQL refuses to turn a queue on while it says v2.
 query_queue = QueryQueueSettings.model_validate(
     starrocks_config.require_object("query_queue")
 )
@@ -866,7 +919,9 @@ query_queue_cmd = command.local.Command(
     delete=_exec_delete_sql,
     environment={
         **_mysql_env,
-        "STARROCKS_SQL": query_queue.set_sql(),
+        "STARROCKS_SQL": applications_stack.require_output(
+            "fe_enable_query_queue_v2"
+        ).apply(lambda v2: query_queue.set_sql(fe_query_queue_v2=v2)),
         "STARROCKS_DELETE_SQL": QueryQueueSettings.reset_sql(),
     },
     # No triggers. A trigger change replaces a Command even when it has an

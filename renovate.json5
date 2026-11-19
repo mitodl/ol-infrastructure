@@ -159,5 +159,20 @@
         '# renovate-digest: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>.+?) packageName=(?<packageName>.+?)\\n\\w+_VERSION = "(?<currentValue>.+?)"\\n\\w+_IMAGE_DIGEST = "(?<currentDigest>sha256:[a-f0-9]{64})"',
       ],
     },
+    {
+      // falco, the Fastly VCL linter: one entry per platform, each a release tag
+      // and the sha256 of that platform's tarball. The release ships no checksum
+      // file, so github-release-attachments hashes the same-named asset in the
+      // new release and moves tag and digest together.
+      // tests/ol_infrastructure/lib/test_falco.py checks this pattern matches
+      // every platform in FALCO_RELEASES.
+      customType: 'regex',
+      managerFilePatterns: [
+        '/^src/ol_infrastructure/lib/falco\\.py$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>\\S+)\\n\\s+"[a-z0-9-]+": \\(\\n\\s+"(?<currentValue>[^"]+)",\\n\\s+# pragma: allowlist nextline secret\\n\\s+"(?<currentDigest>[a-f0-9]{64})",',
+      ],
+    },
   ],
 }

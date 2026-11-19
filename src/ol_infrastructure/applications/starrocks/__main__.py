@@ -594,23 +594,31 @@ if starrocks_config.get_bool("oidc_enabled"):
         {"name": _oidc_group_cm_name, "mountPath": "/opt/starrocks/fe/conf/groups"}
     ]
 
-# The FE's Iceberg REST client verifies Gravitino's certificate against the JVM
-# default trust store, and that certificate comes from a CA local to the
-# gravitino namespace. javax.net.ssl.trustStore replaces the default store
-# rather than adding to it, and the FE still needs the public CAs for AWS and
-# Keycloak, so the entrypoint imports the Gravitino CA into a copy of the JDK's
-# cacerts before starting the FE. The copy is made at container start, so a new
-# CA reaches the FE only when its pods restart.
+# Gravitino's certificate comes from a CA local to the gravitino namespace, and
+# only the governed catalog's Iceberg REST client trusts it. The entrypoint
+# compiles files/CaFileTLSConfigurer.java into fe/lib. Named in the catalog's
+# rest.client.tls.configurer-impl (substructure/starrocks), it gives that one
+# HTTP client the JDK's CAs plus the Gravitino CA (the client also fetches the
+# catalog's token from Keycloak). The rest of the FE JVM (Keycloak JWKS, STS,
+# Glue, S3) trusts only the JDK's CAs. The CA has no name constraints, and Java
+# PKIX ignores them on a trust anchor anyway, so trusting it JVM-wide would let
+# its key holder impersonate any of those hosts to the FE.
+#
+# The class is compiled at container start because the FE image carries a JDK
+# and fe/lib is owned by the FE user, so a changed class reaches the FE only
+# when its pods restart. The CA file is read each time the catalog's REST
+# client is built (FE start or ALTER CATALOG).
 gravitino_catalog_enabled = (
     starrocks_config.get_bool("gravitino_catalog_enabled") or False
 )
-FE_TRUST_STORE_DIR = "/opt/starrocks/truststore"
-FE_TRUST_STORE_PATH = f"{FE_TRUST_STORE_DIR}/cacerts"
 GRAVITINO_CA_MOUNT_PATH = "/etc/starrocks/gravitino-ca"
-# The JDK's published default for cacerts, not a credential.
-JDK_TRUST_STORE_PASSWORD = "changeit"  # pragma: allowlist secret  # noqa: S105
-fe_trust_store_jvm_opts = ""
-gravitino_ca_configmap: kubernetes.core.v1.ConfigMap | None = None
+ICEBERG_TLS_SOURCE_MOUNT_PATH = "/etc/starrocks/iceberg-tls"
+ICEBERG_TLS_SOURCE_FILE = "CaFileTLSConfigurer.java"
+ICEBERG_TLS_CONFIGURER = "edu.mit.ol.iceberg.CaFileTLSConfigurer"
+# start_fe.sh puts every jar in fe/lib on the classpath, and Iceberg's HTTPClient
+# loads the configurer through its own classloader, which is that one.
+ICEBERG_TLS_JAR = "/opt/starrocks/fe/lib/ol-iceberg-tls.jar"
+gravitino_fe_configmaps: list[kubernetes.core.v1.ConfigMap] = []
 if gravitino_catalog_enabled:
     gravitino_stack = make_stack_reference(projects.GRAVITINO_APP, stack_info.name)
     _gravitino = gravitino_stack.require_output("gravitino")
@@ -650,32 +658,45 @@ if gravitino_catalog_enabled:
         ),
         data={"ca.crt": Output.unsecret(_gravitino_ca_pem)},
     )
+    _iceberg_tls_cm_name = f"{stack_info.env_prefix}-starrocks-iceberg-tls"
+    iceberg_tls_configmap = kubernetes.core.v1.ConfigMap(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-iceberg-tls-cm",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=_iceberg_tls_cm_name,
+            namespace=namespace,
+            labels=k8s_app_labels.model_dump(),
+        ),
+        data={
+            ICEBERG_TLS_SOURCE_FILE: Path(__file__)
+            .parent.joinpath("files", ICEBERG_TLS_SOURCE_FILE)
+            .read_text()
+        },
+    )
+    gravitino_fe_configmaps = [gravitino_ca_configmap, iceberg_tls_configmap]
     _fe_trust_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
     _fe_trust_spec["configMaps"] = [
         *_fe_trust_spec.get("configMaps", []),
         {"name": _gravitino_ca_cm_name, "mountPath": GRAVITINO_CA_MOUNT_PATH},
+        {"name": _iceberg_tls_cm_name, "mountPath": ICEBERG_TLS_SOURCE_MOUNT_PATH},
     ]
-    _fe_trust_spec["emptyDirs"] = [
-        {"name": "fe-truststore", "mountPath": FE_TRUST_STORE_DIR}
-    ]
+    # The FE image has to ship a JDK (javac and jar in $JAVA_HOME/bin) and an
+    # iceberg-core with rest.auth.TLSConfigurer in fe/lib, as 4.1.7 does. On an
+    # image without them the FE container exits here, before the FE starts.
+    # -proc:none keeps annotation processors that ship in fe/lib from running.
     _fe_trust_spec["entrypoint"] = {
         "script": (
             "#!/bin/bash\n"
             "set -euo pipefail\n"
-            f'cp "$JAVA_HOME/lib/security/cacerts" {FE_TRUST_STORE_PATH}\n'
-            '"$JAVA_HOME/bin/keytool" -importcert -noprompt -alias gravitino-ca'
-            f" -file {GRAVITINO_CA_MOUNT_PATH}/ca.crt"
-            f" -keystore {FE_TRUST_STORE_PATH}"
-            f" -storepass {JDK_TRUST_STORE_PASSWORD}\n"
+            "_classes=$(mktemp -d)\n"
+            '"$JAVA_HOME/bin/javac" -proc:none --release 17'
+            " -cp '/opt/starrocks/fe/lib/*'"
+            ' -d "$_classes"'
+            f" {ICEBERG_TLS_SOURCE_MOUNT_PATH}/{ICEBERG_TLS_SOURCE_FILE}\n"
+            f'"$JAVA_HOME/bin/jar" cf {ICEBERG_TLS_JAR} -C "$_classes" .\n'
+            'rm -rf "$_classes"\n'
             'exec /opt/starrocks/fe_entrypoint.sh "$FE_SERVICE_NAME"\n'
         )
     }
-    # The Gravitino CA has no name constraints, so trusting it JVM-wide also
-    # trusts it for every other host the FE reaches (Keycloak JWKS, AWS).
-    fe_trust_store_jvm_opts = (
-        f" -Djavax.net.ssl.trustStore={FE_TRUST_STORE_PATH}"
-        f" -Djavax.net.ssl.trustStorePassword={JDK_TRUST_STORE_PASSWORD}"
-    )
 
 if starrocks_config.get_bool("use_be"):
     # Shared-nothing configuration
@@ -893,6 +914,7 @@ fe_background_refresh_interval_ms: int = fe_config.get(
 fe_tablet_create_timeout_second: int = fe_config.get(
     "tablet_create_timeout_second", 300
 )
+FE_ENABLE_QUERY_QUEUE_V2 = False
 _FE_CONFIG_BASE = (
     "LOG_DIR = ${STARROCKS_HOME}/log\n"
     'DATE = "$(date +%Y%m%d-%H%M%S)"\n'
@@ -904,7 +926,7 @@ _FE_CONFIG_BASE = (
     # keeping CPU available for query planning and Thrift RPC handling.
     # -Xms=Xmx pre-allocates heap at startup to avoid resize churn during init.
     f'JAVA_OPTS="-Dlog4j2.formatMsgNoLookups=true'
-    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m{fe_trust_store_jvm_opts}"
+    f" -Xms{fe_jvm_heap_mb}m -Xmx{fe_jvm_heap_mb}m"
     ' -XX:+UseZGC -Xlog:gc*:${LOG_DIR}/fe.gc.log.$DATE:time"\n'
     "http_port = 8030\n"
     "rpc_port = 9020\n"
@@ -927,6 +949,14 @@ _FE_CONFIG_BASE = (
     # refused with "Login name tmacey is not matched to user tmacey@mit.edu".
     "oauth2_principal_field = starrocks_username\n"
     "jwt_principal_field = starrocks_username\n"
+    # Query queue v1. 4.1 defaults to v2, whose SlotSelectionStrategyV2 admits
+    # every group from one cluster-wide slot pool, so a queue there holds
+    # interactive queries behind batch ones. v1 (DefaultSlotSelectionStrategy)
+    # queues each resource group against its own concurrency_limit, which is
+    # what substructure/starrocks configures. The setting is read once when the
+    # FE builds its SlotTracker and is not mutable (ADMIN SET FRONTEND CONFIG
+    # refuses it), so it lives here and takes an FE restart.
+    f"enable_query_queue_v2 = {str(FE_ENABLE_QUERY_QUEUE_V2).lower()}\n"
 )
 
 
@@ -1051,12 +1081,6 @@ _needs_fe_config = (
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
 )
-if gravitino_catalog_enabled and not _needs_fe_config:
-    msg = (
-        "starrocks:gravitino_catalog_enabled needs the FE trust store options in"
-        " fe.conf, which is only rendered with SSL, CN or BE enabled"
-    )
-    raise ValueError(msg)
 if _needs_fe_config:
     _force_str = "TRUE" if ssl_force_secure_transport else "FALSE"
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
@@ -1158,7 +1182,7 @@ starrocks_release = kubernetes.helm.v3.Release(
             starrocks_root_password_secret,
             starrocks_auth_binding,
             *([ssl_keystore_password_secret] if ssl_keystore_password_secret else []),
-            *([gravitino_ca_configmap] if gravitino_ca_configmap else []),
+            *gravitino_fe_configmaps,
         ],
     ),
 )
@@ -1313,6 +1337,22 @@ if stack_info.name == "Production":
         opts=ResourceOptions(depends_on=[starrocks_release]),
     )
 
+# Stable name for the FE MySQL endpoint, published by external-dns from the
+# annotation on the NLB Service below.  Consumers outside this stack need a name
+# they can put in configuration, and the NLB's own AWS hostname is not that:
+# it is regenerated whenever the Service is recreated, which would silently
+# cut off every client still holding the old one.
+#
+# A stack reference would be the usual way to share this, but it is not
+# available here -- this stack already references applications.mit_learn for
+# the NLB's security group, so mit_learn referencing it back would close a
+# cycle.
+fe_mysql_domain = f"mysql.{starrocks_config.require('domain')}"
+
+# The FE serves this certificate on the MySQL port, so it names fe_mysql_domain
+# too: a client dialing the NLB can then verify the hostname, not only the
+# chain. The FE reads its keystore once at startup, so a reissued certificate
+# is served only after the FE pods restart.
 cert_manager_certificate = OLCertManagerCert(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-cert",
     cert_config=OLCertManagerCertConfig(
@@ -1321,7 +1361,7 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_labels=k8s_app_labels.model_dump(),
         create_apisixtls_resource=True,
         dest_secret_name=starrocks_tls_secret_name,
-        dns_names=[starrocks_config.require("domain")],
+        dns_names=[starrocks_config.require("domain"), fe_mysql_domain],
         pkcs12_keystore_password_secret_name=ssl_keystore_password_secret_name,
     ),
     opts=ResourceOptions(
@@ -1420,18 +1460,6 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 # with enableNetworkPolicy false), and the FE pods carry no pod security group.
 FE_MYSQL_PORT = 9030
 
-# Stable name for the FE MySQL endpoint, published by external-dns from the
-# annotation on the Service below.  Consumers outside this stack need a name
-# they can put in configuration, and the NLB's own AWS hostname is not that:
-# it is regenerated whenever the Service is recreated, which would silently
-# cut off every client still holding the old one.
-#
-# A stack reference would be the usual way to share this, but it is not
-# available here -- this stack already references applications.mit_learn for
-# the security group above, so mit_learn referencing it back would close a
-# cycle.
-fe_mysql_domain = f"mysql.{starrocks_config.require('domain')}"
-
 fe_mysql_nlb_security_group = ec2.SecurityGroup(
     f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb-security-group",
     name=f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb",
@@ -1518,11 +1546,23 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
 export("fe_mysql_domain", fe_mysql_domain)
 
 # In-cluster endpoint for consumers on the data cluster. The FE certificate is
-# issued for starrocks:domain, not for the Service name, so a client that
-# verifies TLS needs both values. CI runs with ssl_enabled false, so no CI
-# client can use TLS whatever this says.
+# issued for starrocks:domain and fe_mysql_domain, not for the Service name, so
+# a client that verifies TLS needs both values. CI runs with ssl_enabled false,
+# so no CI client can use TLS whatever this says.
 export("fe_mysql_internal_host", f"{fe_service_name}.{namespace}.svc.cluster.local")
 export("fe_tls_server_name", starrocks_config.require("domain"))
+
+# For substructure/starrocks to set on the Gravitino catalog. The Helm release
+# does not wait for the FE roll, and the class is on an FE's classpath only after
+# that FE restarts, so check every FE has rolled before applying the substructure.
+if gravitino_catalog_enabled:
+    export(
+        "gravitino_catalog_tls",
+        {
+            "configurer_impl": ICEBERG_TLS_CONFIGURER,
+            "ca_file": f"{GRAVITINO_CA_MOUNT_PATH}/ca.crt",
+        },
+    )
 
 export(
     "fe_mysql_host",
@@ -1538,6 +1578,16 @@ export(
 # Export the root password as a secret so the substructure/starrocks stack can
 # reference it via StackReference to prime the Vault database connection.
 export("root_password_secret", starrocks_config.require_secret("root_password"))
+
+# substructure/starrocks turns the query queues on only when this is false, so it
+# cannot be applied before this stack. The Helm release does not wait for the FE
+# roll, so this says what fe.conf asks for, not what the running FEs use: check
+# every FE has rolled before applying the substructure. Without
+# _needs_fe_config the chart's own fe.conf applies, which leaves v2 on.
+export(
+    "fe_enable_query_queue_v2",
+    FE_ENABLE_QUERY_QUEUE_V2 if _needs_fe_config else True,
+)
 
 if shared_data_bucket is not None:
     export(

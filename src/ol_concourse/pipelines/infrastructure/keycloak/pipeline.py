@@ -91,9 +91,12 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),
-            # KEYCLOAK_VERSION is what tag_filters the SPI releases and the
-            # upstream image below, so the deploy has to follow it even though
-            # nothing under applications/keycloak/ imports it.
+            # KEYCLOAK_VERSION tag_filters the CAS SPI release, picks the SCIM
+            # jar, and sets the upstream image tag that triggers the build, so
+            # the deploy has to follow it even though nothing under
+            # applications/keycloak/ imports it. It does not set the server
+            # version: that is the FROM line in ol-keycloak's
+            # Dockerfile.hosted, which has to move with it.
             *version_pin_paths("KEYCLOAK_VERSION"),
             *project_version_paths("applications/keycloak/"),
             *project_secrets_paths("applications/keycloak/"),

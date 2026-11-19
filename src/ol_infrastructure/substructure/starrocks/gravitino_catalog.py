@@ -19,17 +19,16 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ol_infrastructure.lib.data_lake_access import (
-    CATALOG_WIDE_WRITE_ROLES,
-    GOVERNANCE_LAYER_ACCESS,
-    GOVERNANCE_ROLES,
-    layer_database,
-)
-
 CREDENTIAL_PROPERTY = "iceberg.catalog.oauth2.credential"
 # Takes the credential's place in the SQL that is hashed into a Command trigger,
 # so rotating the secret changes neither the trigger nor what state records.
 CREDENTIAL_PLACEHOLDER = "<bootstrap credential>"
+# Iceberg's HTTPClient builds this catalog's TLS context from the named
+# TLSConfigurer (applications/starrocks files/CaFileTLSConfigurer.java), which
+# adds the CA file to the JVM's default CAs for this client alone, so the FE JVM
+# never has to trust the Gravitino CA.
+TLS_CONFIGURER_PROPERTY = "iceberg.catalog.rest.client.tls.configurer-impl"
+TLS_CA_FILE_PROPERTY = "iceberg.catalog.rest.client.tls.ca-file"
 
 
 def catalog_name(env_suffix: str) -> str:
@@ -74,6 +73,46 @@ class GravitinoCatalog(BaseModel):
     warehouse: str
     oauth2_server_uri: str
     aws_region: str
+    tls_configurer_impl: str
+    tls_ca_file: str
+
+    def _identity_properties(self, credential: str) -> dict[str, str]:
+        return {
+            "type": "iceberg",
+            "iceberg.catalog.type": "rest",
+            "iceberg.catalog.uri": self.uri,
+            "iceberg.catalog.warehouse": self.warehouse,
+            "iceberg.catalog.security": "JWT",
+            "iceberg.catalog.oauth2.server-uri": self.oauth2_server_uri,
+            "iceberg.catalog.oauth2.scope": "openid",
+            CREDENTIAL_PROPERTY: credential,
+        }
+
+    def _tls_properties(self) -> dict[str, str]:
+        return {
+            TLS_CONFIGURER_PROPERTY: self.tls_configurer_impl,
+            TLS_CA_FILE_PROPERTY: self.tls_ca_file,
+        }
+
+    def _create_statement(self, properties: Mapping[str, str]) -> str:
+        return (
+            f"CREATE EXTERNAL CATALOG IF NOT EXISTS {self.name}\n"
+            "COMMENT 'MIT OL Data Lake, with your own Gravitino access'\n"
+            f"PROPERTIES(\n{_properties_sql(properties)}\n);"
+        )
+
+    def create_trigger_sql(self) -> str:
+        """Render what the CREATE Command's trigger hashes.
+
+        That is the CREATE with the credential replaced by
+        ``CREDENTIAL_PLACEHOLDER`` and without the TLS properties. ALTER sets
+        both, so changing either must not replace the Command, which would drop
+        the catalog and every grant on it.
+
+        :returns: The statement, never executed.
+        :rtype: str
+        """
+        return self._create_statement(self._identity_properties(CREDENTIAL_PLACEHOLDER))
 
     def create_sql(self, credential: str) -> str:
         """Render the CREATE EXTERNAL CATALOG statement.
@@ -102,20 +141,8 @@ class GravitinoCatalog(BaseModel):
         :returns: The statement.
         :rtype: str
         """
-        properties = {
-            "type": "iceberg",
-            "iceberg.catalog.type": "rest",
-            "iceberg.catalog.uri": self.uri,
-            "iceberg.catalog.warehouse": self.warehouse,
-            "iceberg.catalog.security": "JWT",
-            "iceberg.catalog.oauth2.server-uri": self.oauth2_server_uri,
-            "iceberg.catalog.oauth2.scope": "openid",
-            CREDENTIAL_PROPERTY: credential,
-        }
-        return (
-            f"CREATE EXTERNAL CATALOG IF NOT EXISTS {self.name}\n"
-            "COMMENT 'MIT OL Data Lake, with your own Gravitino access'\n"
-            f"PROPERTIES(\n{_properties_sql(properties)}\n);"
+        return self._create_statement(
+            {**self._identity_properties(credential), **self._tls_properties()}
         )
 
     def alter_sql(self, credential: str) -> str:
@@ -145,55 +172,6 @@ class GravitinoCatalog(BaseModel):
             CREDENTIAL_PROPERTY: credential,
             "iceberg.catalog.vended-credentials-enabled": "true",
             "aws.s3.region": self.aws_region,
+            **self._tls_properties(),
         }
         return f"ALTER CATALOG {self.name} SET (\n{_properties_sql(properties)}\n);"
-
-
-def governance_grants_sql(catalog: str, env_suffix: str) -> str:
-    """Render the StarRocks grants that let governance roles read the catalog.
-
-    SELECT only. A write through this catalog would commit as the bootstrap
-    credential rather than the user, so nobody gets INSERT, UPDATE or DELETE
-    here, and readonly / app / admin get nothing. Scope comes from
-    ``data_lake_access``, the same mapping Gravitino's grants are built from;
-    a role it gives nothing gets no USAGE either.
-
-    SELECT-only does not hold for roles that also hold the built-in
-    ``db_admin`` (ol_platform_admin, ol_data_engineer): it carries every
-    privilege on every catalog, external ones included, and cannot be revoked
-    per catalog. A write by one of them is planned, writes data files with the
-    BE's own S3 access, and then fails at commit because the bootstrap
-    principal holds no Gravitino grants, leaving orphan files. Both roles
-    already write through the Glue catalog, so this is no new data access.
-    db_admin also lets them DROP this catalog, which drops every grant on it
-    and is not re-created until a trigger changes, or ALTER its URI or token
-    endpoint, which redirects the credential and every user's token.
-
-    A per-database grant on an external catalog stores the database name
-    without resolving it, so these need no call to Gravitino, which the admin
-    session making them could not authorize.
-
-    :param catalog: The StarRocks catalog name.
-    :param env_suffix: The environment suffix, e.g. ``qa``.
-
-    :returns: The statements, switching back to default_catalog at the end.
-    :rtype: str
-    """
-    statements: list[str] = []
-    for role in GOVERNANCE_ROLES:
-        if role in CATALOG_WIDE_WRITE_ROLES:
-            targets = ["ALL TABLES IN ALL DATABASES"]
-        else:
-            targets = [
-                f"ALL TABLES IN DATABASE {layer_database(env_suffix, layer)}"
-                for layer in GOVERNANCE_LAYER_ACCESS[role]
-            ]
-        if not targets:
-            continue
-        statements.append(f"GRANT USAGE ON CATALOG {catalog} TO ROLE {role};")
-        statements.append(f"SET CATALOG {catalog};")
-        statements.extend(
-            f"GRANT SELECT ON {target} TO ROLE {role};" for target in targets
-        )
-        statements.append("SET CATALOG default_catalog;")
-    return "\n".join(statements)

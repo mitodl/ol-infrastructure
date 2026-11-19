@@ -498,8 +498,8 @@ secret=$(curl -sf \
 ```
 
 Stop if that printed an error rather than writing an empty value. Write
-`$secret` straight into the store below (`sops edit`, or a `vault kv put`
-of both fields for Open Discussions) without echoing it.
+`$secret` straight into the store below (`sops edit`, or `pulumi config set
+--secret` for Keycloak) without echoing it.
 
 ### Where each key is consumed
 
@@ -507,19 +507,23 @@ of both fields for Open Discussions) without echoing it.
 |---|---|---|
 | MITx Online RC | `mitxonline-rc` | `src/bridge/secrets/mitxonline/secrets.{qa,ci}.yaml` `recaptcha.site-key`/`secret-key`, via Vault `secret-mitxonline/collected-static-secrets` |
 | MITxPro RC and CI | `xpro-rc` | `src/bridge/secrets/xpro/secrets.{qa,ci}.yaml` `recaptcha.site_key`/`secret_key`, via Vault `secret-xpro/recaptcha` |
-| MIT Open Discussions Pre-Prod | `open-discussions-rc` | Vault `secret-operations/rc-apps/mit-open/recaptcha-keys` (`site_key`, `secret_key`), written by hand and shared by the CI and QA Heroku apps |
 | Learn RC (`mit-open`) | `learn-rc` | `src/bridge/secrets/mitlearn/secrets.qa.yaml` `recaptcha.site_key`/`secret_key`, read by `mit_learn` and, for the site key, `mit_learn_nextjs`. CI's values are empty. |
-| SSO CI and RC (`ol-data-platform`) | `sso-rc` | Keycloak's own database (see below) |
+| SSO CI and RC (`ol-data-platform`) | `sso-rc` | `substructure/keycloak/Pulumi.{CI,QA}.yaml` `keycloak_realm:captcha_site_key`/`captcha_secret_key` (Pulumi secrets) |
+| MITx Online Production | `mitxonline-production` | `src/bridge/secrets/mitxonline/secrets.production.yaml`, same fields as RC |
+| MITxPro Production | `xpro-production` | `src/bridge/secrets/xpro/secrets.production.yaml`, same fields as RC |
+| Learn Production (`mit-open`) | `learn-production` | `src/bridge/secrets/mitlearn/secrets.production.yaml`, same fields as RC. Restart both `mit_learn` and `mit_learn_nextjs` pods at cutover: Next.js reads the site key from `mitopen-static-secret` at pod start, so it keeps rendering the old key until it restarts. |
+| SSO Production (`ol-data-platform`) | `sso-production` | `substructure/keycloak/Pulumi.Production.yaml`, same keys as RC |
 
-Keycloak does not take its reCAPTCHA settings from this repository today.
-`keycloak_realm:captcha_site_key` and `captcha_secret_key` are still set in
-`substructure/keycloak/Pulumi.{CI,QA,Production}.yaml`, but nothing reads them
-since the realm refactor in #3452 dropped the olapps registration flow and its
-reCAPTCHA execution config. The registration pages on `sso-qa.ol.mit.edu` and
-`sso.ol.mit.edu` still render the widget, so the live settings sit in the
-olapps realm's registration flow in Keycloak. The SSO cutover is an admin
-console change unless that flow is brought back under Pulumi first, which
-should happen before the production SSO key is touched.
+Open Discussions is being retired, so its two legacy keys (Prod and
+Pre-Prod) get no replacement and are deleted when the property is.
+
+The olapps realm registers through `ol-registration-flow`
+(`substructure/keycloak/registration_flow.py`), whose reCAPTCHA execution
+config is built from the stack's `captcha_site_key` and `captcha_secret_key`.
+Set both with `pulumi config set --secret`, reading the value from stdin so it
+stays out of the shell history, and apply the keycloak stack. A new site key
+replaces the execution config delete-first, so registrations fail for the few
+seconds between the delete and the create.
 
 Bootcamp's three keys (Production, RC and CI) are deletions, not migrations:
 `mitodl/bootcamp-ecommerce` was archived on 2026-08-17, the
@@ -537,10 +541,10 @@ every property behind SSO.
 1. Declare the key under `recaptcha_keys` and let the pipeline apply it. Read
    the site key from `recaptcha_site_keys` and the legacy secret as above.
 2. Write both values into the consumer's store for that tier and deploy the
-   consumer (its Pulumi stack, then confirm the pods or Heroku dynos
-   restarted).
+   consumer (its Pulumi stack, then confirm every pod restarted: a pod that
+   started before the Vault sync keeps the old key in its environment).
 3. Verify. The form page renders the new site key (`recaptchaKey` in the page
-   settings for mitxonline, xPro and Open Discussions, `recaptchaSiteKey` in
+   settings for mitxonline and xPro, `recaptchaSiteKey` in
    Keycloak's register page context), and one real submission (account
    creation, or a HubSpot form on mit-learn) goes through.
 4. Set `protect: true` on the new key.

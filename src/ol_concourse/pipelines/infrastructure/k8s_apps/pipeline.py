@@ -885,18 +885,19 @@ def _build_legacy_app_pipeline(
         else PipelineFragment(resource_types=[], resources=[], jobs=[])
     )
 
-    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep]] = {}
+    release_marker_slack = _release_marker_slack(app_name)
+    additional_post_steps: dict[int, list[GetStep | PutStep | TaskStep | TryStep]] = {
+        0: [],
+        1: [_release_marker_task(app_name, ol_infra_repo, release_marker_slack)],
+    }
     if fastly_qa is not None and fastly_prod is not None:
         purge_params = _fastly_purge_params(pipeline_parameters.fastly_purge_scope)
-        qa_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        qa_purge_steps.append(
+        additional_post_steps[0].append(
             PutStep(put=fastly_qa.name, params=purge_params, no_get=True)
         )
-        prod_purge_steps: list[GetStep | PutStep | TaskStep] = []
-        prod_purge_steps.append(
+        additional_post_steps[1].append(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
-        additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
 
     qa_and_production_fragment = pulumi_jobs_chain(
         refresh_stack=pipeline_parameters.refresh_stack,
@@ -918,6 +919,7 @@ def _build_legacy_app_pipeline(
                 load_var="image_tag", file=f"{app_rc_image.name}/tag", reveal=True
             ),
         ],
+        custom_dependencies={1: [_release_marker_start_task()]},
         additional_env_vars={
             f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
         },
@@ -949,6 +951,7 @@ def _build_legacy_app_pipeline(
     deployment_resources = [
         ol_infra_repo,
         pulumi_resource,
+        release_marker_slack,
         release_repo,
         app_ci_image,  # Needed for CI deployment trigger
         app_rc_image,  # Needed for QA/Prod deployment trigger
@@ -1495,6 +1498,123 @@ def _cache_bust_task() -> TaskStep:
                 args=["-euc", 'date +%s%N > "$OUTPUT_DIR/value"'],
             ),
         ),
+    )
+
+
+_RELEASE_MARKER_SCRIPT = (
+    Path(__file__).parent / "scripts" / "grafana_release_marker.py"
+).read_text()
+RELEASE_MARKER_START_TASK_NAME = "release-marker-start"
+RELEASE_MARKER_TASK_NAME = "grafana-release-marker"
+RELEASE_MARKER_DIR = "release-marker"
+# Written to Vault by the grafana-alerting Production stack (release_markers.py).
+GRAFANA_ANNOTATIONS_URL = "((grafana_annotations.url))"
+GRAFANA_ANNOTATIONS_TOKEN = "((grafana_annotations.token))"  # noqa: S105
+
+
+def _release_marker_start_task() -> TryStep:
+    """Record when the Production rollout starts, for the release marker.
+
+    The last dependency of the Production job, so the time is taken just
+    before the Pulumi step that rolls the pods. Wrapped in a ``try`` so that
+    failing to pull the task image cannot block a deploy; the marker step then
+    errors on its missing ``release-marker`` input, inside its own ``try``, and
+    alerts Slack.
+    """
+    return TryStep(
+        try_=TaskStep(
+            task=Identifier(RELEASE_MARKER_START_TASK_NAME),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=TASK_IMAGE,
+                outputs=[Output(name=Identifier(RELEASE_MARKER_DIR))],
+                params={"OUTPUT_DIR": RELEASE_MARKER_DIR},
+                run=Command(
+                    path="sh",
+                    args=["-euc", 'date +%s > "$OUTPUT_DIR/started_at"'],
+                ),
+            ),
+        )
+    )
+
+
+def _release_marker_slack(app_name: str) -> Resource:
+    """Return the Slack resource the marker step alerts when it fails or errors."""
+    return slack_notification(
+        name=Identifier(f"slack-alert-{app_name}-release-marker"),
+        url="((eks.slack_url))",
+    )
+
+
+def _release_marker_task(
+    app_name: str, ol_infra_repo: Resource, slack_resource: Resource
+) -> TryStep:
+    """Mark a Production release on Grafana dashboards. See the script's docstring.
+
+    The first Production post-step: Pulumi has waited for the rollout, so the
+    marker spans it, and a later post-step that fails (the release finish, the
+    Fastly purge) cannot cost a live release its marker. Wrapped in a ``try``
+    because the release has shipped by the time this runs, and a red
+    Production job would read as a failed deploy.
+
+    The ``try`` also turns a failed or errored marker step green, so the
+    task's own hooks alert Slack; nothing else would show that the Grafana
+    token or the script has stopped working. Concourse runs a step's hooks
+    outside its ``attempts``, so the alert is sent once, after the last attempt:
+    https://github.com/concourse/concourse/blob/880fbe243731d36cf2573aa956b1acda89f20642/atc/steps.go#L223-L257
+    """
+    alert_body = (
+        f"{app_name} ((.:image_tag)) rolled out to Production, and the rollout"
+        f" needs nothing. The {RELEASE_MARKER_TASK_NAME} step did not succeed, so"
+        " Grafana dashboards will not show this release if the version is new;"
+        " a redeploy of an already-marked version loses nothing. The step's log"
+        " says why: a 401 or 403 points at the Grafana token or its roles (the"
+        " grafana-alerting Production stack, release_markers.py), and a missing"
+        f" {RELEASE_MARKER_DIR} input points at the"
+        f" {RELEASE_MARKER_START_TASK_NAME} step."
+    )
+
+    def alert(outcome: str) -> PutStep:
+        step = notification(
+            resource=slack_resource,
+            title=(
+                f"{app_name} deployed to Production;"
+                f" Grafana release marker step {outcome}"
+            ),
+            body=alert_body,
+            alert_type=outcome,
+        )
+        # Nothing reads the put's implicit get, and if that get errored after
+        # on_failure had posted, on_error would post a second alert.
+        step.no_get = True
+        return step
+
+    return TryStep(
+        try_=TaskStep(
+            task=Identifier(RELEASE_MARKER_TASK_NAME),
+            attempts=3,
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=TASK_IMAGE,
+                inputs=[
+                    Input(name=Identifier(RELEASE_MARKER_DIR)),
+                    Input(name=ol_infra_repo.name),
+                ],
+                params={
+                    "APP_NAME": app_name,
+                    "ENVIRONMENT": "production",
+                    "VERSION": "((.:image_tag))",
+                    "STARTED_AT_FILE": f"{RELEASE_MARKER_DIR}/started_at",
+                    "INFRA_REF_FILE": f"{ol_infra_repo.name}/.git/ref",
+                    "INFRA_REPO_URL": ol_infra_repo.source["uri"],
+                    "GRAFANA_URL": GRAFANA_ANNOTATIONS_URL,
+                    "GRAFANA_TOKEN": GRAFANA_ANNOTATIONS_TOKEN,
+                },
+                run=Command(path="python3", args=["-c", _RELEASE_MARKER_SCRIPT]),
+            ),
+            on_failure=alert("failed"),
+            on_error=alert("errored"),
+        )
     )
 
 
@@ -2069,7 +2189,9 @@ def _build_release_resource_app_pipeline(
             },
         ),
     ]
+    release_marker_slack = _release_marker_slack(app_name)
     prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
+        _release_marker_task(app_name, ol_infra_repo, release_marker_slack),
         # Mark the Production GitHub Deployment as successful, and say so on the
         # release issue. Closing that issue authorizes the promotion; it does
         # not show the release is live, and a closed issue is easy to misread as
@@ -2224,6 +2346,7 @@ def _build_release_resource_app_pipeline(
                     put=deployment_prod.name,
                     params={"action": "start", "ref": "((.:image_tag))"},
                 ),
+                _release_marker_start_task(),
             ],
         },
         additional_env_vars={
@@ -2256,6 +2379,7 @@ def _build_release_resource_app_pipeline(
     deployment_resources = [
         ol_infra_repo,
         pulumi_resource,
+        release_marker_slack,
         app_ci_image,  # Needed for CI deployment trigger
         app_rc_image,  # Needed for QA/Prod deployment trigger
         docker_ci_image,

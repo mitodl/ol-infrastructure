@@ -129,30 +129,50 @@ cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 # Single-stack (default) because there is one Sentry org, and one Dagster
 # project within it shared by every environment.
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
-# Keycloak is deployed to CI/QA/Production only; the Dev Dagster stack has no
-# counterpart to reference, so its data_loading deployment simply goes without
-# the Keycloak host and that source stays unavailable there.
-keycloak_stack = (
-    make_stack_reference(projects.KEYCLOAK_APP, stack_info.name)
-    if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+# The application databases data_loading's dlt sources read, as
+# (<NAME>_DB_HOST variable, application project, the stack export holding its
+# RDS hosts). The variable is the ol_dlt source's env prefix plus _HOST. The
+# Dev Dagster stack goes without these hosts, so those sources stay unavailable
+# there. Each application stack's database admits the data VPC's pod subnets
+# (the shared OLAppDatabase component, or the stack's own security group).
+# Loading the QA applications is what lets the QA lake validate identity-bearing
+# features such as the B2B dashboard (RFC 12711).
+DATA_LOADING_DB_SOURCES = (
+    ("KEYCLOAK_DB_HOST", projects.KEYCLOAK_APP, "keycloak"),
+    ("MITXONLINE_APP_DB_HOST", projects.MITXONLINE, "mitxonline"),
+    ("XPRO_APP_DB_HOST", projects.XPRO, "xpro"),
+    ("MITLEARN_APP_DB_HOST", projects.MIT_LEARN, "mit_learn"),
+    ("LEARN_AI_APP_DB_HOST", projects.LEARN_AI, "learn_ai"),
+    ("OCW_STUDIO_APP_DB_HOST", projects.OCW_STUDIO, "ocw_studio"),
+    ("MICROMASTERS_APP_DB_HOST", projects.MICROMASTERS, "micromasters"),
 )
-# Same shape as Keycloak: MITx Online is deployed to CI/QA/Production only, so
-# the Dev Dagster stack goes without the host and that source stays unavailable
-# there. Its app database is what the mitxonline_app dlt source reads
-# (RFC 12711 step 8) -- the QA data lake cannot validate the B2B dashboard while
-# it holds nothing from the QA app.
-mitxonline_stack = (
-    make_stack_reference(projects.MITXONLINE, stack_info.name)
+data_loading_db_stacks = (
+    [
+        (env_var, make_stack_reference(project, stack_info.name), output_name)
+        for env_var, project, output_name in DATA_LOADING_DB_SOURCES
+    ]
     if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+    else []
 )
-# xPro is deployed to CI/QA/Production only, like MITx Online. Its app database
-# is what the xpro_app dlt source reads (RFC 12711).
-xpro_stack = (
-    make_stack_reference(projects.XPRO, stack_info.name)
+# The Open edX deployments whose edxapp MariaDB the edxapp dlt source reads, as
+# (<NAME>_DB_HOST variable, edxapp stack deployment). The edxapp stacks export
+# their hosts differently from the application stacks above; see
+# data_loading_edxapp_db_host.
+DATA_LOADING_EDXAPP_SOURCES = (
+    ("MITX_EDXAPP_DB_HOST", "mitx"),
+    ("XPRO_EDXAPP_DB_HOST", "xpro"),
+    ("MITXONLINE_EDXAPP_DB_HOST", "mitxonline"),
+)
+data_loading_edxapp_stacks = (
+    [
+        (
+            env_var,
+            make_stack_reference(projects.EDXAPP, f"{deployment}.{stack_info.name}"),
+        )
+        for env_var, deployment in DATA_LOADING_EDXAPP_SOURCES
+    ]
     if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+    else []
 )
 
 
@@ -175,6 +195,23 @@ def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[
         "rds_replica_host" if stack_info.env_suffix == "production" else "rds_host"
     )
     return app_stack.require_output(output_name)[host_key]
+
+
+def data_loading_edxapp_db_host(edxapp_stack: StackReference) -> Output[str]:
+    """Pick the edxapp MariaDB host the edxapp dlt source reads.
+
+    Same rule as data_loading_db_host, for the edxapp stack's exports: the read
+    replica (``edxapp_read_replica``) in production, the primary
+    (``edxapp["mariadb"]``) elsewhere.
+
+    :param edxapp_stack: The edxapp deployment's stack reference.
+
+    :returns: The host for the deployment's ``<NAME>_EDXAPP_DB_HOST`` variable.
+    :rtype: Output[str]
+    """
+    if stack_info.env_suffix == "production":
+        return edxapp_stack.require_output("edxapp_read_replica")
+    return edxapp_stack.require_output("edxapp")["mariadb"]
 
 
 # The ml code location traces its LLM calls to the Production Opik from every
@@ -2929,8 +2966,12 @@ code_locations: list[dict[str, str | int]] = [
 
 # Build deployments list for user code
 # Code locations that run 2 replicas for resilience. Criteria: OOM-prone,
-# slow-starting (making restarts expensive), or high sensor-tick frequency.
-multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading"}
+# slow-starting (making restarts expensive), high sensor-tick frequency, or
+# running long asset backfills. The backfill daemon fails a backfill and
+# cancels its queued runs when it evaluates it while the location is down:
+# ml lost a 7,363-partition Learn embeddings backfill to the minute its one
+# replica took to come back after a node termination on 2026-11-18.
+multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading", "ml"}
 
 deployments = []
 for location in code_locations:
@@ -3063,28 +3104,14 @@ for location in code_locations:
     # data_loading's dlt database sources connect by host and take their
     # credentials from Vault at run time, so only the host is passed through
     # here -- from the owning application's stack, not duplicated in config.
-    if name == "data_loading" and keycloak_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "KEYCLOAK_DB_HOST",
-                "value": data_loading_db_host(keycloak_stack, "keycloak"),
-            }
+    if name == "data_loading":
+        deployment["env"].extend(
+            {"name": env_var, "value": data_loading_db_host(app_stack, output_name)}
+            for env_var, app_stack, output_name in data_loading_db_stacks
         )
-
-    if name == "data_loading" and mitxonline_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "MITXONLINE_APP_DB_HOST",
-                "value": data_loading_db_host(mitxonline_stack, "mitxonline"),
-            }
-        )
-
-    if name == "data_loading" and xpro_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "XPRO_APP_DB_HOST",
-                "value": data_loading_db_host(xpro_stack, "xpro"),
-            }
+        deployment["env"].extend(
+            {"name": env_var, "value": data_loading_edxapp_db_host(edxapp_stack)}
+            for env_var, edxapp_stack in data_loading_edxapp_stacks
         )
 
     # ml's Opik tracing and Prompt Library. Only the non-secret settings live
@@ -3400,6 +3427,16 @@ dagster_event_log_max_overflow = dagster_config.get_int("event_log_max_overflow"
 if dagster_event_log_max_overflow is None:
     dagster_event_log_max_overflow = 10
 
+# learn_embeddings/model_calls tag limit, sized against each environment's
+# dagster-ml text-embedding-3-large deployment. QA's is 300K TPM, above one
+# run's largest (250K-token) request but not several, so stacks that set
+# nothing keep one run at a time.
+dagster_learn_embeddings_run_limit = dagster_config.get_int(
+    "learn_embeddings_run_limit"
+)
+if dagster_learn_embeddings_run_limit is None:
+    dagster_learn_embeddings_run_limit = 1
+
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
 dagster_instance_yaml = (
@@ -3409,6 +3446,7 @@ dagster_instance_yaml = (
     .replace("MAX_CONCURRENT_RUNS", str(dagster_max_concurrent_runs))
     .replace("EVENT_LOG_POOL_SIZE", str(dagster_event_log_pool_size))
     .replace("EVENT_LOG_MAX_OVERFLOW", str(dagster_event_log_max_overflow))
+    .replace("LEARN_EMBEDDINGS_RUN_LIMIT", str(dagster_learn_embeddings_run_limit))
 )
 # The daemon and webserver mount dagster.yaml from the dagster-instance
 # ConfigMap via subPath, which kubelet never live-refreshes, and the chart's

@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Show which deployment pipeline stages a GitHub PR has reached.
 
+Run it from an ol-infrastructure checkout with ``uv run python
+scripts/where-is-my-pr <PR URL>``. Started any other way (a Python without the repo's packages, an
+older Python, or a copy outside the checkout), it says how to fix that instead
+of failing on an import.
+
 Maps a PR's GitHub repo to its ol-infrastructure Concourse pipeline via the
 canonical app registry (``bridge.settings.apps``), then checks git ancestry
 of the PR's merge commit against that pipeline's stage branches:
@@ -19,12 +24,15 @@ their GitHub Deployments are checked instead.
 Ancestry is checked via GitHub's compare API rather than a local clone, so
 no repo checkout is needed for the target app.
 
-When `fly` is logged in to the "infrastructure" Concourse team, each
+When `fly` is logged in with a role on the "infrastructure" Concourse team, each
 stage's *last successful build* is also inspected directly (via `fly curl`
 against Concourse's API) to find the exact commit it deployed -- this is
 strictly more precise than the branch-tip check, since a branch can move
 ahead of what was actually last deployed. That live check is used when
-available; the branch-tip check is the fallback otherwise.
+available; the branch-tip check is the fallback otherwise. Before checking
+anything, the script works out whether `fly` is installed, logged in, and
+holds a role on that team, and if not, prints which one is missing and how
+to fix it.
 
 PRs against ol-infrastructure itself are handled differently: rather than
 mapping the *repo* to an app, the PR's *changed files* are inspected to
@@ -58,29 +66,103 @@ is pipeline evidence, not proof a particular key was written to Vault. No SOPS
 decryption or Vault read-back is performed.
 """
 
+# Everything up to the environment check below has to run on old Pythons
+# (e.g. 3.8), so it can explain the problem instead of failing first.
+from __future__ import annotations
+
 import json
+import platform
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from fnmatch import fnmatchcase
-from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from urllib.parse import quote, urlencode
 
-import cyclopts
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Keep in step with requires-python in pyproject.toml.
+MIN_PYTHON = (3, 14)
+UV_INSTALL_URL = "https://docs.astral.sh/uv/getting-started/installation/"
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from bridge.settings.apps import APPS, github_repo, repo_main_branch
-from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
-from ol_concourse.pipelines.secrets_map import (
-    DEPLOY_CREDENTIAL_SECRETS,
-    PROJECT_SECRETS,
-    SECRETS_ROOT,
-)
+
+def _environment_fix(
+    *, in_checkout: bool, in_repo_venv: bool, have_uv: bool
+) -> list[str]:
+    """List the steps to run this script in the ol-infrastructure uv environment."""
+    repo = (
+        shlex.quote(str(REPO_ROOT)) if in_checkout else "<your ol-infrastructure clone>"
+    )
+    args = " ".join(shlex.quote(arg) for arg in sys.argv[1:]) or "<PR URL>"
+    steps = [] if have_uv else [f"Install uv: {UV_INSTALL_URL}"]
+    if not in_checkout:
+        steps.append(
+            "This copy isn't inside an ol-infrastructure checkout, which it "
+            "needs for the app registry. Clone it if you haven't: "
+            "git clone https://github.com/mitodl/ol-infrastructure.git"
+        )
+    if in_repo_venv:
+        steps.append(f"Update the environment: cd {repo} && uv sync")
+    else:
+        steps.append(f"Set up the environment (once): cd {repo} && uv sync")
+    steps.append(
+        f"Run the script through uv: cd {repo} && "
+        f"uv run python scripts/where-is-my-pr {args}"
+    )
+    return steps
+
+
+def _wrong_environment(problem: str) -> NoReturn:
+    """Stop before the third-party imports, explaining how to run under uv."""
+    in_checkout = (REPO_ROOT / "src" / "bridge").is_dir()
+    venv = (REPO_ROOT / ".venv").resolve()
+    in_repo_venv = in_checkout and Path(sys.prefix).resolve() == venv
+    print(
+        f"where-is-my-pr has to run in the ol-infrastructure Python "
+        f"environment, but {problem}.",
+        file=sys.stderr,
+    )
+    if in_repo_venv:
+        print("That environment looks out of date.", file=sys.stderr)
+    print("To fix this:", file=sys.stderr)
+    steps = _environment_fix(
+        in_checkout=in_checkout,
+        in_repo_venv=in_repo_venv,
+        have_uv=bool(shutil.which("uv")),
+    )
+    for number, step in enumerate(steps, start=1):
+        print(f"  {number}. {step}", file=sys.stderr)
+    sys.exit(1)
+
+
+if sys.version_info < MIN_PYTHON:
+    _wrong_environment(
+        f"it was started with Python {platform.python_version()} "
+        f"({sys.executable}), and it needs {'.'.join(map(str, MIN_PYTHON))} or "
+        "newer"
+    )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+try:
+    from functools import cache  # Python 3.9+
+
+    import cyclopts
+
+    from bridge.settings.apps import APPS, github_repo, repo_main_branch
+    from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
+    from ol_concourse.pipelines.secrets_map import (
+        DEPLOY_CREDENTIAL_SECRETS,
+        PROJECT_SECRETS,
+        SECRETS_ROOT,
+    )
+except ModuleNotFoundError as error:
+    missing = f"the '{error.name}' package" if error.name else "a required package"
+    _wrong_environment(f"{sys.executable} can't import {missing}")
 
 app = cyclopts.App(
     help="Show which ol-infrastructure deployment pipeline stages a GitHub PR has reached."
@@ -208,26 +290,209 @@ def _is_ancestor(status: str | None) -> bool | None:
     return status in {"ahead", "identical"}
 
 
-_fly_ready_cache: bool | None = None
+LOGIN_COMMAND = f"fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
+RELOGIN_COMMAND = f"fly -t {CONCOURSE_TEAM} logout && {LOGIN_COMMAND}"
+# Both connectors on the login page work, but only the GitHub one grants every
+# mitodl member read access; the Keycloak one needs a hand-assigned realm role.
+GITHUB_ORG_ADVICE = (
+    "Check that you belong to the mitodl GitHub org: "
+    "https://github.com/orgs/mitodl/people",
+    "Check that Concourse can see that membership: open "
+    "https://github.com/settings/applications, select the Concourse app, and "
+    "under 'Organization access' grant (or request) access for mitodl.",
+)
+CONNECTOR_ADVICE = (
+    "When the browser opens, choose GitHub. Any mitodl GitHub org member gets access.",
+    "If GitHub login fails with \"you are not a member of 'infrastructure'\", "
+    "Concourse can't see your mitodl membership. Check that you're in the org "
+    "(https://github.com/orgs/mitodl/people) and that the Concourse app has "
+    "mitodl access (https://github.com/settings/applications, then Concourse, "
+    "then grant or request mitodl under 'Organization access'), then log in "
+    "again.",
+    "'OL Platform Engineering' (Keycloak) works only if your Keycloak account "
+    "has the 'developer' or 'admin' role. Without one, login fails with the "
+    'same "not a member" error; use GitHub, or ask the DevOps team for the '
+    "'developer' role.",
+)
+# Markers gh prints when it has no token or GitHub rejects the one it has.
+GH_AUTH_ERRORS = ("gh auth login", "HTTP 401", "Bad credentials")
+
+
+@dataclass(frozen=True)
+class FlyAccess:
+    """Whether live Concourse checks can run and, if not, how the user can fix it."""
+
+    ok: bool
+    summary: str = ""
+    fix: tuple[str, ...] = ()
+
+
+def _fly_download_url() -> str:
+    """Link to the fly binary that matches this Concourse server and this machine."""
+    system = {"darwin": "darwin", "win32": "windows"}.get(sys.platform, "linux")
+    machine = platform.machine().lower()
+    arch = "arm64" if machine in {"arm64", "aarch64"} else "amd64"
+    return f"{CONCOURSE_URL}/api/v1/cli?{urlencode({'arch': arch, 'platform': system})}"
+
+
+def _run_fly(*args: str) -> subprocess.CompletedProcess[str] | None:
+    """Run `fly -t CONCOURSE_TEAM <args>`, or return None if it can't run in time."""
+    try:
+        return subprocess.run(  # noqa: S603
+            ["fly", "-t", CONCOURSE_TEAM, *args],  # noqa: S607
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _no_role_access(user: dict[str, Any]) -> FlyAccess:
+    """Explain a successful login that holds no role on CONCOURSE_TEAM."""
+    connector = user.get("connector") or "unknown"
+    who = user.get("user_name") or user.get("name") or "you"
+    if connector == "github":
+        return FlyAccess(
+            ok=False,
+            summary=(
+                f"you're logged in to Concourse with GitHub as {who}, but "
+                f"Concourse doesn't see you as a mitodl org member, so you have "
+                f"no role on the '{CONCOURSE_TEAM}' team"
+            ),
+            fix=(*GITHUB_ORG_ADVICE, f"Log in again: {RELOGIN_COMMAND}"),
+        )
+    if connector == "oidc":
+        return FlyAccess(
+            ok=False,
+            summary=(
+                f"you're logged in to Concourse with Keycloak (OL Platform "
+                f"Engineering) as {who}, but your account has neither the "
+                f"'developer' nor the 'admin' role, so you have no role on the "
+                f"'{CONCOURSE_TEAM}' team"
+            ),
+            fix=(
+                f"Log in again with GitHub instead: {RELOGIN_COMMAND}, then "
+                "choose GitHub in the browser.",
+                "Or ask the DevOps team to give your Keycloak account the "
+                "'developer' role in the ol-platform-engineering realm.",
+            ),
+        )
+    return FlyAccess(
+        ok=False,
+        summary=(
+            f"you're logged in to Concourse as {who} (via {connector}), which "
+            f"has no role on the '{CONCOURSE_TEAM}' team"
+        ),
+        fix=(f"Log in again: {RELOGIN_COMMAND}", *CONNECTOR_ADVICE),
+    )
+
+
+def _diagnose_fly_access() -> FlyAccess:
+    """Check fly is installed, logged in, and holds a role on CONCOURSE_TEAM.
+
+    The target's own team doesn't matter: API paths name CONCOURSE_TEAM
+    explicitly, and any role there (or Concourse admin) can read it.
+    """
+    login_steps = (f"Log in: {LOGIN_COMMAND}", *CONNECTOR_ADVICE)
+    if shutil.which("fly") is None:
+        return FlyAccess(
+            ok=False,
+            summary="the Concourse CLI `fly` isn't installed (or isn't on your PATH)",
+            fix=(
+                f"Download the fly that matches our Concourse: {_fly_download_url()}",
+                "Make it executable (chmod +x fly) and put it on your PATH.",
+                *login_steps,
+            ),
+        )
+    status = _run_fly("status")
+    if status is None:
+        return FlyAccess(
+            ok=False,
+            summary=f"`fly status` didn't finish in time (is {CONCOURSE_URL} reachable?)",
+            fix=("Check your network or VPN, then re-run this script.",),
+        )
+    output = f"{status.stdout}\n{status.stderr}"
+    if "unknown target" in output:
+        return FlyAccess(
+            ok=False,
+            summary=f"fly has no '{CONCOURSE_TEAM}' target yet",
+            fix=login_steps,
+        )
+    if "out of sync" in output and status.returncode != 0:
+        return FlyAccess(
+            ok=False,
+            summary="your fly version doesn't match our Concourse server's",
+            fix=(f"Update it: fly -t {CONCOURSE_TEAM} sync",),
+        )
+    if status.returncode != 0:
+        detail = next((line for line in output.splitlines() if line.strip()), "")
+        detail = detail.strip().rstrip(".")
+        return FlyAccess(
+            ok=False,
+            summary=(
+                "your fly login has expired or isn't valid"
+                + (f" ({detail})" if detail else "")
+            ),
+            fix=login_steps,
+        )
+    # `fly status` skips the version check; `fly curl` refuses any major or
+    # minor mismatch with the server ("... is out of sync with the target").
+    # A patch-only mismatch prints the same text as a warning but succeeds.
+    lookup = _run_fly("curl", "/api/v1/user", "--", "-s")
+    if lookup is None:
+        return FlyAccess(
+            ok=False,
+            summary=f"fly couldn't fetch your user info from {CONCOURSE_URL} in time",
+            fix=("Check your network or VPN, then re-run this script.",),
+        )
+    if lookup.returncode != 0 and "out of sync" in f"{lookup.stdout}\n{lookup.stderr}":
+        return FlyAccess(
+            ok=False,
+            summary="your fly version doesn't match our Concourse server's",
+            fix=(f"Update it: fly -t {CONCOURSE_TEAM} sync",),
+        )
+    try:
+        user = json.loads(lookup.stdout) if lookup.returncode == 0 else None
+    except json.JSONDecodeError:
+        user = None
+    if not isinstance(user, dict):
+        return FlyAccess(
+            ok=False,
+            summary="fly is logged in, but Concourse wouldn't return your user info",
+            fix=login_steps,
+        )
+    if user.get("is_admin") or (user.get("teams") or {}).get(CONCOURSE_TEAM):
+        return FlyAccess(ok=True)
+    return _no_role_access(user)
+
+
+@cache
+def _fly_access() -> FlyAccess:
+    """Diagnose Concourse access once per run."""
+    return _diagnose_fly_access()
 
 
 def _fly_ready() -> bool:
-    """Whether `fly` is logged in to CONCOURSE_TEAM, checked once per run."""
-    global _fly_ready_cache  # noqa: PLW0603
-    if _fly_ready_cache is None:
-        try:
-            result = subprocess.run(  # noqa: S603
-                ["fly", "-t", CONCOURSE_TEAM, "status"],  # noqa: S607
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            _fly_ready_cache = False
-        else:
-            _fly_ready_cache = result.returncode == 0
-    return _fly_ready_cache
+    """Whether live Concourse checks can run against CONCOURSE_TEAM."""
+    return _fly_access().ok
+
+
+def _print_access_report() -> None:
+    """Explain once, up front, why live checks are off and how to turn them on."""
+    access = _fly_access()
+    if access.ok:
+        return
+    print(
+        f"\nConcourse access: {access.summary}.\n"
+        "Live build checks are off, so stages fall back to GitHub branch tips "
+        "where possible, and some stages can't be checked at all."
+    )
+    print("To fix this:")
+    for number, step in enumerate(access.fix, start=1):
+        print(f"  {number}. {step}")
+    print("Then re-run this script.")
 
 
 def _fly_curl(path: str) -> Any | None:
@@ -441,9 +706,7 @@ def _report_ol_infra_app(pr: PullRequest, app_name: str) -> None:
     print(f"    {CONCOURSE_URL}/teams/{CONCOURSE_TEAM}/pipelines/{pipeline}")
 
     if not _fly_ready():
-        print(
-            "    ?  fly not logged in to 'infrastructure' -- can't verify live builds"
-        )
+        _print_fly_login_hint("verify live builds")
         return
 
     resource = f"ol-infra-{app_name}"
@@ -676,10 +939,9 @@ def _pulumi_routes() -> tuple[list[SecretsRoute], list[str]]:
 
 
 def _print_fly_login_hint(action: str) -> None:
-    print(f"    ?  fly not logged in to 'infrastructure' -- can't {action}")
-    print(
-        f"    Log in: fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
-    )
+    summary = _fly_access().summary or f"no access to Concourse '{CONCOURSE_TEAM}'"
+    print(f"    ?  Can't {action}: {summary}.")
+    print("       See 'Concourse access' above for how to fix this.")
 
 
 def _routes_for_secret(path: str, routes: list[SecretsRoute]) -> list[SecretsRoute]:
@@ -1215,6 +1477,52 @@ def _report_upstream_pipelines(pr: PullRequest) -> bool:
     return bool(sources)
 
 
+def _fail(summary: str, fix: tuple[str, ...]) -> NoReturn:
+    """Stop with a problem statement and numbered steps to fix it."""
+    print(f"Can't check this PR: {summary}.", file=sys.stderr)
+    print("To fix this:", file=sys.stderr)
+    for number, step in enumerate(fix, start=1):
+        print(f"  {number}. {step}", file=sys.stderr)
+    sys.exit(1)
+
+
+def _fetch_pr_or_explain(url: str) -> PullRequest:
+    """Fetch the PR, turning a missing or logged-out gh into steps to fix it."""
+    try:
+        _parse_pr_url(url)
+    except ValueError:
+        _fail(
+            f"{url!r} isn't a GitHub pull request URL",
+            ("Pass a URL like https://github.com/mitodl/mitxonline/pull/3801",),
+        )
+    if shutil.which("gh") is None:
+        _fail(
+            "the GitHub CLI `gh` isn't installed (or isn't on your PATH)",
+            ("Install it: https://cli.github.com", "Log in: gh auth login"),
+        )
+    try:
+        return _fetch_pr(url)
+    except (GhNotFoundError, RuntimeError) as error:
+        # Keep GitHub's reason, not the gh command line _gh_json prefixes.
+        reason = str(error).rpartition(" failed: ")[2]
+        # Only auth failures mean "log in"; network or outage errors fall
+        # through so the user sees gh's real reason.
+        if any(marker in reason for marker in GH_AUTH_ERRORS):
+            _fail(
+                "gh isn't logged in to GitHub, or its token has expired",
+                ("Log in: gh auth login", "Check it worked: gh auth status"),
+            )
+        detail = next((line for line in reason.splitlines() if line), "")
+        _fail(
+            f"GitHub wouldn't return that PR ({detail})",
+            (
+                "Check the URL.",
+                "If the repo is private, check that the GitHub account gh uses "
+                "(see: gh auth status) can open the PR in a browser.",
+            ),
+        )
+
+
 @app.default
 def where_is_my_pr(pr_url: str) -> None:
     """Show which ol-infrastructure deployment pipeline stages a GitHub PR has reached.
@@ -1224,12 +1532,13 @@ def where_is_my_pr(pr_url: str) -> None:
     pr_url:
         A GitHub pull request URL, e.g. https://github.com/mitodl/mitxonline/pull/3801
     """
-    pr = _fetch_pr(pr_url)
+    pr = _fetch_pr_or_explain(pr_url)
     print(f"PR #{pr.number} - {pr.owner}/{pr.repo}: {pr.title}")
     if pr.merged:
         print(f"Merged {pr.merged_at} (commit {pr.commit[:8]})")
     else:
         print(f"State: {pr.state} (not merged; checking head commit {pr.commit[:8]})")
+    _print_access_report()
 
     if f"{pr.owner}/{pr.repo}".lower() == OL_INFRA_REPO:
         _report_ol_infrastructure_pr(pr)

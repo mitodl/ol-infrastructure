@@ -152,6 +152,8 @@ def create_mitlearn_k8s_secrets(
     redis_cache: OLAmazonCache,
     restart_targets: list[OLVaultRestartTarget],
     starrocks_vault_mount_path: str | None = None,
+    *,
+    memory_enabled: bool = False,
 ) -> tuple[list[str], list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the mitlearn application.
@@ -173,6 +175,8 @@ def create_mitlearn_k8s_secrets(
         starrocks_vault_mount_path: Vault mount serving dynamic StarRocks
             credentials, or None to skip them. None for any stack that has no
             STARROCKS_HOST configured -- see the caller.
+        memory_enabled: Deliver the memory token-exchange client, in the
+            environments that run the memory service.
 
     Returns:
         The names of the secrets pods require, the names of the secrets pods
@@ -318,6 +322,30 @@ def create_mitlearn_k8s_secrets(
     )
     secret_resources.append(opik_secret)
 
+    # ol-mitlearn-memory-client, which ol-llm's memory interface exchanges a
+    # learner's session token with (OL_LLM_MEMORY_EXCHANGE_*). The keycloak
+    # substructure writes it (ol_memory.py). Required, unlike the Opik client:
+    # the rest of the memory settings are plain env, and MemoryConfig.from_env
+    # accepts them with no exchange pair, so a pod that started before VSO's first
+    # sync would hand raw session tokens to Hindsight and get 401 on every call.
+    if memory_enabled:
+        memory_secret_name, memory_secret = _create_static_secret(
+            stack_info=stack_info,
+            secret_base_name="secret-ops-sso-mitlearn-memory",  # pragma: allowlist secret  # noqa: S106
+            namespace=mitlearn_namespace,
+            labels=k8s_global_labels,
+            mount="secret-operations",
+            path="sso/mitlearn-memory",
+            templates={
+                "OL_LLM_MEMORY_EXCHANGE_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+                "OL_LLM_MEMORY_EXCHANGE_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+            restart_targets=restart_targets,
+        )
+        secret_names.append(memory_secret_name)
+        secret_resources.append(memory_secret)
+
     # 3. Static secrets from the shared 'secret-global' KV-v1 mount
     # Mailgun API key
     secret_global_mailgun_name, secret_global_mailgun = _create_static_secret(
@@ -411,7 +439,7 @@ def create_mitlearn_k8s_secrets(
             namespace=mitlearn_namespace,
             labels=k8s_global_labels,
             mount=starrocks_vault_mount_path,
-            path="creds/readonly",
+            path="creds/batch_readonly",
             templates={
                 "STARROCKS_USER": '{{ get .Secrets "username" }}',
                 "STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',

@@ -34,7 +34,9 @@ finishes, for every witan user. The command is in the server image (agent-kit
 4. runs `optimize` on every graph in `cluster.yaml`, then on the days in
    `omnigraph:cleanup_iso_weekdays` (default every day; Production and QA set
    `[]`, so their windows only optimize) also
-   `cleanup --older-than <cleanup_older_than>`, force-unlocking after each;
+   `cleanup --older-than <cleanup_older_than>` (or `cleanup --keep
+   <cleanup_keep>` where `omnigraph:cleanup_keep` is set, CI only), force-unlocking
+   after each;
 5. scales the Deployment back to the replica count it found and releases the
    Lease.
 
@@ -261,6 +263,29 @@ for as long as the commit before the delete is retained. Past that, and for a
 bad cleanup, the restore is the bucket's noncurrent object versions (30 days)
 or an `aws s3 sync` backup.
 Query latency is driven by fragment count, which the nightly optimize handles.
+
+### `omnigraph:cleanup_keep` (`--keep 1`)
+
+The image's CLI carries a backport of ModernRelay/omnigraph#1188, so `cleanup
+--keep N` with no `--older-than` takes each branch's commit numbers from the
+`_versions/` listing and reads only the commits it retains (each branch head,
+a non-main branch's base, merge bases and tags). The listing still grows with
+commits, but it reads no manifest for an older commit it drops, while
+`--older-than` reads one per older commit. Setting
+`omnigraph:cleanup_keep` switches the window to `--keep` alone; the stack
+refuses it together with `omnigraph:cleanup_older_than`, and the image refuses
+both env vars together, because with both cleanup reads every commit below
+the newest N and its plan grows as `--older-than`'s does.
+
+Moving off it has a cost. A `--keep 1` run deletes the table versions that
+only older commits pin, and those commits stay listed (#644). A later run that
+retains one of them refuses that table's sweep, and one refused table stops
+data-file deletion for every table in the graph on that run. Removing
+`omnigraph:cleanup_keep` (back to `cleanup_older_than`) refuses until the last
+`--keep 1` night is older than that age, about 2 nights at the default.
+Raising it refuses until each branch has that many newer commits, which on a
+quiet writer branch may be never. It also keeps no history between cleanup
+nights, so the `query --snapshot` undelete above lasts only until the next one.
 
 ## Reading a failed run
 
@@ -597,6 +622,52 @@ held Lease until the window closes, so the Deployment update can time out.
 Between the two deploys every bridge write fails with `ClusterGraphMissing`
 (`witan.code.index.bridge_failed`, logged at error, not fatal to the index), and
 the reaper's `code-bridge` sweep fails if it runs then (04:50).
+
+## Retiring a managed repo's graph
+
+From omnigraph 0.13 a graph that `cluster.yaml` stops declaring is deleted by
+the next apply, storage and retained history both. There is no approval step
+(`cluster approve` was removed in 0.12) and no unregister mode, so a graph
+cannot outlive its declaration past the next boot. The server's boot apply and
+the plan gate refuse a plan that deletes a graph not named in
+`omnigraph:graph_removal_allowlist`, so dropping a repo from
+`omnigraph:managed_repos` by mistake fails the deploy rather than deleting its
+graph.
+
+1. In one change to `Pulumi.<env>.yaml`, remove the repo from
+   `omnigraph:managed_repos` and add its graph id to
+   `omnigraph:graph_removal_allowlist`. Copy the id from
+   `aws s3 ls s3://ol-data-witan-<env>/<storage_prefix>/graphs/`, dropping the
+   `.omni` suffix, rather than deriving it by hand, since `code_graph_id`
+   truncates and hashes long names. The code Cedar bundle's `applies_to` is
+   built from the declared graphs, so the graph leaves it in the same change.
+   Count the graph's objects
+   (`aws s3 ls --recursive <storage_root>/graphs/<id>.omni/ | wc -l`): the
+   delete runs under the startup probe, so a large graph also needs
+   `omnigraph:boot_budget_seconds` in this change (see
+   [The delete outlasts the startup probe](#the-delete-outlasts-the-startup-probe)).
+2. Deploy the omnigraph stack. The plan gate logs
+   `this apply deletes allow-listed graphs: [...]`, then the server's boot apply
+   deletes `<storage_root>/graphs/<id>.omni/`. The bucket keeps the deleted
+   objects as noncurrent versions for 30 days. Start it at least the boot
+   budget ahead of the 03:20 window: the booting pod holds the
+   `omnigraph-unlock` Lease, so the window skips that night's optimize and cleanup
+   (see [The delete outlasts the startup probe](#the-delete-outlasts-the-startup-probe)).
+3. Deploy the witan stack. Its CI indexer reads `managed_repos` from the
+   omnigraph stack's output, and the two pipelines are not ordered, so until
+   witan deploys the indexer keeps indexing the retired repo into a graph that
+   no longer exists.
+4. In a follow-up change, remove the allow-list entry and
+   `boot_budget_seconds` if step 1 set it. Preview refuses an allow-list entry
+   for a graph that is declared, so a leftover entry also fails the deploy that
+   re-adds the repo. Do not merge it before step 2's deploy has run: Concourse
+   can skip an intermediate commit, and a deploy of this change alone leaves the
+   graph undeclared and not allow-listed, so the plan gate refuses it.
+
+`council` and `code-bridge` are not managed repos, so neither is retired this
+way. `withheld_graphs` can drop `code-bridge` for a rebuild (see
+[above](#rebuilding-a-graph-whose-schema-change-cannot-be-migrated)), and it
+refuses `council`.
 
 ## When a graph's cleanup plan is over budget
 

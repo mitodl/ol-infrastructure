@@ -71,6 +71,7 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     DEFAULT_SERVER_MEMORY_LIMIT,
     DEFAULT_SERVER_MEMORY_REQUEST,
     OMNIGRAPH_SERVER_SERVICE_NAME,
+    WITAN_CI_ACTOR_ID,
     create_data_tier,
     omnigraph_server_addr,
 )
@@ -149,8 +150,8 @@ omnigraph_config = Config("omnigraph")
 
 # Repos that get a per-repo `code-<repo>` graph on this cluster. Canonical repo
 # URIs — the exact strings witan-code detects from a checkout's git remote and
-# runs through witan_code.config.graph_id to pick its `--graph`; data_tier's
-# code_graph_id mirrors that function to declare the same id here.
+# runs through witan_core.graph_ids.code_graph_id to pick its `--graph`;
+# cluster_config imports the same function to declare the same id here.
 #
 # Provisioning a new repo is deliberately explicit: add it here, `pulumi up`,
 # then `omnigraph cluster apply` + restart the server (see data_tier's
@@ -424,6 +425,21 @@ COUNCIL_PROBE_SCHEDULE = omnigraph_config.get("council_probe_schedule") or (
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
 )
+# `cleanup --keep` in place of `--older-than`. Moving off it has a cost; see
+# maintenance.py below DEFAULT_CLEANUP_OLDER_THAN before setting or removing it.
+# The upper bound is the CLI's: it parses the count as a u32.
+CLEANUP_KEEP: int | None = omnigraph_config.get_int("cleanup_keep")
+MAX_CLEANUP_KEEP = 2**32 - 1
+if CLEANUP_KEEP is not None and (
+    not 1 <= CLEANUP_KEEP <= MAX_CLEANUP_KEEP
+    or omnigraph_config.get("cleanup_older_than")
+):
+    msg = (
+        f"omnigraph:cleanup_keep must be from 1 to {MAX_CLEANUP_KEEP} and replaces "
+        "omnigraph:cleanup_older_than rather than combining with it, got "
+        f"cleanup_keep={CLEANUP_KEEP!r}"
+    )
+    raise ValueError(msg)
 
 # Per-actor admission caps (data_tier.py). Overridable per environment for the
 # same reason the schedules above are, and a sharper one: the count's default is
@@ -529,7 +545,6 @@ ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 # token. Its value must match the "svc-witan-ci" entry of the actor-tokens map
 # above; both come from the same SOPS source record below so they can't drift.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
-WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
 # The break-glass maintenance principal (agent-kit ADR-0005 path b, ADR-0002 D4
 # as amended). Same shape as the CI token above — a raw single-actor token
@@ -1158,6 +1173,7 @@ data_tier = create_data_tier(
     boot_budget_seconds=BOOT_BUDGET_SECONDS,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
+    cleanup_keep=CLEANUP_KEEP,
     # Arming a migration suspends the maintenance CronJobs for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and

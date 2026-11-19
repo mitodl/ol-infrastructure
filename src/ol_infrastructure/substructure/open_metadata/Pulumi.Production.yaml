@@ -15,5 +15,8 @@ config:
   # "true" logs what the job would change without making it, e.g. to review a
   # rules change before it lands.
   open_metadata:domains_dry_run: "false"
+  # The team-keycloak-sync job's role half logs the role and isAdmin
+  # changes it would make without making them. Set false after reviewing a run.
+  open_metadata:roles_dry_run: "true"
   open_metadata:enable_trino_lineage: "true"
   open_metadata:trino_profiler_schema_pattern: '^ol_warehouse_production_.*$'

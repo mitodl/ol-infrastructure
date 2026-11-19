@@ -300,10 +300,10 @@ necessarily the same set:
 aws s3 ls s3://ol-data-witan-<env>/graphs/
 ```
 
-CI has a `main.omni/` in the bucket that no longer appears in cluster.yaml — a
-leftover from before the `council` rename. Undeclared stores are not served and
-not migrated by `cluster apply`; decide deliberately whether each one is dead
-(leave it, or clean it up separately) rather than discovering it mid-migration.
+Undeclared stores are not served and not migrated by `cluster apply`; decide
+deliberately whether each one is dead (leave it, or clean it up separately)
+rather than discovering it mid-migration. (CI's pre-rename `main.omni/` was one.
+As of 2026-11-10 no root in CI, QA or Production has one.)
 
 ## The shape of the migration
 
@@ -312,8 +312,8 @@ a store cannot be relocated with `mv`/`cp` — only rebuilt via `export` →
 `init`/`load`. That constraint drives the design:
 
 **Rebuild under a new storage root, keeping every graph id identical.** Clients
-address graphs by id (`WITAN_MEMORY_GRAPH=council`; witan-code's `graph_id()`
-for `code-<repo>`), never by storage path, so a new root is invisible to them.
+address graphs by id (`WITAN_MEMORY_GRAPH=council`; witan-core's
+`witan_core.graph_ids.code_graph_id()` for `code-<repo>`), never by storage path, so a new root is invisible to them.
 The old root stays byte-for-byte intact, making rollback a config change rather
 than a restore.
 
@@ -1203,8 +1203,8 @@ Do not do this on a root a server is serving or has served. That handoff
 belongs to the server's entrypoint.
 
 **A `code-<repo>` graph is missing after the rebuild.** Its id is derived by
-`code_graph_id()` in `data_tier.py`, mirroring `witan_code.config.graph_id` in
-agent-kit. Enumerating from `managed_repos` instead of from the live cluster.yaml
+`code_graph_id()`, which `cluster_config.py` imports from agent-kit's
+`witan_core.graph_ids`. Enumerating from `managed_repos` instead of from the live cluster.yaml
 will drop any repo whose normalization you got wrong. Re-check against the
 ConfigMap listing in *What gets rebuilt*.
 

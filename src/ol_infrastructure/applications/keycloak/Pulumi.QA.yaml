@@ -8,7 +8,7 @@ config:
   keycloak:memory_request: 1536Mi
   keycloak:memory_limit: 3Gi
   keycloak:cpu_request: 200m
-  keycloak:cpu_limit: 400m
+  keycloak:cpu_limit: 1000m
   keycloak:db_capacity: "50"
   keycloak:domain: sso-qa.ol.mit.edu
   keycloak:instance_type: burstable_medium

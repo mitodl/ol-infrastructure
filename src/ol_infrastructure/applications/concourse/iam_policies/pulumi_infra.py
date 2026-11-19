@@ -661,5 +661,40 @@ policy_definition = {
                 "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"
             ),
         },
+        {
+            # The hindsight stack copies a foundation model into a tagged
+            # application inference profile so Cost Explorer can attribute its
+            # embedding spend. Creating the profile is authorized against the
+            # source (a foundation model or a system inference profile) as well
+            # as the new profile. No invoke actions: the worker only manages
+            # the profile, the app's IRSA role calls it.
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:CreateInferenceProfile",
+                "bedrock:GetFoundationModel",
+                "bedrock:GetInferenceProfile",
+            ],
+            "Resource": [
+                "arn:aws:bedrock:*::foundation-model/*",
+                "arn:aws:bedrock:*:*:inference-profile/*",
+                "arn:aws:bedrock:*:*:application-inference-profile/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:DeleteInferenceProfile",
+                "bedrock:TagResource",
+                "bedrock:UntagResource",
+            ],
+            "Resource": "arn:aws:bedrock:*:*:application-inference-profile/*",
+        },
+        {
+            # Read-only, and it accepts some 30 Bedrock resource types, so
+            # Parliament's RESOURCE_MISMATCH would flag any narrower list.
+            "Effect": "Allow",
+            "Action": ["bedrock:ListTagsForResource"],
+            "Resource": "*",
+        },
     ],
 }

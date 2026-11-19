@@ -5,6 +5,12 @@ and it has no on-call. A rule reading it would page on the archive's gaps, and a
 dashboard panel on it would show those gaps as outages. Plan D13 fixes the
 datasource UIDs so this test can refuse them by name across every module that
 builds rules or dashboards.
+
+This covers rules and dashboards declared in this repo. Grafana offers no
+datasource setting that hides a datasource from Grafana-managed alert rules
+built in the UI (`manageAlerts: false` only affects data source-managed rules,
+grafana/grafana#132468), so a hand-made rule on the archive is a convention
+breach this test cannot see.
 """
 
 from pathlib import Path

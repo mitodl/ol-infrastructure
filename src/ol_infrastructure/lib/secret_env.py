@@ -20,6 +20,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SSecretConfig,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 
 VaultKey = Annotated[tuple[str, ...], Field(min_length=1)]
@@ -107,6 +108,7 @@ def vault_k8s_secrets(  # noqa: PLR0913
     namespace: str,
     labels: dict[str, str],
     vaultauth: str,
+    restart_targets: Mapping[str, list[OLVaultRestartTarget]] | None = None,
     opts: ResourceOptions | None = None,
 ) -> list[tuple[str, OLVaultK8SSecret]]:
     """Create the VSO resources for a deployed stack.
@@ -117,9 +119,20 @@ def vault_k8s_secrets(  # noqa: PLR0913
     :param namespace: Namespace of the VSO resources and the Secrets they write.
     :param labels: Labels for both.
     :param vaultauth: The VaultAuth the resources authenticate with.
+    :param restart_targets: Workloads VSO rolls when it rewrites a secret's
+        Secret, by the secret's ``name``. A pod reading a Secret through
+        ``envFrom`` keeps the values it started with, so a secret it reads that
+        way needs one once Vault can replace the credentials under it.
     :param opts: Resource options for every resource.
     :returns: Each written Secret's name and the resource writing it, in order.
+    :raises ValueError: If ``restart_targets`` names a secret not in ``secrets``.
     """
+    secrets = list(secrets)
+    restart_targets = restart_targets or {}
+    unknown = sorted(set(restart_targets) - {secret.name for secret in secrets})
+    if unknown:
+        msg = f"Restart targets for secrets not described: {', '.join(unknown)}"
+        raise ValueError(msg)
     created = []
     for secret in secrets:
         fields: dict[str, Any] = {
@@ -135,6 +148,8 @@ def vault_k8s_secrets(  # noqa: PLR0913
             "templates": secret.templates,
             "vaultauth": vaultauth,
         }
+        if secret.name in restart_targets:
+            fields["restart_targets"] = restart_targets[secret.name]
         config: OLVaultK8SSecretConfig
         if secret.kind == "static":
             config = OLVaultK8SStaticSecretConfig.model_validate(

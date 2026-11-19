@@ -285,6 +285,15 @@ else:
         "LEARNING_BASE_URL=https://lms." + _rd + "/learn",
         "DISCUSSIONS_MFE_BASE_URL=https://lms." + _rd + "/discussions",
         "MARKETING_SITE_BASE_URL=https://mitxonline." + _rd,
+        # MIT Learn and MIT links, as production's mfe_params sends them.
+        # lehrer's mitxonline slot config builds its MIT Learn links in the
+        # header and footer from MIT_LEARN_BASE_URL (unset, the header's fall
+        # back to production MIT Learn and the footer's have no host) and the
+        # footer logo's link from MIT_BASE_URL. ACCOUNT_SETTINGS_URL is read by
+        # upstream MFE code, not the slot config.
+        "MIT_LEARN_BASE_URL=https://learn." + _rd,
+        "ACCOUNT_SETTINGS_URL=https://learn." + _rd + "/dashboard/settings",
+        "MIT_BASE_URL=https://web.mit.edu",
         "USER_INFO_COOKIE_NAME=edx-user-info",
         # The JWT cookie the LMS actually sets (its JWT_AUTH
         # JWT_AUTH_COOKIE_HEADER_PAYLOAD). frontend-platform defaults this to

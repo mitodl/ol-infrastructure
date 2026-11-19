@@ -59,6 +59,11 @@ from ol_infrastructure.providers.openmetadata.access_control import (
     OpenMetadataRole,
     OpenMetadataTeam,
 )
+from ol_infrastructure.substructure.keycloak.ol_data_platform import (
+    OPEN_METADATA_DEFAULT_ROLE,
+    OPEN_METADATA_ROLE_BY_REALM_ROLE,
+    REALM_DEFAULT_ROLES,
+)
 from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
     OPENMETADATA_PROVISIONER_VAULT_MOUNT,
     OPENMETADATA_PROVISIONER_VAULT_NAME,
@@ -408,11 +413,13 @@ def _bot_jwt_env(bot_secret_name: str) -> dict[str, object]:
     }
 
 
-def _secret_env(secret_name: str, key: str) -> dict[str, object]:
-    return {
-        "name": key,
-        "valueFrom": {"secretKeyRef": {"name": secret_name, "key": key}},
-    }
+def _secret_env(
+    secret_name: str, key: str, *, optional: bool = False
+) -> dict[str, object]:
+    ref: dict[str, object] = {"name": secret_name, "key": key}
+    if optional:
+        ref["optional"] = True
+    return {"name": key, "valueFrom": {"secretKeyRef": ref}}
 
 
 def _plain_env(name: str, value: "str | Output[str]") -> dict[str, object]:
@@ -1133,8 +1140,7 @@ server_config_job = kubernetes.batch.v1.Job(
         ttl_seconds_after_finished=86400,  # auto-clean after 24 h
     ),
     opts=ResourceOptions(
-        # The glossary the Job creates is owned by a team.
-        depends_on=[ingestion_irsa_role, *om_teams],
+        depends_on=[ingestion_irsa_role],
         delete_before_replace=True,
     ),
 )
@@ -1210,6 +1216,38 @@ vault.generic.Secret(
     path="secret-concourse/infrastructure/openmetadata_metrics_bot",
     data_json=Output.json_dumps(
         {"token": metrics_sync_bot.token, "server_url": om_api_url}
+    ),
+)
+
+# glossary-sync-bot runs ol-data-platform's `ol-dbt glossary sync`. A bot of
+# its own keeps the glossary's version history attributable to the sync and its
+# role limited to the glossary. It is not a glossary reviewer and has no team,
+# so OpenMetadata refuses it a term's move from In Review to Approved or
+# Rejected (EntityRepository.updateEntityStatus). The glossary the sync creates
+# is owned and reviewed by the data-platform team, so the bot's token reaches
+# Vault, and the pipeline can run, only once the teams exist.
+glossary_sync_bot = OpenMetadataBot(
+    f"om-glossary-sync-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="glossary-sync-bot",
+        display_name="Glossary sync",
+        description=(
+            "Publishes ol-data-platform's glossary/ files as the business glossary."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"glossary-sync-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["GlossarySyncBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[om_roles["GlossarySyncBotRole"], *om_teams]),
+)
+
+# Read by the ol-data-glossary-sync pipeline, as the metrics sync's token is.
+vault.generic.Secret(
+    f"om-glossary-sync-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-concourse/infrastructure/openmetadata_glossary_bot",
+    data_json=Output.json_dumps(
+        {"token": glossary_sync_bot.token, "server_url": om_api_url}
     ),
 )
 
@@ -1316,6 +1354,16 @@ OpenMetadataEventSubscription(
 # OpenMetadata's jwtTeamClaimMapping stays unset. With it set, every login would
 # add the Keycloak memberships back into OpenMetadata and undo removals made
 # there.
+#
+# The same job then resets each user's roles to what their Keycloak realm roles
+# grant at login (the mapping the keycloak stack builds the `roles` claim from),
+# and clears isAdmin outside adminPrincipals. OpenMetadata only applies the
+# claim at login, so without this a demoted user who never logs in again keeps
+# their roles. That half writes as the provisioner's service account (an
+# admin), from the om-provisioner secret that the application stack creates.
+# Its references are optional so that, until that secret exists, the pod still
+# starts and only the role half fails. open_metadata:roles_dry_run true logs
+# its changes without making them.
 
 _make_cronjob(
     name="team-keycloak-sync",
@@ -1336,6 +1384,22 @@ _make_cronjob(
                 "KEYCLOAK_PARENT_GROUP_ID",
             )
         ),
+        _plain_env(
+            "OM_ROLE_BY_REALM_ROLE",
+            json.dumps(
+                {
+                    **OPEN_METADATA_ROLE_BY_REALM_ROLE,
+                    REALM_DEFAULT_ROLES: OPEN_METADATA_DEFAULT_ROLE,
+                },
+                sort_keys=True,
+            ),
+        ),
+        _plain_env(
+            "OM_ROLES_DRY_RUN",
+            json.dumps(om_config.get_bool("roles_dry_run", default=False)),
+        ),
+        _secret_env("om-provisioner", "OM_ADMIN_CLIENT_ID", optional=True),
+        _secret_env("om-provisioner", "OM_ADMIN_CLIENT_SECRET", optional=True),
     ],
     resources={
         "requests": {"cpu": "100m", "memory": "128Mi"},

@@ -63,8 +63,8 @@ GATEWAY_SSL_CIPHERS = (
 )
 
 # APISIX's default enabled-plugins list for the version shipped by the pinned
-# chart (chart 2.17.x => APISIX 3.18.x), taken from
-# https://github.com/apache/apisix/blob/3.18.0/apisix/cli/config.lua
+# chart (chart 2.19.x => APISIX 3.20.x), taken from
+# https://github.com/apache/apisix/blob/3.20.0/apisix/cli/config.lua
 #
 # Setting ``apisix.plugins`` in the Helm values REPLACES this default list
 # rather than extending it, so the full list must be reproduced here.  We do
@@ -73,16 +73,18 @@ GATEWAY_SSL_CIPHERS = (
 #
 # ``server-info`` is absent here because upstream comments it out of its own
 # default list ("deprecated and will be removed in a future release") in both
-# 3.17 and 3.18.  This list is the active set, so it stays out -- no local
+# 3.17 through 3.20.  This list is the active set, so it stays out -- no local
 # exception to carry forward on the next upgrade.
 #
 # 3.18 adds ``ai-cache``, ``ai-lakera-guard`` and ``ldap-auth-advanced`` to the
-# defaults and removes none.
+# defaults and removes none.  3.19 adds ``openapi-to-mcp`` and
+# ``websocket-proxy``.  3.20 adds ``request-decompress`` and removes
+# ``mcp-bridge``, whose module no longer ships.
 #
 # IMPORTANT: revisit this list on every APISIX major/minor upgrade.  If it
 # drifts from the APISIX default for the running version, plugins omitted here
 # will stop loading.  ``opentelemetry`` is appended at the end below.
-APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
+APISIX_DEFAULT_PLUGINS_3_20: list[str] = [
     "real-ip",
     "ai",
     "client-control",
@@ -100,6 +102,7 @@ APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
     "referer-restriction",
     "csrf",
     "uri-blocker",
+    "request-decompress",
     "request-validation",
     "chaitin-waf",
     "multi-auth",
@@ -152,10 +155,11 @@ APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
     "traffic-split",
     "redirect",
     "response-rewrite",
+    "openapi-to-mcp",
     "oas-validator",
-    "mcp-bridge",
     "degraphql",
     "kafka-proxy",
+    "websocket-proxy",
     "grpc-transcode",
     "grpc-web",
     "http-dubbo",
@@ -195,7 +199,7 @@ APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
 # Full enabled-plugins list applied via the Helm chart: APISIX defaults plus the
 # opentelemetry plugin, which emits OTLP traces (not metrics) for every request.
 APISIX_ENABLED_PLUGINS: list[str] = [
-    *APISIX_DEFAULT_PLUGINS_3_18,
+    *APISIX_DEFAULT_PLUGINS_3_20,
     "opentelemetry",
 ]
 
@@ -427,6 +431,42 @@ def _spread_across_zones_and_nodes(match_labels: dict[str, str]) -> dict[str, An
 
 
 def _high_availability_values(ha: ApisixHighAvailability) -> dict[str, Any]:
+    # Spread gateway pods across availability zones and nodes to reduce
+    # the likelihood that an AZ-level failure takes out multiple pods and
+    # to lower the probability that a rolling update places consecutive pods
+    # on the same node (which shrinks the window where a pod with a stale
+    # services_conf_version can block ADC sidecar syncs on a freshly
+    # restarted ingress controller).
+    placement = _spread_across_zones_and_nodes(
+        {
+            "app.kubernetes.io/name": APISIX_RELEASE_NAME,
+            "app.kubernetes.io/component": "gateway",
+        }
+    )
+    # Keep the gateway off spot capacity. A spot interruption gives two
+    # minutes' notice, which the 90 s preStop plus 120 s grace period below
+    # can't fit, and the PDB rejects the eviction outright whenever another
+    # gateway pod is already disrupted. The node termination handler logged
+    # rejected evictions for 37 gateway pods in Production over the 14 days
+    # to 2026-11-16. A pod that is never evicted dies with its node and
+    # resets the client connections it holds. NotIn matches nodes
+    # without the label too, so this admits the on-demand core node groups
+    # and steers Karpenter to on-demand capacity when it provisions.
+    placement["affinity"]["nodeAffinity"] = {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+                {
+                    "matchExpressions": [
+                        {
+                            "key": "karpenter.sh/capacity-type",
+                            "operator": "NotIn",
+                            "values": ["spot"],
+                        }
+                    ]
+                }
+            ]
+        }
+    }
     return {
         "autoscaling": {
             "enabled": True,
@@ -434,18 +474,7 @@ def _high_availability_values(ha: ApisixHighAvailability) -> dict[str, Any]:
             "maxReplicas": ha.max_replicas,
             "targetCPUUtilizationPercentage": ha.target_cpu_utilization_percentage,
         },
-        # Spread gateway pods across availability zones and nodes to reduce
-        # the likelihood that an AZ-level failure takes out multiple pods and
-        # to lower the probability that a rolling update places consecutive pods
-        # on the same node (which shrinks the window where a pod with a stale
-        # services_conf_version can block ADC sidecar syncs on a freshly
-        # restarted ingress controller).
-        **_spread_across_zones_and_nodes(
-            {
-                "app.kubernetes.io/name": APISIX_RELEASE_NAME,
-                "app.kubernetes.io/component": "gateway",
-            }
-        ),
+        **placement,
         # --- Rolling Update Strategy and Pod Lifecycle ---
         # maxSurge: 0 / maxUnavailable: 1 (drain-first) ensures that an old
         # pod -- which may hold a high services_conf_version accumulated over
@@ -805,7 +834,7 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
         },
         # requests.memory != limits.memory deliberately: a transient
         # buffering spike (e.g. several concurrent large course-CSV/
-        # JupyterHub-bundle downloads pinned to one pod via HTTP/2)
+        # JupyterHub-bundle downloads landing on one pod)
         # needs burst headroom above the steady-state baseline.  With
         # requests == limits (the prior config), the pod was OOMKilled
         # the instant usage crossed the request value, well before the
@@ -891,6 +920,12 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
             # Chart default is true, which sends "Server: APISIX/<version>"
             # on every response (hq#14079).
             "enableServerTokens": False,
+            # Chart default is true. nginx's HTTP/2 code up to 1.31.8 has a
+            # remote code execution bug (CVE-2026-123007, CVE-2026-123633,
+            # "nginx2root"), and every APISIX runtime so far bundles an affected
+            # nginx. Turn it back on once APISIX ships a runtime on nginx 1.31.9+.
+            # Clients fall back to HTTP/1.1; no route serves gRPC.
+            "enableHTTP2": False,
             # Enable comprehensive per-phase request lifecycle tracing
             # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
             # Available since chart 2.16.0; without it OpenTelemetry only

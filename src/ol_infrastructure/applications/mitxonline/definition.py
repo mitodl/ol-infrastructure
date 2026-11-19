@@ -44,6 +44,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sConfig,
     OLApplicationK8sDevShellConfig,
     OLApplicationK8sKedaWebappScalingConfig,
+    application_deployment_names,
 )
 from ol_infrastructure.lib.app_bindings import (
     ClusterCapabilities,
@@ -76,6 +77,7 @@ __all__ = [
     "application_config",
     "celery_worker_configs",
     "cors_allow_origins",
+    "deployment_names",
     "direct_oidc_config",
     "direct_route_configs",
     "direct_route_group",
@@ -92,6 +94,14 @@ __all__ = [
 NAMESPACE = "mitxonline"
 WEBAPP_SERVICE_NAME = "mitxonline-webapp"
 WEBAPP_SERVICE_PORT_NAME = "http"
+# Every webapp route resolves to pod IPs, so the webapp's ApisixUpstream
+# (retries=1, in __main__.py) can retry a refused or reset connection on
+# another pod.
+_WEBAPP_BACKEND: dict[str, Any] = {
+    "backend_service_name": WEBAPP_SERVICE_NAME,
+    "backend_service_port": WEBAPP_SERVICE_PORT_NAME,
+    "backend_resolve_granularity": "endpoint",
+}
 # The MIT Learn API host serves this application under /mitxonline/*.
 API_PATH_PREFIX = "mitxonline"
 WEB_MEMORY_CEILING = "3Gi"
@@ -200,6 +210,7 @@ class MitxonlineBindings(BaseModel):
     carry ``OPENEDX_API_BASE_URL``, which the routes read for a response header."""
     k8s_labels: dict[str, str]
     secret_names: list[str]
+    optional_secret_names: list[str] = Field(default_factory=list)
     oidc_secret_name: str | None = None
     """A Secret in the namespace holding the gateway's OIDC client credentials,
     for clusters without Vault (``cluster.vault_auth_name`` unset). It stands in
@@ -276,6 +287,49 @@ def celery_worker_configs(
     return _celery_worker_configs(CELERY_QUEUE_NAMES, topology, sizing.celery_queues)
 
 
+def _celery_beat_config(sizing: MitxonlineSizing) -> OLApplicationK8sCeleryBeatConfig:
+    return OLApplicationK8sCeleryBeatConfig(
+        resource_requests=sizing.celery_beat.requests,
+        resource_limits=sizing.celery_beat.limits,
+    )
+
+
+def _dev_shell_config(*, dev_shell: bool) -> OLApplicationK8sDevShellConfig | None:
+    # An unrouted, launch-on-request pod in the app image for developers to
+    # run manage.py commands without being OOMKilled or scaled away. Created
+    # at 0 replicas; scale it up to use it and back down when done.
+    #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=1
+    #   kubectl -n mitxonline exec -it deploy/mitxonline-dev-shell -- bash
+    #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=0
+    return OLApplicationK8sDevShellConfig() if dev_shell else None
+
+
+def deployment_names(
+    sizing: MitxonlineSizing,
+    *,
+    celery_topology: Literal["per-queue", "merged"],
+    dev_shell: bool,
+) -> list[str]:
+    """Return the Deployments ``application_config`` has ``OLApplicationK8s`` create.
+
+    Every one of them mounts the bindings' Secrets with ``envFrom``. The deployed
+    program needs the names as VSO restart targets for the Secrets it creates
+    before the bindings exist, since the bindings carry those Secrets' names.
+
+    :param sizing: The bindings' ``sizing``.
+    :param celery_topology: The bindings' ``celery_topology``.
+    :param dev_shell: The bindings' ``dev_shell``.
+    :returns: The names, as ``OLApplicationK8s.all_deployment_names`` lists them.
+    :rtype: list[str]
+    """
+    return application_deployment_names(
+        application_name=Services.mitxonline,
+        celery_worker_configs=celery_worker_configs(celery_topology, sizing),
+        celery_beat_config=_celery_beat_config(sizing),
+        dev_shell_config=_dev_shell_config(dev_shell=dev_shell),
+    )
+
+
 def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
     """Return the ``OLApplicationK8s`` config for these bindings.
 
@@ -295,6 +349,7 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         application_min_replicas=bindings.min_replicas,
         k8s_global_labels=bindings.k8s_labels,
         env_from_secret_names=bindings.secret_names,
+        optional_env_from_secret_names=bindings.optional_secret_names,
         application_security_group_id=cluster.security_group_id,
         application_security_group_name=cluster.security_group_name,
         application_image_repository=bindings.image_repository,
@@ -365,19 +420,8 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         pre_deploy_resource_limits=sizing.pre_deploy.limits,
         celery_redis_config=bindings.celery_redis,
         celery_worker_configs=celery_worker_configs(bindings.celery_topology, sizing),
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests=sizing.celery_beat.requests,
-            resource_limits=sizing.celery_beat.limits,
-        ),
-        # An unrouted, launch-on-request pod in the app image for developers to
-        # run manage.py commands without being OOMKilled or scaled away. Created
-        # at 0 replicas; scale it up to use it and back down when done.
-        #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=1
-        #   kubectl -n mitxonline exec -it deploy/mitxonline-dev-shell -- bash
-        #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=0
-        dev_shell_config=OLApplicationK8sDevShellConfig()
-        if bindings.dev_shell
-        else None,
+        celery_beat_config=_celery_beat_config(sizing),
+        dev_shell_config=_dev_shell_config(dev_shell=bindings.dev_shell),
         resource_requests=sizing.web.requests,
         resource_limits=sizing.web.limits,
         # Memory is managed vertically by the component's webapp VPA, between the
@@ -412,6 +456,9 @@ def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCC
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
+        # ApisixRemoteUserOrgBackend reads auth_time from X-ID-Token so
+        # reconcile_user_orgs can skip org data older than the session.
+        oidc_set_id_token_header=True,
         **settings,
     )
 
@@ -504,6 +551,8 @@ def prefixed_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
         credentials=_oidc_credentials(bindings),
+        # See _oidc_config.
+        set_id_token_header=True,
     )
 
 
@@ -610,13 +659,44 @@ def direct_route_configs(
     stale_session_cleanup = stale_session_cookie_cleanup_plugin(
         cookie_domains=[bindings.hostnames.api.removeprefix("api")],
     )
+    # Ends the caller's current MITx Online gateway session, for
+    # "switch-session" below.  Expiring a live cookie is the same operation as
+    # evicting a dead one, so it reuses the cleanup helper with this group's
+    # cookie name and domain; a deletion only lands on a matching (name,
+    # domain, path).
+    session_reset = stale_session_cookie_cleanup_plugin(
+        cookie_domains=[bindings.hostnames.api.removeprefix("api")],
+        stale_cookie_name=apisix_oidc_session_cookie_name(
+            "mitxonline", bindings.env_suffix
+        ),
+    )
     return [
         *route_group.route_configs(
             oidc,
             shared_plugin_config_name=shared_plugin_config_name,
             extra_plugins=[frame_ancestors, stale_session_cleanup],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
+        ),
+        # Entry point for hand-offs from MIT Learn (hq#12763).  Learn's session
+        # and this host's are separate cookies on separate parent domains, so a
+        # browser can arrive here still carrying the session of whoever used it
+        # before Learn's was replaced.  This drops that session and Django
+        # redirects to `next`; "cart" is unauth_action="auth", so the follow-on
+        # request runs a fresh login and comes back as whoever holds the
+        # Keycloak SSO session now.
+        #
+        # No openid-connect plugin: it would validate, and possibly refresh, the
+        # session this route exists to discard.  Django validates `next`; a
+        # gateway-side redirect would make /switch-session//evil.example an open
+        # redirect.
+        OLApisixRouteConfig(
+            route_name="switch-session",
+            priority=20,
+            hosts=hosts,
+            paths=["/switch-session", "/switch-session/"],
+            plugins=[frame_ancestors, session_reset],
+            shared_plugin_config_name=shared_plugin_config_name,
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="cart",
@@ -633,8 +713,7 @@ def direct_route_configs(
                 stale_session_cleanup,
             ],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         # The `location` blocks that used to live in the nginx sidecar
         # (docs/plans/remove-nginx-sidecar.md, stage 5). nginx resolved
@@ -648,8 +727,7 @@ def direct_route_configs(
             hosts=hosts,
             paths=["/static/hash.txt"],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
             plugins=[_uncached_hash_plugin()],
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
@@ -667,8 +745,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             hosts=hosts,
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -723,8 +800,7 @@ def prefixed_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             rewrite_plugins=[strip_prefix],
             extra_plugins=[frame_ancestors, stale_session_cleanup],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         # Static assets requested through this prefix (frontend references
         # like /mitxonline/static/...) rewrite through "passauth" the same way,
@@ -741,8 +817,7 @@ def prefixed_route_configs(
             paths=[f"/{API_PATH_PREFIX}/static/hash.txt"],
             shared_plugin_config_name=shared_plugin_config_name,
             plugins=[strip_prefix, _uncached_hash_plugin()],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
     ]
 

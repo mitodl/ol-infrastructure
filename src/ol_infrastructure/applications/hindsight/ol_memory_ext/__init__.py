@@ -27,14 +27,21 @@ stack mounts this package from a ConfigMap and selects each class with a
     the tag ``app:<name>`` for the writing app (the write tag scope refuses
     anything else), and only items carrying an app's tag can be changed or
     deleted by it. General banks are readable by every app and writable only
-    under the general grant, on the same terms. Apps may retain, update and
-    delete their own notes and nothing else: config changes, server-side LLM
-    features, knowledge pages, directives and the other bank operations are
-    refused. The admin client is limited to the forget sequence, and a deleted
-    bank is fenced so nothing can recreate it until in-flight work has drained.
+    under the general grant, on the same terms. Apps may retain their own notes,
+    change a note's tags or observation scopes, and delete them, and nothing
+    else. A note is replaced by retaining it again, not edited: memory unit
+    edits would skip Memory Defense, which screens only retain. Config changes,
+    server-side LLM features, knowledge pages, directives and the other bank
+    operations are refused. The admin client is limited to the forget sequence,
+    and a deleted bank is fenced so nothing can recreate it until in-flight work
+    has drained.
 
 ``OLMemoryDefense``
     The built-in sensitive-data screen, plus email addresses and phone numbers.
+
+``model_calls.EmbeddingMeter``
+    Counts embedding calls per app on the /metrics endpoint, without their
+    content (see model_calls.py).
 
 Config (lowercased, prefix stripped by the loader):
     HINDSIGHT_API_TENANT_ISSUER, _AUDIENCE, _JWKS_URL, _CLIENTS
@@ -46,6 +53,7 @@ Config (lowercased, prefix stripped by the loader):
 import asyncio
 import logging
 import re
+from contextvars import ContextVar
 from datetime import timedelta
 from typing import Any
 
@@ -103,6 +111,11 @@ LEARNER_ID_RE = re.compile(
 GENERAL_BANK_RE = re.compile(r"^g-[a-z0-9][a-z0-9-]{0,61}$")
 DEFAULT_FENCE_SECONDS = 3600
 JWKS_CACHE_SECONDS = 600
+
+# The app whose retain or recall the validator last passed in this context. The
+# engine embeds after validating, in the same task or one started from it, so
+# EmbeddingMeter reads it there; a recall has no document id to name the app.
+caller_app: ContextVar[str | None] = ContextVar("ol_memory_caller_app", default=None)
 
 # The bank writes an app or general-grant caller may make, beyond retain: its
 # own notes, retagged or removed. Everything else (memory unit edits, knowledge
@@ -553,6 +566,7 @@ class LearnerBankValidator(OperationValidatorExtension):
                 "attachments are not enabled", status_code=403
             )
         rc = ctx.request_context
+        caller_app.set(rc.tenant_id)
         prefix = f"{rc.tenant_id}."
         if not rc.internal and not all(
             str(item.get("document_id") or "").startswith(prefix)
@@ -570,6 +584,7 @@ class LearnerBankValidator(OperationValidatorExtension):
 
     async def validate_recall(self, ctx: RecallContext) -> ValidationResult:
         """Allow a recall from a bank the caller may read."""
+        caller_app.set(ctx.request_context.tenant_id)
         return self._access(ctx.bank_id, ctx.request_context, write=False)
 
     async def validate_reflect(

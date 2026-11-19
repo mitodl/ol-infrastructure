@@ -191,6 +191,27 @@ def test_deployed_bindings_keep_the_eks_wiring():
     assert config.vault_k8s_resource_auth_name == "mitxonline-auth"
 
 
+@pytest.mark.parametrize(
+    "bindings",
+    [_local_bindings(), _deployed_bindings(dev_shell=True)],
+    ids=["merged", "per-queue-with-dev-shell"],
+)
+def test_deployment_names_are_the_deployments_the_component_creates(bindings):
+    """The deployed program names these as restart targets before the
+    component exists, so they have to be the ones it goes on to create.
+    """
+    app = OLApplicationK8s(definition.application_config(bindings))
+
+    assert (
+        definition.deployment_names(
+            bindings.sizing,
+            celery_topology=bindings.celery_topology,
+            dev_shell=bindings.dev_shell,
+        )
+        == app.all_deployment_names
+    )
+
+
 def test_bindings_reject_a_misspelled_field():
     with pytest.raises(ValidationError, match="dev_shell_enabled"):
         _local_bindings(dev_shell_enabled=True)
@@ -342,6 +363,7 @@ def test_routes_follow_the_bound_hostnames():
         "passauth",
         "logout-redirect",
         "reqauth",
+        "switch-session",
         "cart",
         "static-hash",
         "dnt-policy",
@@ -365,6 +387,26 @@ def test_frame_ancestors_header_names_the_bound_openedx_host():
     assert rewrites[0].config["headers"]["set"]["Content-Security-Policy"] == (
         f"frame-ancestors 'self' {OPENEDX_BASE_URL}"
     )
+
+
+def test_switch_session_expires_this_hosts_session_without_reading_it():
+    """The route drops the direct group's session cookie and must not carry
+    openid-connect, which would validate or refresh the session being dropped.
+    """
+    direct, _ = _route_groups(_deployed_bindings())
+    [switch] = [route for route in direct if route.route_name == "switch-session"]
+    # Route plugins are coerced to OLApisixPluginConfig, so the dict that
+    # get_full_oidc_plugin_config() returns has a .name here too.
+    plugin_names = [plugin.name for plugin in switch.plugins]
+
+    assert switch.paths == ["/switch-session", "/switch-session/"]
+    assert "openid-connect" not in plugin_names
+    [reset] = [
+        plugin for plugin in switch.plugins if plugin.name == "serverless-post-function"
+    ]
+    rendered = str(reset.config)
+    assert "mitxonline_apisix_session" in rendered
+    assert ".mitxonline.mit.test" in rendered
 
 
 def test_routes_refuse_bindings_without_an_openedx_host():
@@ -402,6 +444,23 @@ def test_deployed_routes_read_oidc_credentials_from_the_mitlearn_vault_client():
     )
     assert direct.credentials == expected
     assert prefixed.credentials == expected
+
+
+def test_both_route_groups_forward_the_id_token_and_not_the_access_token():
+    """ApisixRemoteUserOrgBackend reads auth_time from X-ID-Token to skip stale
+    org data.  Without the header nothing errors; reconcile_user_orgs just
+    loses that guard, so it is pinned here.
+    """
+    for config in (
+        definition.direct_oidc_config(_deployed_bindings()),
+        definition.prefixed_oidc_config(_deployed_bindings()),
+    ):
+        plugin = OLApisixOIDCResources(
+            f"header-contract-{config.application_name}", oidc_config=config
+        ).get_full_oidc_plugin_config(unauth_action="pass")["config"]
+        assert plugin["set_userinfo_header"] is True
+        assert plugin["set_id_token_header"] is True
+        assert plugin["set_access_token_header"] is False
 
 
 def test_local_routes_read_oidc_credentials_from_the_bound_secret():

@@ -68,6 +68,12 @@ def test_http_redirects_go_to_443_everywhere():
         assert values["apisix"]["pluginAttrs"]["redirect"] == {"https_port": 443}
 
 
+def test_http2_is_off_everywhere():
+    # CVE-2026-123007 / CVE-2026-123633: the chart turns HTTP/2 on by default.
+    for config in (_single_pod(), _fleet()):
+        assert apisix_helm_values(config)["apisix"]["enableHTTP2"] is False
+
+
 def test_single_pod_has_no_fleet_settings():
     values = apisix_helm_values(_single_pod())
 
@@ -107,6 +113,29 @@ def test_fleet_settings():
     assert values["apisix"]["pluginAttrs"]["opentelemetry"]["collector"] == collector
     assert values["apisix"]["tracing"] is True
     assert values["metrics"]["serviceMonitor"]["labels"] == {"ol.mit.edu/stack": "qa"}
+
+
+def test_fleet_gateway_stays_off_spot():
+    values = apisix_helm_values(_fleet())
+
+    terms = values["affinity"]["nodeAffinity"][
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ]["nodeSelectorTerms"]
+    assert terms == [
+        {
+            "matchExpressions": [
+                {
+                    "key": "karpenter.sh/capacity-type",
+                    "operator": "NotIn",
+                    "values": ["spot"],
+                }
+            ]
+        }
+    ]
+    assert "podAntiAffinity" in values["affinity"]
+    # The ingress controller is not on the request path and may still use spot.
+    controller = values["ingress-controller"]["deployment"]
+    assert "nodeAffinity" not in controller.get("affinity", {})
 
 
 def test_node_ports_and_trusted_ca():

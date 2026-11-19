@@ -7,8 +7,10 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
     MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
+    REALM_DEFAULT_OPTIONAL_SCOPES,
     create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -44,10 +46,14 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
 # ol-open_metadata-client, sent in the `roles` claim that OpenMetadata reads at
 # login (authorizer useRolesFromProvider). Each name must be an OpenMetadata
 # Role, and the claim replaces the roles the user had. The custom roles are
-# defined in substructure/open_metadata's access_control.py. No realm role
-# maps to "Admin": it would set isAdmin, and OpenMetadata never clears isAdmin
-# when it leaves the claim, so Keycloak could grant admin but not take it back.
-# Admins come from initialAdmins in applications/open_metadata, and
+# defined in substructure/open_metadata's access_control.py. The claim is read
+# only at login, so the team-keycloak-sync job there also resets every user's
+# roles to this mapping each hour. It reads realm roles (client roles would need
+# view-clients, which exposes every client secret), so a client role of
+# ol-open_metadata-client granted outside these composites is taken away each
+# hour until the next login. No realm role maps to "Admin": that job
+# clears isAdmin on anyone outside adminPrincipals, so admins come only from
+# initialAdmins in applications/open_metadata, and
 # ol-platform-admin gets DataEngineer (stewardship comes from the data-platform
 # team). ol-instructor is left out. That is not no access: instructors can
 # still log in, and like every user they hold DataConsumer through the realm's
@@ -59,6 +65,12 @@ OPEN_METADATA_ROLE_BY_REALM_ROLE = {
     "ol-data-analyst": "DataConsumer",
     "ol-business-analyst": "DataConsumer",
 }
+# The OpenMetadata role every user holds through the realm's default roles, and
+# the default composite that carries it (Keycloak names it
+# default-roles-<realm>). The role reconciler in substructure/open_metadata reads
+# effective realm roles, so it maps this composite like the roles above.
+OPEN_METADATA_DEFAULT_ROLE = "DataConsumer"
+REALM_DEFAULT_ROLES = "default-roles-ol-data-platform"
 # The composites of default-roles-<realm> in a realm Keycloak creates.
 KEYCLOAK_STOCK_DEFAULT_ROLES = (
     "offline_access",
@@ -452,6 +464,15 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ],
         opts=resource_options,
     )
+    # Optional, not default: this client also signs users in, and their tokens
+    # should not carry the Admin API audience. The service account requests it.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-data-platform-superset-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_superset_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
 
     keycloak.openid.ClientDefaultScopes(
         "ol-data-platform-superset-cli-client-default-scopes",
@@ -535,7 +556,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             Output.concat(
                 ol_data_platform_openmetadata_client.client_id,
                 "/",
-                ol_data_platform_openmetadata_client_role_refs["DataConsumer"].name,
+                ol_data_platform_openmetadata_client_role_refs[
+                    OPEN_METADATA_DEFAULT_ROLE
+                ].name,
             ),
         ],
         opts=resource_options,
@@ -837,6 +860,14 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ],
         opts=resource_options,
     )
+    # Optional for the same reason as the Superset client above.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-data-platform-starrocks-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_starrocks_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
 
     # StarRocks 4.x rejects '@' in usernames.  Expose the Kerberos short username
     # stored in the "saml_uid" user attribute (populated by the Touchstone eppn
@@ -960,6 +991,17 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         service_accounts_enabled=True,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
+    # Optional, not default: a default list would replace the scopes Gravitino
+    # reads this token through (preferred_username for the principal, the
+    # catalog audience), so the optional set is the one that leaves them alone.
+    # The reconciler requests it with scope=kc-admin-api.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-gravitino-admin-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_gravitino_admin_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
     for resource_name, role in [
         ("ol-gravitino-admin-service-account-view-users", "view-users"),
         ("ol-gravitino-admin-service-account-view-clients", "view-clients"),
@@ -1036,11 +1078,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "https://nb.data.ol.mit.edu/*",
             "https://nb-qa.data.ol.mit.edu/*",
             "https://nb-ci.data.ol.mit.edu/*",
-            # Published marimo apps (applications/marimo_data). APISIX derives
-            # redirect_uri from the request path, so this has to be a wildcard.
-            "https://apps.nb.data.ol.mit.edu/*",
-            "https://apps.nb-qa.data.ol.mit.edu/*",
-            "https://apps.nb-ci.data.ol.mit.edu/*",
         ],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
@@ -1076,7 +1113,13 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
-    # ol-marimo-app-client: service account for published (run-mode) notebooks
+    # ol-marimo-app-client: the APISIX openid-connect client for the published
+    # apps host (applications/marimo_data). APISIX forwards the viewer's access
+    # token to the app, which logs in to StarRocks with it as the viewer, and
+    # StarRocks passes it on to Gravitino. So its access tokens carry the claims
+    # those two read, which ol-marimo-client (JupyterHub) can't take: its ol_roles
+    # scope already writes role_keys from ol-superset-client roles, and two
+    # mappers on one claim leave Keycloak emitting only one of them.
     ol_data_platform_marimo_app_client = keycloak.openid.Client(
         "ol-data-platform-marimo-app-client",
         name="ol-data-platform-marimo-app-client",
@@ -1087,9 +1130,19 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ),
         enabled=True,
         access_type="CONFIDENTIAL",
-        standard_flow_enabled=False,
-        **MANAGED_CLIENT_ARGS,
-        service_accounts_enabled=True,
+        standard_flow_enabled=True,
+        **PKCE_REQUIRED_CLIENT_ARGS,
+        service_accounts_enabled=False,
+        # APISIX derives redirect_uri from the request path, so this has to be a
+        # wildcard.
+        valid_redirect_uris=[
+            "https://apps.nb.data.ol.mit.edu/*",
+            "https://apps.nb-qa.data.ol.mit.edu/*",
+            "https://apps.nb-ci.data.ol.mit.edu/*",
+        ],
+        # The app's StarRocks connection hands Gravitino the token it logged in
+        # with, as with ol-starrocks-client.
+        access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
@@ -1097,13 +1150,114 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         "ol-data-platform-marimo-app-client-vault-credentials",
         path="secret-operations/sso/marimo-app",
         data_json=Output.all(
+            url=ol_data_platform_marimo_app_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
             client_id=ol_data_platform_marimo_app_client.client_id,
             client_secret=ol_data_platform_marimo_app_client.client_secret,
+            secret=session_secret,
             realm_id=ol_data_platform_marimo_app_client.realm_id,
             realm_name="ol-data-platform",
         ).apply(json.dumps),
     )
+
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-marimo-app-client-default-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_marimo_app_client.id,
+        # No "roles": its audience resolver would add every client the viewer
+        # holds roles in to aud (ol-superset-client among them), and author code
+        # in an app can read these tokens. role_keys below comes from a direct
+        # client mapper and needs no scope.
+        default_scopes=[
+            "acr",
+            "basic",
+            "email",
+            "profile",
+            "web-origins",
+        ],
+        opts=resource_options,
+    )
+    # StarRocks' keycloak_jwt integration logs the viewer in by this claim.
+    keycloak.openid.UserAttributeProtocolMapper(
+        "ol-data-platform-marimo-app-client-username-mapper",
+        name="starrocks-username",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_marimo_app_client.id,
+        user_attribute="saml_uid",
+        claim_name="starrocks_username",
+        claim_value_type="String",
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+    # Gravitino reads groups from role_keys and needs a list, as on
+    # ol-starrocks-cli above.
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-marimo-app-client-role-keys-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="String",
+        client_id=ol_data_platform_marimo_app_client.id,
+        client_id_for_role_mappings="ol-starrocks-client",
+        multivalued=True,
+        name="starrocks-role-keys",
+        opts=resource_options,
+    )
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-data-platform-marimo-app-client-gravitino-audience-mapper",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_marimo_app_client.id,
+        name="gravitino-audience",
+        included_client_audience=ol_data_platform_gravitino_catalog_client.client_id,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        opts=resource_options,
+    )
     # MARIMO [END] # noqa: ERA001
+
+    # LABEL STUDIO [START]
+    # Label Studio Community has no SSO, so the APISIX openid-connect plugin
+    # gates it with this client and annotators sign in to Label Studio itself
+    # behind the gateway (see the label_studio application stack).
+    # Only stacks that set the redirect URIs (QA, where Label Studio deploys)
+    # create the client and its Vault secret.
+    ol_data_platform_label_studio_redirect_uris = keycloak_realm_config.get_object(
+        "ol-data-platform-label-studio-redirect-uris"
+    )
+    if ol_data_platform_label_studio_redirect_uris:
+        ol_data_platform_label_studio_client = keycloak.openid.Client(
+            "ol-data-platform-label-studio-client",
+            name="ol-data-platform-label-studio-client",
+            realm_id=ol_data_platform_realm.id,
+            client_id="ol-label-studio-client",
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            service_accounts_enabled=False,
+            valid_redirect_uris=ol_data_platform_label_studio_redirect_uris,
+            **MANAGED_CLIENT_ARGS,
+            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        vault.generic.Secret(
+            "ol-data-platform-label-studio-client-vault-oidc-credentials",
+            path="secret-operations/sso/label-studio",
+            data_json=Output.all(
+                url=ol_data_platform_label_studio_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=ol_data_platform_label_studio_client.client_id,
+                client_secret=ol_data_platform_label_studio_client.client_secret,
+                secret=session_secret,
+                realm_id=ol_data_platform_label_studio_client.realm_id,
+                realm_name="ol-data-platform",
+            ).apply(json.dumps),
+        )
+    # LABEL STUDIO [END]
 
     # OL Data Platform Realm - Authentication Flows[START]
     # OL - browser flow [START]

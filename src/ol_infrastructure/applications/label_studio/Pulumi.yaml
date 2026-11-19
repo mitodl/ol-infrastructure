@@ -1,0 +1,9 @@
+---
+name: ol-application-label-studio
+runtime: python
+description: >
+  Deploy Label Studio Community on the data EKS cluster for courseware
+  annotation, behind APISIX with Keycloak OIDC, with RDS Postgres and S3
+  storage.
+backend:
+  url: s3://mitol-pulumi-state/
