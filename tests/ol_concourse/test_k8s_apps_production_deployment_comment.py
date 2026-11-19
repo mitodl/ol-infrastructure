@@ -11,6 +11,7 @@ from typing import Any
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     build_app_pipeline,
 )
+from tests.ol_concourse._plan import walk
 
 APP = "ol-analytics-api"
 
@@ -21,24 +22,10 @@ def _plan(job_suffix: str) -> list[dict[str, Any]]:
     return job["plan"]
 
 
-def _walk(steps: list[dict[str, Any]]):
-    """Yield every step, including those nested in do/try/in_parallel blocks."""
-    for step in steps:
-        yield step
-        for key in ("do", "in_parallel"):
-            nested = step.get(key)
-            if isinstance(nested, dict):
-                nested = nested.get("steps")
-            if nested:
-                yield from _walk(nested)
-        if isinstance(step.get("try"), dict):
-            yield from _walk([step["try"]])
-
-
 def _finish_puts(plan: list[dict[str, Any]], resource: str) -> list[dict[str, Any]]:
     return [
         step
-        for step in _walk(plan)
+        for step in walk(plan)
         if step.get("put") == resource and step["params"].get("action") == "finish"
     ]
 
@@ -57,7 +44,7 @@ def test_the_production_finish_names_the_gate_issue_file():
 
 def test_the_gate_the_comment_reads_is_fetched_before_the_finish():
     """The file named above exists in the build only if the gate is fetched first."""
-    plan = list(_walk(_plan("-production")))
+    plan = list(walk(_plan("-production")))
 
     gate = next(
         i for i, step in enumerate(plan) if step.get("get") == f"{APP}-release-gate"
