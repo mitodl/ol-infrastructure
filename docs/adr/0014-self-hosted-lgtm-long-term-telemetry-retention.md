@@ -606,6 +606,67 @@ writers), and compactor or retention failure. Neither ever pages.
 - **Migration Path:** Nothing is migrated. Rolling back means removing the archive
   destinations and deleting the stack. Cloud never notices.
 
+### QA validation (2026-11-19)
+
+The Phase 0–2 gates from `docs/plans/telemetry-archive-implementation-plan.md`, run
+against the QA archive. Loki had been taking writes since 2026-11-10 and Mimir since
+2026-11-18 18:54 UTC. Production is scheduled to be switched on **Monday 2026-11-23**.
+That is five days into the Mimir soak, not the seven the plan asks for. This was a
+deliberate call, because the gates below already pass. Run them again only if the
+archive code changes before then.
+
+| Gate | Result | Evidence |
+|------|--------|----------|
+| P0 transport | Pass | From an `applications-qa` pod, `telemetry-archive-qa.ol.mit.edu` resolves to four `10.1.x` addresses only. `/ready` returns 200 and an unauthenticated push gets 401. The same holds from `data-qa`. |
+| P0 PDC | Pass | `grafanacloud_grafana_pdc_connected_agents` is 4 on network `677cd074…`. That is 2 replicas × `-connections 2`; the gate's "2" counts pods, not tunnels. |
+| P1 log parity | Pass | `count_over_time` over 1 h matches exactly for `nextjs-app` (260,839), `fastly` (78,968) and `traefik` (83,940), and for the total (645k). |
+| P1 redaction | Pass | 31 olapps IdP login lines in 7 d in each store, all 31 `[REDACTED]`, none unredacted. |
+| P1/P2 no double send | Pass | Per-namespace Cloud log bytes and Cloud series show no doubling. See finding 2 for the archive's own logs. |
+| P1/P2 transport | Pass | Source-VPC NAT `BytesOutToDestination` stayed flat while NLB `ProcessedBytes` rose 7× when Mimir writers came on. A data-qa NAT spike (8 GB, 2026-11-18 03:00–06:00 UTC) came 16 h before that rollout and is unrelated. |
+| P1 soak | Pass | No restart loops. The Loki compactor's retention pass and the Mimir compactor both ran within the last hour. The Loki bucket grows ~0.85 GB/day, about 15% of QA's 5.7 GB/day raw, consistent with the Production estimate. |
+| P2 CPU parity | Pass | `sum(rate(container_cpu_usage_seconds_total[1h])) by (namespace)` for applications-qa: 20/20 namespaces within 1%, 3.267 cores on both sides. |
+| P2 series parity | Pass, gate reworded | 179k in the archive against 235k in Cloud. Cloud's count includes ~47k trace-derived series (spanmetrics and servicegraph) and ~15k Asserts series that never reach the archive. Without them it is ~173k against 179k (+3.5%). Compare like with like in Production too. |
+| P2 QA series headroom | Pass | The busiest ingester holds 64.6k of its 200k share of `max_global_series_per_user` (600k at RF1 over 3 ingesters), 32% used. |
+| P1/P2 failure isolation | Pass | Loki and Mimir distributors at 0 from 18:31 to 19:33 UTC, compared with the hour before. Cloud log entries dropped: 0. Cloud remote-write samples failed: 0. Cloud samples/s +3%. Scrape targets up flat. Archive counters rose: 338k OTLP log records failed, 41k metric points failed, 88k vector-log-proxy archive discards. Remote-write WAL lag peaked at 61 min, under the 2 h keepalive. Memory: `alloy-logs` 140 → 222 MB, `alloy-metrics` 0.90 → 1.02 GB, vector-log-proxy and EC2 hosts flat. Within 10 min of restore, every archive drop counter was at 0, WAL lag was back to 8 s, and Loki matched Cloud exactly again (103,552 lines in 10 min). |
+
+Findings to act on:
+
+1. **Production writers already ship to an archive that does not exist.** The EKS
+   substructure stacks for Production carry the `archive-otlp` and `archive-metrics`
+   destinations, but `telemetry-archive.ol.mit.edu` does not resolve yet. Alloy across
+   the four Production clusters logs ~164k "Exporting failed" lines an hour, about
+   1.5 GB/day into Cloud. The collectors are healthy (0 restarts across 102 Alloy
+   containers), so this was an unplanned failure-isolation test and they passed it.
+   The noise stops when the stack is up on Monday. Future phases should not add a
+   writer before its endpoint exists.
+2. **The archive's own Traefik access log is the largest QA log source in Cloud**, at
+   1.45 GB/day, about 27% of QA's Cloud log ingest. It logs one JSON line per
+   successful push. It should log non-2xx only before Production, where push volume
+   is far higher.
+3. **An archive outage raises Cloud log ingest.** During the failure-isolation hour,
+   Cloud log entries rose 72% (+352k). About 299k of that was the outage itself:
+   Alloy "Exporting failed" lines (+177k), archive Traefik 503 access lines (+113k)
+   and EC2 Vector errors (+9k). The Cloud data path itself was untouched. A long
+   archive outage therefore costs Cloud ingest unless those lines are rate-limited or
+   dropped.
+4. **The archive uses OTLP label names.** Loki streams carry `k8s_namespace_name` and
+   `k8s_container_name`, not `namespace` and `container`, so saved Cloud queries do
+   not run unchanged against `archive-loki`.
+5. **Logs are lost for the whole of an outage.** The archive kept no logs from the
+   outage hour, because the OTLP queue gives up after `maxElapsedTime: 1m`. This is
+   the best-effort design (D3, D10) working as intended.
+6. **Metrics are not backfilled after an outage either.** The WAL replay on restore
+   ran into the per-tenant `ingestion_rate` limit (QA 30k samples/s, Production 50k
+   against 8.1k normal). Distributors logged ~2.5k `err-mimir-tenant-max-ingestion-rate`
+   rejections. With `retryOnHttp429: false` those samples were dropped. The archive
+   holds 4–45% of the normal samples for the outage hour. Raising `ingestion_rate` and
+   `ingestion_burst_size` would let a short outage backfill. Leaving them as they are
+   accepts the gap as best-effort.
+
+Still not recorded in this ADR: the retention and privacy sign-off and the Grafana
+Cloud quote (open question 4), and the instance roll of the Concourse, Consul and
+Vault hosts.
+
 ## Related Decisions
 
 - ADR-0007 (multi-tenant ClickHouse on data EKS): precedent for running a stateful
@@ -652,5 +713,6 @@ Open questions for reviewers:
 | Date | Reviewer | Decision | Notes |
 |------|----------|----------|-------|
 | 2026-10-08 | AI agent | Drafted | Created by AI agent, pending human approval |
+| 2026-11-19 | Platform Engineering | QA gates passed | Phase 0–2 QA validation recorded under Implementation Notes; Production switch-on set for 2026-11-23 |
 
-**Last Updated:** 2026-10-08
+**Last Updated:** 2026-11-19
