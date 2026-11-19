@@ -742,10 +742,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     # provisioning code paths, and a role missing here surfaces as a 403 that
     # does not reproduce in QA.
     for resource_name, role in [
-        ("b2b-view-realm", "view-realm"),
         ("b2b-view-users", "view-users"),
         ("b2b-query-users", "query-users"),
-        ("b2b-manage-realm", "manage-realm"),
+        ("b2b-manage-organizations", "manage-organizations"),
         ("b2b-manage-users", "manage-users"),
         ("b2b-view-identity-providers", "view-identity-providers"),
         ("b2b-manage-identity-providers", "manage-identity-providers"),

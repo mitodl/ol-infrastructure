@@ -891,39 +891,30 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=InvokeOptions(provider=keycloak_provider),
     )
 
-    # Assign required service account roles for Keycloak Admin API access
-    # These roles allow the client to list/view realms, users, and organizations
-    # Refactored repetitive role assignments into a loop for maintainability
-    #
-    # manage-realm covers Organizations but NOT identity providers. IdP
-    # create/update/delete, identity-provider/import-config, and org<->IdP linking
-    # all route through requireManageIdentityProviders(), which RealmPermissions
-    # resolves to the manage-identity-providers role alone; manage-realm is a
-    # distinct, non-composite role and does not satisfy it. Reads go through
-    # requireViewIdentityProviders(), which accepts EITHER identity-provider role,
-    # so view-identity-providers is redundant with manage granted -- it is listed
-    # anyway so the account's read scope is visible here rather than inferred,
-    # matching how view-realm is listed alongside manage-realm above.
-    #
-    # manage-users is required for the same reason, on a different endpoint:
-    # OrganizationMemberResource.addMember() requires BOTH
-    # auth.orgs().requireManage(organization) (satisfied by manage-realm) AND
-    # auth.users().requireManage(user), which only accepts the manage-users role
-    # (UserPermissions.canManage() checks AdminRoles.MANAGE_USERS specifically --
-    # manage-realm is not in its role list, unlike OrganizationPermissions.canManage()
-    # which explicitly accepts manage-realm as an alternative to manage-organizations).
-    # Without it, adding a user to an organization 403s even though the client can
-    # already view/manage the organization itself. This realm does not run Fine-Grained
-    # Admin Permissions (no `features` set on the Keycloak CR), so there is no way to
-    # scope this to just organization members; UserPermissions.canManageByGroup() only
-    # applies when FGAP's AuthorizationProvider is wired up, which it is not here --
-    # the grant is realm-wide, matching the existing mitlearn-admin-client precedent
-    # above.
+    # Checked against the Keycloak 26.8.1 admin resources:
+    # - Organization create/read/update/delete and the organization half of the
+    #   member and IdP-link endpoints go through OrganizationPermissions, which
+    #   accepts manage-organizations (manage-realm is not needed).
+    # - IdP create/update/delete, mappers, identity-provider/import-config and
+    #   the IdP half of org<->IdP linking need manage-identity-providers. Reads
+    #   accept either IdP role; view-identity-providers is listed so the read
+    #   scope is visible here. The one exception is setting
+    #   allowAdminRoleMapping on an IdP, which 26.8 restricts to manage-realm;
+    #   MITx Online never sets it.
+    # - Adding or removing an organization member also calls
+    #   auth.users().requireManage(user), which only manage-users satisfies.
+    #   This realm does not enable admin permissions (FGAP), so the grant is
+    #   realm-wide.
+    # - GET /admin/realms (MITx Online's realm check) lists a realm when the
+    #   caller holds any realm-management role; without view-realm the entry
+    #   carries only the realm name, which is all the check reads.
     for resource_name, role in [
-        ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
         ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
         ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
-        ("olapps-mitxonline-b2b-client-manage-realm-role", "manage-realm"),
+        (
+            "olapps-mitxonline-b2b-client-manage-organizations-role",
+            "manage-organizations",
+        ),
         ("olapps-mitxonline-b2b-client-manage-users-role", "manage-users"),
         (
             "olapps-mitxonline-b2b-client-view-identity-providers-role",
