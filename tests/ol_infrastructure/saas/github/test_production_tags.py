@@ -57,6 +57,15 @@ def test_every_repo_that_writes_production_tags_protects_them(app):
     assert list(_build({"name": name})) == [f"mitodl-repo-production-tags-{name}"]
 
 
+@pytest.mark.parametrize(
+    "app", [app for app in APPS if not release_resource_workflow(app)]
+)
+def test_a_registered_repo_not_yet_on_the_workflow_is_protected_too(app):
+    """Pre-provisioned, so flipping an app's pipeline needs no ruleset edit."""
+    name = github_repo(app).removeprefix("mitodl/")
+    assert list(_build({"name": name})) == [f"mitodl-repo-production-tags-{name}"]
+
+
 def test_only_the_release_bot_and_org_owners_may_write_them():
     inputs = _ruleset("mitxonline")
 
