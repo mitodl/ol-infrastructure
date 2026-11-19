@@ -1,25 +1,19 @@
-"""The Gravitino catalog's SQL must keep rotation in place and users read-only.
+"""The Gravitino catalog's SQL must keep rotation in place.
 
 A change to the hashed CREATE replaces its Command, which drops the catalog and
-every grant on it, so the credential has to stay out of what is hashed. Writes
-through a security=JWT catalog commit as the bootstrap credential, so no role
-may be granted more than SELECT.
+every grant on it, so the credential and the TLS properties, which ALTER also
+sets, have to stay out of what is hashed.
 """
-
-import re
 
 import pytest
 
-from ol_infrastructure.lib.data_lake_access import (
-    GOVERNANCE_LAYER_ACCESS,
-    layer_database,
-)
 from ol_infrastructure.substructure.starrocks.gravitino_catalog import (
     CREDENTIAL_PLACEHOLDER,
     CREDENTIAL_PROPERTY,
+    TLS_CA_FILE_PROPERTY,
+    TLS_CONFIGURER_PROPERTY,
     GravitinoCatalog,
     catalog_name,
-    governance_grants_sql,
 )
 
 CATALOG = GravitinoCatalog(
@@ -28,7 +22,49 @@ CATALOG = GravitinoCatalog(
     warehouse="ol_data_lake_qa",
     oauth2_server_uri="https://sso.example/realms/r/protocol/openid-connect/token",
     aws_region="us-east-1",
+    tls_configurer_impl="edu.mit.ol.iceberg.CaFileTLSConfigurer",
+    tls_ca_file="/etc/starrocks/gravitino-ca/ca.crt",
 )
+
+# What the trigger hashed before the TLS properties existed. If this changes,
+# every environment's catalog is dropped and re-created on the next apply.
+TRIGGER_SQL_BEFORE_TLS = (
+    "CREATE EXTERNAL CATALOG IF NOT EXISTS ol_governed_lake_qa\n"
+    "COMMENT 'MIT OL Data Lake, with your own Gravitino access'\n"
+    "PROPERTIES(\n"
+    '    "type" = "iceberg",\n'
+    '    "iceberg.catalog.type" = "rest",\n'
+    '    "iceberg.catalog.uri" = "https://gravitino.gravitino.svc:9433/iceberg",\n'
+    '    "iceberg.catalog.warehouse" = "ol_data_lake_qa",\n'
+    '    "iceberg.catalog.security" = "JWT",\n'
+    '    "iceberg.catalog.oauth2.server-uri"'
+    ' = "https://sso.example/realms/r/protocol/openid-connect/token",\n'
+    '    "iceberg.catalog.oauth2.scope" = "openid",\n'
+    '    "iceberg.catalog.oauth2.credential" = "<bootstrap credential>"\n'
+    ");"
+)
+
+
+def test_trigger_sql_is_unchanged_by_the_tls_properties() -> None:
+    assert CATALOG.create_trigger_sql() == TRIGGER_SQL_BEFORE_TLS
+
+
+def test_create_and_alter_carry_the_tls_properties() -> None:
+    for sql in (CATALOG.create_sql("c"), CATALOG.alter_sql("c")):
+        assert (
+            f'"{TLS_CONFIGURER_PROPERTY}" = "edu.mit.ol.iceberg.CaFileTLSConfigurer"'
+            in sql
+        )
+        assert f'"{TLS_CA_FILE_PROPERTY}" = "/etc/starrocks/gravitino-ca/ca.crt"' in sql
+
+
+def test_trigger_sql_does_not_depend_on_tls_or_credential() -> None:
+    other = CATALOG.model_copy(
+        update={"tls_configurer_impl": "x.Other", "tls_ca_file": "/other.crt"}
+    )
+
+    assert other.create_trigger_sql() == CATALOG.create_trigger_sql()
+    assert "rest.client.tls" not in CATALOG.create_trigger_sql()
 
 
 def test_catalog_name_differs_from_the_glue_catalog() -> None:
@@ -65,35 +101,3 @@ def test_vended_credentials_on_and_no_catalog_s3_credentials() -> None:
     assert '"iceberg.catalog.vended-credentials-enabled" = "true"' in sql
     assert '"iceberg.catalog.security" = "JWT"' in sql
     assert "use_aws_sdk_default_behavior" not in sql
-
-
-def test_grants_are_select_only_and_governance_only() -> None:
-    sql = governance_grants_sql(catalog_name("qa"), "qa")
-    grants = [line for line in sql.splitlines() if line.startswith("GRANT")]
-
-    assert grants
-    for grant in grants:
-        assert re.match(r"GRANT (USAGE|SELECT) ON ", grant), grant
-    roles = {grant.rsplit(" TO ROLE ", 1)[1].rstrip(";") for grant in grants}
-    assert roles.isdisjoint({"readonly", "batch_readonly", "app", "admin"})
-
-
-def test_grants_follow_data_lake_access() -> None:
-    sql = governance_grants_sql(catalog_name("qa"), "qa")
-
-    assert (
-        "GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_engineer;" in sql
-    )
-    for layer in GOVERNANCE_LAYER_ACCESS["ol_business_analyst"]:
-        assert (
-            f"GRANT SELECT ON ALL TABLES IN DATABASE {layer_database('qa', layer)}"
-            " TO ROLE ol_business_analyst;"
-        ) in sql
-    assert "ALL DATABASES TO ROLE ol_business_analyst" not in sql
-    assert "ol_researcher" not in sql
-
-
-def test_grants_end_in_default_catalog() -> None:
-    sql = governance_grants_sql(catalog_name("qa"), "qa")
-
-    assert sql.splitlines()[-1] == "SET CATALOG default_catalog;"

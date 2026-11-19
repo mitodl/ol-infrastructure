@@ -57,6 +57,10 @@ dependencies = [
   "pulumi-kubernetes>=4,<5",
   "pyyaml>=6,<7",
   "botocore~=1.24",
+  # The code graph ids cluster.yaml declares. witan-code picks its `--graph`
+  # with the same function, so importing it (rather than copying it) is what
+  # keeps the two from drifting. Stdlib-only, so it adds nothing else.
+  "witan-core>=0.57.0,<1",
 ]
 
 [project.urls]
@@ -64,7 +68,7 @@ Repository = "https://github.com/mitodl/ol-infrastructure"
 
 [dependency-groups]
 # CI installs only this group (.github/workflows/autofix.yml); `dev` includes it.
-prek = ["prek==0.5.9"]
+prek = ["prek==0.5.10"]
 dev = [
   { include-group = "prek" },
   "copier",
@@ -379,7 +383,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.uv]
-constraint-dependencies = ["certifi>=2026.10.19"]  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
+constraint-dependencies = [
+  "certifi>=2026.10.19",  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
+  "paramiko>=5.0.0",  # CVE-2026-44405 (SHA-1 in rsakey.py), pulled in by pyinfra
+]
 exclude-newer = "7d"
 required-version = ">=0.9.17"
 
@@ -429,6 +436,7 @@ mitol-django-apigateway = "0d"
 mitol-django-observability = "0d"
 mitol-django-scim = "0d"
 mitol-drf-lint = "0d"
+witan-core = "0d"
 
 [tool.uv.workspace]
 members = ["sdks/qdrant-cloud", "sdks/rootly"]

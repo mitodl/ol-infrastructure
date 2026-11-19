@@ -13,7 +13,6 @@ Keycloak-issued JWT, so there is no token for the hub to pass along.
 
 import json
 from pathlib import Path
-from typing import Any
 
 import pulumi_vault as vault
 from pulumi import Config
@@ -99,69 +98,10 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(jupyterhub_data_namespace, ns)
 )
 
-# IAM policy granting read-only access to OL data lake S3 buckets and Glue catalog.
-# Single-user notebook pods use this via IRSA to run PyIceberg and direct S3 queries.
-jupyterhub_data_lake_policy_document = {
-    "Version": IAM_POLICY_VERSION,
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject",
-                "s3:ListBucket",
-            ],
-            "Resource": [
-                f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
-                f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
-            ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "glue:GetDatabase",
-                "glue:GetDatabases",
-                "glue:GetPartition",
-                "glue:GetPartitions",
-                "glue:GetTable",
-                "glue:GetTables",
-            ],
-            "Resource": [
-                f"arn:aws:glue:us-east-1:{aws_account.account_id}:catalog",
-                (
-                    f"arn:aws:glue:us-east-1:{aws_account.account_id}:database"
-                    f"/ol_warehouse_{stack_info.env_suffix}*"
-                ),
-                (
-                    f"arn:aws:glue:us-east-1:{aws_account.account_id}:table"
-                    f"/ol_warehouse_{stack_info.env_suffix}*/*"
-                ),
-            ],
-        },
-    ],
-}
-parliament_config: dict[str, Any] = {
-    "RESOURCE_STAR": {"ignore_locations": []},
-}
-
-jupyterhub_data_lake_policy = iam.Policy(
-    f"jupyterhub-data-lake-iam-policy-{stack_info.env_suffix}",
-    path=(
-        f"/ol-applications/jupyterhub-data/{stack_info.env_suffix}/"
-        if not stack_info.env_prefix
-        else f"/{stack_info.env_prefix}/{stack_info.env_suffix}/"
-    ),
-    description=(
-        "Read-only access to OL data lake S3 and Glue catalog "
-        "for JupyterHub data notebook pods."
-    ),
-    policy=lint_iam_policy(
-        jupyterhub_data_lake_policy_document,
-        stringify=True,
-        parliament_config=parliament_config,
-    ),
-    tags=aws_config.tags,
-)
-
+# The role grants no data lake access. Every user pod shares it, so a lake read
+# through it would be neither authorized nor attributed per user. Notebook lake
+# access goes through per-user paths instead (a StarRocks OIDC login, or
+# Gravitino vended credentials).
 jupyterhub_data_service_account_name = "jupyterhub-data-service-account"
 jupyterhub_data_trust_role_config = OLEKSTrustRoleConfig(
     account_id=aws_account.account_id,
@@ -169,7 +109,7 @@ jupyterhub_data_trust_role_config = OLEKSTrustRoleConfig(
     cluster_identities=cluster_stack.require_output("cluster_identities"),
     description=(
         "Trust role for JupyterHub data service account "
-        "to read the OL data lake via IRSA"
+        "to invoke Bedrock models via IRSA"
     ),
     policy_operator="StringEquals",
     role_name="jupyterhub-data",
@@ -185,11 +125,6 @@ jupyterhub_data_trust_role_config = OLEKSTrustRoleConfig(
 jupyterhub_data_trust_role = OLEKSTrustRole(
     f"jupyterhub-data-ol-trust-role-{stack_info.env_suffix}",
     role_config=jupyterhub_data_trust_role_config,
-)
-iam.RolePolicyAttachment(
-    f"jupyterhub-data-policy-attachment-{stack_info.env_suffix}",
-    policy_arn=jupyterhub_data_lake_policy.arn,
-    role=jupyterhub_data_trust_role.role.name,
 )
 
 # Bedrock for both marimo's AI assistant (which runs in the user's own server)

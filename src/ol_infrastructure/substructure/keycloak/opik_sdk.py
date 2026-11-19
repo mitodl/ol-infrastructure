@@ -16,6 +16,11 @@ ol-data-platform's evaluation gate (ol-llm's evaluation-gate.yml) runs on GitHub
 Actions with a client of its own too. Only the Production Vault holds it, and this
 module writes it, with the Opik URL and the gate's AWS role, to that repository's
 Actions secrets and variables.
+
+The same repository's prompt promotion job (ol-llm's prompt-promotion.yml) moves the
+production label with a third client. Its credentials go only to the
+``prompt-promotion`` GitHub environment, which deploys from the default branch alone,
+so no pull request job can read them.
 """
 
 import json
@@ -46,6 +51,10 @@ OPIK_GATEWAY_CLIENT_ID = "ol-opik-client"
 OPIK_EVALUATION_CLIENT_ID = "ol-data-platform-evaluation-opik"
 OPIK_EVALUATION_VAULT_PATH = "evaluation-ol-data-platform"
 OPIK_EVALUATION_REPOSITORY = "ol-data-platform"
+OPIK_PROMOTION_CLIENT_ID = "ol-data-platform-promotion-opik"
+OPIK_PROMOTION_VAULT_PATH = "promotion-ol-data-platform"
+# ol-llm's prompt-promotion.yml runs promote in this environment by default.
+PROMPT_PROMOTION_ENVIRONMENT = "prompt-promotion"
 
 
 def _opik_sdk_client(
@@ -137,6 +146,53 @@ def _evaluation_gate_github_settings(
         )
 
 
+def _prompt_promotion_github_environment(
+    promotion_client: keycloak.openid.Client,
+) -> None:
+    """Give ol-data-platform's prompt promotion job its client, on main alone.
+
+    Promotion takes the client from its job's environment, so it is set there and
+    not as a repository secret, where pull request jobs could read it.
+
+    :param promotion_client: The promotion job's Keycloak client.
+    """
+    github_opts = ResourceOptions(provider=get_github_provider("mitodl"))
+    resource_prefix = f"{OPIK_EVALUATION_REPOSITORY}-{PROMPT_PROMOTION_ENVIRONMENT}"
+    environment = github.RepositoryEnvironment(
+        f"{resource_prefix}-environment",
+        repository=OPIK_EVALUATION_REPOSITORY,
+        environment=PROMPT_PROMOTION_ENVIRONMENT,
+        deployment_branch_policy=github.RepositoryEnvironmentDeploymentBranchPolicyArgs(
+            protected_branches=False,
+            custom_branch_policies=True,
+        ),
+        opts=github_opts,
+    )
+    environment_opts = ResourceOptions.merge(
+        github_opts, ResourceOptions(depends_on=[environment])
+    )
+    github.RepositoryEnvironmentDeploymentPolicy(
+        f"{resource_prefix}-deployment-policy-main",
+        repository=OPIK_EVALUATION_REPOSITORY,
+        environment=environment.environment,
+        branch_pattern="main",
+        opts=environment_opts,
+    )
+    secrets = {
+        "OPIK_PROMOTION_CLIENT_ID": promotion_client.client_id,
+        "OPIK_PROMOTION_CLIENT_SECRET": promotion_client.client_secret,
+    }
+    for name, value in secrets.items():
+        github.ActionsEnvironmentSecret(
+            f"{resource_prefix}-secret-{name.lower()}",
+            repository=OPIK_EVALUATION_REPOSITORY,
+            environment=environment.environment,
+            secret_name=name,
+            value=value,
+            opts=environment_opts,
+        )
+
+
 def create_opik_sdk_resources(
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
@@ -188,3 +244,15 @@ def create_opik_sdk_resources(
                 opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
             )
             _evaluation_gate_github_settings(evaluation_client, keycloak_url)
+            promotion_client = _opik_sdk_client(
+                "ol-platform-engineering-opik-promotion-ol-data-platform",
+                OPIK_PROMOTION_CLIENT_ID,
+                keycloak_provider,
+            )
+            vault.generic.Secret(
+                "ol-platform-engineering-opik-promotion-ol-data-platform-vault-credentials",
+                path=f"{OPIK_SDK_VAULT_MOUNT}/{OPIK_PROMOTION_VAULT_PATH}",
+                data_json=_credentials_json(promotion_client, keycloak_url),
+                opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
+            )
+            _prompt_promotion_github_environment(promotion_client)

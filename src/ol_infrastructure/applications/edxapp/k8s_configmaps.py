@@ -548,10 +548,10 @@ def _build_interpolated_config_dict(
         )
         # Header destinations for the Site Project MFEs. The components fall back
         # to the production learn.mit.edu and to lmsBaseUrl when these are
-        # absent, so on RC the instructor dashboard's Dashboard button points at
-        # production MIT Learn and Profile / Settings at the LMS rather than the
-        # marketing site. No trailing slash: the components append their own
-        # path segment.
+        # absent, so on RC the instructor dashboard's Dashboard button and
+        # Settings menu item point at production MIT Learn and Profile at the LMS
+        # rather than the marketing site. No trailing slash: the components
+        # append their own path segment.
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolHeader"] = {
             "mitLearnBaseUrl": f"https://{edxapp_config.require('mit_learn_domain')}",
             "marketingSiteBaseUrl": f"https://{marketing_domain}",

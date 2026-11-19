@@ -15,8 +15,15 @@ Services account and one user-assigned managed identity:
 | edxapp / mitxonline | `ol-openai-mitxonline-{env}` | `system:serviceaccount:mitxonline-openedx:mitxonline-edxapp-vault` |
 | Dagster `ml` code location | `ol-openai-dagster-ml-{env}` | `system:serviceaccount:dagster:dagster-user-code` |
 
-Each account gets a deployment of `gpt-4o`, `gpt-5-mini`, and `gpt-5.2`. `gpt-5-mini`
-stands in for `gpt-4o-mini`, which Azure no longer accepts new deployments of.
+Each account gets a deployment of `gpt-4o`, `gpt-5-mini`, `gpt-5.2`, `gpt-5.4`,
+`gpt-5.4-mini`, `gpt-5.4-nano`, and `gpt-5.4-pro`. `gpt-5-mini` stands in for
+`gpt-4o-mini`, which Azure no longer accepts new deployments of. Each deployment is named
+after its model, so the model name an app sends is the deployment name. An app can only
+call models deployed on its own account, so this list is the set of models an app can
+reach through Azure. Whether a model is allowed, deprecated, or retired, and what it
+costs, is recorded separately in the `ol-llm` catalog
+(`docs/plans/llm-usage-policies-spec.md` §2.2). See [Changing the deployed
+models](#changing-the-deployed-models).
 
 mit-learn's account also gets `text-embedding-3-large` and `text-embedding-3-small`
 (`azure_openai:consumer_extra_models`). These have to be the same models mit-learn
@@ -103,18 +110,23 @@ Capacity (`azure_openai:model_capacity`, in thousands of tokens per minute) defa
 5 outside Production. **Production has no default and must be set explicitly** — the
 stack raises at preview otherwise, because a default that asks for capacity nobody
 confirmed turns a bootstrap into a partial deploy: the account and identity create, then
-`Deployment` creation fails on quota. Production is set to 1000 (1M TPM per deployment).
+`Deployment` creation fails on quota. Production is set to 1000 (1M TPM per deployment),
+except `gpt-5.4-pro` at 300, because its pool is too small for four deployments of 1000.
 
-The `ol-engineering` subscription's `GlobalStandard` limits, measured 2026-09-29 in
-capacity units (1 unit = 1K TPM):
+The `ol-engineering` subscription's `GlobalStandard` limits in capacity units (1 unit =
+1K TPM):
 
-| Model | Limit |
-| --- | --- |
-| `gpt-4o` | 30000 |
-| `gpt-5-mini` | 10000 |
-| `gpt-5.2` | 30000 |
-| `text-embedding-3-large` | 10000 (measured 2026-09-30) |
-| `text-embedding-3-small` | 10000 (measured 2026-09-30) |
+| Model | Limit | Measured |
+| --- | --- | --- |
+| `gpt-4o` | 30000 | 2026-09-29 |
+| `gpt-5-mini` | 10000 | 2026-09-29 |
+| `gpt-5.2` | 30000 | 2026-09-29 |
+| `gpt-5.4` | 10000 | 2026-11-16 |
+| `gpt-5.4-mini` | 10000 | 2026-11-16 |
+| `gpt-5.4-nano` | 150000 | 2026-11-16 |
+| `gpt-5.4-pro` | 1600 | 2026-11-16 |
+| `text-embedding-3-large` | 10000 | 2026-09-30 |
+| `text-embedding-3-small` | 10000 | 2026-09-30 |
 
 `azure_openai:model_capacities` overrides the capacity for a single model, for when one
 pool needs a different size than `model_capacity`. `azure_openai:consumer_model_capacities`
@@ -131,12 +143,84 @@ explicit that "deployments of the same model and version share one quota pool ac
 all regions in a subscription", so the pool is not per region either.
 
 Concretely: the four `gpt-4o` deployments in an environment compete with the eight
-`gpt-4o` deployments in the other two environments, and with nothing else. Not all 42
-deployments against one pool. Capacity planning sums twelve deployments per chat model
-against each of three pools, three deployments (mitlearn's, one per environment)
-against the `text-embedding-3-small` pool, and five (mitlearn's in each environment,
-dagster-ml's in QA and Production) against the `text-embedding-3-large` pool. Raising a non-production capacity still takes
-quota from Production, but only for that one model.
+`gpt-4o` deployments in the other two environments, and with nothing else. Capacity
+planning sums twelve deployments per chat model (four consumers in three environments)
+against that model's pool, three deployments (mitlearn's, one per environment) against
+the `text-embedding-3-small` pool, and five (mitlearn's in each environment, dagster-ml's
+in QA and Production) against the `text-embedding-3-large` pool. Raising a
+non-production capacity still takes quota from Production, but only for that one model.
+
+## Changing the deployed models
+
+The chat models every consumer gets are `ModelConfig.models` in `__main__.py`. Models for
+one consumer only (the embeddings) are `azure_openai:consumer_extra_models` in the QA and
+Production stack config, with the code default covering CI. A stack can also set
+`azure_openai:models`, but that replaces the whole default list for that stack, so prefer
+editing the default.
+
+To add a model:
+
+1. Confirm the model can be deployed as `GlobalStandard` in the subscription and that it
+   is not deprecating. Azure refuses new deployments of a model whose lifecycle is
+   `Deprecating`, e.g. `gpt-4o-mini`.
+
+   ```shell
+   az cognitiveservices account list-models \
+     -n "ol-openai-mitlearn-ci" -g "ol-openai-ci" \
+     --query "[?name=='gpt-5.4'].{version:version, lifecycle:lifecycleStatus, skus:skus[].name}" \
+     -o json
+   ```
+
+2. Check its quota pool. Each pool is subscription-wide and separate per model, so sum
+   every deployment of the new model: Production's `model_capacity` (or its
+   `model_capacities` override) times four consumers, plus 5 per deployment in CI and QA.
+   That sum has to fit in `limit` minus `current`, since anything else in the
+   subscription already deployed on the model draws from the same pool.
+
+   ```shell
+   az cognitiveservices usage list -l eastus \
+     --query "[?name.value=='OpenAI.GlobalStandard.gpt-5.4'].{current:currentValue, limit:limit}" \
+     -o table
+   ```
+
+   If that sum exceeds `limit` minus `current`, set `azure_openai:model_capacities` for the model in
+   `Pulumi.Production.yaml` (e.g. `gpt-5.4-pro: 300`), or request more quota in the
+   Azure portal first. Add the limit to the table above.
+
+3. Add the model to `ModelConfig.models`.
+
+4. Pin the version in `Pulumi.Production.yaml` under `azure_openai:model_versions`,
+   using the version from step 1. CI and QA stay unpinned and auto-upgrade.
+
+5. Update the model list at the top of this README, then `pulumi preview` each stack.
+   Expect one new `Deployment` per consumer. `ModelConfig` fails the preview if a
+   capacity or version names a model that is not deployed.
+
+6. After CI applies, confirm the deployment is live and serving:
+
+   ```shell
+   az cognitiveservices account deployment list \
+     -n "ol-openai-mitlearn-ci" -g "ol-openai-ci" \
+     --query "[].{name:name, version:properties.model.version, state:properties.provisioningState}" \
+     -o table
+   ```
+
+7. Add an `azure:<model>` entry with its price to the catalog in
+   [`ol-llm`](https://github.com/mitodl/ol-llm) (`python/src/ol_llm/catalog.toml`), in a
+   pull request the catalog owner approves (policy spec §2.2 item 3). The
+   entry does not gate the deployment, but until it exists `build_model` warns on the
+   model, runs through `ol-llm`'s entry points tag their traces
+   `model_status:uncataloged`, and its tokens have no price in the spend rules.
+
+To remove a model, first make sure no app still calls it, since requests to a deleted
+deployment fail. Then delete it from the list, along with
+its `model_versions` and capacity entries, which would otherwise fail validation.
+Remove **one model per apply**. Pulumi deletes removed resources in parallel, and Azure
+answers a second concurrent deployment operation on the same account with 409
+`RequestConflict` (see the comment above the deployment loop in `__main__.py`).
+
+Version-only changes go through `azure_openai:model_versions` in Production and need no
+code change.
 
 ## Local development
 

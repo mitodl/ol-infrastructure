@@ -77,6 +77,55 @@ def _observability(
     return observability
 
 
+# CPU for every backend workload. Observed 5m-rate peaks over 30 days in
+# Production were all under 50m (aws the highest, at 47m), so the request covers
+# steady state and the limit leaves ten times that peak for bursts.
+BACKEND_CPU_REQUEST = "50m"
+BACKEND_CPU_LIMIT = "500m"
+
+
+def _backend_resources(*, memory_request: str, memory_limit: str) -> dict[str, object]:
+    """``podTemplateSpec`` that sizes an ``MCPServer``'s backend container.
+
+    ``spec.resources`` on an ``MCPServer`` does NOT reach the backend. The
+    operator applies it to the ``toolhive`` container of the proxy-runner
+    Deployment (``mcpserver_controller.go``, as of operator v0.63.0), while the
+    backend StatefulSet's ``mcp`` container renders ``resources: {}`` and the
+    pod runs BestEffort. ``spec.resources`` on the CRs below therefore sizes the
+    PROXY, and this is what sizes the backend: the proxy runner keeps a
+    user-supplied ``mcp`` container and sets image, args, env and security
+    context on it without touching ``resources``, and the operator layers
+    ``secrets`` and ``serviceAccount`` on top of this template rather than
+    replacing it.
+
+    Memory is sized per backend from its 30-day working-set peak in Production
+    (request at or above the peak, limit at least twice it), because the runtimes
+    differ: the Go servers peak near 60Mi, the npx ones at 100-150Mi, and the
+    Python aws proxy above 200Mi.
+    """
+    return {
+        "podTemplateSpec": {
+            "spec": {
+                "containers": [
+                    {
+                        "name": "mcp",
+                        "resources": {
+                            "requests": {
+                                "cpu": BACKEND_CPU_REQUEST,
+                                "memory": memory_request,
+                            },
+                            "limits": {
+                                "cpu": BACKEND_CPU_LIMIT,
+                                "memory": memory_limit,
+                            },
+                        },
+                    }
+                ]
+            }
+        }
+    }
+
+
 # ServiceAccount the aws backend runs under. The OLEKSAuthBinding in __main__.py
 # creates it annotated with the IRSA role ARN; the EKS pod-identity webhook turns
 # that annotation into AWS_ROLE_ARN + AWS_WEB_IDENTITY_TOKEN_FILE on the pod,
@@ -195,6 +244,7 @@ def create_mcp_servers(  # noqa: PLR0913
             "mcpPort": 8080,
             "groupRef": {"name": MCP_GROUP_NAME},
             **_observability(stack_info, "fetch"),
+            **_backend_resources(memory_request="64Mi", memory_limit="256Mi"),
             # Fetch needs outbound network access to retrieve URLs. The "network"
             # builtin profile grants egress; tighten to an allow-list ConfigMap when
             # the set of reachable hosts is known.
@@ -370,6 +420,7 @@ def create_mcp_servers(  # noqa: PLR0913
             "mcpPort": 8000,
             "groupRef": {"name": MCP_GROUP_NAME},
             **_observability(stack_info, "grafana"),
+            **_backend_resources(memory_request="64Mi", memory_limit="256Mi"),
             # mcp-grafana 1.5 added anonymous usage reporting to Grafana Labs.
             # It ships disabled, but upstream says the default flips to enabled
             # in a later release (usagestats/mode.go), and a Renovate version
@@ -470,6 +521,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 "proxyPort": 8080,
                 "groupRef": {"name": MCP_GROUP_NAME},
                 **_observability(stack_info, "context7"),
+                **_backend_resources(memory_request="128Mi", memory_limit="384Mi"),
                 "secrets": [
                     {
                         "name": CONTEXT7_TOKEN_SECRET_NAME,
@@ -555,6 +607,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 "proxyPort": 8080,
                 "groupRef": {"name": MCP_GROUP_NAME},
                 **_observability(stack_info, "sentry"),
+                **_backend_resources(memory_request="192Mi", memory_limit="384Mi"),
                 "env": sentry_env,
                 "secrets": [
                     {
@@ -643,6 +696,7 @@ def create_mcp_servers(  # noqa: PLR0913
                 "proxyPort": 8080,
                 "groupRef": {"name": MCP_GROUP_NAME},
                 **_observability(stack_info, "aws"),
+                **_backend_resources(memory_request="256Mi", memory_limit="512Mi"),
                 # Appended to the image's `mcp-proxy-for-aws` ENTRYPOINT. The
                 # endpoint URL is POSITIONAL and must come first.
                 #

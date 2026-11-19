@@ -1,19 +1,18 @@
 ---
-encryptionsalt: v1:1H9lnzZG79Q=:v1:/NIoxYp1G0jWpCYy:VmVozP1hULB00aVmsuavkdExnF4Ayw==
 config:
   mailgun:apiKey:
-    secure: v1:fTYoaQ/6JGd1Tqv6:795fMzh+r4jM5ocXjBr89E7iJksrZ6jcgwLRE1zL32UdrDU0uCH2/6bzIeywwMB7n0dNAgcY21GeOhLsvvJbqIq2
+    secure: v1:VBQEAMb2A5hPj6UP:gh48mML5F8rPybtY4k4EvLMHuJ7xwE8+m8P+wzkcGp6sjjh3AQ8NBVlNemZg8LiER4mpehmm6YdtyfUjjPaGZ1/+
   ol_mailgun:domains:
   - name: discussions-mail.odl.mit.edu
     managed: false
   - name: mail.learn.mit.edu
     managed: false
     smtp_password:
-      secure: v1:O4DhmVsi/7AzwnYZ:pmml6w71HazaD+SbsRmDzk7GrZoMHdq1kBmxnHzPFMZCOU/xwIDqaL53eNFeBLFc
+      secure: v1:miEc4xN/8zdKaM9a:AC0teNwQ7pjoWxsmX5zfAFqVqmXHMphSrhzVGdyWDaHS5XG33n3zCMYyr50Xc23V
     credentials:
     - login: no-reply
       smtp_password:
-        secure: v1:S7hfaPBQJRmWU/xA:X/Nr8eBehG92yO10kw4qzgS7a8zbTpLUHH7sc0+OC6aoVU+SfI6dA3jP7RVlD4r9
+        secure: v1:Uz9DyliGdWjBWHsZ:pyrhEfqwwWlSSaPrl/xgQQg1+jGJmv6c3pQMV4WMOgN5F93+49uah6SOc97uJx0E
   - name: mail.mitxonline.mit.edu
     managed: false
   - name: mail.open.mit.edu
@@ -32,3 +31,5 @@ config:
     managed: false
   - name: xpro.mit.edu
     managed: false
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwG0ThQvP9KNPa6pJIuNZKD4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM+nApmPjfCci/+6KUAgEQgDsBreWyG1mW/DB7/V2sjH/7hXNJoNFz1PCzg9cGZxqtS8StZN22AAE4yLrTrV8LhTo28xI+yX8C3EQWrw==

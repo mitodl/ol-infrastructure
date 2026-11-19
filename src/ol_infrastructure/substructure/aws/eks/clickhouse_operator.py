@@ -13,6 +13,7 @@ import pulumi_kubernetes as kubernetes
 import yaml as pyyaml
 from pulumi import Config, ResourceOptions, StackReference
 
+from bridge.lib.constants import CLICKHOUSE_NAMESPACE
 from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import CLICKHOUSE_OPERATOR_VERSION
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
@@ -63,6 +64,19 @@ def _operator_configuration() -> dict[str, Any]:
     The operator lists every ClickHouseOperatorConfiguration in its own
     namespace at startup and merges them, in name order, over the file config.
 
+    The watch is narrowed to the namespace holding every CHI and CHK. With the
+    bundle's empty ``include``, the Keeper controller's cache is keyed on the
+    all-namespaces key ``""``, and the namespaced lists of a Keeper's
+    StatefulSets, Services, ConfigMaps, Secrets, PVCs and PDBs fail with
+    "unknown namespace for the cache" (Altinity/clickhouse-operator#2117). The
+    CHK reconcile still completes, but discovery comes back empty, so a Keeper
+    scale-down would leave the removed host's objects behind. Deleting the CHK
+    still removes them, because each carries an ownerReference to the CHK and
+    Kubernetes garbage collection does that part. A literal
+    namespace name gives the cache that exact key; the bundle's own ``include``
+    is empty, so the merged list is this one name. A CHI or CHK created in any
+    other namespace is ignored.
+
     :returns: The ClickHouseOperatorConfiguration manifest.
     :rtype: dict[str, Any]
     """
@@ -74,11 +88,12 @@ def _operator_configuration() -> dict[str, Any]:
             "namespace": CLICKHOUSE_OPERATOR_BUNDLE_NAMESPACE,
         },
         "spec": {
+            "watch": {"namespaces": {"include": [CLICKHOUSE_NAMESPACE]}},
             "reconcile": {
                 "statefulSet": {
                     "update": {"timeout": OPERATOR_STATEFULSET_UPDATE_TIMEOUT_SECONDS}
                 }
-            }
+            },
         },
     }
 
@@ -104,14 +119,18 @@ def _prepare_operator_deployment(objs: list[dict[str, Any]]) -> None:
     The CRDs, the config ConfigMaps and the ClickHouseOperatorConfiguration go
     in first, so a new operator never starts against old CRDs or config. The
     ConfigGroup's own heuristics only order CRDs before custom resources, not
-    before a Deployment. A rolling update with no surge narrows the overlap
-    between the old and new operator to the old pod's shutdown, but doesn't
-    prevent it: a terminating pod doesn't count against maxUnavailable, so the
-    new pod can start while the old one is still inside its grace period (the
-    bundle sets none, so the default 30s). The operator has no leader election,
-    so both can reconcile during that window. It stays type RollingUpdate
-    because a server-side apply cannot drop the defaulted rollingUpdate block
-    that type Recreate forbids.
+    before a Deployment. The operator has no leader election, so two operator
+    pods running at once would both reconcile every CHI and CHK. During a
+    rollout, type Recreate waits until the old pod has terminated before
+    creating the new one; a rolling update, even with maxSurge 0, can start the
+    new pod while the old one is still inside its grace period, because the
+    surge check counts ReplicaSet replicas and the old ReplicaSet is already
+    scaled to 0. Recreate does not cover an eviction or a pod deletion (a node
+    drain, Karpenter consolidation): the ReplicaSet replaces the pod as soon as
+    it starts terminating, so the two can still overlap for up to the 30s
+    default grace period. The server-side apply can drop rollingUpdate (which
+    Recreate forbids) because this program's field manager owns both of its
+    fields, from when it set maxSurge 0 and maxUnavailable 1.
 
     The CRDs stay in this ConfigGroup: a child's URN is
     ``<group name>:<namespace>/<name>``, so moving them to another group would
@@ -127,10 +146,7 @@ def _prepare_operator_deployment(objs: list[dict[str, Any]]) -> None:
         for obj in objs
         if obj["kind"] in _OPERATOR_PREREQUISITE_KINDS
     )
-    deployment["spec"]["strategy"] = {
-        "type": "RollingUpdate",
-        "rollingUpdate": {"maxSurge": 0, "maxUnavailable": 1},
-    }
+    deployment["spec"]["strategy"] = {"type": "Recreate"}
 
 
 def setup_clickhouse_operator(
@@ -142,7 +158,8 @@ def setup_clickhouse_operator(
 
     The operator is installed from the upstream install-bundle manifest, which
     includes CRDs (ClickHouseInstallation, ClickHouseKeeperInstallation, etc.)
-    and the operator Deployment. It watches all namespaces by default.
+    and the operator Deployment. It watches only CLICKHOUSE_NAMESPACE (see
+    ``_operator_configuration``).
 
     Skipped when ``clickhouse:enable_operator`` is not set to true in config.
 

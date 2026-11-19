@@ -1,19 +1,60 @@
-"""Mirror OpenMetadata team membership into Keycloak groups.
+"""Keep OpenMetadata teams and Keycloak in step, in both directions.
 
-Team membership is assigned by hand in the OpenMetadata UI. This job makes the
-``ol-data-platform`` realm hold one group per team, with exactly the members the
-team has in OpenMetadata. It only writes to Keycloak; nothing flows back.
+Each run does two things, in this order.
 
-The teams are the ones ``access_control.py`` declares in ``TEAMS``; the stack
-passes their names in ``OM_TEAMS``. Each becomes a child of the parent
-group named by ``KEYCLOAK_PARENT_GROUP_ID``, which the keycloak substructure
-stack owns. This job owns every child of that parent: it creates a missing one,
-and deletes one whose team is no longer declared, so a dropped team does not
-keep members who can no longer be removed in OpenMetadata.
+Teams to Keycloak groups. Team membership is assigned by hand in the
+OpenMetadata UI. This makes the ``ol-data-platform`` realm hold one group per
+team, with exactly the members the team has in OpenMetadata. The teams are the
+ones ``access_control.py`` declares in ``TEAMS``; the stack passes their names
+in ``OM_TEAMS``. Each becomes a child of the parent group named by
+``KEYCLOAK_PARENT_GROUP_ID``, which the keycloak substructure stack owns. This
+job owns every child of that parent: it creates a missing one, and deletes one
+whose team is no longer declared, so a dropped team does not keep members who
+can no longer be removed in OpenMetadata.
 
-OpenMetadata users are matched to Keycloak users by email. A member with no
-Keycloak account is reported and skipped, and the run still succeeds. Any API
-error stops the run with a non-zero exit before the remaining writes.
+Keycloak roles to OpenMetadata roles. OpenMetadata sets a user's roles from the
+``roles`` claim only when they log in (AuthenticationCodeFlowHandler
+syncRolesFromProvider in 2.0.7), so a user whose Keycloak roles shrink keeps
+their OpenMetadata roles until their next login, and indefinitely if they never
+log in again. This resets every human user's roles to what that login would
+give them now, and clears ``isAdmin`` on anyone outside the server's
+``adminPrincipals``. The roles a login gives are the client roles of
+``ol-open_metadata-client`` that the user's effective realm roles are
+composites of; the stack passes that mapping in ``OM_ROLE_BY_REALM_ROLE``
+(OPEN_METADATA_ROLE_BY_REALM_ROLE plus the realm's default role, from
+substructure/keycloak ol_data_platform.py). Like the login, a role OpenMetadata
+does not have is dropped.
+
+A client role of ``ol-open_metadata-client`` assigned to a user directly, or
+through a composite made by hand, reaches the claim but not this mapping, so
+this takes it away each hour and the user's next login gives it back. Reading
+the effective client roles instead would match the claim exactly, but Keycloak
+26.7.4 requires view on the client for that (ClientRoleMappingsResource
+getCompositeClientRoleMappings), and view-clients also returns every client's
+secret (ClientResource.getClientSecret), which this job's credentials should not
+reach. Grant ``ol-open_metadata-client`` roles through the realm roles.
+
+Users in ``adminPrincipals`` are left alone: login makes them admins again, and
+an admin's roles grant nothing their admin flag does not. A user with no
+Keycloak account is reported and keeps their roles, though a stray ``isAdmin``
+is still cleared. ``OM_ROLES_DRY_RUN`` true logs each change without making it.
+
+Personal access tokens are left alone. Each one carries a snapshot of the roles
+its user had, but OpenMetadata 2.0.7 neither syncs roles from a token it issued
+(JwtFilter.getUserRolesFromClaims) nor authorizes with them: it reads the user
+it has stored (SubjectContext). Once this resets a user's roles, their tokens
+carry only the new ones, so revoking them would close no way back.
+
+The team half reads OpenMetadata as the ingestion bot. The role half needs an
+admin, since another user's roles and ``isAdmin`` are admin-only, and
+authenticates as the Keycloak service account that ``initialAdmins`` names
+(``OM_ADMIN_CLIENT_ID``), which substructure/open_metadata provisions with.
+Those credentials come from a secret the application stack creates, and the job
+starts without it, so a missing secret fails only the role half.
+
+OpenMetadata users are matched to Keycloak users by email. Any error stops
+that half with a non-zero exit before its remaining writes; the other half
+still runs.
 
 Runs as ``python -c`` in the ingestion-base image, which ships ``requests``.
 """
@@ -32,6 +73,7 @@ OM_PAGE_SIZE = 100
 KEYCLOAK_PAGE_SIZE = 100
 # A Group is the only OpenMetadata team type that holds users directly.
 OM_GROUP_TEAM_TYPE = "Group"
+JSON_PATCH_CONTENT_TYPE = "application/json-patch+json"
 
 
 class SyncError(Exception):
@@ -108,6 +150,110 @@ def plan_sync(
     )
 
 
+@dataclass(frozen=True)
+class OpenMetadataUser:
+    """The fields of a human OpenMetadata user that the role half reads.
+
+    :param id: The user's id.
+    :param name: The user's name, which ``adminPrincipals`` lists.
+    :param email: The user's email, lower-cased.
+    :param is_admin: The user's ``isAdmin`` flag.
+    :param roles: The names of the roles assigned to the user, not inherited.
+    """
+
+    id: str
+    name: str
+    email: str
+    is_admin: bool
+    roles: frozenset[str]
+
+
+@dataclass(frozen=True)
+class UserChange:
+    """The changes that bring one OpenMetadata user in line with Keycloak.
+
+    :param user: The user as OpenMetadata holds them.
+    :param roles: The roles to set, or None to leave them.
+    :param clear_admin: Whether to set ``isAdmin`` false.
+    """
+
+    user: OpenMetadataUser
+    roles: frozenset[str] | None
+    clear_admin: bool
+
+
+@dataclass(frozen=True)
+class RolePlan:
+    """Every change one run of the role half makes.
+
+    :param changes: One entry per user who needs a write, in name order.
+    :param unchanged: How many Keycloak-matched users already match it.
+    :param admins: Names of users left alone because they are admin principals.
+    :param missing: Names of users with no Keycloak account.
+    :param unknown_roles: Roles the mapping names that OpenMetadata lacks.
+    """
+
+    changes: tuple[UserChange, ...]
+    unchanged: int
+    admins: tuple[str, ...]
+    missing: tuple[str, ...]
+    unknown_roles: frozenset[str]
+
+
+def plan_roles(
+    users: Sequence[OpenMetadataUser],
+    admin_principals: frozenset[str],
+    realm_roles_by_email: Mapping[str, frozenset[str]],
+    role_by_realm_role: Mapping[str, str],
+    known_roles: frozenset[str],
+) -> RolePlan:
+    """Compute the changes that give each user the roles a login would.
+
+    :param users: Every human OpenMetadata user.
+    :param admin_principals: The server's ``adminPrincipals``.
+    :param realm_roles_by_email: Each Keycloak-matched user's effective realm
+        roles, by lower-cased email. A user missing here has no account.
+    :param role_by_realm_role: The OpenMetadata role each realm role grants.
+    :param known_roles: The names of the roles OpenMetadata has.
+    :returns: The plan; applying it to users already in line changes nothing.
+    :rtype: RolePlan
+    """
+    changes = []
+    unchanged = 0
+    admins = []
+    missing = []
+    unknown: set[str] = set()
+    for user in sorted(users, key=lambda user: user.name):
+        if user.name in admin_principals:
+            admins.append(user.name)
+            continue
+        roles = None
+        if user.email in realm_roles_by_email:
+            granted = {
+                role_by_realm_role[realm_role]
+                for realm_role in realm_roles_by_email[user.email]
+                if realm_role in role_by_realm_role
+            }
+            unknown |= granted - known_roles
+            wanted = frozenset(granted & known_roles)
+            roles = wanted if wanted != user.roles else None
+        else:
+            missing.append(user.name)
+        if roles is not None or user.is_admin:
+            changes.append(
+                UserChange(user=user, roles=roles, clear_admin=user.is_admin)
+            )
+        elif user.email in realm_roles_by_email:
+            unchanged += 1
+    return RolePlan(
+        changes=tuple(changes),
+        unchanged=unchanged,
+        admins=tuple(admins),
+        missing=tuple(missing),
+        unknown_roles=frozenset(unknown),
+    )
+
+
 class TeamSource(Protocol):
     """Where team membership is read from."""
 
@@ -138,6 +284,32 @@ class GroupTarget(Protocol):
 
     def remove_member(self, group_id: str, user_id: str) -> None:
         """Remove a user from a group."""
+
+
+class RoleSource(Protocol):
+    """The Keycloak reads the role half needs."""
+
+    def user_ids_by_email(self) -> dict[str, str]:
+        """Return every realm user's id by lower-cased email."""
+
+    def effective_realm_roles(self, user_id: str) -> frozenset[str]:
+        """Return a user's realm roles, composites and groups expanded."""
+
+
+class RoleTarget(Protocol):
+    """The OpenMetadata operations the role half needs."""
+
+    def admin_principals(self) -> frozenset[str]:
+        """Return the server's ``adminPrincipals``."""
+
+    def role_ids(self) -> dict[str, str]:
+        """Return every role's id by name."""
+
+    def human_users(self) -> list[OpenMetadataUser]:
+        """Return every user who is not a bot."""
+
+    def patch_user(self, user_id: str, operations: list[dict[str, Any]]) -> None:
+        """Apply a JSON Patch to a user."""
 
 
 def sync(teams: Sequence[str], source: TeamSource, target: GroupTarget) -> SyncPlan:
@@ -173,6 +345,53 @@ def sync(teams: Sequence[str], source: TeamSource, target: GroupTarget) -> SyncP
     return plan
 
 
+def reconcile_roles(
+    source: RoleSource,
+    target: RoleTarget,
+    role_by_realm_role: Mapping[str, str],
+    *,
+    dry_run: bool,
+) -> RolePlan:
+    """Read both sides, plan, and apply the plan to OpenMetadata.
+
+    :param source: Keycloak, or a stand-in.
+    :param target: OpenMetadata as an admin, or a stand-in.
+    :param role_by_realm_role: The OpenMetadata role each realm role grants.
+    :param dry_run: Log each change without making it.
+    :returns: The plan that was applied, or would have been.
+    :rtype: RolePlan
+    :raises SyncError: If the server reports no admin principals, since every
+        admin would then lose ``isAdmin``.
+    """
+    admin_principals = target.admin_principals()
+    if not admin_principals:
+        msg = "the server reports no adminPrincipals"
+        raise SyncError(msg)
+    role_ids = target.role_ids()
+    users = target.human_users()
+    keycloak_ids = source.user_ids_by_email()
+    realm_roles_by_email = {
+        user.email: source.effective_realm_roles(keycloak_ids[user.email])
+        for user in users
+        if user.name not in admin_principals and user.email in keycloak_ids
+    }
+
+    plan = plan_roles(
+        users,
+        admin_principals,
+        realm_roles_by_email,
+        role_by_realm_role,
+        frozenset(role_ids),
+    )
+    for role in sorted(plan.unknown_roles):
+        _log(f"[warn] role {role}: granted by a realm role but not in OpenMetadata")
+    for name in plan.missing:
+        _log(f"[skip] user {name}: no Keycloak account, roles left as they are")
+    for change in plan.changes:
+        _apply_user(change, role_ids, target, dry_run=dry_run)
+    return plan
+
+
 def _apply_group(
     group: GroupPlan,
     group_ids: dict[str, str],
@@ -195,24 +414,92 @@ def _apply_group(
         _log(f"[ok]   group {group.team}: already mirrors the team")
 
 
+def _apply_user(
+    change: UserChange,
+    role_ids: Mapping[str, str],
+    target: RoleTarget,
+    *,
+    dry_run: bool,
+) -> None:
+    user = change.user
+    operations: list[dict[str, Any]] = []
+    described = []
+    if change.roles is not None:
+        operations.append(
+            {
+                "op": "add",
+                "path": "/roles",
+                "value": [
+                    {"id": role_ids[role], "type": "role"}
+                    for role in sorted(change.roles)
+                ],
+            }
+        )
+        described.append(f"roles {_names(user.roles)} -> {_names(change.roles)}")
+    if change.clear_admin:
+        operations.append({"op": "replace", "path": "/isAdmin", "value": False})
+        described.append("isAdmin true -> false")
+    tag, verb = ("[dry]  ", "would set") if dry_run else ("[done] ", "set")
+    if not dry_run:
+        target.patch_user(user.id, operations)
+    _log(f"{tag}user {user.name}: {verb} {', '.join(described)}")
+
+
+def _names(roles: frozenset[str]) -> str:
+    return "[" + ", ".join(sorted(roles)) + "]"
+
+
 def _log(message: str) -> None:
     print(message)  # noqa: T201
 
 
+def client_credentials_token(realm_url: str, client_id: str, secret: str) -> str:
+    """Return an access token for a confidential client's service account.
+
+    :param realm_url: The realm's base URL, ``<keycloak>/realms/<realm>``.
+    :param client_id: The client's id.
+    :param secret: The client's secret.
+    """
+    response = requests.post(
+        f"{realm_url.rstrip('/')}/protocol/openid-connect/token",
+        data={
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": secret,
+        },
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
 class OpenMetadata:
-    """Reads team membership from the OpenMetadata API."""
+    """The OpenMetadata API calls of both halves."""
 
     def __init__(self, server_url: str, token: str) -> None:
         self.server_url = server_url.rstrip("/")
         self.session = requests.Session()
         self.session.headers["Authorization"] = f"Bearer {token}"
 
-    def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
-        response = self.session.get(
-            f"{self.server_url}{path}", params=params, timeout=HTTP_TIMEOUT_SECONDS
+    def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
+        response = self.session.request(
+            method, f"{self.server_url}{path}", timeout=HTTP_TIMEOUT_SECONDS, **kwargs
         )
         response.raise_for_status()
-        return response.json()
+        return response
+
+    def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        return self._request("GET", path, params=params).json()
+
+    def _paged(self, path: str, params: dict[str, Any]) -> Iterator[dict[str, Any]]:
+        params = {**params, "limit": OM_PAGE_SIZE}
+        while True:
+            page = self._get(path, params)
+            yield from page["data"]
+            after = page["paging"].get("after")
+            if not after:
+                return
+            params["after"] = after
 
     def member_emails(self, team: str) -> frozenset[str]:
         """Return the lower-cased emails of a team's members, leaving out bots.
@@ -227,21 +514,43 @@ class OpenMetadata:
         if team_type != OM_GROUP_TEAM_TYPE:
             msg = f"team {team} has teamType {team_type!r}, expected 'Group'"
             raise SyncError(msg)
-        return frozenset(user["email"].lower() for user in self._team_users(team))
+        return frozenset(
+            user["email"].lower()
+            for user in self._paged("/v1/users", {"team": team, "isBot": "false"})
+        )
 
-    def _team_users(self, team: str) -> Iterator[dict[str, Any]]:
-        params: dict[str, Any] = {"team": team, "isBot": "false", "limit": OM_PAGE_SIZE}
-        while True:
-            page = self._get("/v1/users", params)
-            yield from page["data"]
-            after = page["paging"].get("after")
-            if not after:
-                return
-            params["after"] = after
+    def admin_principals(self) -> frozenset[str]:
+        # The settings endpoints refuse authorizerConfiguration
+        # (SystemResource.getSettingByName); /security/config is admin-only.
+        config = self._get("/v1/system/security/config")
+        return frozenset(config["authorizerConfiguration"]["adminPrincipals"])
+
+    def role_ids(self) -> dict[str, str]:
+        return {role["name"]: role["id"] for role in self._paged("/v1/roles", {})}
+
+    def human_users(self) -> list[OpenMetadataUser]:
+        return [
+            OpenMetadataUser(
+                id=user["id"],
+                name=user["name"],
+                email=user["email"].lower(),
+                is_admin=bool(user.get("isAdmin")),
+                roles=frozenset(role["name"] for role in user.get("roles", [])),
+            )
+            for user in self._paged("/v1/users", {"isBot": "false", "fields": "roles"})
+        ]
+
+    def patch_user(self, user_id: str, operations: list[dict[str, Any]]) -> None:
+        self._request(
+            "PATCH",
+            f"/v1/users/{user_id}",
+            json=operations,
+            headers={"Content-Type": JSON_PATCH_CONTENT_TYPE},
+        )
 
 
 class Keycloak:
-    """Manages the children of one group in a Keycloak realm."""
+    """Manages the children of one group in a Keycloak realm, and reads users."""
 
     def __init__(
         self,
@@ -253,19 +562,9 @@ class Keycloak:
     ) -> None:
         self.admin_url = admin_url.rstrip("/")
         self.parent_group_id = parent_group_id
-        token_response = requests.post(
-            f"{realm_url.rstrip('/')}/protocol/openid-connect/token",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-            },
-            timeout=HTTP_TIMEOUT_SECONDS,
-        )
-        token_response.raise_for_status()
         self.session = requests.Session()
         self.session.headers["Authorization"] = (
-            f"Bearer {token_response.json()['access_token']}"
+            f"Bearer {client_credentials_token(realm_url, client_id, client_secret)}"
         )
 
     def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
@@ -316,6 +615,22 @@ class Keycloak:
             raise SyncError(msg)
         return matches[0]["id"] if matches else None
 
+    def user_ids_by_email(self) -> dict[str, str]:
+        return {
+            user["email"].lower(): user["id"]
+            for user in self._paged("/users")
+            if user.get("email")
+        }
+
+    # Needs only view on the user (RoleMapperResource.getCompositeRealmRoleMappings
+    # in Keycloak 26.7.4), which manage-users covers. The client-role variant
+    # would also need view-clients.
+    def effective_realm_roles(self, user_id: str) -> frozenset[str]:
+        roles = self._request(
+            "GET", f"/users/{user_id}/role-mappings/realm/composite"
+        ).json()
+        return frozenset(role["name"] for role in roles)
+
     def create_child_group(self, name: str) -> str:
         return self._request(
             "POST", f"/groups/{self.parent_group_id}/children", json={"name": name}
@@ -331,24 +646,78 @@ class Keycloak:
         self._request("DELETE", f"/users/{user_id}/groups/{group_id}")
 
 
+def _admin_credentials() -> tuple[str, str]:
+    """Return the OpenMetadata admin's Keycloak client id and secret.
+
+    :raises SyncError: If either is unset, which the optional secret references
+        leave them when the om-provisioner secret does not exist.
+    """
+    try:
+        return os.environ["OM_ADMIN_CLIENT_ID"], os.environ["OM_ADMIN_CLIENT_SECRET"]
+    except KeyError as exc:
+        msg = (
+            f"{exc.args[0]} is unset: the om-provisioner secret, which the"
+            " open_metadata application stack creates, is missing"
+        )
+        raise SyncError(msg) from exc
+
+
 def main() -> None:
-    """Mirror every declared team; exit non-zero on any API error."""
-    teams = json.loads(os.environ["OM_TEAMS"])
-    source = OpenMetadata(os.environ["OM_SERVER_URL"], os.environ["OM_BOT_JWT_TOKEN"])
-    target = Keycloak(
-        realm_url=os.environ["KEYCLOAK_REALM_URL"],
+    """Mirror every declared team, then reconcile every user's roles.
+
+    Exits non-zero if either half fails.
+    """
+    server_url = os.environ["OM_SERVER_URL"]
+    realm_url = os.environ["KEYCLOAK_REALM_URL"]
+    keycloak = Keycloak(
+        realm_url=realm_url,
         admin_url=os.environ["KEYCLOAK_ADMIN_URL"],
         client_id=os.environ["KEYCLOAK_CLIENT_ID"],
         client_secret=os.environ["KEYCLOAK_CLIENT_SECRET"],
         parent_group_id=os.environ["KEYCLOAK_PARENT_GROUP_ID"],
     )
+    failed = False
+
     try:
-        plan = sync(teams, source, target)
+        plan = sync(
+            json.loads(os.environ["OM_TEAMS"]),
+            OpenMetadata(server_url, os.environ["OM_BOT_JWT_TOKEN"]),
+            keycloak,
+        )
     except (SyncError, requests.RequestException) as exc:
-        print(f"[fail] {exc}", file=sys.stderr)  # noqa: T201
+        print(f"[fail] team sync: {exc}", file=sys.stderr)  # noqa: T201
+        failed = True
+    else:
+        unmatched = sum(len(group.unmatched) for group in plan.groups)
+        _log(f"\nTeam sync complete. {unmatched} member(s) skipped with no account.\n")
+
+    try:
+        dry_run = json.loads(os.environ["OM_ROLES_DRY_RUN"])
+        admin = OpenMetadata(
+            server_url, client_credentials_token(realm_url, *_admin_credentials())
+        )
+        roles = reconcile_roles(
+            keycloak,
+            admin,
+            json.loads(os.environ["OM_ROLE_BY_REALM_ROLE"]),
+            dry_run=dry_run,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(  # noqa: T201
+            f"[fail] role reconcile: {type(exc).__name__}: {exc}", file=sys.stderr
+        )
+        failed = True
+    else:
+        _log(
+            f"\nRole reconcile complete{' (dry run)' if dry_run else ''}. "
+            f"{len(roles.changes)} user(s) {'to change' if dry_run else 'changed'}, "
+            f"{roles.unchanged} unchanged, "
+            f"{len(roles.admins)} admin principal(s) skipped, "
+            f"{len(roles.missing)} with no Keycloak account."
+        )
+
+    if failed:
         sys.exit(1)
-    unmatched = sum(len(group.unmatched) for group in plan.groups)
-    _log(f"\nSync complete. {unmatched} team member(s) skipped with no account.")
 
 
 if __name__ == "__main__":

@@ -154,6 +154,10 @@ ol_redirect_service_tls = OLFastlyTLS(
         subscription_resource_name=subscription_name,
         validation_resource_name=f"{subscription_name}-validation",
         domains=tls_domains,
+        # The live subscription is on a different configuration than the
+        # "TLS v1.3" lookup returns, and Production applies failed on every
+        # other build trying to move it.
+        pin_configuration=True,
         dns_records=[
             OLFastlyDNSRecordConfig(
                 resource_name=f"fastly-target-for-domain-{domain}",

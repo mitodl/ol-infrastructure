@@ -140,6 +140,9 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             "node",
             "job_name",
             "instance",
+            # metric_rules/telemetry_archive.py aggregates ruler failures by
+            # Mimir rule group.
+            "rule_group",
             # The edge-level equivalent of the labels above: metric_rules/
             # apisix_edge.py aggregates `sum by (matched_host)`, so this is the
             # only resource-identifying label its alerts carry. Without it every
