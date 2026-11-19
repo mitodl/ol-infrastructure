@@ -1,6 +1,7 @@
 """The helpers shared by the Tilt-run programs under local-dev/apps/*/pulumi."""
 
 import importlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from ol_infrastructure.lib.local_dev_program import (
     k3d_provider,
     merged_env,
     secrets_hash,
+    start_after_live_update,
     warn_leftover_app_env_local,
 )
 from tests.local_dev.program_render import ProgramMocks
@@ -136,6 +138,47 @@ def test_await_policy_makes_the_pre_deploy_job_fail_fast_and_stamps_it():
 
 def test_await_policy_leaves_other_kinds_alone():
     assert await_policy(_transform("kubernetes:core/v1:Secret", {})) is None
+
+
+BUILT = "k3d-registry.localhost:5000/mitodl_x-app:tilt-feedface"
+WAIT = ["sh", "-c", "script", "wait-for-live-update", "/marker", "30"]
+LIVE_UPDATE = {"TILT_IMAGE_0": BUILT, "LOCAL_DEV_LIVE_UPDATE_WAIT": json.dumps(WAIT)}
+
+
+def _workload(type_: str, containers: list[dict[str, Any]], init=()):
+    args = _transform(type_, {})
+    args.props["spec"] = {
+        "template": {"spec": {"containers": containers, "initContainers": list(init)}}
+    }
+    return args
+
+
+def test_start_after_live_update_holds_the_commands_tilt_copies_under():
+    app = {"image": BUILT, "command": ["granian"], "args": ["main.wsgi"]}
+    stub = {"image": "python:3", "command": ["python", "/stub/server.py"]}
+    init = {"image": BUILT, "command": ["python", "manage.py", "collectstatic"]}
+
+    result = start_after_live_update(
+        _workload("kubernetes:apps/v1:Deployment", [app, stub], init=[init]),
+        LIVE_UPDATE,
+    )
+
+    pod = result.props["spec"]["template"]["spec"]
+    assert pod["containers"] == [{**app, "command": [*WAIT, "granian"]}, stub]
+    assert pod["initContainers"] == [init]
+
+
+@pytest.mark.parametrize(
+    ("type_", "environ"),
+    [
+        # No checkout: the published image runs and Tilt copies nothing into it.
+        ("kubernetes:apps/v1:Deployment", {**LIVE_UPDATE, "TILT_IMAGE_0": ""}),
+        ("kubernetes:batch/v1:Job", LIVE_UPDATE),
+    ],
+)
+def test_start_after_live_update_leaves_other_commands_alone(type_, environ):
+    container = {"image": BUILT, "command": ["granian"]}
+    assert start_after_live_update(_workload(type_, [container]), environ) is None
 
 
 def test_ca_bundle_names_match_the_core_stacks_module(monkeypatch):

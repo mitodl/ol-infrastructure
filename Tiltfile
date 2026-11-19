@@ -2,6 +2,11 @@
 # Run: ./local-dev/scripts/start.sh (or tilt up --context local-dev)
 # Docs: local-dev/README.md
 
+# The app Tiltfiles start their live_update with initial_sync(). Tilt before
+# 0.37.7 cancels that copy, without an error, when the synced files include a
+# fall_back_on path (https://github.com/tilt-dev/tilt/pull/6823).
+version_settings(constraint=">=0.37.7")
+
 # Tilt applies to, and `tilt down` deletes from, the kubeconfig's current
 # context unless --context overrides it. Its own guard stops only contexts it
 # does not recognize as local: an orbstack or docker-desktop context passes it

@@ -4,7 +4,14 @@
 # mitodl/learn-ai-app image runs (latest, or the prebuilt_tags pin).
 # With a checkout it also serves the sandbox (frontend-demo); see sandbox.yaml.
 
-load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+load(
+    "../../tiltlib.star",
+    "k8s_yaml_local",
+    "current_root_domain",
+    "checkout_live_update",
+    "live_update_wait",
+    "pulumi_app_workloads",
+)
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "learn-ai")
@@ -17,6 +24,24 @@ PROGRAM_DIR = os.path.join(config.main_dir, 'local-dev/apps/learn-ai/pulumi')
 APPLY = os.path.join(config.main_dir, 'local-dev/scripts/pulumi-app-apply.sh')
 root_domain = current_root_domain()
 HAS_CHECKOUT = os.path.exists(os.path.join(APP_DIR, '.git'))
+# The Deployments with a Tilt resource of their own (pulumi_app_workloads).
+# A literal: tests/local_dev/test_tilt_workloads.py reads it with ast and
+# checks the labels against the rendered program. The model stub has no
+# container entry: its source reaches the pod as a ConfigMap the program
+# renders, so there is no image for a click to rebuild.
+WORKLOADS = {
+    'learn-ai-all-celery-worker': {
+        'container': 'celery-worker',
+        'labels': {'ol.mit.edu/application': 'learn-ai', 'ol.mit.edu/worker-name': 'all'},
+    },
+    'learn-ai-celery-beat': {
+        'container': 'celery-beat',
+        'labels': {'ol.mit.edu/application': 'learn-ai', 'ol.mit.edu/worker-name': 'beat'},
+    },
+    'learn-ai-llm-stub': {
+        'labels': {'ol.mit.edu/application': 'learn-ai', 'ol.mit.edu/component': 'llm-stub'},
+    },
+}
 
 # Static export of frontend-demo, served by nginx. NEXT_PUBLIC_* values are
 # inlined by `next build`, so they are build args. NODE_OPTIONS caps the main
@@ -50,20 +75,20 @@ if HAS_CHECKOUT:
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
-        # local-dev = development (dev deps, including granian[reload]) with a
-        # mitodl-owned /src for the sync below and granian reload switched on.
+        # local-dev: the dev deps (including granian[reload]), a mitodl-owned
+        # /src for the sync below, and granian reload switched on.
         target='local-dev',
         # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
         # frontend-demo/ is the sandbox, built separately below; without this every
         # sandbox edit rebuilt this image and rolled the webapp and celery pods.
         ignore=['.claude/', 'frontend-demo/'],
-        live_update=[
+        live_update=checkout_live_update([
             # Dependency changes rebuild the image rather than running uv sync
             # in the pods: Celery doesn't reload, so running processes would
             # keep the old packages, and a restarted container loses the sync.
             fall_back_on([APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock']),
             sync(APP_DIR, '/src'),
-        ],
+        ]),
     )
 
 # ApisixTls is hand-written: the deployed program gets it from an
@@ -84,11 +109,17 @@ k8s_resource(
 prebuilt_tags = os.environ.get('LOCAL_DEV_PREBUILT_IMAGE_TAGS', '')
 k8s_custom_deploy(
     DEPLOY_NAME,
-    apply_cmd=[APPLY, 'learn-ai', 'up'],
+    apply_cmd=[APPLY, 'learn-ai', 'up'] + list(WORKLOADS),
     delete_cmd=[APPLY, 'learn-ai', 'down'],
-    # The pin and the root domain reach the program through the environment;
-    # naming them here makes a change re-apply, which os.putenv alone would not.
-    apply_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
+    # The pin, the root domain and the wait the program puts in front of the
+    # commands Tilt copies the checkout under reach the program through the
+    # environment; naming them here makes a change re-apply, which os.putenv
+    # alone would not.
+    apply_env={
+        'LOCAL_DEV_ROOT_DOMAIN': root_domain,
+        'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags,
+        'LOCAL_DEV_LIVE_UPDATE_WAIT': encode_json(live_update_wait()),
+    },
     delete_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
     # Everything the render reads; .tiltignore keeps __pycache__ out of these.
     deps=[
@@ -116,6 +147,7 @@ k8s_resource(
         [link('https://ai-sandbox.learn.' + root_domain, 'learn-ai sandbox')] if HAS_CHECKOUT else []
     ),
 )
+pulumi_app_workloads('learn-ai', DEPLOY_NAME, WORKLOADS, IMAGE if HAS_CHECKOUT else None)
 
 # No image is published for the sandbox, so it exists only with a checkout.
 # Manual trigger: a save never costs a `next build`. Source, build-arg and

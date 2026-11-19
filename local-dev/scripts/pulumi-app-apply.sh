@@ -4,14 +4,25 @@
 # short name the deployed stacks use, so the stack file is Pulumi.Dev.yaml; the
 # app's own namespace; the file backend under local-dev/infra/.pulumi).
 #
-#   pulumi-app-apply.sh <app> up      pulumi up, then print the objects it owns as YAML
-#   pulumi-app-apply.sh <app> down    pulumi destroy, then wait for those objects to go
+#   pulumi-app-apply.sh <app> up [<deployment>...]
+#       pulumi up, then print the objects it owns as YAML, leaving out the
+#       named Deployments: each has a Tilt resource of its own
+#       (pulumi_app_workloads in local-dev/tiltlib.star)
+#   pulumi-app-apply.sh <app> down
+#       pulumi destroy, then wait for those objects to go
 #
 # Tilt reads stdout as the applied objects, so everything Pulumi says goes to
 # stderr. The program reads its inputs (the image Tilt built, the root domain,
 # the prebuilt-tag pin) from the environment Tilt passes, and the developer's
 # env and memory limits from the gitignored stack file `stack select --create`
 # writes next to it on the first run.
+#
+# The image is not always the newest build. Once the resources that share it
+# have built it separately (any click), Tilt can hand an `up` that builds
+# nothing an older one (tilt-dev/tilt#6872), and the Deployments roll onto it.
+# Their containers still start on the checkout's code, because they wait for
+# Tilt's copy of it (wait-for-live-update.sh); installed packages and the
+# pre-deploy Job are that older build's.
 set -euo pipefail
 app="${1:?usage: $0 <app> up|down}"
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -76,7 +87,13 @@ up)
         kubectl_ logs -l "$selector,ol.mit.edu/job=pre-deploy" --all-containers --tail=100 1>&2 || :
         exit 1
     fi
-    kubectl_ get deploy,svc,apisixroute,apisixpluginconfig -l "$selector" -o yaml
+    # Only Deployments are left out by name: a Service or ConfigMap that
+    # shares a named Deployment's name stays in this resource.
+    others=""
+    for name in "${@:3}"; do others+="${others:+,}metadata.name!=$name"; done
+    kubectl_ get deploy -l "$selector" ${others:+--field-selector "$others"} -o yaml
+    echo ---
+    kubectl_ get svc,apisixroute,apisixpluginconfig -l "$selector" -o yaml
     ;;
 down)
     pulumi_ destroy --yes --skip-preview
