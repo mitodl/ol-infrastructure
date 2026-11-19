@@ -32,9 +32,11 @@ config:
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
     # Contact us support intake (hq#13712). The odl1791467332 sandbox. Field ids
     # and the OAuth credentials in SOPS are a matched pair -- both must come
-    # from this instance, since an unrecognised id rejects the whole ticket.
+    # from this instance. Zendesk silently drops an id it does not recognise.
     AI_ZENDESK_API_URL: "https://odl1791467332.zendesk.com"
+    AI_ZENDESK_BRAND_ID: "56938782029595"
     AI_ZENDESK_NAME_FIELD_ID: "57089968511131"
+    AI_ZENDESK_TICKET_FORM_ID: "56938881603611"
     AI_ZENDESK_URL_FIELD_ID: "57089642026779"
     AI_ZENDESK_USERNAME_FIELD_ID: "57089989500187"
     CSRF_COOKIE_NAME: learn_ai_qa_csrftoken
