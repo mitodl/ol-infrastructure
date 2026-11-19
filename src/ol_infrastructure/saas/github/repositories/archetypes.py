@@ -319,7 +319,7 @@ def load_fleet() -> list[dict[str, Any]]:
 
     MUST use pathlib rather than glob.glob or a shell glob. The org's `.github`
     repo lands at `repos/.github.yaml`, a dotfile, which `glob.glob("*.yaml")`
-    silently skips -- 315 instead of 316. A repo missing from the fleet looks
+    silently skips -- 314 instead of 315. A repo missing from the fleet looks
     exactly like one nobody has gotten to yet. See data/README.md.
     """
     raw = yaml.safe_load((DATA_DIR / "archetypes.yaml").read_text())

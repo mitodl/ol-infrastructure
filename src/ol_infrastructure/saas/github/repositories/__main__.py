@@ -1,4 +1,4 @@
-"""The mitodl repository fleet: 316 repos as data plus a loop.
+"""The mitodl repository fleet: 315 repos as data plus a loop.
 
 Phase 3 of docs/plans/github-org-pulumi-import.md. Every repo is described by a
 YAML file in data/repos/ that declares only what it deviates from its archetype
@@ -7,7 +7,7 @@ on, so `git diff` over that directory shows exactly the drift and nothing else
 
 BATCHING. Section 5.3 calls for importing in waves of ~25 with the empty-diff gate
 after each, so that a failure in wave 4 is 25 repos to reason about rather than
-316. Set the `batch` config to a comma-separated list of repo names to restrict
+315. Set the `batch` config to a comma-separated list of repo names to restrict
 the stack to those:
 
     pulumi config set batch mit-learn,ol-django,ocw-studio
