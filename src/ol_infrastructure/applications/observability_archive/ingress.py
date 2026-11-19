@@ -191,7 +191,13 @@ def build(  # noqa: PLR0913
                     },
                 },
                 "log": {"level": "INFO"},
-                "accessLog": {"enabled": True, "format": "json"},
+                # Errors only: a line per successful push made this QA's
+                # largest Cloud log source (ADR-0014, QA validation).
+                "accessLog": {
+                    "enabled": True,
+                    "format": "json",
+                    "filters": {"statusCodes": "400-599"},
+                },
                 "metrics": {"prometheus": {"serviceMonitor": {"enabled": True}}},
                 "resources": {
                     "requests": {"cpu": "100m", "memory": "128Mi"},

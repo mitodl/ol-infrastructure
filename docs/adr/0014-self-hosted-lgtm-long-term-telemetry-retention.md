@@ -641,8 +641,8 @@ Findings to act on:
    writer before its endpoint exists.
 2. **The archive's own Traefik access log is the largest QA log source in Cloud**, at
    1.45 GB/day, about 27% of QA's Cloud log ingest. It logs one JSON line per
-   successful push. It should log non-2xx only before Production, where push volume
-   is far higher.
+   successful push. Fixed in the same change as this record: it now logs only
+   `400-599` responses (`accessLog.filters.statusCodes`).
 3. **An archive outage raises Cloud log ingest.** During the failure-isolation hour,
    Cloud log entries rose 72% (+352k). About 299k of that was the outage itself:
    Alloy "Exporting failed" lines (+177k), archive Traefik 503 access lines (+113k)
