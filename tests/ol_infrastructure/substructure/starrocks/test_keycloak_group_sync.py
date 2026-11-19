@@ -8,6 +8,7 @@ permitted_groups then refuses every OIDC login.
 
 import json
 import subprocess
+import urllib.parse
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Self
@@ -412,3 +413,25 @@ def test_bootstrap_writes_a_populated_file_without_reading_first(
     assert fake.calls == ["apply"]
     assert fake.configmap is not None
     assert fake.configmap["data"] == {"groups.txt": "ol_data_analyst:alice"}
+
+
+def test_admin_token_request_asks_for_kc_admin_api_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keycloak 26.8.2 returns 401 on the admin API without the kc-admin-api scope."""
+    sent: list[Any] = []
+
+    def urlopen(request: Any) -> _TokenResponse:
+        sent.append(request)
+        return _TokenResponse()
+
+    monkeypatch.setattr(keycloak_group_sync.urllib.request, "urlopen", urlopen)
+
+    token = keycloak_group_sync._fetch_admin_token(
+        "https://sso.example.com/realms/r", "ol-starrocks-client", "secret"
+    )
+
+    form = urllib.parse.parse_qs(sent[0].data.decode())
+    assert token == "token"  # noqa: S105
+    assert form["grant_type"] == ["client_credentials"]
+    assert form["scope"] == ["kc-admin-api"]
