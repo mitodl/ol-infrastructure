@@ -305,8 +305,8 @@ both apps run `init_collectstatic=True`, which populates `/src/staticfiles`
 from an init container before the app container ever starts, so in this
 deployment the first tier (`/src/static/<path>`, the pre-collectstatic source
 tree) is dead code — it only mattered in the Heroku/local-dev path these nginx
-configs were written for (learn_ai's `web.conf` says as much in its own header
-comment), where nothing guaranteed collectstatic had run first. A single
+configs were written for (learn_ai's since-removed `web.conf` said as much in
+its header comment), where nothing guaranteed collectstatic had run first. A single
 `static_path_mounts=["/src/staticfiles"]`, the same shape as ocw_studio/xpro,
 is behaviorally equivalent in production.
 
@@ -377,14 +377,17 @@ production; `web.conf_uwsgi` stays, since it's still the config the dormant
 
 Since then mitxonline has dropped the `use_granian` flag, the
 `import_nginx_config_path` argument and its `files/web.conf_uwsgi`, because no
-stack ran the `False` branch. The paragraph above still describes mit_learn.
+stack ran the `False` branch. learn_ai has since done the same: its
+`use_granian` flag, `nginx_config_filename` and `files/web.conf` are gone, and
+the Granian config lives in `applications/learn_ai/definition.py`. The
+paragraph above still describes mit_learn.
 
 - **mit_learn**: `GranianConfig` gains `static_path_mounts=["/src/staticfiles"]`
   and `static_path_expires`. (As merged this was a two-mount config paired with
   `static_path_routes=["/static", "/media"]`; the `/media` pair was reverted
   immediately after -- see "mit_learn's `/media` mount was dead config" below.)
   `import_nginx_config` gates on
-  `not use_granian`, matching learn_ai. Both `OLApisixRoute` resources
+  `not use_granian`, as learn_ai did at the time. Both `OLApisixRoute` resources
   (`_no_prefix` on `/*`, prefixed on `/learn/*`) already reach `/static/*` and
   `/media/*` through their existing `passauth`/`reqauth` wildcard routes, which
   attach `learn_external_service_shared_plugins` -- `enable_defaults=True`

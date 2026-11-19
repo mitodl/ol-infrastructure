@@ -145,7 +145,10 @@ class SimplePulumiParams(BaseModel):
                            an audit record. Defaults to False -- under
                            preview-gated the gate issue is what authorises the
                            deploy, so the record issue is pure noise unless a
-                           pipeline specifically wants an audit trail.
+                           pipeline specifically wants an audit trail. Must be
+                           True on a pipeline whose stack another entry names
+                           as its prior_stage_stack: that record issue is the
+                           cross-environment trigger.
         description: One or two sentences on what this app is and what the
                      pipeline deploys. Rendered as the pipeline's info-page
                      description once concourse/concourse#9661 ships in a
@@ -384,6 +387,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+        # CLICKHOUSE_TERMINATION_GRACE_SECONDS, shared with grafana-alerting.
+        additional_watched_paths=["src/bridge/lib/magic_numbers.py"],
     ),
     "data_warehouse": SimplePulumiParams(
         app_name="data_warehouse",
@@ -474,6 +479,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+        # CLICKHOUSE_TERMINATION_GRACE_SECONDS sets a ClickHouse alert threshold.
+        additional_watched_paths=["src/bridge/lib/magic_numbers.py"],
     ),
     "gravitino": SimplePulumiParams(
         app_name="gravitino",
@@ -510,6 +517,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         category="data-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+    ),
+    "label-studio": SimplePulumiParams(
+        app_name="label-studio",
+        pulumi_project_path="applications/label_studio/",
+        pulumi_project_name="ol-application-label-studio",
+        description=(
+            "Deploys Label Studio Community, the annotation tool for the "
+            "courseware gold set, via Pulumi."
+        ),
+        category="data-platform",
+        stages=["QA"],
+        topology="preview-gated",
     ),
     "marimo-data": SimplePulumiParams(
         app_name="marimo-data",
@@ -578,6 +597,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         additional_watched_paths=[
             "src/ol_infrastructure/providers/",
             "src/ol_infrastructure/substructure/keycloak/openmetadata_provisioner.py",
+            "src/ol_infrastructure/substructure/keycloak/ol_data_platform.py",
         ],
         stages=["QA", "Production"],
         topology="preview-gated",
@@ -619,6 +639,23 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+    ),
+    "paypal-adapter": SimplePulumiParams(
+        app_name="paypal-adapter",
+        pulumi_project_path="applications/paypal_adapter/",
+        pulumi_project_name="ol-application-paypal-adapter",
+        description=(
+            "Deploys the Stripe-written PayPal adapter that brokers PayPal "
+            "payments for Stripe Checkout via Pulumi. No CI stage: each stack "
+            "needs its own custom payment method in a Stripe account we do not "
+            "control. Both stages are preview-gated because the adapter is in "
+            "the payment path and the first deploys run before real "
+            "credentials exist."
+        ),
+        category="applications",
+        stages=["QA", "Production"],
+        topology="preview-gated",
+        auto_deploy_stages=[],
     ),
     "qdrant-cloud": SimplePulumiParams(
         app_name="qdrant-cloud",
@@ -721,6 +758,9 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         category="data-platform",
         stages=["QA"],
         topology="preview-gated",
+        # starrocks-substructure (prod Concourse) triggers on this pipeline's
+        # "lakehouse.QA deployed." issue being closed.
+        record_deployments=True,
     ),
     "starrocks-substructure-ci": SimplePulumiParams(
         app_name="starrocks_substructure",
@@ -803,6 +843,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stack_prefix="operations",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
+    ),
+    "observability-archive": SimplePulumiParams(
+        app_name="observability-archive",
+        pulumi_project_path="applications/observability_archive/",
+        pulumi_project_name="ol-application-observability-archive",
+        description=(
+            "Deploys the self-hosted Loki/Mimir telemetry archive (ADR-0014) on the "
+            "operations EKS cluster via Pulumi."
+        ),
+        category="core-platform",
+        topology="preview-gated",
+        stages=["QA", "Production"],
     ),
     "aws-ecr": SimplePulumiParams(
         app_name="aws-ecr",
@@ -950,6 +1002,47 @@ pipeline_params: dict[str, SimplePulumiParams] = {
 }
 
 
+def _stack_names(params: SimplePulumiParams) -> set[str]:
+    """Return the stack names a pipeline deploys, without reading the filesystem."""
+    scopes = params.deployment_groups or (
+        [params.stack_prefix] if params.stack_prefix else [""]
+    )
+    return {
+        f"{scope}.{stage}" if scope else stage
+        for scope in scopes
+        for stage in params.stages
+    }
+
+
+def _validate_prior_stage_producers(params_map: dict[str, SimplePulumiParams]) -> None:
+    """Fail if a prior_stage_stack has no pipeline posting its "deployed." issue.
+
+    The consuming pipeline only triggers once that issue is closed, so a missing
+    producer leaves its first stage with nothing to trigger on and no error.
+    """
+    for name, consumer in params_map.items():
+        if not consumer.prior_stage_stack:
+            continue
+        producers = [
+            producer_name
+            for producer_name, producer in params_map.items()
+            if producer.pulumi_project_name == consumer.pulumi_project_name
+            and consumer.prior_stage_stack in _stack_names(producer)
+            and (producer.topology == "deploy-chained" or producer.record_deployments)
+        ]
+        if not producers:
+            msg = (
+                f"{name}: prior_stage_stack {consumer.prior_stage_stack} has no "
+                f"{consumer.pulumi_project_name} pipeline posting its "
+                '"deployed." issue; set record_deployments=True on the '
+                "pipeline that deploys that stack."
+            )
+            raise ValueError(msg)
+
+
+_validate_prior_stage_producers(pipeline_params)
+
+
 def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
     """Generate a simple Pulumi-only pipeline for a given application.
 
@@ -1043,6 +1136,12 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             docker_env_vars_from_files[params.docker_image.env_var_for_tag] = (
                 f"{docker_image_resource.name}/tag"
             )
+
+    # deploy-chained always posts the "deployed." issue (it is that topology's
+    # promotion gate) and the library rejects record_deployments=False for it.
+    record_deployments = (
+        params.topology == "deploy-chained" or params.record_deployments
+    )
 
     # Build cross-environment GitHub issue gate if this pipeline continues a chain
     # that started in a different Concourse environment.  The prior stage's deployment
@@ -1145,7 +1244,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     custom_dependencies=cross_env_custom_deps or None,
                     topology=params.topology,
                     auto_deploy_stages=params.auto_deploy_stages,
-                    record_deployments=params.record_deployments,
+                    record_deployments=record_deployments,
                 )
 
                 # Collect resources and jobs
@@ -1180,7 +1279,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 custom_dependencies=cross_env_custom_deps or None,
                 topology=params.topology,
                 auto_deploy_stages=params.auto_deploy_stages,
-                record_deployments=params.record_deployments,
+                record_deployments=record_deployments,
             )
 
             all_pipeline_resources = [
@@ -1218,7 +1317,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             custom_dependencies=cross_env_custom_deps or None,
             topology=params.topology,
             auto_deploy_stages=params.auto_deploy_stages,
-            record_deployments=params.record_deployments,
+            record_deployments=record_deployments,
         )
 
         all_pipeline_resources = [

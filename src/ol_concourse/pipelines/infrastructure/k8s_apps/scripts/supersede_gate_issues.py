@@ -8,10 +8,12 @@ opened before a release was cut, an older release that a newer cut replaced,
 or an infrastructure issue titled with a live version that has since moved.
 Closing one of those would fire the release gate.
 
-So each one is closed, labelled ``abandoned`` and given a comment that points
-at the issue that replaced it, creating the label first if the repository lacks
-it. The release gate skips ``abandoned`` issues, so once the label lands a
-superseded issue cannot fire it, even if someone closes it afterwards.
+So each one is closed, labelled ``ops:abandoned`` and given a comment that
+points at the issue that replaced it, creating the label first if the
+repository lacks it. The release gate skips ``ops:abandoned`` issues, so once
+the label lands a superseded issue cannot fire it, even if someone closes it
+afterwards. An issue already carrying the legacy ``abandoned`` label counts as
+labelled, since the gate skips that name too.
 
 A gate issue closed as *not planned*, updated in the last day, and not yet
 consumed or labelled is labelled too. This step closes issues that way, so a
@@ -42,8 +44,10 @@ sees the issue.
 Only issues whose whole title is one of the two gate shapes are touched, the
 same match ``assert_gate_names_deploy.py`` uses. ``mit-learn`` and
 ``mit-learn-nextjs`` share a repository, and a prefix match would close the
-other app's issues. Consumed issues (``[CONSUMED #n]...``) and pull requests
-never match.
+other app's issues. Pull requests never match. An issue the gate consumed is
+never touched: it is labelled ``ops:consumed`` and keeps its gate title, so it
+is excluded by that label (one consumed before the label existed was renamed
+``[CONSUMED #n]...`` and fails the title match).
 
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the
@@ -76,7 +80,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-ABANDONED_LABEL = "abandoned"
+ABANDONED_LABEL = "ops:abandoned"
+#: Every name the release gate skips; an issue with any of them is labelled.
+ABANDONED_LABELS = frozenset({ABANDONED_LABEL, "abandoned"})
+#: What the release gate's get labels an issue it consumes.
+CONSUMED_LABEL = "ops:consumed"
 #: An issue as the GitHub REST API returns it.
 Issue = dict[str, Any]
 #: How far back to look for stale gate issues closed but not yet labelled.
@@ -104,10 +112,11 @@ def stale_issues(app: str, issues: list[Issue], keep_number: int | None) -> list
     """Return the gate issues to supersede, oldest first.
 
     Every open gate issue but *keep_number*, and every one closed as not
-    planned that is not yet labelled ``abandoned``: the gate has not consumed
-    it (its title would carry the ``[CONSUMED`` tombstone), so it would still
-    fire. A *completed* close is an approval and is left alone. *keep_number*
-    is the issue that describes what would deploy, or None when nothing does.
+    planned that is not yet labelled abandoned under either name: it would
+    still fire. A *completed* close is an approval and is left alone, and so
+    is any issue labelled ``ops:consumed``, which the gate has already taken.
+    *keep_number* is the issue that describes what would deploy, or None when
+    nothing does.
     """
     unique = {issue["number"]: issue for issue in issues}
     return sorted(
@@ -117,11 +126,12 @@ def stale_issues(app: str, issues: list[Issue], keep_number: int | None) -> list
             if "pull_request" not in issue
             and issue["number"] != keep_number
             and is_gate_title(app, issue["title"])
+            and CONSUMED_LABEL not in _label_names(issue)
             and (
                 issue.get("state", "open") == "open"
                 or (
                     issue.get("state_reason") == "not_planned"
-                    and ABANDONED_LABEL not in _label_names(issue)
+                    and not ABANDONED_LABELS & _label_names(issue)
                 )
             )
         ),
@@ -214,7 +224,7 @@ class GitHub:
 
 
 def ensure_abandoned_label(github: GitHub, repo: str) -> None:
-    """Create the ``abandoned`` label in *repo* unless it already exists."""
+    """Create the ``ops:abandoned`` label in *repo* unless it already exists."""
     # GitHub's REST API creates a missing label implicitly when an issue is
     # labelled with it, in practice, but does not document that. This label is
     # what stops the gate, so create it explicitly. 422 means it exists.
@@ -246,11 +256,10 @@ def installation_token(
 
 
 def supersede(github: GitHub, repo: str, issue: Issue, reason: str) -> None:
-    """Comment on *issue*, then close it if open and label it ``abandoned``.
+    """Comment on *issue*, then close it if open and label it ``ops:abandoned``.
 
     An open issue is closed and labelled in one PATCH, so no reader sees half
-    of it: closed but unlabelled would fire the gate, and open but labelled
-    would let the issue put's ``update_in_place`` strip the label as stale.
+    of it: closed but unlabelled would fire the gate.
 
     Raises RuntimeError if the label cannot be confirmed. The issue is then
     closed and unlabelled, and a retry finds it again among the closed ones.

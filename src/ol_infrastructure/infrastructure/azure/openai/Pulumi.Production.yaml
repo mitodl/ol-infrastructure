@@ -11,14 +11,25 @@ config:
     dagster-ml:
     - text-embedding-3-large
   # 1M TPM per deployment. Four consumers x 1000 is 4000 units of each model's
-  # subscription-wide pool; the tightest is gpt-5-mini at 10000 (measured 2026-09-29).
+  # subscription-wide pool; the tightest at that size are gpt-5-mini, gpt-5.4 and
+  # gpt-5.4-mini at 10000 (measured 2026-09-29 and 2026-11-16).
   azure_openai:model_capacity: 1000
+  # gpt-5.4-pro's pool is 1600 units (2026-11-16), below 4 x 1000. 4 x 300 here plus
+  # 8 x 5 in CI and QA is 1240.
+  azure_openai:model_capacities:
+    gpt-5.4-pro: 300
   # The versions CI and QA have been serving (auto-upgraded there, so they canary new
   # defaults). Pinning makes these NoAutoUpgrade in Production only.
   azure_openai:model_versions:
     gpt-4o: "2024-11-20"
     gpt-5-mini: "2025-08-07"
     gpt-5.2: "2025-12-11"
+    # The only version of each in list-models on 2026-11-16. Production deploys them
+    # at the same time as CI and QA, so there was no auto-upgraded canary to copy.
+    gpt-5.4: "2026-03-05"
+    gpt-5.4-mini: "2026-03-17"
+    gpt-5.4-nano: "2026-03-17"
+    gpt-5.4-pro: "2026-03-05"
     # "1" is the only version either model has (list-models, 2026-09-30). -small
     # deploys on mitlearn's account only, using 1000 of its own 10000-unit pool; -large
     # also deploys on dagster-ml's, using 2000 of its pool here plus QA's 305 and CI's 5.

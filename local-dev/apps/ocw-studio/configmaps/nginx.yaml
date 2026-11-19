@@ -132,3 +132,68 @@ data:
             proxy_pass http://rustfs/$bucket$uri$is_args$args;
         }
     }
+
+    # Published live course sites on the MIT Learn host, at
+    # learn.mit.test/courses/o/<course-id>/. APISIX sends /courses/o/* and
+    # /static_shared/* on that host here (ocwstudio-learn-courses-route).
+    #
+    # This is the local stand-in for Fastly's "Route OCW courses to S3" and
+    # "Serve Learn 404 page for OCW requests" snippets
+    # (src/ol_infrastructure/applications/mit_learn/). Studio publishes the
+    # __OCW_LEARN_THEME__ extra theme to __OCW_LEARN_THEME__/courses/<id>/,
+    # built with a /courses/o/<id> base URL (app-env.yaml), so the pages are
+    # served exactly as published:
+    # - /courses/o/ maps onto __OCW_LEARN_THEME__/courses/ in the live bucket
+    # - a URL whose last segment has no extension gets index.html, since the
+    #   bucket has no directory index
+    # - the query string and cookies are dropped
+    # - /static_shared/ is the theme assets build at the bucket root
+    # - a missing course page gets MIT Learn's own 404 page
+    #
+    # The theme slug is filled in by the ocw-studio Tiltfile, which explains
+    # why it is fixed to the one the production VCL hardcodes.
+    server {
+        listen 8047;
+        absolute_redirect off;
+        # Resolve the Next.js service per request, so this pod still starts
+        # when mit-learn isn't enabled. The address is filled in from
+        # /etc/resolv.conf at startup (NGINX_ENTRYPOINT_LOCAL_RESOLVERS).
+        resolver ${NGINX_LOCAL_RESOLVERS} valid=30s;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Cookie "";
+        proxy_set_header Authorization "";
+
+        location /static_shared/ {
+            proxy_pass http://rustfs/ocw-content-live-local$uri;
+        }
+
+        location /courses/o/ {
+            proxy_intercept_errors on;
+            error_page 403 404 = @learn_not_found;
+
+            # Both rewrites end in `break`: without it nginx would send the
+            # changed URI back through location matching, into `location /`.
+            rewrite ^/courses/o/((?:.*/)?[^./]+)/?$ /__OCW_LEARN_THEME__/courses/$1/index.html break;
+            rewrite ^/courses/o/(.*)$ /__OCW_LEARN_THEME__/courses/$1 break;
+            # Not appending $args drops the query string.
+            proxy_pass http://rustfs/ocw-content-live-local$uri;
+        }
+
+        # Learn renders the page; the status stays 404. The Next.js router
+        # headers are cleared so it returns HTML, not RSC component data.
+        location @learn_not_found {
+            set $learn_frontend mitlearn-nextjs.mit-learn.svc.cluster.local:3000;
+            proxy_set_header Host $http_host;
+            proxy_set_header RSC "";
+            proxy_set_header Next-Router-State-Tree "";
+            proxy_set_header Next-Router-Prefetch "";
+            proxy_set_header Next-Router-Segment-Prefetch "";
+            proxy_pass http://$learn_frontend/not-found;
+        }
+
+        location / {
+            return 404;
+        }
+    }

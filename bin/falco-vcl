@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Lint and unit test Fastly VCL with falco.
+
+Renders each service in ``ol_infrastructure.lib.falco.SUITES`` from the same
+snippets and dictionaries its Pulumi stack deploys, lints it, and runs its
+``tests/vcl/<suite>/*.test.vcl`` files. The prek hook runs this; pytest runs
+the same suites in tests/ol_infrastructure/lib/test_falco.py.
+
+The pinned falco release is downloaded on first use into
+``$XDG_CACHE_HOME/ol-infrastructure/falco/``; set ``FALCO_BIN`` to use another.
+"""
+
+import sys
+from pathlib import Path
+
+import cyclopts
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from ol_infrastructure.lib.falco import (
+    SUITES,
+    ensure_falco,
+    load_suite,
+    render_main_vcl,
+    run_suite,
+)
+
+app = cyclopts.App(help="Lint and unit test Fastly VCL with falco.")
+
+
+@app.default
+def check(*suites: str) -> None:
+    """Lint and test the named suites, or all of them.
+
+    :param suites: Suite names from ``SUITES``. Defaults to every suite.
+    """
+    falco = ensure_falco()
+    failed = []
+    for name in suites or SUITES:
+        for result in run_suite(load_suite(name), falco):
+            status = "ok" if result.ok else "FAILED"
+            print(f"falco {result.command} {name}: {status}")
+            if not result.ok:
+                print(result.output)
+                failed.append(f"{name} ({result.command})")
+    if failed:
+        sys.exit(f"falco failed: {', '.join(failed)}")
+
+
+@app.command
+def render(suite: str, output: Path) -> None:
+    """Write a suite's rendered main VCL, e.g. to run ``falco simulate`` on it.
+
+    :param suite: Suite name from ``SUITES``.
+    :param output: File to write.
+    """
+    output.write_text(render_main_vcl(load_suite(suite)))
+
+
+if __name__ == "__main__":
+    app()

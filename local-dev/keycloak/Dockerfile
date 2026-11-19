@@ -18,7 +18,7 @@ ARG BASE_IMAGE
 
 # The jar is platform-independent, so build it on the host's own architecture.
 # Only the Keycloak stage below has to be linux/amd64 (the base is amd64-only).
-FROM --platform=$BUILDPLATFORM node:24-bookworm AS theme
+FROM --platform=$BUILDPLATFORM node:26-bookworm@sha256:a546d3f8acd2af4382668a7e6acd3bc4418e6a27478373e3246f8162f5181509 AS theme
 # keycloakify packages the theme with Maven; Debian's package brings a JDK.
 # Any Maven 3 works for that, so the exact Debian package version is not
 # worth pinning (and pins rot as bookworm point releases roll).
@@ -29,9 +29,12 @@ RUN apt-get update \
 WORKDIR /theme
 # Dependencies first so a source-only change reuses the installed node_modules
 # layer. The checkout vendors its own Yarn under .yarn/releases (yarnPath in
-# .yarnrc.yml), so the image's stock yarn just hands off to it.
+# .yarnrc.yml). Node 26 images ship neither yarn nor corepack, so put that
+# release on PATH as `yarn`. The glob fails the build if the checkout ever
+# vendors more than one release.
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/ .yarn/
+RUN ln -s /theme/.yarn/releases/yarn-*.cjs /usr/local/bin/yarn
 RUN --mount=type=cache,target=/root/.yarn/berry/cache \
     yarn install --immutable --mode=skip-build
 # The project's postinstall (keycloakify sync-extensions) was skipped above

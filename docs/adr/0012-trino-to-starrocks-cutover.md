@@ -124,9 +124,12 @@ We keep one cluster per environment and isolate with:
 - An interactive resource group for Superset, ol-analytics-api, mitxonline and
   notebooks, classified by user/role. It holds `exclusive_cpu_cores` (or
   `exclusive_cpu_percent`) and a `concurrency_limit`.
-- A batch resource group for dbt, OpenMetadata and Iceberg maintenance, with
-  `mem_limit` and big-query limits so one runaway model cannot evict interactive
-  queries.
+- A batch resource group for dbt, OpenMetadata and Iceberg maintenance. It started
+  with `mem_limit` and big-query limits so one runaway model could not evict
+  interactive queries. Since 2026-11-16 it has no memory cap below the CN
+  (`mem_limit` 1.0, no big-query limit). Those caps refused models QA has to build,
+  and StarRocks has to run the builds Trino runs. A cap comes back once a measured
+  conflict with interactive queries shows the need.
 - Query queues (`enable_query_queue_select`, set with `SET GLOBAL`, because
   `ALTER WAREHOUSE` hits the multi-warehouse stub on OSS).
 

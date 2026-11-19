@@ -30,11 +30,11 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         # Only with the local-dev target: without --reload a sync makes Tilt
         # skip the rebuild and edits never land.
         live_update=[
+            # Dependency changes rebuild the image rather than running uv sync
+            # in the pods: Celery doesn't reload, so running processes would
+            # keep the old packages, and a restarted container loses the sync.
+            fall_back_on([APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock']),
             sync(APP_DIR, '/src'),
-            run(
-                'cd /src && uv sync --frozen',
-                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
-            ),
         ] if has_local_dev else [],
     )
 

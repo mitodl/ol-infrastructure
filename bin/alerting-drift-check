@@ -186,15 +186,19 @@ SENTRY_DETECTORS: tuple[DetectorExpectation, ...] = ()
 # rather than passed over in silence.
 SENTRY_REBUILD_TASK = "tk-rebuild-sentry-alerting-from-scratch-on-signals--dfd607"
 
-# Rootly alert route rules, keyed by id. Pulumi cannot model a rule's `enabled`
-# flag, which is how these two came to sit disabled for 19 days: they are what
-# keeps CI and QA alerts off the production paging path.
+# Rootly alert routes, keyed by id. Pulumi cannot model a rule's `enabled`
+# flag, which is how the two Slack routes' rules came to sit disabled for 19
+# days: they are what keeps CI and QA alerts off the production paging path.
+# The outage route (#6645) pages on-call for a QA service that is down entirely.
 ROOTLY_ROUTES: dict[str, str] = {
     "588edbfc-4d8b-4cb7-8b6f-27eaa0918503": (
         "Grafana Prometheus CI - Slack Warnings Route"
     ),
     "691913ad-dd27-4eba-80ec-5b878f285365": (
         "Grafana Prometheus QA - Slack Warnings Route"
+    ),
+    "e02ddd59-2c5c-409a-8f8b-9a29898ab9c8": (
+        "Grafana Prometheus QA - Outage Paging Route"
     ),
 }
 
@@ -542,7 +546,7 @@ def _check_detector_targets(
 
 
 def check_rootly_routes(report: Report) -> None:
-    """Assert the CI/QA route rules that keep non-prod alerts off paging."""
+    """Assert the CI/QA routes, and every rule in them, are enabled."""
     check = "rootly-routes"
     client = _rootly_client()
 
@@ -561,8 +565,18 @@ def check_rootly_routes(report: Report) -> None:
             report.drift(
                 check,
                 name,
-                "route is disabled; its alerts are no longer diverted to Slack",
+                "route is disabled; its alerts no longer reach its rules' targets",
             )
+        if not attributes["rules"]:
+            report.drift(check, name, "route has no rules, so it routes nothing")
+        for rule in attributes["rules"]:
+            if not rule["enabled"]:
+                report.drift(
+                    check,
+                    name,
+                    f"rule {rule['name']!r} is disabled; alerts it matched fall "
+                    "through to the next rule or route",
+                )
         if attributes.get("name") != name:
             report.info(check, name, f"renamed to {attributes.get('name')!r}")
 

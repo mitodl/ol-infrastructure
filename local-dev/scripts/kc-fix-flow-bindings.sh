@@ -16,48 +16,12 @@
 # Usage:
 #   ./local-dev/scripts/kc-fix-flow-bindings.sh
 #
-# Resolves the Keycloak URL the same way kc-seed-users.sh does.
+# kc-admin.sh resolves the Keycloak URL.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-
-_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.test}"
-KC_URL="${KC_URL:-https://sso.ol.${_ROOT_DOMAIN}}"
-REALM="olapps"
-KC_USER="admin"
-KC_PASS="admin"  # pragma: allowlist secret
-
-# mkcert's root CA is not in the system trust store; see kc-seed-users.sh for
-# why an unvalidated curl here surfaces as a misleading "waiting for Keycloak".
-KC_CACERT="${KC_CACERT:-${REPO_ROOT}/local-dev/certs/rootCA.pem}"
-if [ ! -f "${KC_CACERT}" ]; then
-    echo "[kc-fix-flow-bindings] ERROR: CA certificate not found at ${KC_CACERT}" >&2
-    echo "[kc-fix-flow-bindings] Run local-dev/scripts/setup.sh to generate the local certs." >&2
-    exit 1
-fi
-
-get_token() {
-    local token attempt
-    for attempt in 1 2 3 4 5; do
-        token=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
-            -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
-            -d "client_id=admin-cli" \
-            -d "grant_type=password" \
-            -d "username=${KC_USER}" \
-            -d "password=${KC_PASS}" 2>/dev/null \
-            | jq -r '.access_token // empty' 2>/dev/null || true)
-        if [ -n "$token" ] && [ "$token" != "null" ]; then
-            echo "$token"
-            return 0
-        fi
-        echo "[kc-fix-flow-bindings] attempt ${attempt}/5: waiting for Keycloak..." >&2
-        sleep 5
-    done
-    echo "[kc-fix-flow-bindings] ERROR: could not obtain admin token from ${KC_URL}" >&2
-    return 1
-}
+# shellcheck source=local-dev/scripts/kc-admin.sh disable=SC1091  # followed only with -x
+source "$(dirname "${BASH_SOURCE[0]}")/kc-admin.sh"
 
 echo "[kc-fix-flow-bindings] Connecting to Keycloak at ${KC_URL} ..."
 TOKEN=$(get_token)

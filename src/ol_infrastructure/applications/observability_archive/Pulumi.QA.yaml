@@ -1,0 +1,9 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgEZUecY/BOqJvfFrWsS5C8IAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM/7R+B+HPdpuGyKpWAgEQgDscGxNNbuGHtpa3eYAz6QRui3aiBjyGHi0SFxkOImuPGti+0Jx2k/zl0g4L9Ivxv0N/8dbM8oJTHmSaBA==
+config:
+  aws:region: us-east-1
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa
+  observability_archive:retention_days: "30"
+  observability_archive:grafana_cloud_stack_slug: mitolqa

@@ -277,7 +277,7 @@ xpro_db_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"name": f"xpro-db-access-applications-{stack_info.env_suffix}"}
+        {"Name": f"xpro-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=apps_vpc["id"],
 )
@@ -666,6 +666,7 @@ if k8s_deploy:
         plugin_config=OLApisixSharedPluginsConfig(
             application_name="xpro",
             resource_suffix="ol-shared-plugins",
+            render_only=True,
             k8s_namespace=xpro_namespace,
             k8s_labels=k8s_app_labels,
             # xpro's pages and API share one origin and Django sets no CORS
@@ -1131,5 +1132,10 @@ export(
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
         "rds_host": xpro_db.db_instance.address,
+        **(
+            {"rds_replica_host": xpro_db.db_replica.address}
+            if xpro_db_config.read_replica
+            else {}
+        ),
     },
 )

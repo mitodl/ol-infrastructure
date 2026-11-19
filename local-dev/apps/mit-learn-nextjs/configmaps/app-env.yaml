@@ -21,8 +21,8 @@ data:
   NEXT_PUBLIC_MITX_ONLINE_BASE_URL: "https://api.learn.mit.test/mitxonline"
   NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL: "https://mitxonline.mit.test"
   NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME: "csrf_mitxonline"
-  # learn-ai on mit-learn's API host, where it sees the logged-in user (see
-  # apps/learn-ai/apisix-routes.yaml). On ai.learn.mit.test everyone is anonymous.
+  # learn-ai on mit-learn's API host, where it sees the logged-in user (the
+  # `prefixed_route_configs` in src/ol_infrastructure/applications/learn_ai/definition.py).
   NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT: "https://api.learn.mit.test/ai/http/recommendation_agent/"
   NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT: "https://api.learn.mit.test/ai/http/syllabus_agent/"
   NEXT_PUBLIC_LEARN_AI_SEARCH_SUMMARY_ENDPOINT: "https://api.learn.mit.test/ai/http/search_summary_agent/"

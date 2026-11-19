@@ -150,6 +150,7 @@ def setup_cert_manager(
                 repo="https://charts.jetstack.io",
             ),
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=False,
             values={
                 "crds": {

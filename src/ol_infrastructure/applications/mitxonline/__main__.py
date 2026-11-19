@@ -10,6 +10,7 @@ import json
 import mimetypes
 import textwrap
 from pathlib import Path
+from typing import Literal
 
 import pulumi_fastly as fastly
 import pulumi_vault as vault
@@ -17,6 +18,7 @@ from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
+    Output,
     ResourceOptions,
     export,
 )
@@ -38,10 +40,13 @@ from ol_infrastructure.components.aws.cache import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
+    OLApisixExternalUpstream,
     OLApisixOIDCResources,
     OLApisixRoute,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -61,6 +66,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -76,6 +82,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
 )
 from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
+    s3_sigv4_signing_vcl,
     vcl_snippet,
 )
 from ol_infrastructure.lib.fastly_logging import fastly_logging_args
@@ -153,14 +160,19 @@ cluster_stack.require_output("namespaces").apply(
 # Bucket used to store files from MITx Online app.
 mitxonline_bucket_name = f"ol-mitxonline-app-{stack_info.env_suffix}"
 
+# Piloting SigV4-signed Fastly->S3 requests, so the bucket can be fully private
+# instead of public-read (hq#13287 item 1; mit-learn and learn-ai run the same
+# pattern). The app only links to media through Fastly's /media/ path.
+_mitxonline_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa"}
+
 mitxonline_bucket_config = S3BucketConfig(
     bucket_name=mitxonline_bucket_name,
     versioning_enabled=True,
     ownership_controls="BucketOwnerPreferred",
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
+    block_public_acls=_mitxonline_bucket_is_sigv4_piloted,
+    block_public_policy=_mitxonline_bucket_is_sigv4_piloted,
+    ignore_public_acls=_mitxonline_bucket_is_sigv4_piloted,
+    restrict_public_buckets=_mitxonline_bucket_is_sigv4_piloted,
     intelligent_tiering_archive_access_days=None,  # Fastly backend
     intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
@@ -191,10 +203,70 @@ mitxonline_bucket = OLBucket(
     ),
 )
 
-mitxonline_bucket_policy = s3.BucketPolicy(
-    f"mitxonline-{stack_info.env_suffix}-bucket-policy",
-    bucket=mitxonline_bucket.bucket_v2.id,
-    policy=iam.get_policy_document(
+mitxonline_fastly_s3_signer_access_key = None
+mitxonline_bucket_policy_document: Output[str] | str
+if _mitxonline_bucket_is_sigv4_piloted:
+    # Dedicated identity for Fastly to authenticate to S3 with (SigV4), scoped to
+    # GetObject on just this bucket. It must live under /ol-applications/ and carry
+    # no tags: Concourse's deploy role only manages IAM users under that path, via
+    # managed-policy attach, and has no iam:TagUser (see the same note on the
+    # mit-learn signer).
+    mitxonline_fastly_s3_signer_user = iam.User(
+        f"ol-mitxonline-fastly-s3-signer-{stack_info.env_suffix}",
+        name=f"ol-mitxonline-{stack_info.env_suffix}-fastly-s3-signer",
+        path="/ol-applications/",
+    )
+    mitxonline_fastly_s3_signer_policy = iam.Policy(
+        f"ol-mitxonline-fastly-s3-signer-policy-{stack_info.env_suffix}",
+        path="/ol-applications/",
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["s3:GetObject"],
+                        "Resource": [f"arn:aws:s3:::{mitxonline_bucket_name}/*"],
+                    }
+                ],
+            }
+        ),
+    )
+    mitxonline_fastly_s3_signer_policy_attachment = iam.UserPolicyAttachment(
+        f"ol-mitxonline-fastly-s3-signer-policy-attachment-{stack_info.env_suffix}",
+        user=mitxonline_fastly_s3_signer_user.name,
+        policy_arn=mitxonline_fastly_s3_signer_policy.arn,
+    )
+    mitxonline_fastly_s3_signer_access_key = iam.AccessKey(
+        f"ol-mitxonline-fastly-s3-signer-access-key-{stack_info.env_suffix}",
+        user=mitxonline_fastly_s3_signer_user.name,
+        opts=ResourceOptions(
+            depends_on=[mitxonline_fastly_s3_signer_policy_attachment]
+        ),
+    )
+    # The durable Vault copy of this key is created further down -- search for
+    # "fastly-s3-signer-vault-secret".
+    mitxonline_bucket_policy_document = Output.all(
+        arn=mitxonline_bucket.bucket_v2.arn,
+        signer_arn=mitxonline_fastly_s3_signer_user.arn,
+    ).apply(
+        lambda args: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "FastlySigV4Read",
+                        "Effect": "Allow",
+                        "Principal": {"AWS": args["signer_arn"]},
+                        "Action": "s3:GetObject",
+                        "Resource": f"{args['arn']}/*",
+                    }
+                ],
+            }
+        )
+    )
+else:
+    mitxonline_bucket_policy_document = iam.get_policy_document(
         statements=[
             iam.GetPolicyDocumentStatementArgs(
                 effect="Allow",
@@ -208,7 +280,12 @@ mitxonline_bucket_policy = s3.BucketPolicy(
                 resources=[mitxonline_bucket.bucket_v2.arn.apply("{}/*".format)],
             ),
         ]
-    ).json,
+    ).json
+
+mitxonline_bucket_policy = s3.BucketPolicy(
+    f"mitxonline-{stack_info.env_suffix}-bucket-policy",
+    bucket=mitxonline_bucket.bucket_v2.id,
+    policy=mitxonline_bucket_policy_document,
 )
 
 mitxonline_iam_policy = iam.Policy(
@@ -389,6 +466,22 @@ mitxonline_operations_sentry_dsn = vault.generic.Secret(
         lambda dsn: json.dumps({"value": dsn})
     ),
 )
+if _mitxonline_bucket_is_sigv4_piloted and mitxonline_fastly_s3_signer_access_key:
+    # Durable copy in Vault for visibility/rotation tooling outside of Pulumi state.
+    # Pulumi (via the iam.AccessKey resource) is still the source of truth --
+    # rotating means replacing that resource, which updates this secret in the
+    # same apply.
+    # Deliberately NOT under secret-mitxonline: mitxonline_policy.hcl grants read on
+    # secret-mitxonline/*, and only lists specific secret-operations paths, so a
+    # secret here is unreadable to the app role. Only Fastly needs the key.
+    vault.generic.Secret(
+        f"mitxonline-fastly-s3-signer-vault-secret-{stack_info.env_suffix}",
+        path="secret-operations/mitxonline/fastly-s3-signer",
+        data_json=Output.all(
+            access_key_id=mitxonline_fastly_s3_signer_access_key.id,
+            secret_access_key=mitxonline_fastly_s3_signer_access_key.secret,
+        ).apply(json.dumps),
+    )
 
 mitxonline_vault_policy = vault.Policy(
     f"mitxonline-vault-policy-{stack_info.env_suffix}",
@@ -482,18 +575,18 @@ redis_cache = OLAmazonCache(
     ),
 )
 
-# Create Kubernetes secrets using the dedicated function
-# The function returns the names of the secrets and the Pulumi resource objects
-secret_names, secret_resources = create_mitxonline_k8s_secrets(
-    stack_info=stack_info,
-    mitxonline_namespace=mitxonline_namespace,
-    k8s_global_labels=k8s_app_labels,
-    vault_k8s_resources=vault_k8s_resources,
-    db_config=mitxonline_vault_backend,  # Pass the Vault DB backend config
-    rds_endpoint=rds_endpoint,
-    openedx_environment=openedx_environment,
-    redis_password=redis_config.require("password"),
-    redis_cache=redis_cache,
+# Read-only StarRocks credentials for the migrate_edx_data command, minted from
+# Vault's database-starrocks mount. Only a stack whose `mitxonline:vars` sets
+# STARROCKS_HOST mints them: the edX migration tables exist only in the
+# production lake, and minting for a stack with no host would rotate a StarRocks
+# user for nothing. Pods read them through envFrom at start, so the secret names
+# every Deployment as a VSO restart target: when Vault replaces the user at the
+# lease's six-month max TTL and drops the old one, VSO rolls the pods onto the
+# new credentials.
+starrocks_vault_mount = (
+    "database-starrocks"
+    if mitxonline_config.require_object("vars").get("STARROCKS_HOST")
+    else None
 )
 
 # Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
@@ -522,6 +615,38 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 # there would OOMKill. That is acceptable only because the cap does not trip: QA
 # peaked at 628MiB over the same week.
 mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1000Mi"
+mitxonline_sizing = definition.MitxonlineSizing(
+    web=definition.WorkloadResources(
+        requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
+        limits={"memory": mitxonline_web_memory_limit},
+    )
+)
+mitxonline_celery_topology: Literal["per-queue", "merged"] = "per-queue"
+# Off in CI and QA, where nothing needs it.
+mitxonline_dev_shell = mitxonline_config.get_bool("dev_shell_enabled") or False
+
+# Create Kubernetes secrets using the dedicated function
+# The function returns the names of the secrets and the Pulumi resource objects
+secret_names, optional_secret_names, secret_resources = create_mitxonline_k8s_secrets(
+    stack_info=stack_info,
+    mitxonline_namespace=mitxonline_namespace,
+    k8s_global_labels=k8s_app_labels,
+    vault_k8s_resources=vault_k8s_resources,
+    db_config=mitxonline_vault_backend,  # Pass the Vault DB backend config
+    rds_endpoint=rds_endpoint,
+    openedx_environment=openedx_environment,
+    redis_password=redis_config.require("password"),
+    redis_cache=redis_cache,
+    starrocks_mount=starrocks_vault_mount,
+    starrocks_restart_targets=[
+        OLVaultRestartTarget(kind="Deployment", name=name)
+        for name in definition.deployment_names(
+            mitxonline_sizing,
+            celery_topology=mitxonline_celery_topology,
+            dev_shell=mitxonline_dev_shell,
+        )
+    ],
+)
 
 # Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
 # CPU trigger as a backstop, matching edxapp and mit-learn. CPU alone is a poor
@@ -575,6 +700,7 @@ DEPLOYED_ENV_DEFAULTS = {
     "ZENDESK_HELP_WIDGET_ENABLED": "True",
 }
 
+openedx_login_gate_config = mitxonline_config.get_object("openedx_login_gate")
 bindings = definition.MitxonlineBindings(
     env_suffix=stack_info.env_suffix,
     hostnames=definition.MitxonlineHostnames(
@@ -585,10 +711,18 @@ bindings = definition.MitxonlineBindings(
     environment_variables={
         **DEPLOYED_ENV_DEFAULTS,
         **mitxonline_config.require_object("vars"),
+        "MIT_LEARN_API_BASE_URL": f"https://{learn_backend_domain}",
+        # The bucket is private here, so media URLs must go through Fastly's /media/ route.
+        **(
+            {"AWS_S3_CUSTOM_DOMAIN": f"{frontend_domain}/media"}
+            if _mitxonline_bucket_is_sigv4_piloted
+            else {}
+        ),
     },
     k8s_labels=k8s_app_labels,
     # Use the secret names returned by create_mitxonline_k8s_secrets
     secret_names=secret_names,
+    optional_secret_names=optional_secret_names,
     **docker_image_config_kwargs("MITXONLINE"),
     cluster=definition.ClusterCapabilities(
         security_group_id=mitxonline_app_security_group.id,
@@ -596,21 +730,21 @@ bindings = definition.MitxonlineBindings(
         vault_auth_name=vault_k8s_resources.auth_name,
     ),
     min_replicas=mitxonline_config.get_int("min_replicas") or 2,
-    sizing=definition.MitxonlineSizing(
-        web=definition.WorkloadResources(
-            requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
-            limits={"memory": mitxonline_web_memory_limit},
-        )
-    ),
+    sizing=mitxonline_sizing,
     granian_worker_startup_rss=mitxonline_config.get_int("granian_worker_startup_rss"),
-    # Off in CI and QA, where nothing needs it.
-    dev_shell=mitxonline_config.get_bool("dev_shell_enabled") or False,
+    dev_shell=mitxonline_dev_shell,
+    celery_topology=mitxonline_celery_topology,
     slack_channel=slack_channel,
     celery_redis=OLApplicationK8sCeleryRedisConfig(
         host=redis_cache.address,
         password=redis_config.require("password"),
     ),
     webapp_keda=mitxonline_webapp_keda_config,
+    openedx_login_gate=(
+        definition.OpenedxLoginGate(**openedx_login_gate_config)
+        if openedx_login_gate_config
+        else None
+    ),
 )
 
 mitxonline_k8s_app = OLApplicationK8s(
@@ -663,6 +797,22 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
     ),
 )
 
+# The routes resolve to pod IPs, so a connection refused or reset by a pod that
+# just died (OOMKill, crash, spot interruption) is retried on another pod
+# instead of becoming a 502. retries=1 caps the extra attempts at one instead
+# of APISIX's default of one per remaining pod ("set according to the number
+# of available backend nodes by default",
+# https://apisix.apache.org/docs/apisix/admin-api/#upstream).
+mitxonline_apisix_upstream = OLApisixUpstream(
+    f"mitxonline-webapp-apisix-upstream-{stack_info.env_suffix}",
+    upstream_config=OLApisixUpstreamConfig(
+        service_name=definition.WEBAPP_SERVICE_NAME,
+        k8s_namespace=mitxonline_namespace,
+        k8s_labels=k8s_app_labels,
+        retries=1,
+    ),
+)
+
 mitxonline_apisix_route_direct = OLApisixRoute(
     name=f"mitxonline-apisix-route-direct-{stack_info.env_suffix}",
     k8s_namespace=mitxonline_namespace,
@@ -690,6 +840,31 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         delete_before_replace=True,
     ),
 )
+
+if bindings.openedx_login_gate is not None:
+    mitxonline_openedx_login_gate_upstream = OLApisixExternalUpstream(
+        f"mitxonline-openedx-login-gate-upstream-{stack_info.env_suffix}",
+        external_upstream_config=definition.openedx_login_gate_upstream_config(
+            bindings.openedx_login_gate, stack_info.env_suffix, k8s_app_labels
+        ),
+    )
+    mitxonline_apisix_route_openedx_login_gate = OLApisixRoute(
+        # Not "mitxonline-apisix-route-*", so the webapp KEDA scaler ignores it:
+        # this traffic is the LMS's.
+        name=f"mitxonline-openedx-login-gate-route-{stack_info.env_suffix}",
+        k8s_namespace=mitxonline_namespace,
+        k8s_labels=k8s_app_labels,
+        route_configs=definition.openedx_login_gate_route_configs(
+            bindings,
+            oidc=mitxonline_prefixed_oidc_resources,
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            upstream_name=mitxonline_openedx_login_gate_upstream.resource_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[mitxonline_openedx_login_gate_upstream],
+        ),
+    )
 
 ## Fastly Service
 
@@ -781,6 +956,24 @@ for k, v in mimetypes.types_map.items():
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
 bucket_backend_name = f"MITx Online {stack_info.name} S3 bucket"
+mitxonline_s3_backend_auth_vcl: Output[str] | str
+if _mitxonline_bucket_is_sigv4_piloted and mitxonline_fastly_s3_signer_access_key:
+    mitxonline_s3_backend_auth_vcl = Output.all(
+        access_key_id=mitxonline_fastly_s3_signer_access_key.id,
+        secret_access_key=mitxonline_fastly_s3_signer_access_key.secret,
+    ).apply(
+        lambda args: s3_sigv4_signing_vcl(
+            args["access_key_id"],
+            args["secret_access_key"],
+            f"{mitxonline_bucket_name}.s3.us-east-1.amazonaws.com",
+            bucket_backend_name,
+        )
+    )
+else:
+    mitxonline_s3_backend_auth_vcl = textwrap.dedent(f"""\
+        if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+          unset bereq.http.Authorization;
+        }}""")
 mitxonline_service = fastly.ServiceVcl(
     "mitxonline-service",
     backends=[
@@ -966,19 +1159,15 @@ mitxonline_service = fastly.ServiceVcl(
             priority=200,
             type="recv",
         ),
+        # Kept under their old names (as on mit-learn) so piloting only changes
+        # the content: the signing VCL also unsets the client's Authorization.
         vcl_snippet(
-            content=textwrap.dedent(f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""),
+            content=mitxonline_s3_backend_auth_vcl,
             name="Strip auth headers in S3 miss requests",
             type="miss",
         ),
         vcl_snippet(
-            content=textwrap.dedent(f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""),
+            content=mitxonline_s3_backend_auth_vcl,
             name="Strip auth headers in S3 pass requests",
             type="pass",
         ),
@@ -1047,6 +1236,11 @@ export(
     "mitxonline",
     {
         "rds_host": mitxonline_db.db_instance.address,
+        **(
+            {"rds_replica_host": mitxonline_db.db_replica.address}
+            if mitxonline_db_config.read_replica
+            else {}
+        ),
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
     },

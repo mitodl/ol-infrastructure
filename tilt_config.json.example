@@ -1,5 +1,5 @@
 {
-  "enabled_apps": ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"],
+  "enabled_apps": ["mit-learn", "learn-ai", "mitxonline"],
 
   "per_app_databases": false,
 

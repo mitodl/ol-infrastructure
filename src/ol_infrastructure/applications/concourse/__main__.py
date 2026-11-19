@@ -45,6 +45,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultPostgresDatabaseConfig,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib import telemetry_archive
 from ol_infrastructure.lib.aws.ec2_helper import (
     DiskTypes,
     InstanceTypes,
@@ -117,6 +118,33 @@ consul_provider = get_consul_provider(stack_info)
 grafana_credentials = read_yaml_secrets(
     Path(f"vector/grafana.{stack_info.env_suffix}.yaml")
 )
+# The telemetry archive (ADR-0014) gets a copy of the host logs and metrics.
+# Vector loads sink files cloud-init adds beside the image's templates; Alloy
+# on the web nodes imports a module cloud-init writes over the image's
+# discarding one. None in CI, where the image's defaults ship to Grafana Cloud
+# alone. The metric sink is per role: only web nodes run the Concourse
+# exporter scrape that the sink names as an input.
+archive = telemetry_archive.push_target(stack_info.env_suffix)
+archive_vector_env = telemetry_archive.ec2_vector_env_lines(archive) if archive else ""
+archive_alloy_env = telemetry_archive.ec2_alloy_env_lines(archive) if archive else ""
+archive_worker_vector_files = (
+    [
+        telemetry_archive.ec2_vector_sink_file("concourse", archive),
+        telemetry_archive.ec2_vector_metric_sink_file("concourse-worker", archive),
+    ]
+    if archive
+    else []
+)
+archive_web_vector_files = (
+    [
+        telemetry_archive.ec2_vector_sink_file("concourse", archive),
+        telemetry_archive.ec2_vector_metric_sink_file("concourse-web", archive),
+    ]
+    if archive
+    else []
+)
+# Only the web image installs Alloy (bilder/images/concourse/deploy.py).
+archive_alloy_files = [telemetry_archive.ec2_alloy_module_file()] if archive else []
 
 
 def build_worker_user_data(
@@ -151,9 +179,11 @@ def build_worker_user_data(
                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
                     """
-                ),
+                )
+                + archive_vector_env,
                 "owner": "root:root",
             },
+            *archive_worker_vector_files,
         ]
     }
     if concourse_team:
@@ -649,7 +679,8 @@ ol_web_launch_config = OLLaunchTemplateConfig(
                                     GRAFANA_CLOUD_PROMETHEUS_API_USER={grafana_credentials["prometheus_user_id"]}
                                     GRAFANA_CLOUD_LOKI_API_USER={grafana_credentials["loki_user_id"]}
                                     """
-                                ),
+                                )
+                                + archive_vector_env,
                                 "owner": "root:root",
                             },
                             {
@@ -669,9 +700,12 @@ ol_web_launch_config = OLLaunchTemplateConfig(
                                     GRAFANA_TEMPO_PASSWORD="{grafana_credentials["tempo_api_key"]}"
                                     GRAFANA_TEMPO_USERNAME="{grafana_credentials["tempo_user_id"]}"
                                     """
-                                ),
+                                )
+                                + archive_alloy_env,
                                 "owner": "root:root",
                             },
+                            *archive_web_vector_files,
+                            *archive_alloy_files,
                         ]
                     },
                     sort_keys=True,

@@ -68,7 +68,10 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     CLUSTER_CONFIGMAP_NAME,
     DEFAULT_PER_ACTOR_BYTES_MAX,
     DEFAULT_PER_ACTOR_INFLIGHT_MAX,
+    DEFAULT_SERVER_MEMORY_LIMIT,
+    DEFAULT_SERVER_MEMORY_REQUEST,
     OMNIGRAPH_SERVER_SERVICE_NAME,
+    WITAN_CI_ACTOR_ID,
     create_data_tier,
     omnigraph_server_addr,
 )
@@ -97,6 +100,10 @@ from ol_infrastructure.applications.omnigraph.token_sync import (
     DEFAULT_SYNC_SCHEDULE,
     SERVICE_TOKENS_VAULT_PATH,
     create_token_sync,
+)
+from ol_infrastructure.applications.omnigraph.version_census import (
+    DEFAULT_CENSUS_SCHEDULE,
+    create_version_census,
 )
 from ol_infrastructure.applications.witan.ci_indexer import (
     CRONJOB_NAME as CI_INDEXER_CRONJOB_NAME,
@@ -143,8 +150,8 @@ omnigraph_config = Config("omnigraph")
 
 # Repos that get a per-repo `code-<repo>` graph on this cluster. Canonical repo
 # URIs — the exact strings witan-code detects from a checkout's git remote and
-# runs through witan_code.config.graph_id to pick its `--graph`; data_tier's
-# code_graph_id mirrors that function to declare the same id here.
+# runs through witan_core.graph_ids.code_graph_id to pick its `--graph`;
+# cluster_config imports the same function to declare the same id here.
 #
 # Provisioning a new repo is deliberately explicit: add it here, `pulumi up`,
 # then `omnigraph cluster apply` + restart the server (see data_tier's
@@ -203,6 +210,15 @@ WITHHELD_GRAPHS: list[str] = omnigraph_config.get_object("withheld_graphs", [])
 # in the boot apply at about 1,000 objects a minute, and clear it with the
 # withheld graph. Unset leaves the Deployment spec as it is.
 BOOT_BUDGET_SECONDS: int | None = omnigraph_config.get_int("boot_budget_seconds")
+
+# The server container's memory request and limit. See
+# DEFAULT_SERVER_MEMORY_LIMIT in data_tier.py for why Production differs.
+SERVER_MEMORY_REQUEST: str = (
+    omnigraph_config.get("server_memory_request") or DEFAULT_SERVER_MEMORY_REQUEST
+)
+SERVER_MEMORY_LIMIT: str = (
+    omnigraph_config.get("server_memory_limit") or DEFAULT_SERVER_MEMORY_LIMIT
+)
 
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
@@ -281,11 +297,34 @@ if MIGRATE_FROM_IMAGE and MIGRATE_TO_PREFIX == STORAGE_PREFIX:
 STORAGE_ROLLBACK_FROM: str = validate_storage_prefix(
     omnigraph_config.get("storage_rollback_from"), key="storage_rollback_from"
 )
+_this_stack = make_stack_reference(projects.OMNIGRAPH, stack_info.name)
 DEPLOYED_STORAGE_PREFIX: str | None = optional_stack_output_value(
-    make_stack_reference(projects.OMNIGRAPH, stack_info.name), "storage_prefix"
+    _this_stack, "storage_prefix"
 )
 validate_storage_prefix_progression(
     DEPLOYED_STORAGE_PREFIX, STORAGE_PREFIX, STORAGE_ROLLBACK_FROM
+)
+# ── Nor may it be handed to an image that can't open what was written to it.
+# An in-place upgrade (0.13 -> 0.14) raises the format a root holds without
+# touching storage_prefix or internal_schema_version, so this stack tracks the
+# highest format it has deployed onto each root itself. See
+# next_written_internal_schema; it runs in create_data_tier once the image's
+# label has been read, and create_data_tier exports the result
+# (written_internal_schema) before it registers the server Deployment.
+DEPLOYED_WRITTEN_INTERNAL_SCHEMA: dict[str, float] | None = optional_stack_output_value(
+    _this_stack, "written_internal_schema"
+)
+STORAGE_RESTORED_TO_FORMAT: int | None = omnigraph_config.get_int(
+    "storage_restored_to_format"
+)
+# ── Nor may the server move to an HTTP contract the running witan can't speak.
+# The witan stack reads this stack's omnigraph_server_addr, so the reference
+# runs both ways; each reads the other's last completed deploy. A reference to
+# a stack that doesn't exist fails the program, so a new environment needs
+# `pulumi stack init` for the witan stack before this stack's first deploy
+# (see the runbook). See image_schema.check_http_api_contract.
+DEPLOYED_WITAN_HTTP_API_CONTRACTS: list[str] | None = optional_stack_output_value(
+    make_stack_reference(projects.WITAN, stack_info.name), "witan_http_api_contracts"
 )
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
@@ -386,6 +425,21 @@ COUNCIL_PROBE_SCHEDULE = omnigraph_config.get("council_probe_schedule") or (
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
 )
+# `cleanup --keep` in place of `--older-than`. Moving off it has a cost; see
+# maintenance.py below DEFAULT_CLEANUP_OLDER_THAN before setting or removing it.
+# The upper bound is the CLI's: it parses the count as a u32.
+CLEANUP_KEEP: int | None = omnigraph_config.get_int("cleanup_keep")
+MAX_CLEANUP_KEEP = 2**32 - 1
+if CLEANUP_KEEP is not None and (
+    not 1 <= CLEANUP_KEEP <= MAX_CLEANUP_KEEP
+    or omnigraph_config.get("cleanup_older_than")
+):
+    msg = (
+        f"omnigraph:cleanup_keep must be from 1 to {MAX_CLEANUP_KEEP} and replaces "
+        "omnigraph:cleanup_older_than rather than combining with it, got "
+        f"cleanup_keep={CLEANUP_KEEP!r}"
+    )
+    raise ValueError(msg)
 
 # Per-actor admission caps (data_tier.py). Overridable per environment for the
 # same reason the schedules above are, and a sharper one: the count's default is
@@ -491,7 +545,6 @@ ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
 # token. Its value must match the "svc-witan-ci" entry of the actor-tokens map
 # above; both come from the same SOPS source record below so they can't drift.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
-WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
 # The break-glass maintenance principal (agent-kit ADR-0005 path b, ADR-0002 D4
 # as amended). Same shape as the CI token above — a raw single-actor token
@@ -1108,6 +1161,11 @@ data_tier = create_data_tier(
     # resolved the image reference. See validate_image_internal_schema.
     internal_schema_version=INTERNAL_SCHEMA_VERSION,
     migrate_to_prefix=MIGRATE_TO_PREFIX,
+    deployed_written_internal_schema=DEPLOYED_WRITTEN_INTERNAL_SCHEMA,
+    storage_restored_to_format=STORAGE_RESTORED_TO_FORMAT,
+    deployed_witan_http_api_contracts=DEPLOYED_WITAN_HTTP_API_CONTRACTS,
+    server_memory_request=SERVER_MEMORY_REQUEST,
+    server_memory_limit=SERVER_MEMORY_LIMIT,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
@@ -1115,6 +1173,7 @@ data_tier = create_data_tier(
     boot_budget_seconds=BOOT_BUDGET_SECONDS,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
+    cleanup_keep=CLEANUP_KEEP,
     # Arming a migration suspends the maintenance CronJobs for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and
@@ -1183,6 +1242,23 @@ if MIGRATE_FROM_IMAGE:
         witan_writer_cronjobs=[CI_INDEXER_CRONJOB_NAME, VIEW_REAPER_CRONJOB_NAME],
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
+
+##############################################
+#   Per-graph version census                  #
+##############################################
+# Hourly per-graph counts of the `_versions/` objects cleanup has to plan,
+# read by log_rules/omnigraph_versions.py in the grafana_alerting stack. QA and
+# Production schedule no cleanup (omnigraph:cleanup_iso_weekdays: []), so
+# nothing else reports how far behind they are. See version_census.py.
+create_version_census(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    aws_cli_image=cached_image_uri(f"amazon/aws-cli:{AWS_CLI_VERSION}"),
+    service_account_name="omnigraph-server",
+    storage_root=data_tier.storage_uri,
+    schedule=DEFAULT_CENSUS_SCHEDULE,
+)
 
 ##############################################
 #   Council-health synthetic probe            #

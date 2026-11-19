@@ -15,6 +15,8 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
+
 REALM_NAME = "ol-data-platform"
 OPENMETADATA_PROVISIONER_CLIENT_ID = "ol-openmetadata-provisioner"
 # Keycloak names every service account user after its client.
@@ -47,8 +49,7 @@ def create_openmetadata_provisioner_resources(
         access_type="CONFIDENTIAL",
         service_accounts_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
@@ -70,8 +71,9 @@ def create_openmetadata_provisioner_resources(
     )
 
     # Filed in OpenMetadata's own kv mount, next to the team sync client: the
-    # secret makes its holder an OpenMetadata admin, and application policies
-    # read secret-operations/*. No Kubernetes workload reads it; Pulumi does.
+    # secret makes its holder an OpenMetadata admin, so it stays out of reach of
+    # any broad secret-operations grant. Pulumi reads it, and so does the
+    # team-keycloak-sync CronOMJob, which resets users' roles and isAdmin.
     vault.generic.Secret(
         "ol-data-platform-openmetadata-provisioner-vault-credentials",
         path=f"{OPENMETADATA_PROVISIONER_VAULT_MOUNT}/{OPENMETADATA_PROVISIONER_VAULT_NAME}",

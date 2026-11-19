@@ -136,6 +136,7 @@ tika_helm_release = kubernetes.helm.v3.Release(
         version=TIKA_CHART_VERSION,
         namespace=tika_namespace,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://apache.jfrog.io/artifactory/tika",
         ),

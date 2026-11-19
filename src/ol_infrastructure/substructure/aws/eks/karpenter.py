@@ -11,6 +11,7 @@ from bridge.lib.magic_numbers import AWS_EVENT_TARGET_GROUP_NAME_MAX_LENGTH
 from bridge.lib.versions import KARPENTER_CHART_VERSION
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.ec2_helper import InstanceClasses, InstanceTypes
+from ol_infrastructure.lib.aws.eks_helper import DISABLE_SCTP_USER_DATA
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.ol_types import (
     AlertTier,
@@ -214,6 +215,7 @@ def setup_karpenter(  # noqa: PLR0913
             disable_crd_hooks=True,
             namespace="operations",
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=False,
             values={},
         ),
@@ -259,6 +261,7 @@ def setup_karpenter(  # noqa: PLR0913
             version=KARPENTER_CHART_VERSION,
             namespace="operations",  # Deploy into the operations namespace
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=False,  # Wait for resources to be ready
             skip_crds=True,  # CRDs are managed by the separate CRD cha
             values={
@@ -390,6 +393,8 @@ def setup_karpenter(  # noqa: PLR0913
             "amiSelectorTerms": [
                 {"alias": ami_alias},
             ],
+            # A plain shell script; Karpenter puts it after its own NodeConfig part.
+            "userData": DISABLE_SCTP_USER_DATA,
             "tags": aws_config.merged_tags(
                 {"Name": f"{cluster_name}-karpenter-default-nodeclass"}
             ),

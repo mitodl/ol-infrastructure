@@ -12,26 +12,27 @@ Nothing in this module may read Pulumi config, a stack reference, or a cloud
 API, so that importing it needs no provider.
 """
 
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
-from kubernetes.utils.quantity import parse_quantity
-from pulumi import Output
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bridge.lib.constants import (
+    LearnSession,
     apisix_oidc_session_cookie_name,
-    mit_learn_session_cookie_name,
+    edxapp_lms_service_host,
 )
 from bridge.lib.magic_numbers import STATIC_ASSET_MAX_AGE_SECONDS
 from ol_infrastructure.components.services.apisix import (
+    OLApisixExternalUpstreamConfig,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCSecretCredentials,
     OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRouteConfig,
+    learn_session_oidc_config,
     oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
@@ -43,13 +44,64 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sConfig,
     OLApplicationK8sDevShellConfig,
     OLApplicationK8sKedaWebappScalingConfig,
+    application_deployment_names,
+)
+from ol_infrastructure.lib.app_bindings import (
+    ClusterCapabilities,
+    WorkloadResources,
+    oidc_credentials,
+    validate_queue_sizing,
+)
+from ol_infrastructure.lib.app_bindings import (
+    celery_worker_configs as _celery_worker_configs,
 )
 from ol_infrastructure.lib.ol_types import Services
 from ol_infrastructure.lib.pulumi_helper import merge_otel_resource_attributes
 
+__all__ = [
+    "API_PATH_PREFIX",
+    "CELERY_QUEUE_NAMES",
+    "LOCAL_AND_DEPLOYED_ENV",
+    "NAMESPACE",
+    "OPENEDX_LOGIN_PATH",
+    "RELOAD_IGNORE_DIRS",
+    "WEBAPP_SERVICE_NAME",
+    "WEBAPP_SERVICE_PORT_NAME",
+    "WEB_MEMORY_CEILING",
+    "ClusterCapabilities",
+    "MitxonlineBindings",
+    "MitxonlineHostnames",
+    "MitxonlineSizing",
+    "OpenedxLoginGate",
+    "WorkloadResources",
+    "application_config",
+    "celery_worker_configs",
+    "cors_allow_origins",
+    "deployment_names",
+    "direct_oidc_config",
+    "direct_route_configs",
+    "direct_route_group",
+    "environment_variables",
+    "learn_session",
+    "openedx_login_gate_route_configs",
+    "openedx_login_gate_upstream_config",
+    "prefixed_oidc_config",
+    "prefixed_route_configs",
+    "prefixed_route_group",
+    "shared_plugins",
+]
+
 NAMESPACE = "mitxonline"
 WEBAPP_SERVICE_NAME = "mitxonline-webapp"
 WEBAPP_SERVICE_PORT_NAME = "http"
+# Every webapp route resolves to pod IPs, so the webapp's ApisixUpstream
+# (retries=1, in __main__.py) can retry a refused or reset connection on
+# another pod.
+_WEBAPP_BACKEND: dict[str, Any] = {
+    "backend_service_name": WEBAPP_SERVICE_NAME,
+    "backend_service_port": WEBAPP_SERVICE_PORT_NAME,
+    "backend_resolve_granularity": "endpoint",
+}
 # The MIT Learn API host serves this application under /mitxonline/*.
 API_PATH_PREFIX = "mitxonline"
 WEB_MEMORY_CEILING = "3Gi"
@@ -63,6 +115,12 @@ RELOAD_IGNORE_DIRS = ["frontend", "static", "staticfiles"]
 # (third-party service hosts, S3, real mailboxes) is a default in the deployed
 # program, not here.
 LOCAL_AND_DEPLOYED_ENV = {
+    "KEYCLOAK_REALM_NAME": "olapps",
+    # The APISIX user middleware reads the X-Userinfo header the gateway injects
+    # and logs in (creating if needed) the Django user. The app defaults it to
+    # disabled, which leaves requests authenticated only by the gateway
+    # anonymous.
+    "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE": "false",
     # The refund sheet's column layout; a developer works against a copy of it.
     "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": "12",
     "MITOL_GOOGLE_SHEETS_REFUNDS_ERROR_COL": "13",
@@ -89,15 +147,6 @@ class MitxonlineHostnames(BaseModel):
     api: str
     frontend: str
     learn_api: str
-
-
-class WorkloadResources(BaseModel):
-    """Requests and limits for one workload, in the component's shape."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    requests: dict[str, str]
-    limits: dict[str, str]
 
 
 class MitxonlineSizing(BaseModel):
@@ -136,32 +185,17 @@ class MitxonlineSizing(BaseModel):
     def _every_queue_once(
         cls, queues: dict[str, WorkloadResources]
     ) -> dict[str, WorkloadResources]:
-        expected = set(CELERY_QUEUE_NAMES)
-        if set(queues) != expected:
-            msg = (
-                f"celery_queues must size exactly {sorted(expected)}: "
-                f"missing {sorted(expected - set(queues))}, "
-                f"unknown {sorted(set(queues) - expected)}"
-            )
-            raise ValueError(msg)
-        return queues
+        return validate_queue_sizing(queues, CELERY_QUEUE_NAMES)
 
 
-class ClusterCapabilities(BaseModel):
-    """What the target cluster provides beyond plain Kubernetes.
+class OpenedxLoginGate(BaseModel):
+    """Where the Open edX LMS is served."""
 
-    The defaults describe EKS. A cluster without the AWS VPC CNI, ECR, KEDA, the
-    VPA or the Prometheus operator turns the matching capability off.
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
-
-    registry: Literal["dockerhub", "ecr", "direct"] = "ecr"
-    security_group_id: Output[str] | None = None
-    security_group_name: Output[str] | None = None
-    vault_auth_name: str | None = None
-    autoscalers: bool = True
-    pod_monitors: bool = True
+    lms_host: str
+    """The LMS's public host, e.g. ``courses.learn.mit.edu``."""
+    lms_service_port: int = 8000
 
 
 class MitxonlineBindings(BaseModel):
@@ -176,6 +210,7 @@ class MitxonlineBindings(BaseModel):
     carry ``OPENEDX_API_BASE_URL``, which the routes read for a response header."""
     k8s_labels: dict[str, str]
     secret_names: list[str]
+    optional_secret_names: list[str] = Field(default_factory=list)
     oidc_secret_name: str | None = None
     """A Secret in the namespace holding the gateway's OIDC client credentials,
     for clusters without Vault (``cluster.vault_auth_name`` unset). It stands in
@@ -185,6 +220,9 @@ class MitxonlineBindings(BaseModel):
     ``bridge.lib.constants.oidc_secret_data`` returns."""
     application_docker_tag: str | None = None
     application_image_digest: str | None = None
+    application_version: str | None = None
+    """The release the image was built for; labels the pods. The release
+    pipeline sets it alongside the digest."""
     cluster: ClusterCapabilities
     min_replicas: int
     # The deployed stacks pull the published image; a cluster that serves the
@@ -200,6 +238,22 @@ class MitxonlineBindings(BaseModel):
     """``merged`` runs one worker Deployment consuming every queue, for clusters
     where a Deployment per queue costs more than it tells a developer."""
     webapp_keda: OLApplicationK8sKedaWebappScalingConfig | None = None
+    openedx_login_gate: OpenedxLoginGate | None = None
+    """Set to sign learners in to MIT Learn when the Open edX login starts."""
+
+    @model_validator(mode="after")
+    def _gate_host_gets_the_learn_cookie(self) -> "MitxonlineBindings":
+        # Browsers drop a cookie whose domain doesn't cover the host setting it.
+        gate = self.openedx_login_gate
+        if gate is None:
+            return self
+        domain = learn_session(self).cookie_domain
+        if not gate.lms_host.endswith(domain):
+            msg = (
+                f"openedx_login_gate.lms_host {gate.lms_host!r} is not under {domain!r}"
+            )
+            raise ValueError(msg)
+        return self
 
 
 def environment_variables(bindings: MitxonlineBindings) -> dict[str, Any]:
@@ -230,35 +284,50 @@ def celery_worker_configs(
     :returns: Worker configs for ``OLApplicationK8sConfig.celery_worker_configs``.
     :rtype: list[OLApplicationK8sCeleryWorkerConfig]
     """
-    if topology == "merged":
+    return _celery_worker_configs(CELERY_QUEUE_NAMES, topology, sizing.celery_queues)
 
-        def memory_limit(resources: WorkloadResources) -> Decimal:
-            # A queue with no memory limit is unbounded, so it is the largest.
-            limit = resources.limits.get("memory")
-            return Decimal("Infinity") if limit is None else parse_quantity(limit)
 
-        largest = max(
-            (sizing.celery_queues[name] for name in CELERY_QUEUE_NAMES),
-            key=memory_limit,
-        )
-        return [
-            OLApplicationK8sCeleryWorkerConfig(
-                # Explicit because the name lands in the Deployment name and a
-                # label value, where the comma in queue_name is not valid.
-                worker_name="all",
-                queue_name=",".join(CELERY_QUEUE_NAMES),
-                resource_requests=largest.requests,
-                resource_limits=largest.limits,
-            )
-        ]
-    return [
-        OLApplicationK8sCeleryWorkerConfig(
-            queue_name=name,
-            resource_requests=sizing.celery_queues[name].requests,
-            resource_limits=sizing.celery_queues[name].limits,
-        )
-        for name in CELERY_QUEUE_NAMES
-    ]
+def _celery_beat_config(sizing: MitxonlineSizing) -> OLApplicationK8sCeleryBeatConfig:
+    return OLApplicationK8sCeleryBeatConfig(
+        resource_requests=sizing.celery_beat.requests,
+        resource_limits=sizing.celery_beat.limits,
+    )
+
+
+def _dev_shell_config(*, dev_shell: bool) -> OLApplicationK8sDevShellConfig | None:
+    # An unrouted, launch-on-request pod in the app image for developers to
+    # run manage.py commands without being OOMKilled or scaled away. Created
+    # at 0 replicas; scale it up to use it and back down when done.
+    #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=1
+    #   kubectl -n mitxonline exec -it deploy/mitxonline-dev-shell -- bash
+    #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=0
+    return OLApplicationK8sDevShellConfig() if dev_shell else None
+
+
+def deployment_names(
+    sizing: MitxonlineSizing,
+    *,
+    celery_topology: Literal["per-queue", "merged"],
+    dev_shell: bool,
+) -> list[str]:
+    """Return the Deployments ``application_config`` has ``OLApplicationK8s`` create.
+
+    Every one of them mounts the bindings' Secrets with ``envFrom``. The deployed
+    program needs the names as VSO restart targets for the Secrets it creates
+    before the bindings exist, since the bindings carry those Secrets' names.
+
+    :param sizing: The bindings' ``sizing``.
+    :param celery_topology: The bindings' ``celery_topology``.
+    :param dev_shell: The bindings' ``dev_shell``.
+    :returns: The names, as ``OLApplicationK8s.all_deployment_names`` lists them.
+    :rtype: list[str]
+    """
+    return application_deployment_names(
+        application_name=Services.mitxonline,
+        celery_worker_configs=celery_worker_configs(celery_topology, sizing),
+        celery_beat_config=_celery_beat_config(sizing),
+        dev_shell_config=_dev_shell_config(dev_shell=dev_shell),
+    )
 
 
 def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
@@ -280,11 +349,13 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         application_min_replicas=bindings.min_replicas,
         k8s_global_labels=bindings.k8s_labels,
         env_from_secret_names=bindings.secret_names,
+        optional_env_from_secret_names=bindings.optional_secret_names,
         application_security_group_id=cluster.security_group_id,
         application_security_group_name=cluster.security_group_name,
         application_image_repository=bindings.image_repository,
         application_docker_tag=bindings.application_docker_tag,
         application_image_digest=bindings.application_image_digest,
+        application_version=bindings.application_version,
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
@@ -349,19 +420,8 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         pre_deploy_resource_limits=sizing.pre_deploy.limits,
         celery_redis_config=bindings.celery_redis,
         celery_worker_configs=celery_worker_configs(bindings.celery_topology, sizing),
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests=sizing.celery_beat.requests,
-            resource_limits=sizing.celery_beat.limits,
-        ),
-        # An unrouted, launch-on-request pod in the app image for developers to
-        # run manage.py commands without being OOMKilled or scaled away. Created
-        # at 0 replicas; scale it up to use it and back down when done.
-        #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=1
-        #   kubectl -n mitxonline exec -it deploy/mitxonline-dev-shell -- bash
-        #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=0
-        dev_shell_config=OLApplicationK8sDevShellConfig()
-        if bindings.dev_shell
-        else None,
+        celery_beat_config=_celery_beat_config(sizing),
+        dev_shell_config=_dev_shell_config(dev_shell=bindings.dev_shell),
         resource_requests=sizing.web.requests,
         resource_limits=sizing.web.limits,
         # Memory is managed vertically by the component's webapp VPA, between the
@@ -380,23 +440,11 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
 def _oidc_credentials(
     bindings: MitxonlineBindings,
 ) -> OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials:
-    vault_auth_name = bindings.cluster.vault_auth_name
-    secret_name = bindings.oidc_secret_name
-    if secret_name is not None and vault_auth_name is None:
-        return OLApisixOIDCSecretCredentials(secret_name=secret_name)
-    if vault_auth_name is not None and secret_name is None:
-        return OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",
-            vaultauth=vault_auth_name,
-        )
-    msg = (
-        "The OIDC routes need exactly one credential source: "
-        "cluster.vault_auth_name (from Vault) or oidc_secret_name "
-        "(a Secret already in the namespace)."
+    return oidc_credentials(
+        vault_auth_name=bindings.cluster.vault_auth_name,
+        secret_name=bindings.oidc_secret_name,
+        vault_path=LearnSession.vault_path,
     )
-    raise ValueError(msg)
 
 
 def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCConfig:
@@ -408,7 +456,51 @@ def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCC
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
+        # ApisixRemoteUserOrgBackend reads auth_time from X-ID-Token so
+        # reconcile_user_orgs can skip org data older than the session.
+        oidc_set_id_token_header=True,
         **settings,
+    )
+
+
+def learn_session(bindings: MitxonlineBindings) -> LearnSession:
+    """Return the MIT Learn session the /mitxonline/* routes share.
+
+    :param bindings: The environment being rendered for.
+    :returns: The shared session for the bound environment.
+    :rtype: LearnSession
+    """
+    return LearnSession.for_host(bindings.env_suffix, bindings.hostnames.learn_api)
+
+
+def direct_route_group(bindings: MitxonlineBindings) -> OLApisixOIDCRouteGroup:
+    """Return where the routes on MITx Online's own hosts are served.
+
+    :param bindings: The environment being rendered for.
+    :returns: The route group for ``direct_oidc_config`` and its routes.
+    :rtype: OLApisixOIDCRouteGroup
+    """
+    return OLApisixOIDCRouteGroup(
+        hosts=[bindings.hostnames.api, bindings.hostnames.frontend],
+        login_paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
+    )
+
+
+def prefixed_route_group(bindings: MitxonlineBindings) -> OLApisixOIDCRouteGroup:
+    """Return where the /mitxonline/* routes on MIT Learn's host are served.
+
+    The post-logout landing is on the MIT Learn host because the prefixed path
+    only exists there: api.<env>.mitxonline.mit.edu/mitxonline/logout/ is proxied
+    through unrewritten and Django answers it with a 404.
+
+    :param bindings: The environment being rendered for.
+    :returns: The route group for ``prefixed_oidc_config`` and its routes.
+    :rtype: OLApisixOIDCRouteGroup
+    """
+    return OLApisixOIDCRouteGroup(
+        hosts=[bindings.hostnames.learn_api],
+        path_prefix=API_PATH_PREFIX,
+        login_paths=["/login/", "/login/oidc*", "/admin/login/*", "/login"],
     )
 
 
@@ -419,13 +511,13 @@ def direct_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
     :returns: The config to hand to ``OLApisixOIDCResources``.
     :rtype: OLApisixOIDCConfig
     """
-    api_domain = bindings.hostnames.api
+    route_group = direct_route_group(bindings)
     return _oidc_config(
         bindings,
         application_name="mitxonline-k8s-no-prefix",
-        oidc_logout_path="/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{api_domain}/logout/",
-        oidc_session_cookie_domain=api_domain.removeprefix("api"),
+        oidc_logout_path=route_group.logout_path,
+        oidc_post_logout_redirect_uri=route_group.post_logout_uri,
+        oidc_session_cookie_domain=bindings.hostnames.api.removeprefix("api"),
         # This is MITx Online's own login session, on its own parent domain --
         # distinct from the MIT Learn session the prefixed resources below read,
         # so it gets its own name rather than the shared one.  It needs an
@@ -443,39 +535,24 @@ def direct_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
 def prefixed_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
     """Return the OIDC settings for the /mitxonline/* routes on MIT Learn's host.
 
+    These routes are what the MIT Learn frontend calls as
+    NEXT_PUBLIC_MITX_ONLINE_BASE_URL.  Their "pass" plugins read the session
+    mit-learn's login set and their "reqauth" route writes it, so everything
+    about the session comes from ``learn_session``.
+
     :param bindings: The environment being rendered for.
     :returns: The config to hand to ``OLApisixOIDCResources``.
     :rtype: OLApisixOIDCConfig
     """
-    learn_api_domain = bindings.hostnames.learn_api
-    return _oidc_config(
-        bindings,
+    return learn_session_oidc_config(
+        learn_session(bindings),
+        prefixed_route_group(bindings),
         application_name="mitxonline-k8s",
-        oidc_logout_path=f"/{API_PATH_PREFIX}/logout/oidc",
-        # The MIT Learn host, not MITx Online's own: the prefixed path only
-        # exists on the host these routes are served from, so naming api_domain
-        # here pointed the tail of the logout at
-        # api.<env>.mitxonline.mit.edu/mitxonline/logout/, which the catch-all
-        # "passauth" route proxies through unrewritten and Django answers with a
-        # 404 (verified on CI) -- so every RP-initiated logout on this group
-        # ended on an error page.
-        oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/{API_PATH_PREFIX}/logout/",
-        # These routes are served from MIT Learn's own host
-        # (api.<env>.learn.mit.edu) and are what the MIT Learn frontend calls as
-        # NEXT_PUBLIC_MITX_ONLINE_BASE_URL.  Their unauth_action="pass" plugins
-        # recognize the session mit-learn's login flow set, which only works
-        # while both name the cookie identically -- so this must track
-        # mit_learn/__main__.py's oidc_session_cookie_name, not the mitxonline
-        # name used above.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(bindings.env_suffix),
-        # Matching mit_learn/__main__.py's cookie domain matters as much as
-        # matching its name.  The "reqauth" route below performs a real login
-        # (unauth_action="auth" on /mitxonline/login/), and without a domain the
-        # plugin would write a *host-only* cookie on api.<env>.learn.mit.edu
-        # under the shared name -- a second, separate entry in the browser's jar
-        # shadowing mit-learn's .learn.mit.edu cookie on that host.  With the
-        # domain set, all of them read and write the one shared cookie.
-        oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
+        k8s_labels=bindings.k8s_labels,
+        k8s_namespace=NAMESPACE,
+        credentials=_oidc_credentials(bindings),
+        # See _oidc_config.
+        set_id_token_header=True,
     )
 
 
@@ -525,7 +602,7 @@ def shared_plugins(bindings: MitxonlineBindings) -> list[OLApisixPluginConfig]:
         oidc_gateway_pre_function_plugin(
             session_cookie_names=[
                 apisix_oidc_session_cookie_name("mitxonline", bindings.env_suffix),
-                mit_learn_session_cookie_name(bindings.env_suffix),
+                learn_session(bindings).cookie_name,
             ],
         ),
     ]
@@ -567,7 +644,8 @@ def direct_route_configs(
     :returns: Route configs for one ``OLApisixRoute``.
     :rtype: list[OLApisixRouteConfig]
     """
-    hosts = [bindings.hostnames.api, bindings.hostnames.frontend]
+    route_group = direct_route_group(bindings)
+    hosts = route_group.hosts
     frame_ancestors = _frame_ancestors_plugin(bindings)
     # Both OIDC resources moved off lua-resty-session's default "session" cookie
     # name, so every current user has a dead one in their browser.  The two route
@@ -581,48 +659,44 @@ def direct_route_configs(
     stale_session_cleanup = stale_session_cookie_cleanup_plugin(
         cookie_domains=[bindings.hostnames.api.removeprefix("api")],
     )
+    # Ends the caller's current MITx Online gateway session, for
+    # "switch-session" below.  Expiring a live cookie is the same operation as
+    # evicting a dead one, so it reuses the cleanup helper with this group's
+    # cookie name and domain; a deletion only lands on a matching (name,
+    # domain, path).
+    session_reset = stale_session_cookie_cleanup_plugin(
+        cookie_domains=[bindings.hostnames.api.removeprefix("api")],
+        stale_cookie_name=apisix_oidc_session_cookie_name(
+            "mitxonline", bindings.env_suffix
+        ),
+    )
     return [
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            hosts=hosts,
-            paths=["/*"],
+        *route_group.route_configs(
+            oidc,
             shared_plugin_config_name=shared_plugin_config_name,
-            plugins=[
-                oidc.get_full_oidc_plugin_config(unauth_action="pass"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            extra_plugins=[frame_ancestors, stale_session_cleanup],
+            **_WEBAPP_BACKEND,
         ),
+        # Entry point for hand-offs from MIT Learn (hq#12763).  Learn's session
+        # and this host's are separate cookies on separate parent domains, so a
+        # browser can arrive here still carrying the session of whoever used it
+        # before Learn's was replaced.  This drops that session and Django
+        # redirects to `next`; "cart" is unauth_action="auth", so the follow-on
+        # request runs a fresh login and comes back as whoever holds the
+        # Keycloak SSO session now.
+        #
+        # No openid-connect plugin: it would validate, and possibly refresh, the
+        # session this route exists to discard.  Django validates `next`; a
+        # gateway-side redirect would make /switch-session//evil.example an open
+        # redirect.
         OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
+            route_name="switch-session",
+            priority=20,
             hosts=hosts,
-            paths=["/logout/oidc/*"],
-            plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
+            paths=["/switch-session", "/switch-session/"],
+            plugins=[frame_ancestors, session_reset],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            hosts=hosts,
-            paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
-            plugins=[
-                oidc.get_full_oidc_plugin_config(unauth_action="auth"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         OLApisixRouteConfig(
             route_name="cart",
@@ -639,8 +713,7 @@ def direct_route_configs(
                 stale_session_cleanup,
             ],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
         ),
         # The `location` blocks that used to live in the nginx sidecar
         # (docs/plans/remove-nginx-sidecar.md, stage 5). nginx resolved
@@ -654,8 +727,7 @@ def direct_route_configs(
             hosts=hosts,
             paths=["/static/hash.txt"],
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
             plugins=[_uncached_hash_plugin()],
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
@@ -673,8 +745,7 @@ def direct_route_configs(
             shared_plugin_config_name=shared_plugin_config_name,
             hosts=hosts,
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -705,7 +776,8 @@ def prefixed_route_configs(
     :returns: Route configs for one ``OLApisixRoute``.
     :rtype: list[OLApisixRouteConfig]
     """
-    hosts = [bindings.hostnames.learn_api]
+    route_group = prefixed_route_group(bindings)
+    hosts = route_group.hosts
     frame_ancestors = _frame_ancestors_plugin(bindings)
     stale_session_cleanup = stale_session_cookie_cleanup_plugin()
     strip_prefix = OLApisixPluginConfig(
@@ -718,66 +790,17 @@ def prefixed_route_configs(
         },
     )
     return [
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            hosts=hosts,
-            paths=[f"/{API_PATH_PREFIX}/*"],
-            shared_plugin_config_name=shared_plugin_config_name,
-            plugins=[
-                strip_prefix,
-                oidc.get_full_oidc_plugin_config(unauth_action="pass"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        ),
-        # Strips the trailing slash onto this group's own logout path.  It named
-        # the unprefixed "/logout/oidc", which on this host is mit-learn's
-        # plugin: the shared cookie meant the session did get destroyed, but the
-        # post-logout redirect then came from mit-learn's resource, so a user
+        # The logout-redirect route sends the trailing-slash spelling onto this
+        # group's own logout path.  It used to name the unprefixed
+        # "/logout/oidc", which on this host is mit-learn's plugin, so a user
         # logging out of MITx Online landed on a mit-learn page and never
         # reached the Open edX logout fan-out their own logout view performs.
-        # Their MITx Online session cookie also outlived the logout, though
-        # ApisixUserMiddleware inherits force_logout_if_no_header from
-        # RemoteUserMiddleware and drops it on the next request.
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            hosts=hosts,
-            paths=[f"/{API_PATH_PREFIX}/logout/oidc/*"],
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect",
-                    config={"uri": f"/{API_PATH_PREFIX}/logout/oidc"},
-                ),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
+        *route_group.route_configs(
+            oidc,
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            hosts=hosts,
-            paths=[
-                f"/{API_PATH_PREFIX}/login/",
-                f"/{API_PATH_PREFIX}/login/oidc*",
-                f"/{API_PATH_PREFIX}/admin/login/*",
-                f"/{API_PATH_PREFIX}/login",
-            ],
-            plugins=[
-                strip_prefix,
-                oidc.get_full_oidc_plugin_config(unauth_action="auth"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            rewrite_plugins=[strip_prefix],
+            extra_plugins=[frame_ancestors, stale_session_cleanup],
+            **_WEBAPP_BACKEND,
         ),
         # Static assets requested through this prefix (frontend references
         # like /mitxonline/static/...) rewrite through "passauth" the same way,
@@ -794,7 +817,105 @@ def prefixed_route_configs(
             paths=[f"/{API_PATH_PREFIX}/static/hash.txt"],
             shared_plugin_config_name=shared_plugin_config_name,
             plugins=[strip_prefix, _uncached_hash_plugin()],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+            **_WEBAPP_BACKEND,
+        ),
+    ]
+
+
+# Every LMS login entry (/login, /register, /auth/idp_redirect/) passes through
+# this path on its way to MITx Online, with or without a MITx Online session.
+OPENEDX_LOGIN_PATH = "/auth/login/ol-oauth2/"
+
+
+def openedx_login_gate_upstream_config(
+    gate: OpenedxLoginGate, env_suffix: str, k8s_labels: dict[str, str]
+) -> OLApisixExternalUpstreamConfig:
+    """Return the gate's upstream: the LMS Service, by cluster DNS name.
+
+    An ApisixRoute can only name Services in its own namespace, and the LMS runs
+    in edxapp's.
+
+    :param gate: Where the LMS is served.
+    :param env_suffix: The stack environment suffix, shared with edxapp's stack.
+    :param k8s_labels: Labels for the ApisixUpstream.
+    :returns: The config for ``OLApisixExternalUpstream``.
+    :rtype: OLApisixExternalUpstreamConfig
+    """
+    return OLApisixExternalUpstreamConfig(
+        application_name="mitxonline-openedx-login-gate",
+        resource_suffix="lms",
+        k8s_labels=k8s_labels,
+        k8s_namespace=NAMESPACE,
+        external_hostname=edxapp_lms_service_host("mitxonline", env_suffix),
+        scheme="http",
+        port=gate.lms_service_port,
+        # The LMS rejects any Host but its public one (DisallowedHost).
+        pass_host="pass",  # noqa: S106 -- APISIX passHost mode, not a password
+    )
+
+
+def openedx_login_gate_route_configs(
+    bindings: MitxonlineBindings,
+    oidc: OLApisixOIDCResources,
+    shared_plugin_config_name: str,
+    upstream_name: str,
+) -> list[OLApisixRouteConfig]:
+    """Return the route that signs learners in to MIT Learn when the Open edX login starts.
+
+    Without it, a learner who signs in on courseware gets MITx Online's session
+    but not MIT Learn's, so learn-ai sees them as anonymous. With no MIT Learn
+    session, the route runs mit-learn's Keycloak login (``oidc``, from
+    ``prefixed_oidc_config``), then returns the learner to the same URL and the
+    edX login carries on.
+
+    Only browser page loads match. MITx Online's server-side replay of this login
+    (``create_edx_auth_token``), ``fetch()``, iframes and browsers without Fetch
+    Metadata go to the LMS's own route as before.
+
+    :param bindings: The environment being rendered for. Renders nothing unless
+        ``openedx_login_gate`` is set.
+    :param oidc: The OIDC resources built from ``prefixed_oidc_config``.
+    :param shared_plugin_config_name: Name of the ``shared_plugins`` ApisixPluginConfig.
+    :param upstream_name: Name of the ApisixUpstream from
+        ``openedx_login_gate_upstream_config``.
+    :returns: Route configs for one ``OLApisixRoute``.
+    :rtype: list[OLApisixRouteConfig]
+    """
+    gate = bindings.openedx_login_gate
+    if gate is None:
+        return []
+    oidc_plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+    # The LMS needs none of the learner's tokens.
+    oidc_plugin["config"].update(
+        set_access_token_header=False,
+        set_id_token_header=False,
+        set_userinfo_header=False,
+    )
+    return [
+        OLApisixRouteConfig(
+            route_name="openedx-login-gate",
+            # Above the LMS's "/*" route (priority 0).
+            priority=10,
+            # The callback URI is built from Host, and Keycloak only accepts
+            # the public one.
+            hosts=[gate.lms_host],
+            # Exact paths: on any other path the plugin would send Keycloak a
+            # callback URI it doesn't accept.
+            paths=[OPENEDX_LOGIN_PATH, f"{OPENEDX_LOGIN_PATH}.apisix/redirect"],
+            exprs=[
+                {
+                    "subject": {"scope": "Header", "name": "Sec-Fetch-Mode"},
+                    "op": "Equal",
+                    "value": "navigate",
+                },
+                {
+                    "subject": {"scope": "Header", "name": "Sec-Fetch-Dest"},
+                    "op": "Equal",
+                    "value": "document",
+                },
+            ],
+            shared_plugin_config_name=shared_plugin_config_name,
+            plugins=[oidc_plugin],
+            upstream=upstream_name,
         ),
     ]

@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import re
 from functools import partial
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -50,6 +51,12 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 DEFAULT_TERMINATION_GRACE_PERIOD_SECONDS = 30
 
 ALERT_TIER_LABEL = "ol.mit.edu/alert_tier"
+
+# The release (calver) a pod runs. Release-workflow apps deploy by image
+# digest, so the image reference no longer says which release that is.
+RELEASE_VERSION_LABEL = "ol.mit.edu/version"
+# A Kubernetes label value: at most 63 characters, alphanumeric at both ends.
+_LABEL_VALUE_RE = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?")
 
 
 def truncate_k8s_metanames(name: str) -> str:
@@ -952,6 +959,15 @@ class OLApplicationK8sConfig(BaseModel):
         ),
     )
     env_from_secret_names: list[str]
+    optional_env_from_secret_names: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Secrets mounted with envFrom like env_from_secret_names, but marked "
+            "optional, so pods start before the secret exists (e.g. one written "
+            "by another stack that may not have applied yet) and read it the "
+            "next time they start."
+        ),
+    )
     application_security_group_id: Output[str] | None = Field(
         default=None,
         description=(
@@ -968,6 +984,14 @@ class OLApplicationK8sConfig(BaseModel):
     application_image_repository_suffix: str | None = None
     application_docker_tag: str | None = None
     application_image_digest: str | None = None
+    application_version: str | None = Field(
+        default=None,
+        description=(
+            "The release version the image was built for, e.g. 2026.10.28.1. "
+            f"Set as the {RELEASE_VERSION_LABEL} label on every pod built from "
+            "the application image, never on a selector."
+        ),
+    )
     application_cmd_array: list[str] | None = None
     application_arg_array: list[str] | None = None
     command_prefix: list[str] = Field(
@@ -1391,6 +1415,34 @@ class OLApplicationK8sConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_application_version(self) -> "OLApplicationK8sConfig":
+        """Reject a version Kubernetes would refuse as a label value."""
+        if self.application_version is not None and not _LABEL_VALUE_RE.fullmatch(
+            self.application_version
+        ):
+            msg = (
+                f"application_version {self.application_version!r} is not a "
+                f"valid value for the {RELEASE_VERSION_LABEL} label: at most 63 "
+                "characters of [A-Za-z0-9._-], starting and ending alphanumeric."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_version_is_not_a_selector_label(self) -> "OLApplicationK8sConfig":
+        """Keep the release version out of the immutable Deployment selectors."""
+        if RELEASE_VERSION_LABEL in self.k8s_global_labels:
+            msg = (
+                f"k8s_global_labels must not carry {RELEASE_VERSION_LABEL}. Every "
+                "Deployment this component creates selects on k8s_global_labels, "
+                "and a selector is immutable, so a new version there deletes and "
+                "recreates the Deployment. Set application_version, which stays "
+                "off the selectors."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
     def validate_alert_tier_is_not_a_selector_label(self) -> "OLApplicationK8sConfig":
         """Keep the alert tier out of the immutable Deployment selectors."""
         if ALERT_TIER_LABEL in self.k8s_global_labels:
@@ -1765,6 +1817,13 @@ class OLApplicationK8s(ComponentResource):
 
         # Selected by the SecurityGroupPolicy at the end of this constructor, so
         # it is on every pod the component creates or on none of them.
+        # Pod labels only, like the alert tier: on a selector, every release
+        # would delete and recreate the Deployment.
+        version_label = (
+            {RELEASE_VERSION_LABEL: ol_app_k8s_config.application_version}
+            if ol_app_k8s_config.application_version
+            else {}
+        )
         security_group_labels: dict[str, Output[str]] = {}
         if ol_app_k8s_config.application_security_group_name is not None:
             security_group_labels["ol.mit.edu/pod-security-group"] = (
@@ -1952,6 +2011,15 @@ class OLApplicationK8s(ComponentResource):
                     ),
                 )
             )
+        for secret_name in ol_app_k8s_config.optional_env_from_secret_names:
+            application_deployment_envfrom.append(  # noqa: PERF401
+                kubernetes.core.v1.EnvFromSourceArgs(
+                    secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                        name=secret_name,
+                        optional=True,
+                    ),
+                )
+            )
 
         image_pull_policy = ol_app_k8s_config.image_pull_policy
         if (
@@ -2055,6 +2123,7 @@ class OLApplicationK8s(ComponentResource):
             "ol.mit.edu/component": "deploy-job",
             "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
             **security_group_labels,
+            **version_label,
         }
         if ol_app_k8s_config.slack_channel:
             deploy_job_pod_labels["ol.mit.edu/slack-channel"] = (
@@ -2067,7 +2136,9 @@ class OLApplicationK8s(ComponentResource):
         webapp_alert_tier_label = {
             ALERT_TIER_LABEL: str(ol_app_k8s_config.webapp_alert_tier)
         }
-        application_pod_labels = application_labels | webapp_alert_tier_label
+        application_pod_labels = (
+            application_labels | webapp_alert_tier_label | version_label
+        )
 
         # The otel label is on the Deployment's own metadata only: on the selector
         # it would force a replacement, and on the pod template a rollout.
@@ -2769,7 +2840,7 @@ class OLApplicationK8s(ComponentResource):
                     ol_app_k8s_config.slack_channel
                 )
 
-            celery_pod_labels = celery_labels | celery_alert_tier_label
+            celery_pod_labels = celery_labels | celery_alert_tier_label | version_label
 
             _celery_deployment_name = celery_worker_deployment_name(
                 ol_app_k8s_config.application_name,
@@ -2956,7 +3027,7 @@ class OLApplicationK8s(ComponentResource):
                 ol_app_k8s_config.application_name
             )
             self.beat_deployment_name = _beat_deployment_name
-            beat_pod_labels = beat_labels | celery_alert_tier_label
+            beat_pod_labels = beat_labels | celery_alert_tier_label | version_label
             self.beat_deployment = kubernetes.apps.v1.Deployment(
                 f"{ol_app_k8s_config.application_name}-celery-beat-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -3041,6 +3112,7 @@ class OLApplicationK8s(ComponentResource):
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
                 **security_group_labels,
                 "ol.mit.edu/job-name": scheduled_job.name,
+                **version_label,
             }
             _scheduled_job_name = scheduled_job_name(
                 ol_app_k8s_config.application_name, scheduled_job.name
@@ -3177,7 +3249,8 @@ class OLApplicationK8s(ComponentResource):
                     ),
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                            labels=dev_shell_labels,
+                            # Not the selector: dev_shell_labels is one.
+                            labels=dev_shell_labels | version_label,
                             annotations={
                                 **pod_config_hash_annotations,
                                 "karpenter.sh/do-not-disrupt": "true",

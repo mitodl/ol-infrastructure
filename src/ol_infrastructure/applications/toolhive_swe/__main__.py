@@ -73,10 +73,9 @@ Incoming auth (MCP clients log in with Keycloak directly, via a static CLI clien
     ``kubectl delete pvc data-toolhive-swe-redis-0 -n toolhive-swe`` (per cluster)
     or it keeps billing for an unused volume indefinitely.
 
-    Audience: Keycloak 26.7.2 (the pinned KEYCLOAK_VERSION) does not implement RFC
-    8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
-    tracker, where support is tracked as in-progress for milestone 26.8.0 (issue
-    #51413 and related PRs), not yet shipped. So the token minted for
+    Audience: Keycloak ships RFC 8707 resource indicators only as the experimental
+    ``resource-indicators`` feature (26.8, keycloak/keycloak#51413), which our image
+    build does not enable. So the token minted for
     ``toolhive-swe-cli`` would carry no ``aud`` claim matching this vMCP's resource
     URL by default. The keycloak substructure (``ol_platform_engineering.py``,
     TOOLHIVE block) stamps one in unconditionally via a plain per-client

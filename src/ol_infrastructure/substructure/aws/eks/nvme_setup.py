@@ -206,6 +206,7 @@ def setup_nvme_local_storage(
             version=LOCAL_PATH_PROVISIONER_CHART_VERSION,
             namespace="kube-system",
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=False,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://charts.rancher.io",

@@ -100,6 +100,7 @@ def setup_keda(
                 repo="https://kedacore.github.io/charts"
             ),
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=True,
             values={
                 # additionalLabels is the chart's only workload-object key,

@@ -850,6 +850,7 @@ gravitino_release = kubernetes.helm.v3.Release(
         version=GRAVITINO_CHART_VERSION,
         namespace=NAMESPACE,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=False,
         values=gravitino_values,
     ),

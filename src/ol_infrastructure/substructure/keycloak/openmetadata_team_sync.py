@@ -15,6 +15,11 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+    MANAGED_CLIENT_ARGS,
+)
+
 REALM_NAME = "ol-data-platform"
 
 
@@ -49,15 +54,27 @@ def create_openmetadata_team_sync_resources(
         access_type="CONFIDENTIAL",
         service_accounts_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # basic carries sub, roles carries the realm-management roles, and
+    # kc-admin-api the audience the Admin API requires since 26.8.2. Service
+    # account only, so it is a default scope.
+    keycloak.openid.ClientDefaultScopes(
+        "ol-openmetadata-team-sync-default-scopes",
+        realm_id=realm.id,
+        client_id=sync_client.id,
+        default_scopes=["basic", "roles", ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
 
     # manage-users is the one realm-management role that allows creating
     # groups and changing membership, and in Keycloak 26 it also covers
     # viewing users and groups, so view-users and query-groups would add
-    # nothing. It is realm-wide: it can edit any user in the realm.
+    # nothing. It is realm-wide: it can edit any user in the realm. The same
+    # job's role half reads each user's effective realm roles, which needs only
+    # view on the user, so this covers it too.
     realm_management_client = keycloak.openid.get_client(
         realm_id=REALM_NAME,
         client_id="realm-management",
@@ -75,8 +92,9 @@ def create_openmetadata_team_sync_resources(
     # Read by the open_metadata application stack into the om-team-keycloak-sync
     # Kubernetes secret. Filed in OpenMetadata's own kv mount, which that stack
     # creates, rather than secret-operations/sso/ with the other clients:
-    # application policies read secret-operations/* (e.g. odl_video_service),
-    # and this secret can edit any user in the realm.
+    # an application policy with a broad secret-operations grant (as
+    # odl_video_service's secret-operations/* was) would reach it, and this
+    # secret can edit any user in the realm.
     vault.generic.Secret(
         "ol-data-platform-openmetadata-team-sync-vault-credentials",
         path="secret-openmetadata/keycloak-team-sync",

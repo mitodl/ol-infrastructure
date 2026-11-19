@@ -7,8 +7,10 @@ import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+    MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
-    create_pkce_client_policy,
+    create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_staff_organizations,
@@ -147,7 +149,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         opts=resource_options,
     )
 
-    create_pkce_client_policy(
+    create_client_policies(
         ol_platform_engineering_realm.id, "ol-platform-engineering", resource_options
     )
 
@@ -163,7 +165,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -212,9 +213,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=True,
-        direct_access_grants_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-opik-redirect-uris"
@@ -248,6 +247,48 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             aliases=[Alias(name="ol-data-platform-opik-client-vault-oidc-credentials")]
         ),
     )
+    # OSS Opik treats every request as the admin of workspace "default", so who
+    # gets past APISIX can edit any prompt and read every trace. APISIX admits
+    # a browser session only when the ID token's groups claim names this group
+    # (claim_schema on the opik stack's session routes). Membership is managed
+    # in the admin console, not here. A membership change reaches an existing
+    # session on its next token refresh, because Keycloak re-runs the mapper
+    # and lua-resty-openidc replaces the stored ID token.
+    keycloak.Group(
+        "ol-platform-engineering-opik-users-group",
+        realm_id=ol_platform_engineering_realm.id,
+        name="opik-users",
+        opts=resource_options,
+    )
+    keycloak.openid.GroupMembershipProtocolMapper(
+        "ol-platform-engineering-opik-group-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_opik_client.id,
+        name="groups",
+        claim_name="groups",
+        # The claim_schema matches the bare name, so "/opik-users" would fail.
+        full_path=False,
+        add_to_id_token=True,
+        add_to_access_token=False,
+        add_to_userinfo=False,
+        opts=resource_options,
+    )
+    # Every client in this realm signs with the same key, so the bearer route's
+    # signature and issuer checks alone admit a client-credentials token from
+    # any of them. This client's service-account tokens carry only "account"
+    # in aud, so the opik stack's audience check (match_with_client_id) needs
+    # this mapper in place first or learn-ai, Dagster and gwarek tracing gets
+    # 403s. A per-application client for Opik traffic needs the same audience.
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-opik-audience-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_opik_client.id,
+        name="opik-audience",
+        included_client_audience=ol_platform_engineering_opik_client.client_id,
+        add_to_access_token=True,
+        add_to_id_token=False,
+        opts=resource_options,
+    )
     # OPIK [END] # noqa: ERA001
 
     # TOOLHIVE [START] # noqa: ERA001
@@ -276,11 +317,12 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # Revisit if Keycloak's upstream CIMD work (Client ID Metadata Document,
     # tracked alongside RFC 8707 resource indicators in
     # https://github.com/keycloak/keycloak/issues/51413, explicitly scoped for
-    # "AI tools like Claude and ChatGPT", targeted at milestone 26.8.0 — not
-    # shipped as of KEYCLOAK_VERSION 26.7.2) lands AND MCP client tooling adopts
-    # it: CIMD resolves a client_id as a URL the client hosts itself rather than
-    # a value Keycloak persists from an anonymous write, which is a genuinely
-    # different, spam-resistant trust model — unlike an Initial Access Token,
+    # "AI tools like Claude and ChatGPT"; shipped in 26.8 as the experimental
+    # `cimd` feature, which our image build does not enable) is supported AND
+    # MCP client tooling adopts it: CIMD resolves a client_id as a URL the
+    # client hosts itself rather than a value Keycloak persists from an
+    # anonymous write, which is a genuinely different, spam-resistant trust
+    # model — unlike an Initial Access Token,
     # not just a reframing of the same static-client tradeoff.
     if stack_info.env_suffix == "production":
         toolhive_swe_resource_url = "https://toolhive-swe.ol.mit.edu"
@@ -311,8 +353,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         # Public client with no secret — PKCE is the ONLY proof-of-possession
         # this flow has, so it must be server-enforced, not just assumed because
@@ -328,10 +368,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # Keycloak 26.7.2 (this repo's pinned KEYCLOAK_VERSION) does not implement RFC
-    # 8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
-    # tracker (#51413), where support is tracked as in-progress for milestone
-    # 26.8.0, not yet shipped. So the token minted for this client carries no
+    # Keycloak ships RFC 8707 resource indicators only as the experimental
+    # `resource-indicators` feature (26.8, keycloak/keycloak#51413), which our
+    # image build does not enable. So the token minted for this client carries no
     # `aud` matching the vMCP's resource URL unless stamped in explicitly. Because
     # this is a single Pulumi-managed client (unlike the DCR design this replaced,
     # which had no fixed client_id to attach a mapper to), that stamping is a
@@ -395,8 +434,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         access_type="CONFIDENTIAL",
         service_accounts_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
@@ -410,6 +448,15 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         realm_id="ol-platform-engineering",
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
+    )
+    # basic carries sub, roles carries the realm-management roles, and
+    # kc-admin-api carries the audience the Admin API requires since 26.8.2.
+    keycloak.openid.ClientDefaultScopes(
+        "ol-platform-engineering-witan-token-sync-default-scopes",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_witan_token_sync_client.id,
+        default_scopes=["basic", "roles", ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
     keycloak.openid.ClientServiceAccountRole(
         "ol-platform-engineering-witan-token-sync-view-users",
@@ -461,6 +508,12 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     #   - No `client_secret` argument: passing one to a PUBLIC client is silently
     #     ignored by Keycloak and would only mislead a future reader into
     #     thinking one is required.
+    #   - PKCE required (S256): Keycloak checks the challenge on the device
+    #     authorization request and the verifier on the token poll, so a device
+    #     code intercepted between the two cannot be redeemed by anyone else.
+    #     witan-core sends both from 0.46.0 (agent-kit#542), and witan-council
+    #     0.44.1 and witan-code 0.27.1 require it. A CLI on an older witan-core
+    #     cannot log in.
     #
     # No Vault write accompanies this client, unlike every other client in this
     # file: a public client has no secret to distribute, and issuer/client_id/
@@ -474,9 +527,8 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         access_type="PUBLIC",
         oauth2_device_authorization_grant_enabled=True,
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
+        **PKCE_REQUIRED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
@@ -537,9 +589,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # here too. CIMD is additionally not viable yet regardless of that
     # tradeoff: it needs RFC 8707 resource indicators to stamp `aud: witan`
     # onto a token minted for a client Keycloak provisions on the fly, and
-    # that combination is tracked as unshipped, target milestone 26.8.0
-    # (keycloak/keycloak#51413) — not available as of KEYCLOAK_VERSION
-    # 26.7.2. Revisit once that lands; until then a static client is the
+    # both shipped in 26.8 only as experimental features
+    # (keycloak/keycloak#51413) that our image build does not enable.
+    # Revisit once they are supported; until then a static client is the
     # only way to get `aud: witan` onto a desktop app's token at all.
     ol_platform_engineering_witan_desktop_client = keycloak.openid.Client(
         "ol-platform-engineering-witan-desktop-client",
@@ -549,8 +601,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         # Same PKCE reasoning as `toolhive-swe-cli` and
         # `ol-platform-engineering-grafana-client`: a PUBLIC client has no
@@ -617,8 +667,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="PUBLIC",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=[f"{witan_ui_origin}/ui/"],
@@ -652,7 +700,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-jupyterhub-redirect-uris"
@@ -693,7 +741,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -735,7 +782,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -791,7 +837,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -844,7 +889,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            implicit_flow_enabled=False,
             service_accounts_enabled=False,
             **PKCE_REQUIRED_CLIENT_ARGS,
             valid_redirect_uris=keycloak_realm_config.get_object(
@@ -930,7 +974,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -973,8 +1016,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(

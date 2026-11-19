@@ -9,6 +9,8 @@ spec:
   hosts:
   - "mitxonline.mit.test"
   - "api.mitxonline.mit.test"
+  # mitxonline's Open edX login gate (pulumi/__main__.py).
+  - "courses.learn.mit.test"
   secret:
     name: local-dev-tls
     namespace: mitxonline

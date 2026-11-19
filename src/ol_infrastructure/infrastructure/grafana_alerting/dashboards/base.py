@@ -28,9 +28,11 @@ Sub-modules
   journeys — The journey definitions themselves (which endpoints a capability
     calls, in call order). Adding a capability means appending a `Journey`
     there; no change to `user_journey` or to this module is needed.
+  witan_memory — Whether witan's stored memories reach sessions: how often a
+    first task claim carried one, and how often agents read them unasked.
 
 Dashboards live in per-subject folders (Keycloak, Application Performance,
-ClickHouse, StarRocks, User Journeys) so an unrelated dashboard is not filed
+ClickHouse, StarRocks, User Journeys, Witan) so an unrelated dashboard is not filed
 under a service it has nothing to do with; add a new Folder in `create()`
 rather than widening an existing one.
 """
@@ -51,6 +53,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
     service_red,
     starrocks_overview,
     user_journey,
+    witan_memory,
 )
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
     LOKI_DATASOURCE_REF,
@@ -657,6 +660,23 @@ def create(resource_opts: ResourceOptions) -> None:
         _stat_panel,
         _table_panel,
         _traceql_timeseries_panel,
+        _row_panel,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    witan_folder = Folder(
+        "witan-dashboards-folder",
+        title="Witan",
+        uid="witan-dashboards",
+        opts=resource_opts,
+    )
+
+    witan_memory.create(
+        witan_folder.uid,
+        _timeseries_panel,
+        _stat_panel,
+        _logs_panel,
         _row_panel,
         _create_dashboard,
         resource_opts,

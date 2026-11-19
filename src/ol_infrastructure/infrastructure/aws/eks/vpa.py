@@ -101,6 +101,7 @@ def setup_vpa(
             version=versions["VPA_CHART"],
             namespace="kube-system",
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://kubernetes.github.io/autoscaler",
             ),

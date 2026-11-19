@@ -6,6 +6,7 @@ import mimetypes
 import textwrap
 from pathlib import Path
 from string import Template
+from typing import Any
 
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
@@ -25,7 +26,7 @@ from pulumi_aws import ec2, iam, route53, s3
 from bridge.lib.constants import (
     FASTLY_A_TLS_1_3,
     FASTLY_CNAME_TLS_1_3,
-    mit_learn_session_cookie_name,
+    LearnSession,
 )
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
@@ -49,15 +50,18 @@ from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBCo
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
-    OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPluginsConfig,
     OLApisixSharedPluginsVariant,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
+    learn_session_oidc_config,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
@@ -110,6 +114,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.opik import opik_api_url
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     make_stack_reference,
@@ -209,6 +214,7 @@ learn_frontend_domain = mitlearn_config.require("frontend_domain")
 legacy_learn_frontend_domain = mitlearn_config.require("legacy_frontend_domain")
 nextjs_heroku_domain = mitlearn_config.require("nextjs_heroku_domain")
 mitlearn_api_domain = mitlearn_config.require("api_domain")
+learn_session = LearnSession.for_host(stack_info.env_suffix, mitlearn_api_domain)
 
 aws_config = AWSBase(
     tags={
@@ -828,95 +834,6 @@ mitlearn_role_statements["app"] = {
     "renew": [],
     "rollback": [],
 }
-mitlearn_role_statements["reverse-etl"] = {
-    "create": [
-        # Check if the reverse_etl role exists and create it if not
-        Template(
-            """
-            DO
-            $$do$$
-            BEGIN
-               IF EXISTS (
-                  SELECT FROM pg_catalog.pg_roles
-                  WHERE  rolname = 'reverse_etl' THEN
-                      RAISE NOTICE 'Role "reverse_etl" already exists. Skipping.';
-               ELSE
-                  BEGIN   -- nested block
-                     CREATE ROLE reverse_etl;
-                  EXCEPTION
-                     WHEN duplicate_object THEN
-                        RAISE NOTICE 'Role "reverse_etl" was just created by a concurrent transaction. Skipping.';
-                  END;
-               END IF;
-            END
-            $$do$$;
-            """
-        ),
-        # Create the external schema if it doesn't exist already
-        Template("""CREATE SCHEMA IF NOT EXISTS external;"""),
-        Template(
-            """GRANT CREATE ON SCHEMA external TO reverse_etl WITH GRANT OPTION;"""
-        ),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA external TO "reverse_etl"
-            WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """
-            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external TO "reverse_etl"
-            WITH GRANT OPTION;
-            """
-        ),
-        # Set/refresh default privileges in both schemas
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA external
-            GRANT ALL PRIVILEGES ON TABLES TO "reverse_etl" WITH GRANT OPTION;
-            """
-        ),
-        Template(
-            """
-            ALTER DEFAULT PRIVILEGES FOR ROLE "reverse_etl" IN SCHEMA external
-            GRANT ALL PRIVILEGES ON SEQUENCES TO "reverse_etl" WITH GRANT OPTION;
-            """
-        ),
-        Template("""RESET ROLE;"""),
-        # Actually create the user in the 'reverse_etl' role
-        Template(
-            """
-            CREATE USER "{{name}}" WITH PASSWORD '{{password}}'
-            VALID UNTIL '{{expiration}}' IN ROLE "reverse_etl" INHERIT;
-            """
-        ),
-        # Make sure things done by the new user belong to role and not the user
-        Template("""ALTER ROLE "{{name}}" SET ROLE "reverse_etl";"""),
-    ],
-    "revoke": [
-        # Remove the user from the reverse_etl role
-        Template("""REVOKE "reverse_etl" FROM "{{name}}";"""),
-        # Put the user back into the app role but as an administrator
-        Template("""GRANT "{{name}}" TO reverse_etl WITH ADMIN OPTION;"""),
-        # Change ownership to the app role for anything that might belong to this user
-        Template("""SET ROLE reverse_etl;"""),
-        Template("""REASSIGN OWNED BY "{{name}}" TO "reverse_etl";"""),
-        Template("""RESET ROLE;"""),
-        # Take any permissions assigned directly to this user away
-        Template(
-            """REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA external FROM "{{name}}";"""
-        ),
-        Template(
-            """REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA external FROM "{{name}}";"""
-        ),
-        Template("""REVOKE USAGE ON SCHEMA external FROM "{{name}}";"""),
-        # Finally, drop this user from the database
-        Template("""DROP USER "{{name}}";"""),
-    ],
-    "renew": [],
-    "rollback": [],
-}
-
 mitlearn_vault_backend_config = OLVaultPostgresDatabaseConfig(
     db_name=mitlearn_db_config.db_name,
     mount_point=f"{mitlearn_db_config.engine}-mitlearn",
@@ -1028,6 +945,7 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "is_new_user",
     "status",
     "module",
+    "modules",
     "needs_attention",
     "view",
     # LearningResourceDrawer params (not in mit-learn's registry).
@@ -1584,13 +1502,13 @@ env_vars = {
     "QDRANT_ENABLE_INDEXING_PLUGIN_HOOKS": True,
     "QDRANT_ENCODER": "vector_search.encoders.litellm.LiteLLMEncoder",
     "QDRANT_SPARSE_ENCODER_V2": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
-    "OCR_PDF_MAX_PAGE_THRESHOLD": 20,
+    "OCR_PDF_MAX_PAGE_THRESHOLD": 0,
     "QDRANT_SPARSE_MODEL_V2": "qdrant/bm25",
     "QDRANT_HOST_V2": qdrant_cloud_stack.require_output("cluster_url"),
     "QDRANT_SPARSE_ENCODER": "vector_search.encoders.qdrant_cloud.QdrantCloudEncoder",
     "QDRANT_SPARSE_MODEL": "qdrant/bm25",
     "QDRANT_HOST": qdrant_cloud_stack.require_output("cluster_url"),
-    "OCR_MODEL": "gpt-5-nano-2025-08-07",
+    "OCR_MODEL": "gpt-6-luna",
     "SECURE_CROSS_ORIGIN_OPENER_POLICY": "None",
     "SEE_API_ACCESS_TOKEN_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/oauth/token",
     "SEE_API_URL": "https://mit-unified-portal-prod-78eeds.43d8q2.usa-e2.cloudhub.io/api/",
@@ -1609,7 +1527,6 @@ env_vars = {
 interpolation_vars = mitlearn_config.get_object("interpolation_vars")
 
 csrf_origins_list = interpolation_vars["csrf_domains"] or []
-session_cookie_domain = interpolation_vars["session_cookie_domain"] or ""
 cors_urls_list = interpolation_vars["cors_urls"] or []
 cors_urls_json = json.dumps(cors_urls_list)
 auth_allowed_redirect_hosts_list = (
@@ -1628,7 +1545,9 @@ interpolated_vars = {
     "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
     "MITOL_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
-    "SESSION_COOKIE_DOMAIN": session_cookie_domain,
+    # Django's own session cookie, scoped like the gateway's so both reach
+    # every host under the Learn parent domain.
+    "SESSION_COOKIE_DOMAIN": learn_session.cookie_domain,
     "ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",
@@ -1663,6 +1582,40 @@ if mitlearn_config.get_bool("enable_azure_openai"):
 else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
+
+# Opik tracing of the embedding encoder through ol-llm. mit-learn leaves tracing off
+# unless OPIK_URL_OVERRIDE is set. Every environment traces to the Production Opik
+# (lib/opik.py), so OL_LLM_ENVIRONMENT is what tells the environments apart there.
+# It is explicit because the app otherwise falls back to MITOL_ENVIRONMENT, which is
+# "rc" in QA. The Keycloak client arrives through the secret-opik/sdk-mit-learn secret
+# in k8s_secrets.py. OPIK_API_KEY stays unset: ol-llm refuses to start with it
+# alongside the OPIK_KEYCLOAK_* variables.
+env_vars.update(
+    {
+        "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
+        "OPIK_URL_OVERRIDE": opik_api_url(),
+        "OPIK_WORKSPACE": "default",
+        "OPIK_PROJECT_NAME": "mit-learn",
+    }
+)
+
+# Learner memory through ol-llm's memory interface (ol_llm.memory.MemoryConfig).
+# mit-learn exchanges the learner's session token as ol-mitlearn-memory-client,
+# whose id and secret arrive as OL_LLM_MEMORY_EXCHANGE_* from k8s_secrets.py.
+# A config switch rather than always on, because the Hindsight stack and that
+# Keycloak client exist only in some environments, and a StackReference to a
+# missing stack fails the preview.
+memory_enabled = mitlearn_config.get_bool("enable_memory") or False
+if memory_enabled:
+    hindsight_stack = make_stack_reference(projects.HINDSIGHT, stack_info.name)
+    env_vars.update(
+        {
+            "OL_LLM_MEMORY_BACKEND": "hindsight",
+            "OL_LLM_MEMORY_APP": "mit-learn",
+            "OL_LLM_MEMORY_URL": hindsight_stack.require_output("hindsight")["url"],
+            "OL_LLM_MEMORY_TOKEN_URL": interpolated_vars["ACCESS_TOKEN_URL"],
+        }
+    )
 
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
@@ -1723,6 +1676,14 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The default burst of 25 rejected one browser's 27 near-simultaneous
+        # requests on 2026-11-07, most likely several tabs (search pages with a
+        # resource drawer open cost 5-7 API calls each) restored at once. Those
+        # were the only gateway 429s in Production in the five days after
+        # #6837. The sustained rate stays at 50 r/s; only the instantaneous
+        # slack grows. Only the browser variant enables limit-req, so this
+        # changes nothing on the Fastly-fronted routes.
+        rate_limit_burst=100,
         # The same list Django gets as CORS_ALLOWED_ORIGINS above.  The gateway
         # answers CORS preflights itself, so an origin missing here is blocked
         # on every preflighted request whatever django-cors-headers allows.
@@ -1742,7 +1703,7 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
             # single entry in the browser's jar. Safe to delete once the old
             # cookies have aged out of circulation.
             stale_session_cookie_cleanup_plugin(
-                cookie_domains=[mitlearn_api_domain.removeprefix("api")],
+                cookie_domains=[learn_session.cookie_domain],
             ),
             # 327 callbacks a day on api.learn.mit.edu come back from Keycloak
             # with error=temporarily_unavailable instead of a code, and the
@@ -1754,9 +1715,7 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
             # currently sends Keycloak an http:// redirect_uri, and answers with
             # an OIDC session cookie over cleartext.
             oidc_gateway_pre_function_plugin(
-                session_cookie_names=[
-                    mit_learn_session_cookie_name(stack_info.env_suffix)
-                ],
+                session_cookie_names=[learn_session.cookie_name],
             ),
         ],
     ),
@@ -1768,12 +1727,11 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         OLApisixSharedPluginsVariant(
             name="ol-mitlearn-external-service-browser-apisix-plugins",
             resource_suffix="ol-browser-shared-plugins",
-            # CI/QA soak before Production, same rollout shape as enable_gzip's
-            # own soak: the thresholds above are sized from 30d of
-            # api.learn.mit.edu traffic, not from measured Production request
-            # volume under load. Flip to unconditional True once that's
-            # confirmed; #5562 tracks the SSR-side limiter this doesn't cover.
-            enable_rate_limiting=stack_info.env_suffix != "production",
+            # Per-client-IP backstop against a single noisy source. It does not
+            # stop distributed crawlers (a few requests a minute per IP across
+            # thousands of IPs), and #5562 tracks the SSR-side limiter it
+            # doesn't cover.
+            enable_rate_limiting=True,
         ),
     ],
 )
@@ -2000,23 +1958,20 @@ mitlearn_celery_beat_config = OLApplicationK8sCeleryBeatConfig(
 # stack's `mitlearn:vars` is what makes mit-learn register the warehouse-pull
 # beat entries (it requires STARROCKS_HOST and STARROCKS_USER together), so
 # minting credentials for a stack that has no host would rotate a StarRocks
-# user on every refresh for nothing. Only CI lacks a StarRocks cluster
-# entirely; QA has one but is held back for the reason recorded in
-# Pulumi.QA.yaml.
+# user on every refresh for nothing. Only CI sets no host.
 starrocks_vault_mount_path = (
     "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
 )
 
-# The StarRocks credential reaches the app through env_from_secret_names, i.e.
-# envFrom, so its values become pod environment variables fixed at pod start.
-# Re-rendering the Kubernetes Secret does not touch a running pod. Vault
-# rotates this lease on its own (the StarRocks role's max TTL is six months),
-# so without these restart targets the rotation lands in the Secret, Vault
-# revokes the old StarRocks user with DROP USER, and beat keeps authenticating
-# as a user that no longer exists -- the sync stops until something unrelated
-# rolls the pods. That failure is silent in exactly the way the missing
-# configuration this PR fixes was.
-starrocks_secret_restart_targets = [
+# The StarRocks and Opik credentials reach the app through env_from_secret_names,
+# i.e. envFrom, so their values become pod environment variables fixed at pod
+# start. Re-rendering the Kubernetes Secret does not touch a running pod. Vault
+# rotates the StarRocks lease on its own (the StarRocks role's max TTL is six
+# months), so without these restart targets the rotation lands in the Secret,
+# Vault revokes the old StarRocks user with DROP USER, and beat keeps
+# authenticating as a user that no longer exists -- the sync stops until
+# something unrelated rolls the pods, and nothing reports it.
+env_secret_restart_targets = [
     OLVaultRestartTarget(kind="Deployment", name=deployment_name)
     for deployment_name in application_deployment_names(
         application_name="mitlearn",
@@ -2026,7 +1981,7 @@ starrocks_secret_restart_targets = [
 ]
 
 # Create all Kubernetes secrets needed by the application
-secret_names, secret_resources = create_mitlearn_k8s_secrets(
+secret_names, optional_secret_names, secret_resources = create_mitlearn_k8s_secrets(
     stack_info=stack_info,
     mitlearn_namespace=learn_namespace,
     k8s_global_labels=k8s_app_labels,
@@ -2036,7 +1991,8 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
     starrocks_vault_mount_path=starrocks_vault_mount_path,
-    starrocks_restart_targets=starrocks_secret_restart_targets,
+    restart_targets=env_secret_restart_targets,
+    memory_enabled=memory_enabled,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -2051,6 +2007,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_app_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
+        optional_env_from_secret_names=optional_secret_names,
         application_min_replicas=mitlearn_config.get_int("min_replicas") or 2,
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,
@@ -2064,45 +2021,40 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
             workers=2,
-            # Sized against the VPA *floor* (3.5Gi in production), not the declared
-            # 3200Mi limit, because the floor is the smallest limit a pod can be
-            # running under and therefore the one the cap has to beat. The component's
-            # own floor(limit/workers*0.9) would give 1440, leaving the worker pair at
-            # 2880Mi with almost nothing left for the master under the floor.
+            # Sized against the lowest limit a production pod can run under: the VPA
+            # floor (mitlearn:webapp_vpa_min_allowed_memory, 3.5Gi) at the 1:1
+            # request:limit ratio, so 3584Mi as admitted by the VPA. Not the declared
+            # 3200Mi, which a pod only runs under if VPA admission doesn't mutate it.
             #
-            # Raised again 2026-08-07, 1350 -> 1500. The previous 1350 (pair 2700Mi,
-            # ~370Mi margin under a 3Gi floor) was sized against a 2774Mi peak that
-            # was itself measured while the fleet was over-scaled (the two inert Prometheus
-            # triggers left the undersized-request CPU trigger pegging the HPA near
-            # max_replicas and spreading traffic thin). PR #5303 raised the CPU request, so
-            # the HPA settled into a much smaller replica range,
-            # container RSS to 3045-3069Mi within a day -- eating the margin and
-            # reviving the OOMKills. 2*1500 = 3000Mi leaves ~580Mi under the new 3.5Gi
-            # floor for the master and transient overshoot, sized with more headroom
-            # than before since this margin has now been eaten twice. See
-            # les-root-cause-found-mit-learn-s-aug-6-cpu-request-b-cfebf0 (witan) for
-            # the full investigation.
+            # The cap has to leave room for a planned respawn. Granian starts the
+            # replacement worker before stopping the old one (one worker at a time),
+            # so at the moment a cap trips the container holds both workers at up to
+            # the cap plus the new worker's import. The component's
+            # resolve_workers_max_rss formula (worker_startup_rss can't be passed
+            # alongside an explicit cap) applied to the floor:
+            #   floor((0.9 * 3584 - 650) / 2) = 1287
+            #   2 * 1287 + 650 = 3224Mi, leaving 360Mi for the master and growth
+            #   between RSS samples.
+            # 650MiB is a fresh worker's share of container RSS about a minute after
+            # an RSS respawn (630-650MiB on 2026-10-27; fresh pods sit at 836/913MiB
+            # p50/p90 for master plus both workers 30-150s after start, 7d).
             #
-            # Coupled to `workers` and to the VPA floor: both must be revisited
-            # together. Dropping to workers=1 without resizing this would cap the sole
-            # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
+            # The previous 1500 needed 2 * 1500 + 650 = 3650Mi, over the 3584Mi floor.
+            # On 2026-10-26 a crawler surge pushed workers to the cap while the VPA
+            # held pods at the floor, and the respawns OOMKilled pods until the
+            # Deployment had none available at 04:58Z.
+            #
+            # Coupled to `workers` and to the VPA floor: revisit all three together.
+            # On granian 2.8 (mit-learn#4024) each worker owns its listener, so a
+            # respawn is covered only by the other worker; workers=1 also needs
+            # respawn_interval above the worker cold start. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
-            # The image runs granian 2.8.3 since mit-learn 0.81.8 (mit-learn#4024). On
-            # 2.8 each worker owns its listener, so a respawn is covered only by the
-            # other worker. Moving to workers=1 also needs respawn_interval set above
-            # the worker cold start, or every respawn refuses connections.
-            #
-            # This is one value across all stacks, while the VPA floor it is sized
-            # against is production-only (CI/QA keep the 256Mi default). That is not
-            # the protection gap it looks like: a cap only guards anything when
-            # 2*cap + master fits under the running limit, and no cap derived from
-            # the 3200Mi declared limit fits under a VPA floor of 256Mi. Below a
-            # ~2300Mi limit the cap is inert at 1080, 1350 and 1500 alike, so CI/QA
-            # are no worse off than before. Making it genuinely track the limit the
-            # kernel enforces needs a runtime cgroup read, not a synth-time constant
-            # -- tracked as tk-evaluate-runtime-cgroup-derived-workers-max-rss.
-            workers_max_rss=1500,
+            # One value across all stacks, but CI/QA keep the 256Mi VPA floor, under
+            # which no cap fits and the cap is inert. Tracking the limit the kernel
+            # enforces needs a runtime cgroup read, not a synth-time constant:
+            # tk-evaluate-runtime-cgroup-derived-workers-max-rss.
+            workers_max_rss=1287,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
@@ -2171,71 +2123,48 @@ mitlearn_k8s_app = OLApplicationK8s(
     ),
 )
 
+# Both route groups on this host read and write the shared MIT Learn session;
+# LearnSession pins everything the other participants (learn-ai,
+# mitxonline's /mitxonline/*, ol-analytics-api's Learn host) must agree on.
+# The route groups only decide where each resource's logout happens.
+mitlearn_login_paths = ["/admin/login/*", "/login", "/login/*"]
+mitlearn_route_group_no_prefix = OLApisixOIDCRouteGroup(
+    hosts=[mitlearn_api_domain],
+    login_paths=mitlearn_login_paths,
+)
+mitlearn_route_group = OLApisixOIDCRouteGroup(
+    hosts=[mitlearn_api_domain],
+    path_prefix="learn",
+    login_paths=mitlearn_login_paths,
+)
+mitlearn_oidc_credentials = OLApisixOIDCVaultCredentials(
+    path=LearnSession.vault_path,
+    vaultauth=vault_k8s_resources.auth_name,
+)
+# mit-learn exchanges the forwarded X-Access-Token for its memory token
+# (profiles/memory.py), so only a stack with memory enabled receives it.
 mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
     f"ol-mitlearn-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
-    oidc_config=OLApisixOIDCConfig(
+    oidc_config=learn_session_oidc_config(
+        learn_session,
+        mitlearn_route_group_no_prefix,
         application_name="mitlearn-k8s-no-prefix",
         k8s_labels=application_labels,
         k8s_namespace=learn_namespace,
-        oidc_logout_path="/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/logout/",
-        oidc_session_absolute_timeout=60 * 20160,
-        # Disable APISIX's own idling/rolling checks (which otherwise default
-        # to 15min/60min) so the session envelope lasts the full 14-day
-        # absolute_timeout above, matching the Keycloak SSO session and
-        # browser cookie lifetime instead of expiring early (hq#8416).
-        oidc_session_idling_timeout=0,
-        oidc_session_rolling_timeout=0,
-        # Broadened from the default host-only scope so a logged-in session
-        # cookie is also sent to ol-analytics-api's Learn-scoped host
-        # (analytics.learn.mit.edu et al.), letting its "pass" route recognize
-        # the same session instead of requiring a second login -- see
-        # ol_analytics_api/__main__.py's Learn-scoped OIDC resource, which
-        # shares this same "sso/mitlearn" Vault path/client and mirrors this
-        # cookie domain.
-        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
-        # Environment-scoped name instead of lua-resty-session's default
-        # "session". Required because of the broadened cookie domain above:
-        # a *.learn.mit.edu cookie is also sent to the RC and CI hosts, where
-        # a same-named cookie from another environment cannot be decrypted.
-        # Shared with learn-ai and ol-analytics-api -- see the helper's
-        # docstring.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
-            stack_info.env_suffix,
-        ),
-        oidc_use_session_secret=True,
-        credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
+        credentials=mitlearn_oidc_credentials,
+        set_access_token_header=memory_enabled,
     ),
 )
 mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
     f"ol-mitlearn-k8s-olapisixoidcresources-{stack_info.env_suffix}",
-    oidc_config=OLApisixOIDCConfig(
+    oidc_config=learn_session_oidc_config(
+        learn_session,
+        mitlearn_route_group,
         application_name="mitlearn-k8s",
         k8s_labels=application_labels,
         k8s_namespace=learn_namespace,
-        oidc_logout_path="/learn/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
-        oidc_session_absolute_timeout=60 * 20160,
-        # See the mitlearn-k8s-no-prefix resources above for why these are 0,
-        # and for the cookie domain and name below.
-        oidc_session_idling_timeout=0,
-        oidc_session_rolling_timeout=0,
-        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
-            stack_info.env_suffix,
-        ),
-        oidc_use_session_secret=True,
-        credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
+        credentials=mitlearn_oidc_credentials,
+        set_access_token_header=memory_enabled,
     ),
 )
 
@@ -2249,12 +2178,12 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
     },
 )
 # Why this host needs the User-Agent clause, not just the Origin match: the
-# Next.js SSR layer reaches api.learn as `axios/1.12.2`
-# (frontends/api/package.json) from four AWS egress addresses, and on
-# 2026-09-21 the busiest of them sustained 371-676 req/min -- 11.3 req/s
-# against the 50 req/s per-IP bucket the browser-* routes carry. It misses
-# these routes today only because Node axios sends no Origin header, which is
-# an accident of the HTTP client rather than a decision.
+# Next.js SSR layer reaches api.learn as `mit-learn-ssr/<version>`
+# (frontends/main/src/bootstrap/api.ts) from four AWS egress addresses, and on
+# 2026-09-21 (when it still sent `axios/1.12.2`) the busiest of them sustained 371-676 req/min -- 11.3 req/s
+# against the 50 req/s per-IP bucket the browser-* routes carry. Without the
+# clause it would miss these routes only because Node axios sends no Origin
+# header, which is an accident of the HTTP client rather than a decision.
 #
 # Measured while choosing the clause: crawlers DO replay our Origin
 # (DuckDuckBot, DuckAssistBot, and an Amazon Bedrock knowledge base, the last
@@ -2279,198 +2208,112 @@ fastly_api_match_exprs = [
     }
 ]
 
+# With "service" granularity APISIX has a single node (the ClusterIP), so when
+# a webapp pod dies (OOMKill, crash, spot interruption) the refused connection
+# has nowhere to be retried and the client gets a 502. Resolving to pod IPs
+# lets APISIX retry it on another pod. retries=1 caps the extra attempts at one
+# instead of APISIX's default of one per remaining pod.
+webapp_endpoint_routing = mitlearn_config.get_bool("webapp_endpoint_routing") or False
+webapp_backend: dict[str, Any] = {
+    "backend_service_name": mitlearn_k8s_app.application_lb_service_name,
+    "backend_service_port": mitlearn_k8s_app.application_lb_service_port_name,
+    "backend_resolve_granularity": "endpoint" if webapp_endpoint_routing else "service",
+}
+if webapp_endpoint_routing:
+    OLApisixUpstream(
+        name=f"ol-mitlearn-k8s-apisix-upstream-{stack_info.env_suffix}",
+        upstream_config=OLApisixUpstreamConfig(
+            service_name=mitlearn_k8s_app.application_lb_service_name,
+            k8s_namespace=learn_namespace,
+            k8s_labels=application_labels,
+            retries=1,
+        ),
+    )
+
+
+def mitlearn_route_configs(
+    route_group: OLApisixOIDCRouteGroup, oidc: OLApisixOIDCResources
+) -> list[OLApisixRouteConfig]:
+    """Return one route group's fastly-*, browser-* and unmatched routes.
+
+    :param route_group: Where the routes are served.
+    :param oidc: The OIDC resources built for ``route_group``.
+    :returns: Route configs for one ``OLApisixRoute``.
+    :rtype: list[OLApisixRouteConfig]
+    """
+    # fastly-* sits below browser-*: browser requests via Fastly carry both
+    # Origin and Fastly-Client-IP, so the more specific browser-* match must be
+    # evaluated first or the broad Fastly-Client-IP presence check swallows all
+    # browser traffic and the rate-limited routes never trigger.
+    fastly = route_group.route_configs(
+        oidc,
+        route_name_prefix="fastly-",
+        passauth_priority=20,
+        priority=30,
+        shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+        rewrite_plugins=[proxy_rewrite_plugin_config],
+        exprs=fastly_api_match_exprs,
+        **webapp_backend,
+    )
+    browser = route_group.route_configs(
+        oidc,
+        route_name_prefix="browser-",
+        passauth_priority=40,
+        priority=50,
+        shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+        rewrite_plugins=[proxy_rewrite_plugin_config],
+        exprs=browser_api_match_exprs,
+        **webapp_backend,
+    )
+    passauth, logout_redirect, reqauth = route_group.route_configs(
+        oidc,
+        shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+        rewrite_plugins=[proxy_rewrite_plugin_config],
+        **webapp_backend,
+    )
+    # Credential metadata generation calls a frontier model once per Open
+    # Badges field (gpt-5 and Claude measure 25-46s each, generated
+    # concurrently), so it does not fit the 60s read timeout every route
+    # takes by default. Since the nginx sidecar was dropped and APISIX
+    # proxies to Granian directly this route's timeout is the only ceiling
+    # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
+    #
+    # A route of its own rather than a raised timeout on "passauth": that
+    # one matches every path, so lifting its ceiling would let any slow
+    # request in the application hold a connection three times as long.
+    # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
+    # (120s), below this, so a slow model is recorded as a failed
+    # generation rather than surfacing here as a gateway timeout.
+    credential_metadata = OLApisixRouteConfig(
+        route_name="credential-metadata",
+        priority=10,
+        timeout_read="180s",
+        shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+        plugins=[
+            proxy_rewrite_plugin_config,
+            oidc.get_full_oidc_plugin_config(unauth_action="pass"),
+        ],
+        hosts=route_group.hosts,
+        paths=[route_group.path("/api/v0/credential_metadata/")],
+        **webapp_backend,
+    )
+    return [
+        *fastly,
+        *browser,
+        passauth,
+        credential_metadata,
+        logout_redirect,
+        reqauth,
+    ]
+
+
 learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
     route_configs=[
-        OLApisixRouteConfig(
-            route_name="fastly-passauth",
-            # Lower priority than browser-* (see below): browser requests via
-            # Fastly carry both Origin and Fastly-Client-IP, so the more
-            # specific browser-* match must be evaluated first or the
-            # broader ".+"  Fastly-Client-IP match here swallows all browser
-            # traffic and the rate-limited routes never trigger (found by
-            # Sentry AI review on this PR).
-            priority=20,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/*"],
-            exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-logout-redirect",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/logout/oidc/*"],
-            exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-reqauth",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/admin/login/*",
-                "/login",
-                "/login/*",
-            ],
-            exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-passauth",
-            # Higher priority than fastly-* above: Origin is the more
-            # specific signal for direct browser traffic and must win the
-            # match before the broad Fastly-Client-IP presence check.
-            priority=40,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/*"],
-            exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-logout-redirect",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/logout/oidc/*"],
-            exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-reqauth",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/admin/login/*",
-                "/login",
-                "/login/*",
-            ],
-            exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        # Credential metadata generation calls a frontier model once per Open
-        # Badges field (gpt-5 and Claude measure 25-46s each, generated
-        # concurrently), so it does not fit the 60s read timeout every route
-        # takes by default. Since the nginx sidecar was dropped and APISIX
-        # proxies to Granian directly this route's timeout is the only ceiling
-        # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
-        #
-        # A route of its own rather than a raised timeout on "passauth": that
-        # one matches every path, so lifting its ceiling would let any slow
-        # request in the application hold a connection three times as long.
-        # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
-        # (120s), below this, so a slow model is recorded as a failed
-        # generation rather than surfacing here as a gateway timeout.
-        OLApisixRouteConfig(
-            route_name="credential-metadata",
-            priority=10,
-            timeout_read="180s",
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/api/v0/credential_metadata/"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/logout/oidc/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/admin/login/*",
-                "/login",
-                "/login/*",
-            ],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        *mitlearn_route_configs(
+            mitlearn_route_group_no_prefix, mitlearn_k8s_app_oidc_resources_no_prefix
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
         # for "no policy published"). "passauth" above would otherwise proxy
@@ -2495,8 +2338,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             hosts=[mitlearn_api_domain],
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -2520,197 +2362,13 @@ learn_external_service_apisix_route = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
-    route_configs=[
-        OLApisixRouteConfig(
-            route_name="fastly-passauth",
-            # See the matching comment on the no-prefix route set above:
-            # lower priority than browser-* so the more specific Origin
-            # match is evaluated first.
-            priority=20,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/*"],
-            exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-logout-redirect",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/logout/oidc/*"],
-            exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-reqauth",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/learn/admin/login/*",
-                "/learn/login",
-                "/learn/login/*",
-            ],
-            exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-passauth",
-            # Higher priority than fastly-* above: see the matching comment
-            # on the no-prefix route set.
-            priority=40,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/*"],
-            exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-logout-redirect",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/logout/oidc/*"],
-            exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-reqauth",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/learn/admin/login/*",
-                "/learn/login",
-                "/learn/login/*",
-            ],
-            exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        # Credential metadata generation calls a frontier model once per Open
-        # Badges field (gpt-5 and Claude measure 25-46s each, generated
-        # concurrently), so it does not fit the 60s read timeout every route
-        # takes by default. Since the nginx sidecar was dropped and APISIX
-        # proxies to Granian directly this route's timeout is the only ceiling
-        # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
-        #
-        # A route of its own rather than a raised timeout on "passauth": that
-        # one matches every path, so lifting its ceiling would let any slow
-        # request in the application hold a connection three times as long.
-        # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
-        # (120s), below this, so a slow model is recorded as a failed
-        # generation rather than surfacing here as a gateway timeout.
-        OLApisixRouteConfig(
-            route_name="credential-metadata",
-            priority=10,
-            timeout_read="180s",
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/api/v0/credential_metadata/"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/logout/oidc/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/learn/admin/login/*",
-                "/learn/login",
-                "/learn/login/*",
-            ],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
-        ),
-    ],
+    route_configs=mitlearn_route_configs(
+        mitlearn_route_group, mitlearn_k8s_app_oidc_resources
+    ),
     opts=ResourceOptions(
         delete_before_replace=True,
     ),
 )
-
 
 # VPA objects for mit-learn workloads.
 # The webapp's memory VPA is created by OLApplicationK8s (manage_webapp_memory_vpa)
@@ -2777,5 +2435,11 @@ export(
             mitlearn_vault_iam_role.backend, mitlearn_vault_iam_role.name
         ).apply(lambda role: f"{role[0]}/roles/{role[1]}"),
         "app_security_group_id": mitlearn_app_security_group.id,
+        "rds_host": mitlearn_db.db_instance.address,
+        **(
+            {"rds_replica_host": mitlearn_db.db_replica.address}
+            if mitlearn_db_config.read_replica
+            else {}
+        ),
     },
 )

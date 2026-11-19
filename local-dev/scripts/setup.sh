@@ -42,6 +42,9 @@ HOSTS=(
     # ocw-hugo-themes dev server, run on the host and fronted by APISIX so it
     # has an origin inside .learn.${ROOT_DOMAIN} (see apps/mit-learn/ocw-hugo-dev.yaml)
     "ocw-dev.learn.${ROOT_DOMAIN}"
+    # ol-analytics-api's Learn-scoped host, which the org analytics dashboard
+    # calls (only deployed when ol-analytics-api is in enabled_apps)
+    "analytics.learn.${ROOT_DOMAIN}"
     # mitxonline's routes serve the api host too, and its post-logout
     # redirect goes there
     "mitxonline.${ROOT_DOMAIN}"
@@ -72,6 +75,8 @@ HOSTS=(
     "mail.${ROOT_DOMAIN}"
     # Grafana (logs from every local-dev service)
     "grafana.${ROOT_DOMAIN}"
+    # Qdrant dashboard (the vector database's bundled web UI)
+    "qdrant.${ROOT_DOMAIN}"
     # Open edX (composed from lehrer; only deployed with --enabled_apps openedx,
     # but /etc/hosts has no wildcard so the names must exist unconditionally).
     # No MFE entry: Site Projects are served as an LMS sub-path, and that route
@@ -367,6 +372,12 @@ if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
     # sure the registry is reachable from the cluster network regardless.
     docker network connect "k3d-${CLUSTER_NAME}" "${REGISTRY_NAME}" 2>/dev/null || true
 else
+    # Image stores teardown.sh kept (`volumes:` in k3d-config.yaml); the new
+    # nodes mount them, so images already pulled once don't download again.
+    KEPT_IMAGE_VOLUMES="$(docker volume ls -q | grep -c "^${CLUSTER_NAME}-containerd-" || true)"
+    if (( KEPT_IMAGE_VOLUMES > 0 )); then
+        ok "Reusing node images kept by teardown.sh (${KEPT_IMAGE_VOLUMES} volumes)."
+    fi
     k3d cluster create --config "${K3D_CONFIG}"
     ok "Cluster '${CLUSTER_NAME}' created."
 fi

@@ -11,6 +11,8 @@ config:
   mitxonline:k8s_deploy: "true"
   mitxonline:dev_shell_enabled: false
   mitxonline:learn_backend_domain: "api.ci.learn.mit.edu"
+  mitxonline:openedx_login_gate:
+    lms_host: "courses.ci.learn.mit.edu"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-ci"
     CORS_ALLOWED_ORIGINS: "https://ci.mitxonline.mit.edu,https://ci.learn.mit.edu"
@@ -22,12 +24,10 @@ config:
     GTM_TRACKING_ID: "GTM-TW97MNR"
     KEYCLOAK_BASE_URL: "https://sso-ci.ol.mit.edu"
     KEYCLOAK_CLIENT_ID: "ol-mitxonline-client"
-    KEYCLOAK_REALM_NAME: "olapps"
     LOGOUT_REDIRECT_URL: "https://courses.ci.learn.mit.edu/logout"
     MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mitxonline-ci-mail.mitxonline.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mitxonline-ci-mail.mitxonline.mit.edu"
     MAILGUN_WEBHOOK_VALIDATE_SIGNATURE: "true"
-    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
     MITOL_APIGATEWAY_USERINFO_UPDATE: "false"
     MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (ci)"
     MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW: "4"
@@ -48,7 +48,7 @@ config:
     SENTRY_LOG_LEVEL: "ERROR"
     SESSION_COOKIE_NAME: "session_mitxonline_ci"
     MIT_LEARN_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
-    MIT_LEARN_DASHBOARD_URL: "https://learn.mit.edu/dashboard"
+    MIT_LEARN_DASHBOARD_URL: "https://ci.learn.mit.edu/dashboard"
     VERIFIABLE_CREDENTIAL_SIGNER_URL: "http://dcc.ci.learn.mit.edu/instance/default/credentials/issue"
   redis:password:
     secure: v1:N1ZyKKPiMa/DaKYH:Y8NIcmgFnBBjTIUkT6PeefRnINIjVI/MMmX8IXKfxF5bLfMjRT/6dG8eYwMtHFSRMn+Kb1ZEJod3oqiSeMdeidttL4LPKK0=

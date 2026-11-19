@@ -91,6 +91,15 @@ def build_witan_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_PROJECT_PATH),
+            # The witan stack reads its image's HTTP-contract label with the
+            # omnigraph stack's reader, which imports the council probe's
+            # contract list, so a change to either has to redeploy witan too.
+            str(PULUMI_CODE_PATH.joinpath("applications/omnigraph/image_schema.py")),
+            str(
+                PULUMI_CODE_PATH.joinpath(
+                    "applications/omnigraph/scripts/check_council_health.py"
+                )
+            ),
             *project_version_paths("applications/witan/"),
             *project_secrets_paths("applications/witan/"),
         ],

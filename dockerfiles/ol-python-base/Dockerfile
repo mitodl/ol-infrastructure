@@ -62,6 +62,11 @@ RUN apt-get update && \
       ca-certificates \
       curl \
       git \
+      # less registers the /usr/bin/pager alternative, which Debian's psql runs
+      # when PAGER is unset. DHI's util-linux ships `more` but doesn't register
+      # it, so without this any psql result long enough to page (e.g. in
+      # `manage.py dbshell`) fails with "sh: pager: command not found".
+      less \
       libffi-dev \
       libjpeg-dev \
       libpq-dev \
@@ -94,7 +99,7 @@ RUN command -v which >/dev/null 2>&1 || \
     update-alternatives --install /usr/bin/which which /usr/bin/which.debianutils 0
 
 # Install uv (pinned via the upstream tag; bump deliberately).
-COPY --from=ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 /uv /uvx /usr/local/bin/
 
 # Non-root runtime user and the directories the apps expect to own.
 RUN adduser --disabled-password --gecos "" mitodl && \

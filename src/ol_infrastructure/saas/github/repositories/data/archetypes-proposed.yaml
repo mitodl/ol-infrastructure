@@ -40,8 +40,10 @@ archived:
 - custom-courses-on-edx-slides
 - dagster-formula
 - datadog-formula
+- default-labels-repo
 - discern
 - django-cas
+- django-cas-mapper
 - django-elastic-transcoder
 - django-formula
 - django-server-status
@@ -61,6 +63,7 @@ archived:
 - edx-video-api
 - edx2bigquery
 - edx2course_axis
+- edxcut
 - elastic-stack-formula
 - elasticsearch-formula
 - flask-log
@@ -89,10 +92,13 @@ archived:
 - mdl-react-components
 - mga
 - micromasters-templates
+- mit-moira
+- mit-open-bk
 - mit-open-login-button
 - mit_lti_flask_sample
 - mitili
 - mitx-devstack
+- mitx_cas_mapper
 - mitxpro-openedx-extensions
 - mongodb-formula
 - monit-formula
@@ -131,7 +137,9 @@ archived:
 - python-formula
 - rabbitmq-formula
 - rapid-response-xblock
+- realistic-mm-users
 - reddit
+- reddit-config
 - reddit-formula
 - refresh_token
 - salt-extensions
@@ -145,6 +153,7 @@ archived:
 - standalone-course-prototype
 - superset-marimo
 - teachersportal
+- template-mit-demo
 - tika-formula
 - travisfail
 - tubular
@@ -155,6 +164,8 @@ archived:
 - uwsgi-formula
 - vault-formula
 - webcast.mit.edu
+- world_geographic_regions
+- xanalytics
 - xbundle
 - xsiftx
 - zookeeper-formula
@@ -223,7 +234,6 @@ fork:
 - library
 - library-customization
 - micromasters-zendesk-theme
-- mit-open-bk
 - mitxonline-translations
 - mitxonline-zendesk-theme
 - mitxpro-zendesk-theme
@@ -271,10 +281,7 @@ library:
 - apisix-testbed
 - common-access
 - course-search-utils
-- default-labels-repo
 - django-aqueduct
-- django-cas-mapper
-- edxcut
 - eslint-config
 - gwarek
 - hacksnack
@@ -284,10 +291,8 @@ library:
 - learn-ai
 - lehrer
 - mit-learn-api-clients
-- mit-moira
 - mitx-grading-library
 - mitx-theme
-- mitx_cas_mapper
 - mitxonline-api-clients
 - mitxonline-theme
 - mitxpro-theme
@@ -310,16 +315,11 @@ library:
 - open-video-data
 - platform-engineering-site
 - product
-- realistic-mm-users
-- reddit-config
 - redux-asserts
 - redux-hammock
 - smoot-design
 - superset-nl-explorer
 - tech-talk-slides
-- template-mit-demo
 - vault-plugin-database-starrocks
 - vault-raft-backup
 - video_translation_demo
-- world_geographic_regions
-- xanalytics

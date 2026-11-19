@@ -64,3 +64,10 @@ data:
 
   # Status token
   STATUS_TOKEN: "local"
+
+  # ui.apps refuses to start unless every settings.MANDATORY_SETTINGS entry
+  # has a value, and most of them are AWS, CloudFront, Dropbox, YouTube and
+  # Mailgun credentials the tracked config can't ship. Skip the check so the stack
+  # boots without them; features that need those services fail when used.
+  # Real values go in app-env.local.yaml (see the .example).
+  ENFORCE_MANDATORY_SETTINGS: "False"

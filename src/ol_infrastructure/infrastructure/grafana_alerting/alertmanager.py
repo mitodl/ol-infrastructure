@@ -140,6 +140,9 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             "node",
             "job_name",
             "instance",
+            # metric_rules/telemetry_archive.py aggregates ruler failures by
+            # Mimir rule group.
+            "rule_group",
             # The edge-level equivalent of the labels above: metric_rules/
             # apisix_edge.py aggregates `sum by (matched_host)`, so this is the
             # only resource-identifying label its alerts carry. Without it every
@@ -200,6 +203,10 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             "daemon_type",
             "tick_type",
             "relation",
+            # log_rules/omnigraph_versions.py aggregates `by (cluster, graph)`.
+            # Without this, two graphs crossing a threshold together arrive
+            # as one notification.
+            "graph",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.

@@ -17,7 +17,10 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
-    create_pkce_client_policy,
+    ADMIN_API_SCOPE_NAME,
+    MANAGED_CLIENT_ARGS,
+    REALM_DEFAULT_OPTIONAL_SCOPES,
+    create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     NameIdFormat,
@@ -152,7 +155,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
         opts=resource_options,
     )
 
-    create_pkce_client_policy(ol_mit_realm.id, "ol-mit", resource_options)
+    create_client_policies(ol_mit_realm.id, "ol-mit", resource_options)
 
     # Realm roles for broad access control.  Applications may introduce their own
     # client roles; these realm roles serve as a cross-cutting layer and as targets
@@ -379,8 +382,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-mit-ovs-redirect-uris"
@@ -392,9 +394,23 @@ def create_ol_mit_realm(  # noqa: PLR0913
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # Grant the service account realm-management roles for user and group management.
-    # These are consumed by the moira-to-keycloak migration management commands via
-    # the Keycloak admin API (client_credentials grant against /realms/master).
+    # Optional, not default: this client also signs users in, and their tokens
+    # should not carry the Admin API audience. The service account requests it
+    # with scope=kc-admin-api. It declared no scopes before, so the optional set
+    # keeps the realm defaults alongside it.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-mit-ovs-client-optional-scopes",
+        realm_id=ol_mit_realm.id,
+        client_id=ol_mit_ovs_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
+
+    # OVS looks up users by email and reads groups, a user's groups, group members
+    # and group attributes, which view-users covers (it is a composite of
+    # query-users and query-groups).
+    # manage-users is for the assign_group_users management command, which adds
+    # existing users to a group.
     realm_management_client = keycloak.openid.get_client(
         realm_id=ol_mit_realm.id,
         client_id="realm-management",
@@ -403,8 +419,6 @@ def create_ol_mit_realm(  # noqa: PLR0913
     for resource_name, role in [
         ("ol-mit-ovs-sa-manage-users", "manage-users"),
         ("ol-mit-ovs-sa-view-users", "view-users"),
-        ("ol-mit-ovs-sa-query-users", "query-users"),
-        ("ol-mit-ovs-sa-query-groups", "query-groups"),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
@@ -684,8 +698,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-mit-ocw-studio-redirect-uris"

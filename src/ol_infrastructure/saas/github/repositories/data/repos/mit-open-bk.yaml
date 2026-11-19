@@ -8,7 +8,7 @@ _visibility: public
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
-archetype: fork
+archetype: archived
 default_branch: master
 has_discussions: false
 has_issues: true

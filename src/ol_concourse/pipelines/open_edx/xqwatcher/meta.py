@@ -16,6 +16,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo
 
+from bridge.settings.openedx.accessors import filter_deployments_by_application
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
@@ -87,7 +88,14 @@ def build_meta_job(release_name):
     )
 
 
-meta_jobs = [build_meta_job(release_name) for release_name in OpenEdxSupportedRelease]
+# A release with no xqwatcher deployments yields a pipeline with an unused
+# deploy resource, which fails validation, so only generate pipelines for
+# releases that deploy it.
+meta_jobs = [
+    build_meta_job(release_name)
+    for release_name in OpenEdxSupportedRelease
+    if filter_deployments_by_application(release_name, "xqwatcher")
+]
 meta_jobs.append(build_meta_job("meta"))
 
 meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
@@ -101,8 +109,9 @@ if __name__ == "__main__":
         user_data={
             "description": (
                 "Regenerates and applies the per-release xqwatcher pipelines "
-                "(`docker-pulumi-xqwatcher-{release}`) for every "
-                "`OpenEdxSupportedRelease`, plus this meta pipeline itself."
+                "(`docker-pulumi-xqwatcher-{release}`) for each "
+                "`OpenEdxSupportedRelease` that deploys xqwatcher, plus this "
+                "meta pipeline itself."
             ),
             "team": "main",
             "category": "meta",

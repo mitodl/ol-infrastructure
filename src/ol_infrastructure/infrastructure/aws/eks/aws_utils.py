@@ -18,6 +18,11 @@ from ol_infrastructure.lib.ol_types import (
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+# How long the node termination handler waits for a drain to finish before giving
+# up. The node group termination lifecycle hooks in __main__.py are sized from
+# this, so the instance stays up for the whole drain.
+NTH_NODE_TERMINATION_GRACE_PERIOD_SECONDS = 120
+
 
 def setup_aws_integrations(
     aws_account,
@@ -372,6 +377,7 @@ def setup_aws_integrations(
             version=versions["AWS_LOAD_BALANCER_CONTROLLER_CHART"],
             namespace="kube-system",
             cleanup_on_fail=True,
+            max_history=10,
             timeout=600,
             # The CRDs are applied above as their own Pulumi resource. Helm would
             # only write them on a fresh install anyway, which is the bug.
@@ -455,6 +461,7 @@ def setup_aws_integrations(
             version=versions["AWS_NODE_TERMINATION_HANDLER_CHART"],
             namespace="kube-system",
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=True,
             values={
                 "podLabels": node_termination_labels,
@@ -468,9 +475,21 @@ def setup_aws_integrations(
                 "enableSpotInterruptionDraining": True,
                 "enableASGLifecycleDraining": True,
                 "enableScheduledEventDraining": True,
-                "enableRebalanceMonitoring": True,
-                "enableRebalanceDraining": True,
+                # Ignore rebalance recommendations. Draining on them is meant for
+                # ASGs that replace the instance on rebalance, and Karpenter nodes
+                # aren't in one. In Production, rebalance drains outnumbered real
+                # spot interruptions 431 to 142 over 14 days, and a drain blocked
+                # by a PDB retries every 5 s until the node goes away (one handler
+                # pod logged ~16k rejections in that window). Cordon-only is no
+                # better: it leaves the node unschedulable with no replacement,
+                # which is why Karpenter's interruption queue omits rebalance
+                # events (src/ol_infrastructure/substructure/aws/eks/karpenter.py).
+                # Spot interruption notices are still drained here and by
+                # Karpenter.
+                "enableRebalanceMonitoring": False,
+                "enableRebalanceDraining": False,
                 "emitKubernetesEvents": True,
+                "nodeTerminationGracePeriod": NTH_NODE_TERMINATION_GRACE_PERIOD_SECONDS,
                 "podTerminationGracePeriod": 30,
                 # 24Mi (set in #3560, never revisited) is fine for idle
                 # steady-state -- 5 of 6 daemonset pods are healthy at

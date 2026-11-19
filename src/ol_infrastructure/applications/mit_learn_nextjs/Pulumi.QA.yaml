@@ -12,6 +12,7 @@ config:
   nextjs:gtm_cookies_win: "x"
   nextjs:gtm_preview: "env-3"
   nextjs:gtm_tracking_id: "GTM-NMJ2CT6T"
+  nextjs:educator_share_story_url: "https://docs.google.com/forms/d/e/1FAIpQLSetc1AAJN6vG9SQG1zYxh1hXhe6uLMByOmIJwVxM9Ykakdlyw/viewform"
   nextjs:embedly_key:
     secure: v1:1+Ibvcym7D5UMBPn:kQV6cI3kOhR2uGeeQCQdEvp9gYyfIKv5wInPQzzmnaZhMMAjPBDAJIoyx2zREBGB
   nextjs:mitlearn_api_base_url: "https://api.rc.learn.mit.edu"

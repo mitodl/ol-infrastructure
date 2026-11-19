@@ -14,6 +14,7 @@ config:
     GITHUB_APP_ID: 12
     GITHUB_RATE_LIMIT_CHECK: "False"
     GITHUB_WEBHOOK_BRANCH: 'release-candidate'
+    OCW_HUGO_TAG_RELEASES: "True"
     GTM_ACCOUNT_ID: GTM-5JZ7X78
     MAILGUN_FROM_EMAIL: 'MIT OCW <no-reply@ocw-ci.mail.odl.mit.edu'
     MAILGUN_SENDER_DOMAIN: 'ocw-ci.mail.odl.mit.edu'

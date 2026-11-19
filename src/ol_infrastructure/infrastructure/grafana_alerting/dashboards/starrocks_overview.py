@@ -28,9 +28,10 @@ Metric quirks this dashboard works around:
   `gauge` but are brpc `bvar::Adder`s that only grow, so they are read with
   `rate()`/`increase()` like counters.
 - Failure counts are graphed as per-minute rates rather than
-  `increase(...[$__interval])`: at a 60s step over a 30s scrape each window
-  holds about two samples, so increments falling between windows vanish and
-  the rest are extrapolated (prod's first ~45 minutes: compaction successes
+  `increase(...[$__interval])`: at a 60s step over a 60s scrape each window
+  holds about one sample, so increments falling between windows vanish and
+  the rest are extrapolated (with the earlier 30s scrape, prod's first ~45
+  minutes: compaction successes
   summed per interval to 2 against an `increase()` of ~5 over the same
   span). Totals come from `increase(...[$__range])`.
 - `fslib_*_latency` histograms are in microseconds.

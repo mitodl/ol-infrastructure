@@ -5,6 +5,7 @@ import json
 import mimetypes
 import textwrap
 from pathlib import Path
+from typing import Literal
 
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
@@ -21,42 +22,37 @@ from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 
 from bridge.lib.constants import (
     FASTLY_A_TLS_1_3,
-    apisix_oidc_session_cookie_name,
-    mit_learn_session_cookie_name,
 )
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
-    DEFAULT_WSGI_PORT,
-    STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.learn_ai import definition
+from ol_infrastructure.applications.learn_ai.vault_secrets import (
+    secret_named,
+    undescribed_static_keys,
+    vault_secrets,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.apisix import (
-    OLApisixOIDCConfig,
     OLApisixOIDCResources,
-    OLApisixOIDCVaultCredentials,
-    OLApisixPluginConfig,
     OLApisixRoute,
-    OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
-    stale_session_cookie_cleanup_plugin,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
-    GranianConfig,
     OLApplicationK8s,
-    OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryRedisConfig,
-    OLApplicationK8sCeleryWorkerConfig,
-    OLApplicationK8sConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SDynamicSecretConfig,
@@ -64,6 +60,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResourcesConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -94,14 +91,16 @@ from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
-    KubernetesServiceAppProtocol,
     Services,
+)
+from ol_infrastructure.lib.opik import (
+    OPIK_SDK_VAULT_MOUNT,
+    opik_api_url,
+    opik_sdk_vault_path,
 )
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
-    format_docker_image_ref,
     make_stack_reference,
-    merge_otel_resource_attributes,
     parse_stack,
 )
 from ol_infrastructure.lib.stack_defaults import defaults
@@ -117,7 +116,6 @@ cluster_substructure_stack = make_stack_reference(
 )
 dns_stack = make_stack_reference(projects.DNS, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
-opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
@@ -136,7 +134,6 @@ learn_ai_config = Config("learn_ai")
 vault_config = Config("vault")
 
 slack_channel = learn_ai_config.get("slack_channel")  # Optional Slack channel
-apisix_ingress_class = learn_ai_config.get("apisix_ingress_class") or "apisix"
 
 setup_vault_provider(stack_info)
 fastly_provider = get_fastly_provider()
@@ -146,7 +143,7 @@ k8s_global_labels = K8sGlobalLabels(
 ).model_dump()
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
-learn_ai_namespace = "learn-ai"
+learn_ai_namespace = definition.NAMESPACE
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(learn_ai_namespace, ns)
 )
@@ -157,11 +154,10 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
-# CI and QA use SigV4-signed Fastly->S3 requests, so the bucket can be fully
-# private instead of public-read (hq#13287 item 1; mit-learn runs the same
-# pattern in every environment). Production stays on the public-read policy
-# until QA has been validated.
-_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa"}
+# Every environment uses SigV4-signed Fastly->S3 requests, so the bucket can be
+# fully private instead of public-read (hq#13287 item 1; mit-learn runs the same
+# pattern). Kept as a flag so production can be rolled back by dropping it here.
+_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa", "production"}
 
 learn_ai_app_storage_bucket_config = S3BucketConfig(
     bucket_name=learn_ai_app_storage_bucket_name,
@@ -551,11 +547,24 @@ if _learn_ai_bucket_is_sigv4_piloted and learn_ai_fastly_s3_signer_access_key:
             secret_access_key=learn_ai_fastly_s3_signer_access_key.secret,
         ).apply(json.dumps),
     )
+
+
+def learn_ai_static_secret_data(sentry_dsn: str) -> dict[str, str]:
+    """Return what the stack writes to secret-learn-ai/secrets."""
+    return {**learn_ai_vault_secrets, "SENTRY_DSN": sentry_dsn}
+
+
+# vault_secrets.py describes what pods read from this path; a key it lacks would
+# reach the pods deployed and go unnoticed by the local-dev program.
+undescribed = undescribed_static_keys(learn_ai_static_secret_data(""))
+if undescribed:
+    msg = f"Keys not described in learn_ai/vault_secrets.py: {', '.join(undescribed)}"
+    raise ValueError(msg)
 learn_ai_static_vault_secrets = vault.generic.Secret(
     f"learn-ai-secrets-{stack_info.env_suffix}",
     path=learn_ai_vault_mount.path.apply("{}/secrets".format),
     data_json=sentry_stack.require_output("learn_ai_sentry_dsn").apply(
-        lambda dsn: json.dumps({**learn_ai_vault_secrets, "SENTRY_DSN": dsn})
+        lambda dsn: json.dumps(learn_ai_static_secret_data(dsn))
     ),
 )
 
@@ -689,6 +698,25 @@ vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
+# The bindings below take these too, so the restart targets name the Deployments
+# the component goes on to create.
+learn_ai_sizing = definition.LearnAiSizing()
+learn_ai_celery_topology: Literal["per-queue", "merged"] = "per-queue"
+
+# Every Secret below reaches the webapp, celery worker and beat pods through
+# envFrom, so its values are environment variables fixed at pod start, and VSO
+# re-rendering the Secret doesn't touch a running pod. Worse, a Pulumi run that
+# changes a Vault value and the pod template together rolls the pods straight
+# away, while VSO picks up the new value only on its next refresh (up to
+# refreshAfter later), so the new pods start with the old value. With these
+# targets VSO rolling-restarts every Deployment when a Secret's content changes.
+env_secret_restart_targets = [
+    OLVaultRestartTarget(kind="Deployment", name=name)
+    for name in definition.deployment_names(
+        learn_ai_sizing, celery_topology=learn_ai_celery_topology
+    )
+]
+
 # Load the database creds into a k8s secret via VSO
 db_creds_secret_name = "pgsql-db-creds"  # noqa: S105  # pragma: allowlist secret
 db_creds_secret = Output.all(
@@ -706,11 +734,15 @@ db_creds_secret = Output.all(
             labels=k8s_global_labels,
             mount=learn_ai_db.app_db_vault_backend.db_mount.path,
             path="creds/app",
-            restart_target_kind="Deployment",
-            restart_target_name="learn-ai-app",
-            templates={
-                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username"}}}}:{{{{ get .Secrets "password" }}}}@{db["address"]}:{db["port"]}/{db["db_name"]}',
-            },
+            restart_targets=env_secret_restart_targets,
+            templates=secret_named(
+                vault_secrets(
+                    database_mount=learn_ai_db.app_db_vault_backend.db_mount.path,
+                    database_host=f"{db['address']}:{db['port']}",
+                    database_name=db["db_name"],
+                ),
+                "learn-ai-db-creds",
+            ).templates,
             vaultauth=vault_k8s_resources.auth_name,
         ),
         opts=ResourceOptions(
@@ -762,6 +794,7 @@ static_secrets = OLVaultK8SSecret(
         includes=["*"],
         excludes=[],
         exclude_raw=True,
+        restart_targets=env_secret_restart_targets,
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -771,12 +804,12 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
-# Opik LLM-observability credentials. The ``ol-opik-client`` Keycloak client
-# (client-credentials grant) and its realm discovery URL are published by the
-# keycloak substructure to Vault at ``secret-operations/sso/opik``. Sync them
-# into a K8s secret via VSO and expose them to the app as the OPIK_KEYCLOAK_*
-# env vars. The token endpoint is derived from the realm ``url`` key so it stays
-# correct across environments (sso-ci / sso-qa / sso) without hardcoding.
+# Opik LLM-observability credentials. Every environment traces to the Production
+# Opik (lib/opik.py), so this is learn-ai's Production Keycloak client for this
+# environment, ``opik-learn-ai-<env>`` (client-credentials grant), which the
+# Production keycloak substructure writes to ``secret-opik/sdk-learn-ai`` in this
+# environment's Vault. Sync it into a
+# K8s secret via VSO and expose it to the app as the OPIK_KEYCLOAK_* env vars.
 opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(
     name=f"learn-ai-{stack_info.env_suffix}-opik-keycloak-secret",
@@ -786,17 +819,14 @@ opik_keycloak_secret = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=opik_keycloak_secret_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
+        mount=OPIK_SDK_VAULT_MOUNT,
         mount_type="kv-v1",
-        path="sso/opik",
-        restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
-        templates={
-            "OPIK_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "OPIK_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OPIK_KEYCLOAK_TOKEN_URL": (
-                '{{ get .Secrets "url" }}/protocol/openid-connect/token'
-            ),
-        },
+        path=opik_sdk_vault_path("learn-ai"),
+        restart_targets=env_secret_restart_targets,
+        templates=secret_named(
+            vault_secrets(database_mount="", database_host="", database_name=""),
+            "learn-ai-opik-keycloak",
+        ).templates,
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -833,25 +863,26 @@ else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
 
-# Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
-# the opik application stack's exported URL so it tracks the deployed instance
-# per environment; the workspace/project are static for our OSS install. The
-# Keycloak client id/secret and token URL arrive via envFrom (see the VSO secret
-# above). Note: do NOT set OPIK_API_KEY — the app's Keycloak auth flow owns the
-# Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
+# Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is the Production
+# Opik's API for every environment; the workspace/project are static for our OSS
+# install. learn-ai traces its chatbots through ol-llm, which puts
+# OL_LLM_ENVIRONMENT on every trace and span as Opik's environment, and that is what
+# tells the environments apart in the shared learn-ai project. The Opik SDK stamps
+# OPIK_ENVIRONMENT on whatever it traces without ol-llm. Both are the stack's
+# environment, so QA reports "qa" as mit-learn and dagster do, not
+# MITOL_ENVIRONMENT's "rc", which the app otherwise falls back to. The Keycloak
+# client id/secret and token URL arrive via envFrom (see the VSO secret above). Do
+# NOT set OPIK_API_KEY: ol-llm refuses to start with it alongside the OPIK_KEYCLOAK_*
+# variables (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
 env_vars.update(
     {
-        "OPIK_URL_OVERRIDE": opik_stack.require_output("opik_url").apply(
-            lambda url: f"{url}/api/"
-        ),
+        "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
+        "OPIK_URL_OVERRIDE": opik_api_url(),
         "OPIK_WORKSPACE": "default",
         "OPIK_PROJECT_NAME": "learn-ai",
+        "OPIK_ENVIRONMENT": stack_info.env_suffix,
     }
 )
-
-# Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
-# signals carry organizational metadata regardless of stack environment.
-merge_otel_resource_attributes(env_vars, k8s_global_labels)
 
 # Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
 # CPU trigger as a backstop, matching edxapp, mit-learn and mitxonline. CPU is an
@@ -878,149 +909,61 @@ learn_ai_webapp_keda_config = build_webapp_keda_config(
     route_matcher=f"learn-ai_.*learn-ai-{stack_info.env_suffix}-https-olapisixroute_.*",
     container_name="learn-ai-app",
     requests_threshold=learn_ai_config.get("autoscaling_requests_threshold") or "20",
-    latency_threshold=learn_ai_config.get("autoscaling_latency_threshold") or "2000",
+    # No latency trigger by default: about half of learn-ai's requests are LLM
+    # agent calls (/ai/http/*_agent/) that take 2-10s, so p95 sat above 4.4s in
+    # every hourly sample of the week to 2026-10-28 and a 2000ms trigger held
+    # the production webapp at max replicas for 60+ days at ~0.25 req/s. Adding
+    # replicas cannot shorten an LLM response. Set
+    # `learn_ai:autoscaling_latency_threshold` on a stack to opt back in.
+    latency_threshold=learn_ai_config.get("autoscaling_latency_threshold"),
     cpu_threshold=learn_ai_config.get("autoscaling_cpu_threshold") or "60",
 )
 
-# Instantiate the OLApplicationK8s component
-learn_ai_app_k8s = OLApplicationK8s(
-    ol_app_k8s_config=OLApplicationK8sConfig(
-        project_root=Path(__file__).parent,
-        application_config=env_vars,
-        application_name="learn-ai",
-        application_namespace=learn_ai_namespace,
-        application_lb_service_name="learn-ai-webapp",
-        application_lb_service_port_name="http",
-        application_lb_service_app_protocol=KubernetesServiceAppProtocol.WS,
-        k8s_global_labels=k8s_global_labels,
-        env_from_secret_names=[
-            db_creds_secret_name,
-            redis_creds_secret_name,
-            static_secrets_name,
-            opik_keycloak_secret_name,
-        ],
-        application_security_group_id=learn_ai_application_security_group.id,
-        # Use the fixed name used in the SecurityGroupPolicy spec
-        application_security_group_name=Output.from_input("learn-ai-app"),
-        application_service_account_name=learn_ai_service_account.metadata.name,
-        extra_volumes=azure_identity_volumes,
-        extra_volume_mounts=azure_identity_volume_mounts,
-        application_image_repository="mitodl/learn-ai-app",
-        **docker_image_config_kwargs("LEARN_AI"),
-        application_min_replicas=learn_ai_config.get("min_replicas") or 2,
-        application_cmd_array=["uvicorn"],
-        application_arg_array=[
-            "main.asgi:application",
-            "--reload",
-            "--host",
-            "0.0.0.0",  # noqa: S104
-            "--port",
-            f"{DEFAULT_WSGI_PORT}",
-        ],
-        granian_config=GranianConfig(
-            interface="asgi",
-            workers=1,
-            # Above the measured cold start: RSS respawns in production took 14.7-19.5s
-            # from "Spawning worker-1" to "Started worker-1" (2026-10-14). On the 2.7.x
-            # the image ships today the main process holds the listener, so this only
-            # lets the old worker keep serving through the import instead of
-            # connections queueing for it. On 2.8.x the old worker is stopped after
-            # this interval whether or not the new one is listening, so Granian's 3.5s
-            # default would refuse connections for ~15s per respawn. Set ahead of the
-            # bump, since pyproject allows granian<3 and a lockfile refresh alone moves
-            # it (mit-learn#4024).
-            respawn_interval=60,
-            # Fresh pods sit at 523-595MiB container RSS (7d to 2026-10-15). On an
-            # RSS respawn the old worker keeps draining long-lived streamed responses
-            # beside the new one (up to ~22 minutes observed), so the cap has to leave
-            # room for both. All 3 OOMKills in the 14 days to 2026-10-15 came 65-90s
-            # into a respawn, two of them at the 1536Mi floor limit.
-            worker_startup_rss=600,
-            runtime_mode=None,
-            # Holding pin: the component default dropped to 1. asgi forces
-            # blocking_threads=1 regardless, so this is the only axis on which the
-            # overhaul touches learn_ai until its review task.
-            # See docs/plans/granian-configuration-overhaul.md
-            runtime_threads=2,
-            no_ws=False,
-            backlog=None,
-            log_level="debug",
-            application_module="main.asgi:application",
-            nginx_config_filename="web.conf",  # learn_ai shares one nginx config for all server types
-            enable_metrics=True,
-            # Serve /static/* from Granian's Rust layer instead of the sidecar
-            # (docs/plans/remove-nginx-sidecar.md, stage 4), matching the
-            # STATIC_ROOT/STATIC_URL precedent from ocw_studio/xpro. Only
-            # meaningful when the sidecar is actually dropped below, i.e. in
-            # the use_granian branch.
-            static_path_mounts=["/src/staticfiles"],
-            static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
-        )
-        if learn_ai_config.get_bool("use_granian")
-        else None,
-        slack_channel=slack_channel,
-        vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        # The sidecar is only redundant once Granian is actually serving the
-        # app (static_path_mounts above); the use_granian=False branch still
-        # runs bare uvicorn with no static handling of its own, so it keeps
-        # the sidecar. See docs/plans/remove-nginx-sidecar.md.
-        import_nginx_config=not learn_ai_config.get_bool("use_granian"),
-        # Nginx resources (defaults from component are fine)
-        # App container resources
-        # Steady-state working set runs 600-630Mi; MainConfig.ready() eagerly
-        # imports litellm, so exec'ing a shell or running a management command
-        # in a live pod has no headroom against a 1000Mi limit. Keep the
-        # request where actual usage sits and raise the limit for burst room.
-        # The limit is also the lowest one the memory VPA admits a pod with (it
-        # keeps the request:limit ratio and floors the request), so it sets the
-        # Granian RSS cap: (0.9 * 2048 - worker_startup_rss 600) = 1243MiB. That is
-        # close to the 1382MiB cap 1536Mi gave without the reservation, so respawns
-        # stay about as frequent (34 in 14 days). The p90 pod peaked at 1312MiB
-        # container RSS over the 7 days to 2026-10-15.
-        resource_requests={"cpu": "100m", "memory": "1000Mi"},
-        resource_limits={"memory": "2048Mi"},
-        init_migrations=True,
-        init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
-        # Both queues run --concurrency=2 prefork (component default), so each
-        # forked child re-pays the litellm import cost -- steady-state working
-        # set already sits at 815-930Mi against the old 1000Mi limit (one
-        # queue has already been OOMKilled in production). Raise the limit to
-        # give the prefork children room without changing the pool model.
-        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
-            host=redis_cache.address,
-            password=redis_config.require("password"),
-        ),
-        celery_worker_configs=[
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="default",
-                resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1536Mi"},
-            ),
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="edx_content",
-                resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1536Mi"},
-            ),
-        ],
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            scheduler="celery.beat.PersistentScheduler",
-            # learn-ai's main.apps.MainConfig.ready() unconditionally imports
-            # litellm (added in 0.36.2 to fix a separate memory leak), which
-            # beat now pays for at boot despite never executing LLM code --
-            # 384Mi no longer covers that baseline import cost and beat
-            # OOMKilled on every startup. Matching the other three containers
-            # at 1000Mi/1000Mi (zero memory headroom) still wasn't
-            # enough -- prod shows ~25 beat restarts/week -- so give it the
-            # same limit bump as the rest of the app.
-            resource_requests={"cpu": "10m", "memory": "1000Mi"},
-            resource_limits={"memory": "1536Mi"},
-        ),
-        # hpa_scaling_metrics is left at the component default. It is unused here:
-        # the component builds a KEDA ScaledObject instead of a native HPA when
-        # webapp_keda_config is set, and the CPU backstop lives in the KEDA triggers.
-        # Memory is managed vertically by the component's webapp memory VPA.
-        webapp_keda_config=learn_ai_webapp_keda_config,
+learn_ai_api_domain = learn_ai_config.require("backend_domain")
+learn_api_domain = learn_ai_config.require("learn_backend_domain")
+_min_replicas = learn_ai_config.get_int("min_replicas")
+min_replicas = 2 if _min_replicas is None else _min_replicas
+
+bindings = definition.LearnAiBindings(
+    env_suffix=stack_info.env_suffix,
+    hostnames=definition.LearnAiHostnames(
+        api=learn_ai_api_domain,
+        frontend=learn_ai_frontend_domain,
+        learn_api=learn_api_domain,
     ),
+    environment_variables=env_vars,
+    cors_frontend_origins=learn_ai_config.require_object("cors_frontend_origins"),
+    k8s_labels=k8s_global_labels,
+    secret_names=[
+        db_creds_secret_name,
+        redis_creds_secret_name,
+        static_secrets_name,
+    ],
+    # Optional so pods start before the Production keycloak stack writes it.
+    optional_secret_names=[opik_keycloak_secret_name],
+    **docker_image_config_kwargs("LEARN_AI"),
+    cluster=definition.ClusterCapabilities(
+        security_group_id=learn_ai_application_security_group.id,
+        # Use the fixed name used in the SecurityGroupPolicy spec
+        security_group_name=Output.from_input("learn-ai-app"),
+        vault_auth_name=vault_k8s_resources.auth_name,
+    ),
+    service_account_name=learn_ai_service_account.metadata.name,
+    min_replicas=min_replicas,
+    sizing=learn_ai_sizing,
+    celery_topology=learn_ai_celery_topology,
+    slack_channel=slack_channel,
+    celery_redis=OLApplicationK8sCeleryRedisConfig(
+        host=redis_cache.address,
+        password=redis_config.require("password"),
+    ),
+    webapp_keda=learn_ai_webapp_keda_config,
+    extra_volumes=azure_identity_volumes,
+    extra_volume_mounts=azure_identity_volume_mounts,
+)
+
+learn_ai_app_k8s = OLApplicationK8s(
+    ol_app_k8s_config=definition.application_config(bindings),
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[
@@ -1037,67 +980,10 @@ learn_ai_app_k8s = OLApplicationK8s(
     ),
 )
 
-# Reconstruct variables needed for Celery deployment
-application_image_repository_and_tag = format_docker_image_ref(
-    "mitodl/learn-ai-app", "LEARN_AI"
-)
-
-learn_ai_deployment_env_vars = []
-for k, v in (learn_ai_config.require_object("env_vars") or {}).items():
-    learn_ai_deployment_env_vars.append(
-        kubernetes.core.v1.EnvVarArgs(
-            name=k,
-            value=v,
-        )
-    )
-
-# Build a list of sensitive env vars for the deployment config via envFrom
-learn_ai_deployment_envfrom = [
-    # Database creds
-    kubernetes.core.v1.EnvFromSourceArgs(
-        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-            name=db_creds_secret_name,
-        ),
-    ),
-    # Redis Configuration
-    kubernetes.core.v1.EnvFromSourceArgs(
-        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-            name=redis_creds_secret_name,
-        ),
-    ),
-    # static secrets from secrets-learn-ai/secrets
-    kubernetes.core.v1.EnvFromSourceArgs(
-        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
-            name=static_secrets_name,
-        ),
-    ),
-]
-
 # Create the apisix custom resources since it doesn't support gateway-api yet
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
-
-# Origins allowed to read learn-ai responses cross-origin, with credentials.
-# This shared config is attached to routes on both of learn-ai's hosts (the
-# legacy api-learn-ai.ol.mit.edu and the /ai/* paths on
-# api.<env>.learn.mit.edu), so it has to cover every frontend that calls either
-# one: learn-ai's own UI and hosts, plus every other frontend that embeds the
-# chat widget, listed per stack in cors_frontend_origins: mit-learn, and each
-# Open edX LMS whose ol-openedx-chat aside calls /ai/* on
-# api.<env>.learn.mit.edu from the learning MFE.
-#
-# Not read out of the stack's CSRF_ALLOWED_ORIGINS -- that list names the same
-# four origins on QA and Production but omits the learn.mit.edu pair on CI, even
-# though learn-ai serves api.ci.learn.mit.edu there. The gateway's headers are
-# what the browser enforces, so a gap here silently breaks the widget rather
-# than Django's CSRF check.
-learn_ai_cors_allow_origins = [
-    f"https://{learn_ai_frontend_domain}",
-    f"https://{learn_ai_config.require('backend_domain')}",
-    f"https://{learn_ai_config.require('learn_backend_domain')}",
-    *learn_ai_config.require_object("cors_frontend_origins"),
-]
 
 # Instantiate shared plugins component
 learn_ai_shared_plugins = OLApisixSharedPlugins(
@@ -1108,328 +994,53 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_ai_namespace,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
-        cors_allow_origins=learn_ai_cors_allow_origins,
-        plugins=[
-            # Both of learn-ai's OIDC resources have now moved off
-            # lua-resty-session's default "session" name, so every current user
-            # has a dead one of those in their browser: on the legacy host from
-            # this file's own rename, and on api.<env>.learn.mit.edu from the
-            # rename in #5219.  Nothing else evicts them -- #5219 attached no
-            # cleanup to learn-ai, and mit-learn's cleanup only fires on
-            # responses from mit-learn's own routes, not from /ai/*.
-            #
-            # No cookie_domains: this config is referenced from both hosts, and a
-            # Domain=.learn.mit.edu deletion emitted from api-learn-ai.ol.mit.edu
-            # would just be rejected by the browser.  Host-only is also the only
-            # scope learn-ai ever wrote a "session" cookie at, on either host.
-            # Safe to delete once the old cookies have aged out of circulation.
-            stale_session_cookie_cleanup_plugin(),
-        ],
+        cors_allow_origins=definition.cors_allow_origins(bindings),
+        plugins=definition.shared_plugins(bindings),
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-# Instantiate OIDC resources component for learn-ai's own legacy host.
-#
-# This one deliberately sets no cookie domain: the legacy host is not under
-# learn.mit.edu, so a Domain=.learn.mit.edu cookie would be rejected there
-# outright.  A host-only cookie is correct for it -- there is no mit-learn
-# session on that host to share.  The routes served from mit-learn's own host
-# use the separate resource below.
 learn_ai_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-{stack_info.env_suffix}-oidc-resources",
-    oidc_config=OLApisixOIDCConfig(
-        application_name="learn-ai",
-        k8s_labels=k8s_global_labels,
-        k8s_namespace=learn_ai_namespace,
-        # Narrower than the component default, which adds organization:*.  Safe
-        # on this host: its session is not shared with mit-learn, and learn-ai's
-        # own APISIX_USERDATA_MAP reads no organization claim.
-        oidc_scope="openid profile email",
-        oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
-        oidc_logout_path="/logout",
-        oidc_post_logout_redirect_uri="/",
-        oidc_session_idling_timeout=0,
-        oidc_session_rolling_timeout=0,
-        # Its own name, not the shared MIT Learn one: this host is not under
-        # learn.mit.edu, so no mit-learn cookie is ever sent here and there is no
-        # session to share -- naming it after mit-learn would only mislead
-        # whoever next reads a Cookie header from this host.  The resource below
-        # is the one that actually participates in the shared MIT Learn session.
-        oidc_session_cookie_name=apisix_oidc_session_cookie_name(
-            "learn-ai",
-            stack_info.env_suffix,
-        ),
-        oidc_use_session_secret=True,
-        credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",  # Use mitlearn SSO config
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-    ),
+    oidc_config=definition.direct_oidc_config(bindings),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )
 
-learn_ai_api_domain = learn_ai_config.require("backend_domain")  # Legacy domain
-learn_api_domain = learn_ai_config.require("learn_backend_domain")  # New domain
-
-# Instantiate a second OIDC resource for the /ai/* routes served from mit-learn's
-# own host (api.<env>.learn.mit.edu).
-#
-# Identical to the legacy-host resource above apart from the cookie domain,
-# which is why it has to be a separate resource rather than one shared config:
-# the domain lives on the plugin config, and a single config cannot be both
-# host-only on api-learn-ai.ol.mit.edu and domain-scoped on
-# api.<env>.learn.mit.edu.  ol_analytics_api/__main__.py splits its own
-# .ol.mit.edu and .learn.mit.edu hosts into "<app>" and "<app>-learn" resources
-# for the same reason.
-#
-# The domain is what matters here.  These routes' unauth_action="pass" plugins
-# recognize the session mit-learn's login flow set, which requires the cookie
-# name to match -- but the "reqauth" route below performs a real login
-# (unauth_action="auth" on /ai/http/login/, which the learn-ai frontend uses as
-# its log-in link).  Without a matching domain that login writes a *host-only*
-# cookie on api.<env>.learn.mit.edu under the shared name: a second, separate
-# entry in the browser's jar that shadows mit-learn's .learn.mit.edu cookie,
-# since a cookie's identity includes whether it is host-only.  Both are then
-# sent on every request and the gateway reads whichever comes first, so an OIDC
-# callback can be handed a session envelope with no state for the flow in
-# progress.  With the domain set, all of them read and write the one shared
-# cookie.
 learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-mit-learn-{stack_info.env_suffix}-oidc-resources",
-    oidc_config=OLApisixOIDCConfig(
-        application_name="learn-ai-mit-learn",
-        k8s_labels=k8s_global_labels,
-        k8s_namespace=learn_ai_namespace,
-        # No oidc_scope override, unlike the legacy-host resource above: the
-        # "reqauth" route below writes the shared session, so it has to request
-        # the same claims mit-learn's own login does.  The component default
-        # adds organization:*, which mit-learn maps to users.User.organizations
-        # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
-        oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
-        # Prefixed, because logout_path is compared against the un-rewritten
-        # request URI and every request on this host arrives under /ai/.  Both
-        # the plugin (openid-connect.lua reads ctx.var.request_uri) and
-        # lua-resty-openidc (ngx.var.request_uri) read the original URI, which
-        # proxy-rewrite never touches -- it sets upstream_uri -- so this holds
-        # regardless of the order the two plugins run in.  The comparison is
-        # exact string equality, which is what the "logout-redirect" route
-        # below exists to satisfy.
-        #
-        # An unprefixed "/logout" therefore never matched anything here, so
-        # learn-ai's plugin never performed a logout of its own.  What logged
-        # people out instead was a three-hop detour: "logout-redirect" 302'd to
-        # mit-learn's /logout, whose CustomLogoutView cleared the mit-learn
-        # Django session and -- seeing the gateway header still present --
-        # bounced to OIDC_LOGOUT_URL, which is mit-learn's own /logout/oidc.
-        # That did end the shared session, but by way of another application's
-        # views, and it left learn-ai's own post_logout_redirect_uri dead.
-        oidc_logout_path="/ai/logout/oidc",
-        # mit-learn's own post-logout landing, not a learn-ai path: the session
-        # being destroyed is the shared MIT Learn one, and learn-ai has no
-        # logout view of its own (main/urls.py).  Its CustomLogoutView clears
-        # the mit-learn Django session -- which otherwise outlives the gateway
-        # session -- and sends the browser on to the Learn frontend.  Keycloak
-        # accepts it: this is byte-identical to the URI mit-learn's own
-        # resource passes, and ol-mitlearn-client's end_session endpoint takes
-        # it in CI, RC and Production (an unregistered URI gets a 400 there).
-        oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/logout/",
-        # 14 days, matching mit_learn/__main__.py.  Unset, lua-resty-session
-        # applies its compiled-in 86400 (resty/session.lua's
-        # DEFAULT_ABSOLUTE_TIMEOUT) -- and because the "reqauth" route below
-        # performs a real login that writes the *shared* cookie, a user who
-        # logged in through /ai/http/login/ got a one-day MIT Learn session
-        # while one who logged in through mit-learn got fourteen.
-        oidc_session_absolute_timeout=60 * 20160,
-        oidc_session_idling_timeout=0,
-        oidc_session_rolling_timeout=0,
-        oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
-        # Must track mit_learn/__main__.py's oidc_session_cookie_name exactly.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
-            stack_info.env_suffix,
-        ),
-        oidc_use_session_secret=True,
-        credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",  # Use mitlearn SSO config
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
-    ),
+    oidc_config=definition.prefixed_oidc_config(bindings),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )
 
-# ApisixUpstream resources don't seem to work but we don't really need them?
-# Ref: https://github.com/apache/apisix-ingress-controller/issues/1655
-# Ref: https://github.com/apache/apisix-ingress-controller/issues/1855
+# The routes resolve to pod IPs, so a connection refused or reset by a pod that
+# just died (OOMKill, crash, spot interruption) is retried on another pod
+# instead of becoming a 502. retries=1 caps the extra attempts at one instead
+# of APISIX's default of one per remaining pod ("set according to the number
+# of available backend nodes by default",
+# https://apisix.apache.org/docs/apisix/admin-api/#upstream).
+learn_ai_apisix_upstream = OLApisixUpstream(
+    f"learn-ai-{stack_info.env_suffix}-webapp-apisix-upstream",
+    upstream_config=OLApisixUpstreamConfig(
+        service_name=definition.WEBAPP_SERVICE_NAME,
+        k8s_namespace=learn_ai_namespace,
+        k8s_labels=k8s_global_labels,
+        retries=1,
+    ),
+)
 
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_route_v2/
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_route/
-
-# Define proxy-rewrite plugin once
-proxy_rewrite_plugin = OLApisixPluginConfig(
-    name="proxy-rewrite",
-    enable=True,
-    config={
-        "regex_uri": [
-            "/ai/(.*)",
-            "/$1",
-        ],
-    },
-)
 
 # Instantiate ApisixRoute component for the learn.mit.edu address
 mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     f"mit-learn-learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
-    route_configs=[
-        # Protected route for canvas syllabus agent - requires canvas_token header
-        #
-        # Referenced no plugin config until now, unlike every sibling on this
-        # host, so it was the one learn-ai path emitting no prometheus series and
-        # no OTLP span.  Attaching the shared config is safe even though these
-        # are the streaming agent endpoints: the shared `gzip` deliberately
-        # leaves `text/event-stream` out of its `types` list, so an SSE response
-        # is not held in a compression buffer.  `passauth` below, which already
-        # references the same config, matches the rest of the same streaming
-        # prefix -- so this route was carrying the exception without benefiting
-        # from it.
-        OLApisixRouteConfig(
-            route_name="canvas_syllabus_agent",
-            priority=20,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="key-auth",
-                    config={
-                        "header": "canvas_token",
-                    },
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=["/ai/http/canvas_*"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Wildcard route that can use auth but doesn't require it
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=2,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin,
-                # Use helper from OIDC component instance
-                OLApisixPluginConfig(
-                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
-                        "pass"
-                    )
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=["/ai/*"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Strip trailing slash from logout redirect.
-        #
-        # The route-level `redirect` (uri) wholly overrides the shared
-        # `redirect` (http_to_https) rather than merging with it, so attaching
-        # the shared config leaves the rewrite intact -- the same arrangement
-        # mitxonline's and mit-learn's logout-redirect routes already run on --
-        # while restoring the prometheus/opentelemetry/gzip this route was
-        # missing.
-        #
-        # Now feeds the plugin's own logout path instead of mit-learn's
-        # /logout.  Three patterns, all landing on /ai/logout/oidc: the two
-        # exact spellings a caller would use as the human-facing entry point,
-        # plus the trailing-slash variant of the plugin path itself.
-        #
-        # A "/foo/*" pattern is a prefix match on "/foo/" and cannot match the
-        # shorter exact "/foo", which cuts both ways here.  The old
-        # "/ai/logout/*" covered /ai/logout/ but not /ai/logout, so the
-        # slashless spelling 404s today and is new rather than retained.  And
-        # /ai/logout/oidc matches none of the three patterns below, so it falls
-        # through to "passauth", whose plugin holds the logout_path and performs
-        # the real logout -- listing it here would 302 it to itself forever.
-        #
-        # Deeper paths under /ai/logout/ no longer trigger a logout, where
-        # "/ai/logout/*" swept them all in.  Deliberate: they are not endpoints,
-        # and nothing references them.
-        #
-        # No proxy-rewrite, since a matching request is answered with a 302 and
-        # never reaches the upstream -- mitxonline's and mit-learn's equivalents
-        # omit it for the same reason.
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect",
-                    config={
-                        "uri": "/ai/logout/oidc",
-                    },
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=["/ai/logout", "/ai/logout/", "/ai/logout/oidc/*"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Routes that require authentication
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin,
-                OLApisixPluginConfig(
-                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
-                        "auth"
-                    )
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=[
-                "/ai/admin/login/*",
-                "/ai/http/login/*",
-            ],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # WebSocket route for /ai/ws/* paths (using legacy ApisixRoute CRD).
-        # Note: This uses ApisixRoute where 'websocket' field IS used to enable
-        # WebSocket support. This is different from Gateway API HTTPRoute where
-        # websocket support is controlled by Service appProtocol field.
-        OLApisixRouteConfig(
-            route_name="websocket",
-            priority=1,
-            websocket=True,  # Required for ApisixRoute to enable WebSocket
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin,
-                OLApisixPluginConfig(
-                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
-                        "pass"
-                    )
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=[
-                "/ai/ws/*",
-            ],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-    ],
+    route_configs=definition.prefixed_route_configs(
+        bindings,
+        learn_ai_mit_learn_oidc_resources,
+        shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+    ),
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[learn_ai_app_k8s, learn_ai_mit_learn_oidc_resources],
@@ -1445,148 +1056,11 @@ learn_ai_https_apisix_route = OLApisixRoute(
     f"learn-ai-{stack_info.env_suffix}-https-olapisixroute",
     k8s_namespace=learn_ai_namespace,
     k8s_labels=k8s_global_labels,
-    route_configs=[
-        # Protected route for canvas syllabus agent - requires canvas_token header
-        #
-        # Referenced no plugin config until now, unlike every sibling on this
-        # host, so it was the one learn-ai path emitting no prometheus series and
-        # no OTLP span.  Attaching the shared config is safe even though these
-        # are the streaming agent endpoints: the shared `gzip` deliberately
-        # leaves `text/event-stream` out of its `types` list, so an SSE response
-        # is not held in a compression buffer.  `passauth` below, which already
-        # references the same config, matches the rest of the same streaming
-        # prefix -- so this route was carrying the exception without benefiting
-        # from it.
-        OLApisixRouteConfig(
-            route_name="canvas_syllabus_agent",
-            priority=20,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="key-auth",
-                    config={
-                        "header": "canvas_token",
-                    },
-                ),
-            ],
-            hosts=[learn_ai_api_domain],
-            paths=["/http/canvas_*"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Wildcard route that can use auth but doesn't require it
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=2,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                # Use helper from OIDC component instance
-                OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
-                ),
-            ],
-            hosts=[learn_ai_api_domain],
-            paths=["/*"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Strip trailing slash from logout redirect.
-        #
-        # The route-level `redirect` (uri) wholly overrides the shared
-        # `redirect` (http_to_https) rather than merging with it, so attaching
-        # the shared config leaves the rewrite intact -- the same arrangement
-        # mitxonline's and mit-learn's logout-redirect routes already run on --
-        # while restoring the prometheus/opentelemetry/gzip this route was
-        # missing.
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect",
-                    config={
-                        "uri": "/logout",  # Redirect within the rewritten path
-                    },
-                ),
-            ],
-            hosts=[learn_ai_api_domain],
-            paths=["/logout/*"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Routes that require authentication
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("auth")
-                ),
-            ],
-            hosts=[learn_ai_api_domain],
-            paths=[
-                "/admin/login/*",
-                "/http/login/*",
-            ],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # WebSocket route for /ws/* paths (using legacy ApisixRoute CRD).
-        # Note: This uses ApisixRoute where 'websocket' field IS used to enable
-        # WebSocket support. This is different from Gateway API HTTPRoute where
-        # websocket support is controlled by Service appProtocol field.
-        OLApisixRouteConfig(
-            route_name="websocket",
-            priority=1,
-            websocket=True,  # Required for ApisixRoute to enable WebSocket
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    **learn_ai_oidc_resources.get_full_oidc_plugin_config("pass")
-                ),
-            ],
-            hosts=[learn_ai_api_domain],
-            paths=[
-                "/ws/*",
-            ],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # The sidecar answered this with a 204 (EFF Do Not Track convention
-        # for "no policy published"). "passauth" above would otherwise proxy
-        # it through to Django, which has no view for it -- kept as a mock so
-        # a crawled path doesn't burn a Granian blocking thread on a 404. See
-        # docs/plans/remove-nginx-sidecar.md.
-        OLApisixRouteConfig(
-            route_name="dnt-policy",
-            priority=10,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            hosts=[learn_ai_api_domain],
-            paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-            plugins=[
-                OLApisixPluginConfig(
-                    name="mocking",
-                    secretRef=None,
-                    config={
-                        "response_status": 204,
-                        "response_example": "",
-                        "content_type": "text/plain",
-                        "with_mock_header": False,
-                    },
-                ),
-            ],
-        ),
-    ],
+    route_configs=definition.direct_route_configs(
+        bindings,
+        learn_ai_oidc_resources,
+        shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
+    ),
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[learn_ai_app_k8s, learn_ai_oidc_resources],
@@ -1610,30 +1084,28 @@ learn_ai_https_apisix_consumer = kubernetes.apiextensions.CustomResource(
     api_version="apisix.apache.org/v2",
     kind="ApisixConsumer",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="canvas-agent",
+        name=definition.CANVAS_AGENT_CONSUMER_NAME,
         namespace=learn_ai_namespace,
         labels=k8s_global_labels,
     ),
-    spec={
-        "ingressClassName": "apache-apisix",
-        "authParameter": {
-            "keyAuth": {
-                "value": {
-                    "key": Output.secret(
-                        read_yaml_secrets(
-                            Path(f"vault/secrets.{stack_info.env_suffix}.yaml"),
-                        )["learn_ai"]["canvas_syllabus_token"]
-                    ),
-                },
-            },
-        },
-    },
+    spec=definition.canvas_agent_consumer_spec(
+        Output.secret(
+            read_yaml_secrets(
+                Path(f"vault/secrets.{stack_info.env_suffix}.yaml"),
+            )["learn_ai"]["canvas_syllabus_token"]
+        )
+    ),
 )
 
 export(
     "learn_ai",
     {
         "rds_host": learn_ai_db.app_db.db_instance.address,
+        **(
+            {"rds_replica_host": learn_ai_db.app_db.db_replica.address}
+            if learn_ai_db.app_db_config.read_replica
+            else {}
+        ),
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
     },

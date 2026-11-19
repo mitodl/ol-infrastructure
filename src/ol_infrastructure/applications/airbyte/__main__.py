@@ -664,6 +664,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
         version=VERSIONS["AIRBYTE_CHART"],
         namespace=airbyte_namespace,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://airbytehq.github.io/charts",
         ),

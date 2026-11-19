@@ -163,8 +163,8 @@ cache over `cold_s3`. Tables move onto it one at a time. A table can only switch
 to a policy that keeps every volume and disk of its current one, which is why
 the hot volume is named `default`.
 
-`hot_data_days` is not read by the program. The move-to-cold interval lives in
-each table's TTL.
+The move-to-cold interval lives in each table's TTL; there is no stack config
+for it.
 
 Opik's `traces` and `spans` can't usefully tier as they are: they are
 unpartitioned, so each holds one or two huge parts spanning their whole history,
@@ -181,8 +181,8 @@ so we run the equivalent statements ourselves (step 7).
 
 ### Before the window
 
-1. The 26.3 server upgrade is done. The upstream cutover scripts and runbook
-   were verified against ClickHouse 26.3, and we run 24.8.
+1. Production must run 26.3. The upstream cutover scripts and runbook were
+   verified against ClickHouse 26.3.
 2. `tiered_replicated` is present on every replica:
    ```sql
    SELECT hostName(), policy_name, volume_name, disks
@@ -316,8 +316,8 @@ Sharding is only recommended when a single shard exceeds ~2 TB hot data.
 
 If the hot disk is running low, shorten the move TTL on the tiered tables
 (`ALTER TABLE ... MODIFY TTL id_at + INTERVAL <fewer weeks> WEEK TO DISK
-'cold'`, see [Tiered Storage](#tiered-storage-and-the-opik-v2-cutover)); the
-`hot_data_days` stack config does nothing. Monitor via the `system.disks` query:
+'cold'`, see [Tiered Storage](#tiered-storage-and-the-opik-v2-cutover)).
+Monitor via the `system.disks` query:
 ```sql
 SELECT name, path, free_space, total_space
 FROM system.disks
@@ -472,13 +472,32 @@ upgrade goes to QA first.
      with the `applications/clickhouse` QA stack. Production stays on the old
      version by setting `clickhouse:version` in `Pulumi.Production.yaml` until
      the canary passes. In every stack that rolls, set `clickhouse:compatibility`
-     to the version being upgraded from (e.g. `'24.8'`), so an upgraded replica
+     to the version being upgraded from (e.g. `'25.8'` for 25.8 -> 26.3), so an upgraded replica
      writes parts the others can still read, and remove it in a later change
      once every replica runs the new version. A target more than a year or two
      LTS lines newer needs an intermediate version first.
    - Operator: `CLICKHOUSE_OPERATOR_VERSION` in `bridge/lib/versions.py`,
      applied with the `data.QA` stack of `substructure/aws/eks`, which installs the
-     operator.
+     operator. The constant is shared and CI applies it on merge, so to
+     canary in QA before CI, apply `data.QA` from the branch before merging.
+     Otherwise CI goes first and QA and Production wait at their gates. The
+     apply updates the CRDs, the config
+     ConfigMaps and the `ol-overrides` ClickHouseOperatorConfiguration before
+     it replaces the operator pod (a `config.kubernetes.io/depends-on`
+     annotation on the Deployment). The Deployment uses strategy `Recreate`,
+     so during the rollout the new operator starts only after the old pod has
+     terminated: with no leader election, two running at once would both
+     reconcile. Expect no operator for the old pod's shutdown plus the new
+     one's startup. Recreate doesn't apply when the pod is evicted or deleted
+     (e.g. a node drain), so avoid draining the operator's node mid-upgrade.
+     Never
+     delete the CRDs, or move them to another ConfigGroup: deleting a CRD
+     deletes every CHI and CHK of that kind. Read the release notes for changes
+     to the Keeper defaults, which roll every Keeper pod, and for changes to
+     the generated StatefulSets, which roll every ClickHouse replica. Check the
+     new operator's startup log for the merged `reconcile.statefulSet.update.timeout`
+     (`OPERATOR_STATEFULSET_UPDATE_TIMEOUT_SECONDS`), then watch the CHI and
+     CHK reach `Completed`.
    - Keeper: `CLICKHOUSE_KEEPER_VERSION` in `bridge/lib/versions.py`, applied
      with the `applications/clickhouse` QA stack. It is a floating tag
      (`26.8-alpine`) shared by every environment and bumped by Renovate, so a
@@ -502,6 +521,12 @@ upgrade goes to QA first.
    - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
      reports `zk_server_state leader` with `zk_synced_followers 2`, the others
      `follower`.
+   - The first upgraded replica took the compatibility value before the next
+     one restarts: `getSetting('compatibility')` returns the old line, and for
+     25.8 -> 26.3 `system.merge_tree_settings` shows
+     `string_serialization_version = single_stream` and
+     `propagate_types_serialization_versions_to_nested_types = 0` (26.3's own
+     defaults are `with_size_stream` and `1`).
 4. Opik smoke check on QA. Opik runs its Liquibase migrations (against
    replica 0) only in the `backend-migrations` init container, and a
    ClickHouse upgrade does not restart Opik, so restart it first:
@@ -511,6 +536,17 @@ upgrade goes to QA first.
 5. For a server upgrade, restore the latest production backup into a scratch
    server at the new version (above) to confirm production data loads.
 6. Promote the same change to production.
+7. Once every replica in an environment runs the new version, drop the system
+   log tables the restart renamed. When a log table's definition changes (its
+   columns across server versions, e.g. `metric_log`, or its engine or TTL),
+   ClickHouse renames the old one to `<table>_N` on the first flush and never
+   writes to it again. A renamed table keeps its old engine, so one that had no
+   TTL keeps its data forever. On 2026-11-04 these held about 1 GiB per
+   production replica (`metric_log_0` through `metric_log_2`, `query_log_0`,
+   `part_log_0`, `error_log_0`, `backup_log_0`). Use the query and `DROP` from
+   the comment starting "After a change to SYSTEM_LOG_TABLES_XML rolls out" in
+   `applications/clickhouse/__main__.py`, dropping only the `<table>_N` names,
+   on each replica, since system tables are not replicated.
 
 ---
 

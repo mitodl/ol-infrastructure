@@ -22,6 +22,26 @@ class AppConfig:
     # override gets the refusal, which says what is wrong, rather than an
     # opaque Concourse 404.
     release_workflow: bool = False
+    # The jobs the bot triggers or links to, from
+    # bridge.settings.apps.release_job_names. Unset means the k8s app names,
+    # so a hand-written repos_config override that predates them still works.
+    release_job: str | None = None
+    qa_job: str | None = None
+    production_job: str | None = None
+    abandon_job: str | None = None
+
+
+_K8S_JOB_NAMES = {
+    "release_job": "build-{app}-release-image",
+    "qa_job": "deploy-ol-application-{app}-qa",
+    "production_job": "deploy-ol-application-{app}-production",
+    "abandon_job": "abandon-{app}-release",
+}
+
+
+def job_name(app_name: str, cfg: AppConfig, role: str) -> str:
+    """Return *cfg*'s job for *role* (``release_job`` and so on)."""
+    return getattr(cfg, role) or _K8S_JOB_NAMES[role].format(app=app_name)
 
 
 def release_workflow_apps(repos: dict[str, AppConfig]) -> dict[str, AppConfig]:
@@ -66,3 +86,16 @@ def load_libraries_config() -> dict[str, LibraryConfig]:
 def load_unpublishable_libraries() -> dict[str, str]:
     """Load name -> why-it-has-no-pipeline, for libraries Doof could publish."""
     return json.loads(os.environ.get("UNPUBLISHABLE_LIBRARIES", "{}"))
+
+
+def load_slack_user_overrides() -> dict[str, str]:
+    """Load commit-identity -> Slack member id overrides for author mentions.
+
+    Maps a commit email or GitHub handle to the Slack account to @-mention,
+    for the authors ``users.lookupByEmail`` cannot find (see slack_users.py).
+    Sourced from the SOPS-encrypted release_bot secret rather than
+    bridge.settings so a roster of people is not published in a public
+    repository. Optional, like LIBRARIES_CONFIG; its shape is validated at
+    ``pulumi up`` in __main__.py.
+    """
+    return json.loads(os.environ.get("SLACK_USER_OVERRIDES", "").strip() or "{}")

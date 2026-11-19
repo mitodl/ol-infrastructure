@@ -12,16 +12,28 @@ Slack returns ``missing_scope``; lookups are then disabled for the life of the
 process (one loud log line rather than an API call per author per poll) and
 every author falls back to a plain-text handle.
 
+AN EMAIL LOOKUP ONLY WORKS IF THE COMMIT EMAIL *IS* THE SLACK EMAIL, and for
+much of the team it is not. The mitxonline 2026.10.28.1 RC announcement read
+"Still waiting on: `Anas12091101`, `dsubak`, @James Kachel": only James commits
+under his Slack address. The other two commit as
+``dsubak@users.noreply.github.com`` and
+``88967643+Anas12091101@users.noreply.github.com``, addresses no Slack account
+can ever carry, so the two people who needed the ping were exactly the two who
+did not get one. ``SLACK_USER_OVERRIDES`` (``configure_overrides`` below) maps
+such identities to a Slack member id explicitly. It is consulted *before* the
+email lookup, and independently of it, so overrides still resolve on a token
+that lacks ``users:read.email`` altogether.
+
 Doof did this with a difflib fuzzy match of the git author *name* against
 every Slack user's ``real_name`` at a 0.8 threshold, because the release PR
-gave it no emails. Emails make an exact lookup possible, so the fuzzy match is
-not carried over.
+gave it no emails. That was not reliably correct and is not carried over: an
+override is an exact hand-maintained entry, never an inferred one.
 """
 
 import logging
 import re
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -40,6 +52,20 @@ _cache: dict[str, tuple[str, float]] = {}
 # fail the same way, and the checkbox watcher polls every 60s per author.
 _lookups_disabled = False
 
+# Identity -> Slack member id, from SLACK_USER_OVERRIDES. Keys are lowercased;
+# _identity_keys says what an author is matched on.
+_overrides: dict[str, str] = {}
+
+# Slack member ids: U for an ordinary account, W for an Enterprise Grid one
+# (much of this workspace is on W ids, so matching only U would reject half the
+# team). The {7,} bound is the one _ID_RE uses in slack_channels, and is a
+# floor rather than an exact length: it rejects an obviously truncated paste
+# without betting on how long Slack keeps making ids.
+# Validated at configure time because a *wrong* id fails silently -- Slack
+# renders an unresolvable `<@U123>` as literal text, which is the same
+# nobody-got-pinged outcome this list exists to fix.
+_SLACK_USER_ID_RE = re.compile(r"^[UW][A-Z0-9]{7,}$")
+
 _SLACK_MARKUP_RE = re.compile(r"[`<>&]")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+$")
 # GitHub's no-reply addresses carry the account handle: both the legacy
@@ -56,6 +82,74 @@ _GITHUB_NOREPLY_RE = re.compile(
 _BOT_AUTHOR_RE = re.compile(
     r"(\[bot\]|^(renovate|dependabot|github-actions|noreply)@)", re.IGNORECASE
 )
+
+
+def _identity_keys(author: str) -> list[str]:
+    """Return the override keys *author* may be listed under, most specific first.
+
+    An author string is whatever the release resource read out of the commit,
+    so two things are worth keying on:
+
+    * the string itself -- usually a full commit email
+      (``james@jkachel.com``), or a bare name for an author field with no
+      address in it at all;
+    * the GitHub handle, for the no-reply addresses that are the whole reason
+      this exists. Keying ``dsubak`` rather than the address covers both
+      no-reply forms at once, and the legacy one carries no account id to key
+      on anyway.
+
+    Deliberately *not* keyed on the local part of an arbitrary address:
+    treating ``jkachel@mit.edu`` and ``jkachel@tacostand.local`` as the same
+    person is a guess, and this module does not guess. List the second address
+    as well if it matters.
+    """
+    author = author.strip()
+    keys = [author.lower()]
+    noreply = _GITHUB_NOREPLY_RE.match(author)
+    if noreply:
+        keys.append(noreply.group("handle").lower())
+    return keys
+
+
+def configure_overrides(overrides: Mapping[str, str]) -> None:
+    """Install the identity -> Slack member id override list.
+
+    Called once at boot, and in tests. An entry whose value is not a member id
+    is dropped with a log line rather than taken on faith, because rendering
+    ``<@dsubak>`` puts a dead mention in a release channel that reads exactly
+    like a successful ping. Pass ``{}`` to clear.
+    """
+    _overrides.clear()
+    rejected = []
+    for identity, user_id in overrides.items():
+        # Tolerate the two shapes a human copying an id out of Slack produces:
+        # a leading "@", and the lowercase of a hand-typed id.
+        normalized = str(user_id).strip().lstrip("@").upper()
+        if not _SLACK_USER_ID_RE.match(normalized):
+            rejected.append(identity)
+            continue
+        _overrides[identity.strip().lower()] = normalized
+    # A fallback cached before configure() ran would outlive the override by a
+    # day, which is most of the way to "the fix did not ship".
+    _cache.clear()
+    if rejected:
+        log.error(
+            "Ignoring %s SLACK_USER_OVERRIDES entr(ies) whose value is not a "
+            "Slack member id (expected U… or W…, not a display name, handle, "
+            "or email): %s",
+            len(rejected),
+            ", ".join(sorted(rejected)),
+        )
+    log.info("Loaded %s Slack user override(s)", len(_overrides))
+
+
+def _override(author: str) -> str | None:
+    """Return the configured mention for *author*, or None if not listed."""
+    for key in _identity_keys(author):
+        user_id = _overrides.get(key)
+        if user_id:
+            return f"<@{user_id}>"
+    return None
 
 
 def _fallback(author: str) -> str:
@@ -110,17 +204,9 @@ def _store(author: str, rendered: str, ttl: float) -> str:
     return rendered
 
 
-async def mention(client: Any, author: str) -> str:
-    """Return ``<@U…>`` for *author*, or a plain-text fallback."""
+async def _lookup_by_email(client: Any, author: str) -> str:
+    """Resolve *author*'s commit email through Slack, and cache the outcome."""
     global _lookups_disabled  # noqa: PLW0603
-
-    cached = _cached(author)
-    if cached is not None:
-        return cached
-    if _lookups_disabled or not _EMAIL_RE.match(author):
-        return _fallback(author)
-    if _BOT_AUTHOR_RE.search(author):
-        return _store(author, _fallback(author), _HIT_TTL_SECONDS)
 
     try:
         response = await client.users_lookupByEmail(email=author)
@@ -151,6 +237,60 @@ async def mention(client: Any, author: str) -> str:
     return _store(author, f"<@{user_id}>", _HIT_TTL_SECONDS)
 
 
+async def mention(client: Any, author: str) -> str:
+    """Return ``<@U…>`` for *author*, or a plain-text fallback."""
+    cached = _cached(author)
+    if cached is not None:
+        return cached
+    # Ahead of every other branch, including the bot filter and the
+    # lookups-disabled short circuit: an override is a person stating that this
+    # identity is that account, and nothing inferred here should outrank it.
+    override = _override(author)
+    if override is not None:
+        return _store(author, override, _HIT_TTL_SECONDS)
+    if _lookups_disabled or not _EMAIL_RE.match(author):
+        return _fallback(author)
+    if _BOT_AUTHOR_RE.search(author):
+        return _store(author, _fallback(author), _HIT_TTL_SECONDS)
+    return await _lookup_by_email(client, author)
+
+
 async def format_authors(client: Any, authors: Iterable[str]) -> str:
     """Render a set of commit authors as a comma-separated Slack mention list."""
     return ", ".join([await mention(client, author) for author in sorted(authors)])
+
+
+async def unusable_overrides(client: Any) -> list[str]:
+    """Return the override identities whose Slack id cannot be mentioned.
+
+    Shape and intent copied from ``slack_channels.unresolvable``: an override
+    that points at a deleted account, or at a well-formed id belonging to no
+    one, renders as a mention that notifies nobody. Nothing downstream can tell
+    that apart from a working ping, so the list is checked once at boot and
+    named in the log rather than discovered by someone not being nagged.
+
+    Returns ``[]`` -- not a complaint -- if the token cannot call ``users.info``
+    at all, since that says nothing about whether the ids are right.
+    """
+    unusable = []
+    for identity, user_id in sorted(_overrides.items()):
+        try:
+            response = await client.users_info(user=user_id)
+        except Exception as exc:  # noqa: BLE001
+            code = _error_code(exc)
+            if code == "missing_scope":
+                log.warning(
+                    "Cannot verify SLACK_USER_OVERRIDES: the bot token lacks "
+                    "users:read. The overrides are still applied as written."
+                )
+                return []
+            unusable.append(f"{identity} -> {user_id} ({code or exc})")
+            continue
+        user = (
+            (response.get("user") or {})
+            if hasattr(response, "get")
+            else response["user"]
+        )
+        if user.get("deleted"):
+            unusable.append(f"{identity} -> {user_id} (deactivated account)")
+    return unusable

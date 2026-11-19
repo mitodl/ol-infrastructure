@@ -473,6 +473,11 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             },
         },
         "startOptimized": stack_info.name != "CI",
+        # CI starts non-optimized and re-augments at startup, so it does not
+        # inherit --features-disabled=scim-api from the image build
+        # (ol-keycloak#317). Repeat it here so CI serves SCIM from the plugin
+        # alone, as QA and Production do.
+        **({"features": {"disabled": ["scim-api"]}} if stack_info.name == "CI" else {}),
         "http": {
             "tlsSecret": keycloak_tls_secret_name,
         },
@@ -520,7 +525,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         "ingress": {"enabled": False},
         # Configure the ServiceMonitor the operator auto-creates when
         # metrics-enabled is set in the image build.
-        "serviceMonitor": {"interval": "30s", "scrapeTimeout": "10s"},
+        "serviceMonitor": {"interval": "60s", "scrapeTimeout": "10s"},
         "additionalOptions": [
             {"name": "metrics-enabled", "value": "true"},
             {
@@ -558,6 +563,17 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             {
                 "name": "spi-events-listener--jboss-logging--success-level",
                 "value": "info",
+            },
+            # 26.8 deprecates "Full scope allowed" and logs a WARN on every
+            # token issuance for each client that has it on, which is every
+            # client we manage. Silence that category until the clients move to
+            # explicit scope mappings.
+            {
+                "name": (
+                    "log-level-org.keycloak.protocol.oidc.endpoints"
+                    ".TokenEndpoint.full-scope-allowed"
+                ),
+                "value": "error",
             },
         ],
         "tracing": tracing_config,
@@ -642,6 +658,35 @@ gateway = OLEKSGateway(
     ),
 )
 
+# Traefik >= 3.7.15 no longer infers HTTPS from the "https" port name, and the
+# operator-owned Service has no appProtocol, so declare backend TLS explicitly.
+# Keycloak serves the same Let's Encrypt cert as the gateway listener.
+keycloak_backend_tls_policy = kubernetes.apiextensions.CustomResource(
+    f"keycloak-backend-tls-policy-{stack_info.env_suffix}",
+    api_version="gateway.networking.k8s.io/v1",
+    kind="BackendTLSPolicy",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="keycloak-backend-tls",
+        namespace=keycloak_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec={
+        "targetRefs": [
+            {
+                "group": "",
+                "kind": "Service",
+                "name": f"{keycloak_resource_name}-service",
+                "sectionName": "https",
+            }
+        ],
+        "validation": {
+            "hostname": keycloak_domain,
+            "wellKnownCACertificates": "System",
+        },
+    },
+    opts=ResourceOptions(depends_on=[keycloak_resource]),
+)
+
 # Vault KV2 mount definition
 keycloak_server_vault_mount = vault.Mount(
     "keycloak-server-configuration-secrets-mount",
@@ -662,5 +707,10 @@ export(
     "keycloak",
     {
         "rds_host": db_address,
+        **(
+            {"rds_replica_host": keycloak_db.db_replica.address}
+            if keycloak_db_config.read_replica
+            else {}
+        ),
     },
 )

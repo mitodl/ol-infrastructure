@@ -39,9 +39,9 @@ OM_DBT_RUN_RESULTS_LOOKBACK_HOURS
                       How far back to read run_results files (default: 48,
                       two schedule intervals, so one failed night loses nothing).
 OM_DBT_SCHEMA_INCLUDES
-                      JSON list of schema regexes whose dbt nodes are ingested
-                      (default: the production dbt layer schemas).  A manifest
-                      built for another engine names different schemas.
+                      JSON list of schema regexes whose dbt nodes are ingested.
+                      A manifest built for another engine names different
+                      schemas.
 """
 
 import json
@@ -62,19 +62,7 @@ _RUN_RESULTS_LOOKBACK_HOURS = int(
     os.environ.get("OM_DBT_RUN_RESULTS_LOOKBACK_HOURS", "48")
 )
 
-# Restrict to production dbt layer schemas to avoid attempting to resolve
-# dev-namespace model names that don't exist in OM.
-_SCHEMA_INCLUDES: list[str] = json.loads(
-    os.environ.get(
-        "OM_DBT_SCHEMA_INCLUDES",
-        json.dumps(
-            [
-                r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
-                r"ol_data_lake_[a-z]+",
-            ]
-        ),
-    )
-)
+_SCHEMA_INCLUDES: list[str] = json.loads(os.environ["OM_DBT_SCHEMA_INCLUDES"])
 
 s3 = boto3.client("s3", region_name=_REGION)
 

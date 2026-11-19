@@ -3,14 +3,14 @@
 #
 # Usage:
 #   ./local-dev/scripts/seed.sh --app <name>              # run all seed commands for an app
-#   ./local-dev/scripts/seed.sh --app <name> --cmd <cmd>  # run a single management command
+#   ./local-dev/scripts/seed.sh --app <name> --cmd <cmd>  # run one shell command in the pod
 #   ./local-dev/scripts/seed.sh --list                    # list available apps and their defaults
 #
 # Examples:
 #   ./local-dev/scripts/seed.sh --app mit-learn
-#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "loaddata platforms schools departments offered_by"
-#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "populate_course_data"
-#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "backpopulate_ocw_data"
+#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "python manage.py loaddata platforms schools departments offered_by"
+#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "python manage.py populate_course_data"
+#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "python manage.py backpopulate_ocw_data"
 #
 # The script delegates execution to `kubectl exec` — the target namespace and
 # deployment name are derived from the app name.  The cluster must be running
@@ -32,7 +32,7 @@ declare -A APP_NAMESPACE=(
 
 declare -A APP_DEPLOY=(
     [mit-learn]="mitlearn-webapp"
-    [learn-ai]="learnai-webapp"
+    [learn-ai]="learn-ai-app"
     [mitxonline]="mitxonline-app"
     [odl-video-service]="odlvideo-webapp"
     [ocw-studio]="ocwstudio-webapp"
@@ -49,13 +49,14 @@ python manage.py loaddata platforms schools departments offered_by
 python manage.py create_qdrant_collections
 python manage.py prune_subscription_queries"
 
-    [learn-ai]="python manage.py migrate --noinput
-RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
-python manage.py createcachetable"
+    # No learn-ai default: its pre-deploy Job runs migrate and createcachetable
+    # whenever an apply creates or replaces it, and `tilt trigger learn-ai-app`
+    # recreates the stack, Job included, so it re-runs them.
 
-    # No mitxonline default: its pre-deploy Job runs migrate and configure_wagtail
-    # on every apply, and `tilt trigger mitxonline-app` recreates the stack, Job
-    # included, so it re-runs them.
+    # No mitxonline default: its pre-deploy Job runs migrate and
+    # configure_wagtail whenever an apply creates or replaces it, and
+    # `tilt trigger mitxonline-app` recreates the stack, Job included, so it
+    # re-runs them.
 
     [odl-video-service]="python manage.py migrate --noinput
 python manage.py createpresets"
@@ -130,7 +131,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            echo "Usage: seed.sh [--app <name>] [--cmd <management-command>] [--list]"
+            echo "Usage: seed.sh [--app <name>] [--cmd <shell command to run in the pod>] [--list]"
             exit 0
             ;;
         *)

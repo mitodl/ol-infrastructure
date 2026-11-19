@@ -56,8 +56,15 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
+# Applied with the rest so that enabling or disabling the analytics API changes
+# the config fingerprint and rolls the pod (see apps/mit-learn's warehouse-env).
+_analytics_env = 'configmaps/analytics-env-off.yaml'
+if 'ol-analytics-api' in os.environ.get('LOCAL_DEV_ENABLED_APPS', '').split(','):
+    _analytics_env = 'configmaps/analytics-env.yaml'
+
 k8s_yaml_local([
     'configmaps/app-env.yaml',
+    _analytics_env,
     'deployment.yaml',
     'apisix-routes.yaml',
 ], local_overrides='configmaps/app-env.local.yaml')

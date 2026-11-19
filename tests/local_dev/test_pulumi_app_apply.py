@@ -2,7 +2,8 @@
 
 The stubs log their arguments; the tests pin that a live stack lock stops the
 run before any of them is called, and that a stale one is cleared and the
-apply goes ahead.
+apply goes ahead; and that the leftover check skips objects Tilt applies on
+purpose.
 """
 
 import getpass
@@ -86,3 +87,14 @@ def test_a_stale_lock_is_cleared_and_the_apply_goes_ahead(tmp_path):
     assert result.returncode == 0, result.stderr
     assert not list(lock_dir.glob("*.json"))
     assert "pulumi up" in calls
+
+
+def test_the_leftover_check_ignores_objects_applied_beside_the_program(tmp_path):
+    script, _, bin_dir = _tree(tmp_path)
+    _, calls = _run(script, bin_dir, tmp_path)
+    (get_call,) = [
+        c
+        for c in calls.splitlines()
+        if c.startswith("kubectl") and " get " in c and "managed-by=tilt" in c
+    ]
+    assert "!ol.mit.edu/yaml-by-design" in get_call

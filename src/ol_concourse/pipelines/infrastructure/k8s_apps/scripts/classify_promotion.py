@@ -37,6 +37,10 @@ was previewed. Closing the issue approves that diff, and the Production job's
 marker leads the body because the issue put truncates an oversized body from
 the end.
 
+A tag-only release deploys no ol-infrastructure code and has no preview. It
+leaves ``PREVIEW_SUMMARY_FILE`` unset, and then the issue is the checklist
+alone, with no revision marker, and only a new release gets one.
+
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained.
 
@@ -46,7 +50,8 @@ Environment:
     PRODUCTION_VERSION_FILE: ``production_version`` from a fresh release get.
     PRODUCTION_STATE_FILE: ``production_state`` from the same get.
     CHECKLIST_FILE: ``<release>/checklist.md`` from the release resource.
-    PREVIEW_SUMMARY_FILE: the Production preview's markdown summary.
+    PREVIEW_SUMMARY_FILE: the Production preview's markdown summary. Unset for
+        a tag-only release, which also leaves the next three unset.
     NO_CHANGES_MARKER_FILE: written next to the summary when it found no changes.
     INFRA_REF_FILE: ``<ol-infra>/.git/ref``, the commit that was previewed.
     INFRA_REPO_URL: the ol-infrastructure repository's web URL, for the link.
@@ -135,6 +140,20 @@ def compose_body(  # noqa: PLR0913
     return "\n\n".join(parts) + "\n"
 
 
+def write_tag_only(app: str, version: str, *, new_release: bool) -> None:
+    """Write the issue for a release with no infrastructure: the checklist alone."""
+    output = Path(os.environ["OUTPUT_DIR"])
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "title").write_text(f"Release {app} {version}")
+    (output / "release_tag").write_text(version if new_release else "")
+    if not new_release:
+        (output / "skip").write_text("nothing to approve\n")
+        print(f"{app}: {version} is already in Production. Nothing to approve.")  # noqa: T201
+        return
+    (output / "body.md").write_text(Path(os.environ["CHECKLIST_FILE"]).read_text())
+    print(f"{app}: new release {version}. Issue: 'Release {app} {version}'.")  # noqa: T201
+
+
 def _read(name: str) -> str:
     return Path(os.environ[name]).read_text().strip()
 
@@ -152,6 +171,9 @@ def main() -> None:
     except (ValueError, OSError) as error:
         sys.exit(f"Refusing to classify {app}: {error}. No issue was posted.")
 
+    if not os.environ.get("PREVIEW_SUMMARY_FILE"):
+        write_tag_only(app, version, new_release=new_release)
+        return
     summary_file = Path(os.environ["PREVIEW_SUMMARY_FILE"])
     if not summary_file.is_file():
         # No summary means the preview did not report; guessing "no changes"

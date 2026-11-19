@@ -23,7 +23,14 @@ from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
 from ol_infrastructure.substructure.keycloak.openmetadata_team_sync import (
     create_openmetadata_team_sync_resources,
 )
+from ol_infrastructure.substructure.keycloak.opik_sdk import create_opik_sdk_resources
 from ol_infrastructure.substructure.keycloak.scim import create_scim_resources
+
+# pulumi_keycloak defaults to 5s and the provider does not retry, so one slow
+# request fails the whole refresh. In a failed QA refresh the timed-out GET
+# reached the gateway almost 5s after it was sent, so the time went to
+# connection setup on the Concourse side rather than to Keycloak.
+KEYCLOAK_CLIENT_TIMEOUT_SECONDS = 60
 
 stack_info = parse_stack()
 env_name = f"keycloak-{stack_info.env_suffix}"
@@ -58,6 +65,7 @@ keycloak_provider = keycloak.Provider(
     realm="master",
     client_id=keycloak_config.get("client_id"),
     client_secret=keycloak_config.get("client_secret"),
+    client_timeout=KEYCLOAK_CLIENT_TIMEOUT_SECONDS,
     initial_login=True,
 )
 
@@ -105,6 +113,10 @@ create_openmetadata_team_sync_resources(
 create_openmetadata_provisioner_resources(
     keycloak_provider, keycloak_url, ol_data_platform_realm
 )
+# Only the Production realm signs tokens the Production Opik accepts, and every
+# environment traces there, so this stack writes the client to all their Vaults.
+if stack_info.env_suffix == "production":
+    create_opik_sdk_resources(keycloak_provider, keycloak_url)
 create_olapps_realm(
     keycloak_provider,
     keycloak_url,

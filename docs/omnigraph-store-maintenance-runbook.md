@@ -34,7 +34,9 @@ finishes, for every witan user. The command is in the server image (agent-kit
 4. runs `optimize` on every graph in `cluster.yaml`, then on the days in
    `omnigraph:cleanup_iso_weekdays` (default every day; Production and QA set
    `[]`, so their windows only optimize) also
-   `cleanup --older-than <cleanup_older_than>`, force-unlocking after each;
+   `cleanup --older-than <cleanup_older_than>` (or `cleanup --keep
+   <cleanup_keep>` where `omnigraph:cleanup_keep` is set, CI only), force-unlocking
+   after each;
 5. scales the Deployment back to the replica count it found and releases the
    Lease.
 
@@ -121,6 +123,12 @@ but never removes:
 aws s3 ls --recursive s3://ol-data-witan-<env>/<storage_prefix>/graphs/<id>.omni/ \
   | grep -c '/_versions/'
 ```
+
+The `omnigraph-version-census` CronJob runs the same listing every hour and
+logs one line per graph, split into the manifest versions cleanup cannot
+remove and the table versions it can:
+`{namespace="omnigraph", container="count-versions"} |= "graph=<id> "` in
+Loki (QA and Production), or `kubectl -n omnigraph logs` on its latest Job.
 
 The run is the nightly window with a longer budget, so the data tier is down
 for every witan user until it ends. Announce it, and keep it clear of the
@@ -255,6 +263,29 @@ for as long as the commit before the delete is retained. Past that, and for a
 bad cleanup, the restore is the bucket's noncurrent object versions (30 days)
 or an `aws s3 sync` backup.
 Query latency is driven by fragment count, which the nightly optimize handles.
+
+### `omnigraph:cleanup_keep` (`--keep 1`)
+
+The image's CLI carries a backport of ModernRelay/omnigraph#1188, so `cleanup
+--keep N` with no `--older-than` takes each branch's commit numbers from the
+`_versions/` listing and reads only the commits it retains (each branch head,
+a non-main branch's base, merge bases and tags). The listing still grows with
+commits, but it reads no manifest for an older commit it drops, while
+`--older-than` reads one per older commit. Setting
+`omnigraph:cleanup_keep` switches the window to `--keep` alone; the stack
+refuses it together with `omnigraph:cleanup_older_than`, and the image refuses
+both env vars together, because with both cleanup reads every commit below
+the newest N and its plan grows as `--older-than`'s does.
+
+Moving off it has a cost. A `--keep 1` run deletes the table versions that
+only older commits pin, and those commits stay listed (#644). A later run that
+retains one of them refuses that table's sweep, and one refused table stops
+data-file deletion for every table in the graph on that run. Removing
+`omnigraph:cleanup_keep` (back to `cleanup_older_than`) refuses until the last
+`--keep 1` night is older than that age, about 2 nights at the default.
+Raising it refuses until each branch has that many newer commits, which on a
+quiet writer branch may be never. It also keeps no history between cleanup
+nights, so the `query --snapshot` undelete above lasts only until the next one.
 
 ## Reading a failed run
 
@@ -591,6 +622,217 @@ held Lease until the window closes, so the Deployment update can time out.
 Between the two deploys every bridge write fails with `ClusterGraphMissing`
 (`witan.code.index.bridge_failed`, logged at error, not fatal to the index), and
 the reaper's `code-bridge` sweep fails if it runs then (04:50).
+
+## Retiring a managed repo's graph
+
+From omnigraph 0.13 a graph that `cluster.yaml` stops declaring is deleted by
+the next apply, storage and retained history both. There is no approval step
+(`cluster approve` was removed in 0.12) and no unregister mode, so a graph
+cannot outlive its declaration past the next boot. The server's boot apply and
+the plan gate refuse a plan that deletes a graph not named in
+`omnigraph:graph_removal_allowlist`, so dropping a repo from
+`omnigraph:managed_repos` by mistake fails the deploy rather than deleting its
+graph.
+
+1. In one change to `Pulumi.<env>.yaml`, remove the repo from
+   `omnigraph:managed_repos` and add its graph id to
+   `omnigraph:graph_removal_allowlist`. Copy the id from
+   `aws s3 ls s3://ol-data-witan-<env>/<storage_prefix>/graphs/`, dropping the
+   `.omni` suffix, rather than deriving it by hand, since `code_graph_id`
+   truncates and hashes long names. The code Cedar bundle's `applies_to` is
+   built from the declared graphs, so the graph leaves it in the same change.
+   Count the graph's objects
+   (`aws s3 ls --recursive <storage_root>/graphs/<id>.omni/ | wc -l`): the
+   delete runs under the startup probe, so a large graph also needs
+   `omnigraph:boot_budget_seconds` in this change (see
+   [The delete outlasts the startup probe](#the-delete-outlasts-the-startup-probe)).
+2. Deploy the omnigraph stack. The plan gate logs
+   `this apply deletes allow-listed graphs: [...]`, then the server's boot apply
+   deletes `<storage_root>/graphs/<id>.omni/`. The bucket keeps the deleted
+   objects as noncurrent versions for 30 days. Start it at least the boot
+   budget ahead of the 03:20 window: the booting pod holds the
+   `omnigraph-unlock` Lease, so the window skips that night's optimize and cleanup
+   (see [The delete outlasts the startup probe](#the-delete-outlasts-the-startup-probe)).
+3. Deploy the witan stack. Its CI indexer reads `managed_repos` from the
+   omnigraph stack's output, and the two pipelines are not ordered, so until
+   witan deploys the indexer keeps indexing the retired repo into a graph that
+   no longer exists.
+4. In a follow-up change, remove the allow-list entry and
+   `boot_budget_seconds` if step 1 set it. Preview refuses an allow-list entry
+   for a graph that is declared, so a leftover entry also fails the deploy that
+   re-adds the repo. Do not merge it before step 2's deploy has run: Concourse
+   can skip an intermediate commit, and a deploy of this change alone leaves the
+   graph undeclared and not allow-listed, so the plan gate refuses it.
+
+`council` and `code-bridge` are not managed repos, so neither is retired this
+way. `withheld_graphs` can drop `code-bridge` for a rebuild (see
+[above](#rebuilding-a-graph-whose-schema-change-cannot-be-migrated)), and it
+refuses `council`.
+
+## When a graph's cleanup plan is over budget
+
+`OmnigraphCleanupPlanOverBudgetWarning` (QA) and
+`OmnigraphCleanupPlanOverBudgetProdWarning` (Production) fire when the hourly
+census puts one graph past 16,364 `_versions/` objects, which at 0.22s each is
+over an hour of cleanup planning with the data tier stopped
+(`src/ol_infrastructure/infrastructure/grafana_alerting/log_rules/omnigraph_versions.py`).
+A [backlog run](#clearing-a-cleanup-backlog) at that size keeps every witan
+user offline for more than an hour and leaves `manifest_versions` where it was,
+because 0.13's cleanup never deletes them. So until upstream bounds cleanup
+planning (ModernRelay/omnigraph#644), we rebuild the graph instead of cleaning
+it (decided 2026-10-28). A rebuild deletes every version the graph has and
+refills it from source, which only works for a derived graph. council is not
+derived and waits for upstream.
+
+### Is the graph derived
+
+The alert's `graph` label is the graph id
+(`src/ol_infrastructure/applications/omnigraph/cluster_config.py`):
+
+- `code-bridge` is derived. It holds the cross-repo bindings the CI indexer
+  writes for every managed repo.
+- `code-<repo>` (e.g. `code-github-com-mitodl-ol-data-platform`) is derived.
+  There is one per entry in `omnigraph:managed_repos` in `Pulumi.<env>.yaml`,
+  named by `code_graph_id`.
+- `council` is not. It holds what people and agents wrote, and nothing replays
+  it. See [If council fires](#if-council-fires).
+
+A derived graph loses nothing in a rebuild that the indexer does not put back,
+apart from the per-writer branch views that developers' witan-code clients
+keep in it (`<actor>/<branch>` in a `code-<repo>` graph,
+`<actor>/<repo-slug>/<branch>` in code-bridge). Those are deleted with the
+graph, and a client creates its view again the next time it indexes that
+branch (`ensure_branch` in agent-kit
+`mcp/servers/witan-code/witan_code/indexer.py`).
+
+### Size the outage
+
+The delete is what stops the data tier. It runs in the server's boot apply,
+before the server listens, at about 1,000 objects a minute, and every graph
+(council included) is unreachable until it ends. Count the objects, not the
+versions:
+
+```bash
+aws s3 ls --recursive s3://ol-data-witan-<env>/<storage_prefix>/graphs/<id>.omni/ | wc -l
+```
+
+Production's code-bridge held 18,139 objects for 6,392 versions on 2026-10-28,
+about 2.8 per version. At that ratio a graph at the threshold is about 46,000
+objects and 46 minutes of delete, far past the default startup probe, so it
+needs `omnigraph:boot_budget_seconds` (see
+[The delete outlasts the startup probe](#the-delete-outlasts-the-startup-probe)).
+
+The code-bridge rebuild in [#6628](https://github.com/mitodl/ol-infrastructure/pull/6628) and [#6630](https://github.com/mitodl/ol-infrastructure/pull/6630) is the measured case, from the
+server log
+(`{namespace="omnigraph", container="omnigraph-server"} |~ "allow-listed|cluster converged"`):
+
+- QA, 9,026 objects: `this apply deletes allow-listed graphs: ['code-bridge']`
+  at 23:18:58Z on 2026-10-23, `cluster converged; starting server` at
+  23:27:29Z, about 8.5 minutes.
+- Production, 26,728 objects: the new pod took the Lease at 23:36:10Z and
+  converged at 00:01:31Z on 10-24, about 25 minutes.
+
+The create in the second deploy took 5 seconds in Production (00:36:28Z to
+00:36:33Z). Between the two deploys the graph does not exist, so writes to it
+fail with `ClusterGraphMissing`, and so do the `code_*` tools that read it
+(the cross-repo `code_interface_*` tools for code-bridge, that repo's lookups
+for a `code-<repo>` graph). After the create it reads as empty until the
+refill finishes.
+
+### Rebuild it
+
+1. Withhold and allow-list the graph in `Pulumi.<env>.yaml`, with a boot
+   budget sized from the object count, as [#6628](https://github.com/mitodl/ol-infrastructure/pull/6628) did. This is step 1 of
+   [Rebuilding a graph whose schema change cannot be migrated](#rebuilding-a-graph-whose-schema-change-cannot-be-migrated),
+   and everything there about timing applies: announce the outage, and start
+   the deploy at least the budget ahead of the 03:20 window.
+
+   ```yaml
+   omnigraph:withheld_graphs:
+   - code-github-com-mitodl-ol-data-platform
+   omnigraph:graph_removal_allowlist:
+   - code-github-com-mitodl-ol-data-platform
+   omnigraph:boot_budget_seconds: 5400
+   ```
+
+   Both lists take several graph ids, so more than one derived graph can share
+   the pair of deploys. Size the budget from their summed object count.
+
+2. After that deploy has passed, remove all three keys, as [#6630](https://github.com/mitodl/ol-infrastructure/pull/6630) did. The next
+   boot apply creates the graph empty. Do not merge this before step 1 has
+   deployed, because Concourse can skip an intermediate commit.
+
+3. Refill it.
+   - A `code-<repo>` graph refills on the next scheduled `witan-ci-indexer`
+     run (every 4 hours, on the hour). The new graph holds no content hashes,
+     so the run indexes every file. There is nothing to start by hand.
+   - `code-bridge` needs the forced reindex Job from
+     [Rebuilding a graph whose schema change cannot be migrated](#rebuilding-a-graph-whose-schema-change-cannot-be-migrated),
+     started right after a scheduled run finishes. Production's
+     (`witan-ci-reindex-202610240038`) started at 00:38Z on 2026-10-24 and
+     logged `witan-ci-index: indexed 16, failed 0` at 02:30Z. It rewrites every
+     file of every managed repo, so every `code-<repo>` graph gains versions
+     too: in that window code-github-com-mitodl-ol-infrastructure gained 307
+     and code-github-com-mitodl-ol-data-platform 243 (`_versions/` objects by
+     S3 `LastModified`, which also counts any other writer in the window).
+
+### Confirm the count reset
+
+The census logs each graph once an hour:
+
+```logql
+{namespace="omnigraph", container="count-versions"} |= "graph=<id> "
+```
+
+After step 1's deploy the graph has no line at all, since the census only
+prints graphs that have version objects. After step 2's it comes back with a
+count in the tens or hundreds, rising as the refill commits. The alert reads
+the highest count in a 2h window, so it keeps firing for up to 2 hours after
+the last high line and then resolves by itself.
+
+To check the store directly, the oldest `_versions/` object should postdate
+step 2's deploy (`aws s3 ls` prints local time):
+
+```bash
+aws s3 ls --recursive s3://ol-data-witan-<env>/<storage_prefix>/graphs/<id>.omni/ \
+  | grep /_versions/ | sort | head -1
+```
+
+Production's code-bridge listing on 2026-10-28 started at 00:36:32Z on 10-24,
+one second before the create converged. QA's server log shows the same reset:
+code-bridge's `__manifest` committed version 2193 at 20:01:57Z on 10-23, and
+loaded at `version=1` at 00:19:13Z on 10-24.
+
+A rebuild resets the count, not the rate. Production's code-bridge was
+recreated at 00:36Z on 2026-10-24, and the census read 6,186 versions at
+19:41Z on 10-28, about 1,290 a day. If it keeps that average it crosses the
+threshold again around 2026-11-05, so expect to repeat this for a fast-growing
+graph until upstream ships.
+
+### If council fires
+
+Do not rebuild it. `omnigraph:withheld_graphs` refuses `council` at preview,
+because a rebuild would delete data nothing can put back. Per the 2026-10-28
+decision, council waits for upstream. [#6697](https://github.com/mitodl/ol-infrastructure/pull/6697) projected it would fire in
+Production around 2026-11-06, from its average of about 800 versions a day over
+2026-10-22 to 10-27. The census read 9,908 (4,906 of them manifest versions) at
+19:41Z on 10-28.
+
+1. Check that it is steady growth and not a writer in a loop. A loop shows as
+   `OmnigraphVersionGrowthProdWarning` for council, or as a jump between census
+   lines a day apart, and that alert's description says where to look.
+2. Leave it serving. The alert prices a cleanup; it does not report a serving
+   failure.
+3. Check ModernRelay/omnigraph#644 and #1095 for a release. Upgrading to one
+   that bounds planning is the fix.
+4. While waiting, silence only that graph: a Grafana silence matching
+   `alertname=OmnigraphCleanupPlanOverBudgetProdWarning` and `graph=council`,
+   ending on the date someone will next check upstream. Do not raise the
+   threshold, because it covers every graph.
+5. If council has to be cleaned before upstream ships, the only way is
+   [a backlog run](#clearing-a-cleanup-backlog) with a planned outage of at
+   least `versions` x 0.22s, over an hour by then. It removes table versions
+   only, so the next plan never costs less than `manifest_versions` x 0.22s.
 
 ## What this does not cover
 

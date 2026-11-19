@@ -13,6 +13,8 @@ This module verifies:
    cookie cleanup plugin's generated Lua
 6. The identity-header strip plugin's wiring: the Lua it ships, the phase it
    runs in, and the header list it defaults to
+7. The shared MIT Learn session contract (LearnSession) and the logout paths
+   and route triple an OLApisixOIDCRouteGroup derives from where it is served
 """
 
 from __future__ import annotations
@@ -49,6 +51,7 @@ from pydantic import ValidationError  # noqa: E402
 
 from bridge.lib.constants import (  # noqa: E402
     GATEWAY_IDENTITY_HEADERS,
+    LearnSession,
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
     oidc_secret_data,
@@ -56,8 +59,12 @@ from bridge.lib.constants import (  # noqa: E402
 from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
+    FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
+    OLApisixExternalUpstream,
+    OLApisixExternalUpstreamConfig,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCSecretCredentials,
     OLApisixOIDCVaultCredentials,
     OLApisixSharedPlugins,
@@ -67,6 +74,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
     gateway_global_pre_function_plugin,
+    learn_session_oidc_config,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
@@ -398,17 +406,47 @@ def test_session_cookie_name_and_domain_coexist():
     assert oidc.base_oidc_config["session"] == {
         "cookie_name": "mitlearn_apisix_session",
         "cookie_domain": ".learn.mit.edu",
-        "cookie_secure": True,
+        **EXPLICIT_COOKIE_ATTRIBUTES,
     }
 
 
-def test_session_cookie_is_secure_when_nothing_else_is_set():
-    """A caller that sets none of the session options still gets the Secure
-    flag, and nothing else, so lua-resty-session keeps its own defaults.
+EXPLICIT_COOKIE_ATTRIBUTES = {
+    "cookie_secure": True,
+    "cookie_http_only": True,
+    "cookie_same_site": "Lax",
+}
+
+
+def test_session_cookie_attributes_are_explicit_when_nothing_else_is_set():
+    """A caller that sets none of the session options still gets Secure,
+    HttpOnly and SameSite=Lax spelled out, and no timeouts, so lua-resty-session
+    keeps its own defaults for everything else.
     """
     oidc = oidc_resources("test-oidc-no-session-config")
 
-    assert oidc.base_oidc_config["session"] == {"cookie_secure": True}
+    assert oidc.base_oidc_config["session"] == EXPLICIT_COOKIE_ATTRIBUTES
+
+
+def test_session_cookie_http_only_and_same_site_can_be_changed():
+    oidc = oidc_resources(
+        "test-oidc-cookie-attributes",
+        oidc_session_cookie_http_only=False,
+        oidc_session_cookie_same_site="Strict",
+    )
+
+    session = oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"][
+        "session"
+    ]
+    assert session["cookie_http_only"] is False
+    assert session["cookie_same_site"] == "Strict"
+
+
+def test_session_cookie_same_site_rejects_values_lua_resty_session_does_not():
+    """The openid-connect schema enumerates SameSite; a lower-case or unknown
+    value would only fail when the ingress controller syncs the route.
+    """
+    with pytest.raises(ValidationError, match="oidc_session_cookie_same_site"):
+        oidc_config(oidc_session_cookie_same_site="lax")
 
 
 def test_session_cookie_secure_can_be_turned_off():
@@ -463,6 +501,59 @@ def test_pkce_can_be_turned_off_per_application():
     oidc = oidc_resources("test-oidc-pkce-off", oidc_use_pkce=False)
 
     assert oidc.base_oidc_config["use_pkce"] is False
+
+
+def test_access_token_leeway_is_omitted_by_default():
+    """0 is the plugin's own default, so callers that don't set it render the
+    same plugin config as before the field existed.
+    """
+    oidc = oidc_resources("test-oidc-no-leeway")
+
+    config = oidc.get_full_oidc_plugin_config(unauth_action="pass")["config"]
+
+    assert "access_token_expires_leeway" not in config
+
+
+def test_access_token_leeway_reaches_the_plugin_config():
+    oidc = oidc_resources(
+        "test-oidc-leeway",
+        oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
+    )
+
+    config = oidc.get_full_oidc_plugin_config(unauth_action="pass")["config"]
+
+    assert (
+        config["access_token_expires_leeway"]
+        == FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS
+    )
+
+
+def test_only_x_userinfo_is_forwarded_by_default():
+    """The plugin's own defaults forward X-Access-Token and X-ID-Token too, so
+    every header flag is spelled out rather than left to them.
+    """
+    config = oidc_resources("test-oidc-header-defaults").get_full_oidc_plugin_config(
+        unauth_action="pass"
+    )["config"]
+
+    assert {key: value for key, value in config.items() if key.startswith("set_")} == {
+        "set_userinfo_header": True,
+        "set_access_token_header": False,
+        "set_id_token_header": False,
+        "set_raw_id_token_header": False,
+        "set_refresh_token_header": False,
+    }
+
+
+def test_tokens_are_forwarded_only_when_asked_for():
+    config = oidc_resources(
+        "test-oidc-header-opt-in",
+        oidc_set_access_token_header=True,
+        oidc_set_id_token_header=True,
+    ).get_full_oidc_plugin_config(unauth_action="pass")["config"]
+
+    assert config["set_access_token_header"] is True
+    assert config["set_id_token_header"] is True
 
 
 # ─── Session cookie naming ─────────────────────────────────────────────────────
@@ -537,12 +628,13 @@ def test_cleanup_plugin_expires_each_named_domain_separately():
 
 
 def test_cleanup_plugin_matches_chunked_cookies():
-    """lua-resty-session splits an oversized payload across <name>, <name>_2,
-    <name>_3... and each chunk is its own cookie to expire.
+    """lua-resty-session splits an oversized payload across <name>, <name>2,
+    <name>3... (<name>_2 in 3.x) and each chunk is its own cookie to expire.
+    test_apisix_lua.py runs the pattern against real cookie names.
     """
     (lua,) = stale_session_cookie_cleanup_plugin().config["functions"]
 
-    assert 'name:match("^session_%d+$")' in lua
+    assert 'name:match("^session_?%d+$")' in lua
 
 
 def test_cleanup_plugin_honours_a_custom_stale_name():
@@ -1018,6 +1110,44 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
             assert plugin_named(spec["plugins"], name) is not None, name
 
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+# ─── render_only ───────────────────────────────────────────────────────────────
+
+
+def test_shared_plugins_create_both_crs_by_default():
+    """Legacy ApisixRoute/Ingress callers reference the v2 CR by name, so the
+    default must keep creating it.
+    """
+    plugins = shared_plugins("test-shared-plugins-default-crs")
+
+    assert plugins.shared_plugin_apisix_pluginconfig_resource is not None
+    assert plugins.shared_plugin_pluginconfig_resource is not None
+    assert plugins.resource_name == "myapp-shared-plugins"
+
+
+def test_render_only_creates_no_crs_but_keeps_plugin_list():
+    """A Gateway API-only application needs the rendered list for
+    OLApisixHTTPRoute to merge, and nothing else: no route references either
+    shared CR by name.
+    """
+    plugins = shared_plugins("test-shared-plugins-render-only", render_only=True)
+
+    assert plugins.shared_plugin_apisix_pluginconfig_resource is None
+    assert plugins.shared_plugin_pluginconfig_resource is None
+    names = [plugin.name for plugin in plugins.plugin_list]
+    for expected in ("redirect", "cors", "response-rewrite", "prometheus", "gzip"):
+        assert expected in names, expected
+
+
+def test_render_only_refuses_to_hand_out_resource_name():
+    """A route given this name as plugin_config_name would point at a CR that
+    does not exist, so asking for it fails at preview instead.
+    """
+    plugins = shared_plugins("test-shared-plugins-render-only-name", render_only=True)
+
+    with pytest.raises(ValueError, match="render_only"):
+        _ = plugins.resource_name
 
 
 # ─── gateway_global_pre_function_plugin wiring ────────────────────────────────
@@ -1588,13 +1718,16 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
 
 # ─── Browser traffic match exprs ────────────────────────────────────────────────
 
+# What the mit-learn SSR layer sends (mitodl/mit-learn#4061); the bare form is
+# sent when NEXT_PUBLIC_VERSION is unset.
+MIT_LEARN_SSR_UAS = ["mit-learn-ssr/v0.61.2", "mit-learn-ssr"]
+
 # User-Agent strings observed on api.learn.mit.edu, 2026-09-21. The crawlers all
 # send the site's own Origin, so the Origin match alone does not separate them
 # from a browser -- which is the whole reason the User-Agent clause exists.
-MIT_LEARN_SSR_UA = "axios/1.12.2"
-# What mit-learn sets once its SSR layer names itself; the bare form is sent
-# when NEXT_PUBLIC_VERSION is unset.
-MIT_LEARN_SSR_EXPLICIT_UAS = ["mit-learn-ssr/v0.61.2", "mit-learn-ssr"]
+# STOCK_AXIOS_UA was the SSR layer's before #4061. Any caller still sending it
+# is not the SSR layer, so it stays on the rate-limited routes.
+STOCK_AXIOS_UA = "axios/1.12.2"
 BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -1637,9 +1770,7 @@ def test_browser_traffic_match_exprs_requires_the_site_origin():
     assert not re.search(origin["value"], "https://learn.mit.edu.evil.com")
 
 
-@pytest.mark.parametrize(
-    "ssr_user_agent", [MIT_LEARN_SSR_UA, *MIT_LEARN_SSR_EXPLICIT_UAS]
-)
+@pytest.mark.parametrize("ssr_user_agent", MIT_LEARN_SSR_UAS)
 def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client(
     ssr_user_agent,
 ):
@@ -1655,11 +1786,13 @@ def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client(
     )
 
 
-@pytest.mark.parametrize("user_agent", [BROWSER_UA, *CRAWLER_UAS])
+@pytest.mark.parametrize("user_agent", [BROWSER_UA, *CRAWLER_UAS, STOCK_AXIOS_UA])
 def test_browser_traffic_match_exprs_keeps_browsers_and_crawlers_in(user_agent):
     """A crawler is a single actor sending our Origin, which is exactly what a
     per-client-IP limit is for. Excluding every non-browser would exempt them,
-    so the clause names the first-party client instead.
+    so the clause names the first-party client instead. Stock axios is in that
+    set: the SSR layer names itself, so excusing the library default would
+    exempt any integrator that happens to use axios.
     """
     user_agent_expr = expr_for_header(browser_exprs(), "User-Agent")
     assert not re.search(user_agent_expr["value"], user_agent)
@@ -1674,9 +1807,8 @@ def test_browser_traffic_match_exprs_ua_regex_is_anchored():
     """
     assert FIRST_PARTY_SERVICE_CLIENT_UA_REGEX.startswith("^")
     user_agent = expr_for_header(browser_exprs(), "User-Agent")
-    assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {MIT_LEARN_SSR_UA}")
-    for explicit_ua in MIT_LEARN_SSR_EXPLICIT_UAS:
-        assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {explicit_ua}")
+    for ssr_ua in MIT_LEARN_SSR_UAS:
+        assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {ssr_ua}")
     assert not re.search(user_agent["value"], "mit-learn-ssr-lookalike/1.0")
 
 
@@ -1822,3 +1954,236 @@ def test_cors_origins_accept_a_port_and_plain_http():
         "http://localhost:8063",
         "https://api.ci.learn.mit.edu",
     ]
+
+
+# ─── Shared MIT Learn session and OIDC route groups ───────────────────────────
+
+
+def test_learn_session_is_the_same_from_any_sibling_host():
+    """mit-learn derives the session from api.<env>, ol-analytics-api from
+    analytics.<env>; both have to land on the same cookie or the analytics host
+    stops recognizing a mit-learn login.
+    """
+    from_api = LearnSession.for_host("qa", "api.rc.learn.mit.edu")
+    from_analytics = LearnSession.for_host("qa", "analytics.rc.learn.mit.edu")
+
+    assert from_api == from_analytics
+    assert from_api.cookie_domain == ".rc.learn.mit.edu"
+    assert from_api.cookie_name == mit_learn_session_cookie_name("qa")
+    assert from_api.logout_landing_uri == "https://api.rc.learn.mit.edu/logout/"
+
+
+def test_learn_session_needs_a_parent_domain():
+    """A bare host has no parent domain to scope a shared cookie to."""
+    with pytest.raises(ValueError, match="no parent domain"):
+        LearnSession.for_host("ci", "localhost")
+
+
+@pytest.mark.parametrize(
+    ("path_prefix", "logout_path", "post_logout_uri"),
+    [
+        ("", "/logout/oidc", "https://api.learn.mit.edu/logout/"),
+        ("learn", "/learn/logout/oidc", "https://api.learn.mit.edu/learn/logout/"),
+    ],
+)
+def test_route_group_logout_settings_follow_its_prefix(
+    path_prefix, logout_path, post_logout_uri
+):
+    """logout_path is matched against the un-rewritten URI, so it carries the prefix."""
+    group = OLApisixOIDCRouteGroup(hosts=["api.learn.mit.edu"], path_prefix=path_prefix)
+
+    assert group.logout_path == logout_path
+    assert group.post_logout_uri == post_logout_uri
+
+
+def test_route_group_prefix_takes_no_slashes():
+    """The group adds the slashes; a slashed prefix would render "//learn"."""
+    with pytest.raises(ValidationError):
+        OLApisixOIDCRouteGroup(hosts=["api.learn.mit.edu"], path_prefix="/learn")
+
+
+def _learn_group(**overrides) -> OLApisixOIDCRouteGroup:
+    return OLApisixOIDCRouteGroup(
+        hosts=["api.learn.mit.edu"],
+        login_paths=["/login", "/login/*"],
+        **overrides,
+    )
+
+
+def _learn_oidc(name: str, group: OLApisixOIDCRouteGroup) -> OLApisixOIDCResources:
+    return OLApisixOIDCResources(
+        name,
+        oidc_config=learn_session_oidc_config(
+            LearnSession.for_host("production", "api.learn.mit.edu"),
+            group,
+            application_name=name,
+            k8s_namespace="mitlearn",
+            k8s_labels={},
+            credentials=OLApisixOIDCSecretCredentials(secret_name=LOCAL_SECRET_NAME),
+        ),
+    )
+
+
+def test_prefixed_logout_redirect_feeds_its_own_plugin():
+    """The logout-redirect route has to send the browser to the logout path of
+    the plugin its own passauth route carries.  Pointing a prefixed group at the
+    unprefixed "/logout/oidc" hands the logout to another resource's plugin and
+    leaves this one's logout settings dead.
+    """
+    group = _learn_group(path_prefix="learn", logout_entry_paths=["/logout/"])
+    oidc = _learn_oidc("learn-prefixed", group)
+
+    passauth, logout_redirect, reqauth = group.route_configs(
+        oidc,
+        backend_service_name="mitlearn",
+        backend_service_port="http",
+        rewrite_plugins=[{"name": "proxy-rewrite", "config": {}}],
+    )
+
+    [redirect] = [p for p in logout_redirect.plugins if p.name == "redirect"]
+    assert redirect.config == {"uri": oidc.base_oidc_config["logout_path"]}
+    assert redirect.config == {"uri": "/learn/logout/oidc"}
+    assert logout_redirect.paths == ["/learn/logout/", "/learn/logout/oidc/*"]
+    assert passauth.paths == ["/learn/*"]
+    assert reqauth.paths == ["/learn/login", "/learn/login/*"]
+    # A 302 never reaches the upstream, so it gets no rewrite.
+    assert not any(
+        isinstance(p, dict) and p["name"] == "proxy-rewrite"
+        for p in logout_redirect.plugins
+    )
+    assert [r.route_name for r in (passauth, logout_redirect, reqauth)] == [
+        "passauth",
+        "logout-redirect",
+        "reqauth",
+    ]
+
+
+def test_learn_session_groups_differ_only_in_where_they_log_out():
+    """Every resource sharing the Learn session has to agree on everything that
+    decides whether it accepts another's cookie.
+    """
+    unprefixed = _learn_oidc("learn-unprefixed", _learn_group()).base_oidc_config
+    prefixed = _learn_oidc(
+        "learn-prefixed-2", _learn_group(path_prefix="learn")
+    ).base_oidc_config
+
+    logout_keys = {"logout_path", "post_logout_redirect_uri"}
+    assert {k: v for k, v in unprefixed.items() if k not in logout_keys} == {
+        k: v for k, v in prefixed.items() if k not in logout_keys
+    }
+    assert unprefixed["session"]["cookie_name"] == "mitlearn_apisix_session"
+    assert unprefixed["session"]["cookie_domain"] == ".learn.mit.edu"
+
+
+def test_learn_session_writers_all_refresh_with_the_forwarded_token_leeway():
+    """lua-resty-openidc subtracts the leeway when it stores a refreshed token,
+    so one participant without it hands /ai/* a token with no headroom.
+    """
+    config = _learn_oidc("learn-leeway", _learn_group()).base_oidc_config
+
+    assert (
+        config["access_token_expires_leeway"]
+        == FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS
+    )
+
+
+def test_learn_session_participants_choose_their_own_token_headers():
+    """The shared session stores every token either way; whether one reaches a
+    participant's upstream is that participant's choice alone.
+    """
+    session = LearnSession.for_host("production", "api.learn.mit.edu")
+    common = {
+        "k8s_namespace": "mitlearn",
+        "k8s_labels": {},
+        "credentials": OLApisixOIDCSecretCredentials(secret_name=LOCAL_SECRET_NAME),
+    }
+
+    plain = learn_session_oidc_config(
+        session, _learn_group(), application_name="plain", **common
+    )
+    with_tokens = learn_session_oidc_config(
+        session,
+        _learn_group(),
+        application_name="with-tokens",
+        set_access_token_header=True,
+        set_id_token_header=True,
+        **common,
+    )
+
+    assert (plain.oidc_set_access_token_header, plain.oidc_set_id_token_header) == (
+        False,
+        False,
+    )
+    assert (
+        with_tokens.oidc_set_access_token_header,
+        with_tokens.oidc_set_id_token_header,
+    ) == (True, True)
+    assert plain.oidc_session_contents == with_tokens.oidc_session_contents
+
+
+def test_learn_session_rejects_another_clients_vault_path():
+    """The session is encrypted with the shared client's session secret, so a
+    resource reading another client's credentials cannot decrypt it.
+    """
+    with pytest.raises(ValueError, match="sso/mitlearn"):
+        learn_session_oidc_config(
+            LearnSession.for_host("production", "api.learn.mit.edu"),
+            _learn_group(),
+            application_name="wrong-client",
+            k8s_namespace="mitlearn",
+            k8s_labels={},
+            credentials=OLApisixOIDCVaultCredentials(
+                path="sso/ol-analytics-api", vaultauth="vaultauth"
+            ),
+        )
+
+
+@pulumi.runtime.test
+def test_external_upstream_spec_omits_unset_port_and_pass_host():
+    """Existing external upstreams keep the controller defaults."""
+    upstream = OLApisixExternalUpstream(
+        "test-external-default",
+        OLApisixExternalUpstreamConfig(
+            application_name="ext",
+            k8s_namespace="ns",
+            external_hostname="example.org",
+        ),
+    )
+
+    def check(spec):
+        assert spec == {
+            "scheme": "https",
+            "externalNodes": [{"type": "Domain", "name": "example.org"}],
+        }
+
+    return upstream.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_external_upstream_spec_carries_port_and_pass_host():
+    upstream = OLApisixExternalUpstream(
+        "test-external-service",
+        OLApisixExternalUpstreamConfig(
+            application_name="ext-svc",
+            k8s_namespace="ns",
+            external_hostname="lms.other-ns.svc.cluster.local",
+            scheme="http",
+            port=8000,
+            pass_host="pass",
+        ),
+    )
+
+    def check(spec):
+        assert spec == {
+            "scheme": "http",
+            "passHost": "pass",
+            "externalNodes": [
+                {
+                    "type": "Domain",
+                    "name": "lms.other-ns.svc.cluster.local",
+                    "port": 8000,
+                }
+            ],
+        }
+
+    return upstream.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)

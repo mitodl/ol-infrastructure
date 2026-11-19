@@ -266,7 +266,7 @@ micromasters_db_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"Name": "micromasters-db-access-applications-{stack_info.env_suffix}"}
+        {"Name": f"micromasters-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=micromasters_vpc["id"],
 )
@@ -1327,5 +1327,10 @@ export(
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
         "rds_host": micromasters_db.db_instance.address,
+        **(
+            {"rds_replica_host": micromasters_db.db_replica.address}
+            if micromasters_db_config.read_replica
+            else {}
+        ),
     },
 )

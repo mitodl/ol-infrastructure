@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+from bridge.settings.apps import APPS, release_kind, release_resource_workflow
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _CLASSIFY_SCRIPT,
     CACHE_BUST_TASK_NAME,
@@ -30,7 +31,12 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
 APP = "ol-analytics-api"
 PULUMI = f"pulumi-ol-application-{APP}"
 DOCKER_TAG_ENV = "OL_ANALYTICS_API_DOCKER_TAG"
-RELEASE_APPS = ("ol-analytics-api", "learn-ai", "micromasters")
+DOCKER_SHA_ENV = "OL_ANALYTICS_API_DOCKER_SHA"
+RELEASE_VERSION_ENV = "OL_ANALYTICS_API_RELEASE_VERSION"
+RELEASE_IMAGE = f"{APP}-app-release-ecr-image"
+RELEASE_APPS = [
+    app for app in APPS if release_resource_workflow(app) and release_kind(app) == "k8s"
+]
 VERSION = "2026.10.2.1"
 LIVE = "2026.10.1.1"
 SHA = "c" * 40
@@ -77,7 +83,9 @@ def test_qa_preview_is_a_production_preview_at_the_cut_version():
 
     assert preview["params"]["stack_name"] == "Production"
     assert preview["params"]["preview"] is True
-    assert preview["params"]["env_os"][DOCKER_TAG_ENV] == "((.:image_tag))"
+    assert preview["params"]["env_os"][DOCKER_SHA_ENV] == "((.:image_digest))"
+    assert DOCKER_TAG_ENV not in preview["params"]["env_os"]
+    assert preview["params"]["env_os"][RELEASE_VERSION_ENV] == "((.:image_tag))"
     assert preview["get_params"]["summary_file"] == "preview_summary.md"
     assert preview["get_params"]["preview_stack"] == "Production"
     assert preview["get_params"]["read_outputs"] is False
@@ -92,7 +100,9 @@ def test_qa_still_deploys_the_cut_version_to_qa():
     qa_up = plan[_index(plan, "put", PULUMI, 0)]
 
     assert qa_up["params"]["stack_name"] == "QA"
-    assert qa_up["params"]["env_os"][DOCKER_TAG_ENV] == "((.:image_tag))"
+    assert qa_up["params"]["env_os"][DOCKER_SHA_ENV] == "((.:image_digest))"
+    assert DOCKER_TAG_ENV not in qa_up["params"]["env_os"]
+    assert qa_up["params"]["env_os"][RELEASE_VERSION_ENV] == "((.:image_tag))"
 
 
 def test_production_state_is_read_with_a_cache_busting_get():
@@ -144,10 +154,11 @@ def test_issue_put_carries_the_composed_body_and_skip_marker():
 
     assert issue["params"] == {
         "body_file": "promotion/body.md",
-        "labels": ["release"],
+        "labels": ["ops:release"],
         "title_template": "((.:promotion_title))",
         "skip_if_file": "promotion/skip",
         "skip_if_tag_missing": "((.:release_tag))",
+        "carry_checks_unless_labeled": ["ops:abandoned", "abandoned"],
     }
     # An issue that does not exist must not auto-close: closing approves it.
     assert "close_if_file" not in issue["params"]
@@ -171,9 +182,36 @@ def test_production_deploys_the_cut_version_the_gate_names():
     plan = _job(APP, "-production")["plan"]
     up = plan[_index(plan, "put", PULUMI)]
 
-    assert up["params"]["env_os"][DOCKER_TAG_ENV] == "((.:image_tag))"
+    assert up["params"]["env_os"][DOCKER_SHA_ENV] == "((.:image_digest))"
+    assert DOCKER_TAG_ENV not in up["params"]["env_os"]
+    assert up["params"]["env_os"][RELEASE_VERSION_ENV] == "((.:image_tag))"
     assert not any(step.get("task") == CLASSIFY_TASK_NAME for step in plan)
     assert not any(step.get("task") == CACHE_BUST_TASK_NAME for step in plan)
+
+
+@pytest.mark.parametrize(
+    ("job_suffix", "passed"),
+    [
+        ("-qa", [f"build-{APP}-release-image"]),
+        ("-production", [f"deploy-ol-application-{APP}-qa"]),
+    ],
+)
+def test_release_deploys_pin_the_image_digest_qa_ran(job_suffix, passed):
+    """Deploy the pushed digest, not the calver tag.
+
+    Abandoning a release deletes its tag, so a same-day re-cut gets the same
+    version and overwrites the same image tag. A tag-pinned pod spec would not
+    change, nothing would roll out, and RC would keep the abandoned build.
+    Production's image get is passed through QA, so it deploys the digest QA
+    ran.
+    """
+    plan = _job(APP, job_suffix)["plan"]
+    image_get = _index(plan, "get", RELEASE_IMAGE)
+    load = _index(plan, "load_var", "image_digest")
+
+    assert plan[image_get]["passed"] == passed
+    assert plan[load]["file"] == f"{RELEASE_IMAGE}/digest"
+    assert image_get < load < _index(plan, "put", PULUMI)
 
 
 def test_qa_and_production_share_the_production_stack_serial_group():
@@ -195,9 +233,7 @@ def test_every_release_workflow_app_gets_the_preview(app_name):
 
 def test_legacy_pipelines_are_untouched():
     """Legacy pipelines have no release issue, so they get none of it."""
-    pipeline = json.dumps(
-        json.loads(build_app_pipeline("mitxonline").model_dump_json())
-    )
+    pipeline = json.dumps(json.loads(build_app_pipeline("mit-learn").model_dump_json()))
     assert CLASSIFY_TASK_NAME not in pipeline
     assert CACHE_BUST_TASK_NAME not in pipeline
     assert "serial_groups" not in pipeline
@@ -456,4 +492,62 @@ def test_classify_fails_closed_without_a_commit_sha(tmp_path):
 
     assert result.returncode != 0
     assert "not a full commit SHA" in result.stderr
+    assert not (out / "title").exists()
+
+
+def _classify_tag_only(
+    tmp_path: Path, *, production: str, state: str
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    """Run classify for a tag-only release: no preview, no ol-infrastructure."""
+    (tmp_path / "version").write_text(VERSION + "\n")
+    (tmp_path / "production_version").write_text(production)
+    (tmp_path / "production_state").write_text(state)
+    checklist = f"## Release {VERSION}\n\n- [ ] a by b\n"
+    (tmp_path / "checklist.md").write_text(checklist)
+    out = tmp_path / "promotion"
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", _CLASSIFY_SCRIPT],
+        env={
+            **os.environ,
+            "APP_NAME": APP,
+            "VERSION_FILE": str(tmp_path / "version"),
+            "PRODUCTION_VERSION_FILE": str(tmp_path / "production_version"),
+            "PRODUCTION_STATE_FILE": str(tmp_path / "production_state"),
+            "CHECKLIST_FILE": str(tmp_path / "checklist.md"),
+            "OUTPUT_DIR": str(out),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, out
+
+
+@pytest.mark.parametrize(("production", "state"), [(LIVE, "known"), ("", "none")])
+def test_classify_tag_only_release_is_the_checklist_alone(tmp_path, production, state):
+    """No preview, so no marker and no infrastructure section."""
+    result, out = _classify_tag_only(tmp_path, production=production, state=state)
+
+    assert result.returncode == 0, result.stderr
+    assert (out / "title").read_text() == f"Release {APP} {VERSION}"
+    assert (out / "body.md").read_text() == f"## Release {VERSION}\n\n- [ ] a by b\n"
+    assert (out / "release_tag").read_text() == VERSION
+    assert not (out / "skip").exists()
+
+
+def test_classify_tag_only_release_already_in_production_posts_nothing(tmp_path):
+    """There is no infrastructure-only issue for a tag-only release."""
+    result, out = _classify_tag_only(tmp_path, production=VERSION, state="known")
+
+    assert result.returncode == 0, result.stderr
+    assert (out / "skip").exists()
+    assert not (out / "body.md").exists()
+    assert (out / "release_tag").read_text() == ""
+
+
+def test_classify_tag_only_still_fails_closed_when_production_is_unknown(tmp_path):
+    result, out = _classify_tag_only(tmp_path, production="", state="unknown")
+
+    assert result.returncode != 0
+    assert "could not tell" in result.stderr
     assert not (out / "title").exists()

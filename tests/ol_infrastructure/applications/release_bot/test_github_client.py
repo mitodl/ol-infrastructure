@@ -2,7 +2,7 @@
 selection, and PyGithub-backed API wrappers.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import github_client as github
 import pytest
@@ -209,6 +209,9 @@ class _FakeIssue:
         self.labels = [_FakeLabel(name) for name in labels]
         self.comments = []
         self.state = "open"
+        self.closed_at = None
+        self.pull_request = None
+        self.updated_at = datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
 
     def add_to_labels(self, label):
         self.labels.append(_FakeLabel(label))
@@ -219,6 +222,8 @@ class _FakeIssue:
     def edit(self, **kwargs):
         if "state" in kwargs:
             self.state = kwargs["state"]
+            if self.state == "closed":
+                self.closed_at = datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
 
 
 class _FakeDeploymentStatus:
@@ -259,12 +264,14 @@ class _FakeRepo:
         self._branches = branches
         self._deployments = deployments
         self._issues = {issue.number: issue for issue in issues}
+        self.label_queries: list[str] = []
 
-    def get_deployments(self, environment=None, **_kwargs):
+    def get_deployments(self, environment=None, ref=None, **_kwargs):
         return [
             deployment
             for deployment in self._deployments
             if environment in (None, deployment.environment)
+            and ref in (None, deployment.ref)
         ]
 
     def get_tags(self):
@@ -281,12 +288,20 @@ class _FakeRepo:
     def get_commits(self):
         return list(self._commits)
 
-    def get_issues(self, state=None, labels=None, sort=None, direction=None):  # noqa: ARG002
-        assert state in {"open", "all"}
-        assert labels == ["release"]
-        issues = list(self._issues.values())
-        if state == "open":
-            issues = [issue for issue in issues if issue.state == "open"]
+    def get_issues(self, state=None, labels=None, **_kwargs):
+        assert state in {"open", "closed", "all"}
+        # The issues API ANDs the labels it is given; every caller asks for one.
+        (label,) = labels
+        self.label_queries.append(label)
+        issues = [
+            issue
+            for issue in sorted(
+                self._issues.values(), key=lambda i: i.number, reverse=True
+            )
+            if label in {lbl.name for lbl in issue.labels}
+        ]
+        if state != "all":
+            issues = [issue for issue in issues if issue.state == state]
         return issues
 
     def get_issue(self, number):
@@ -535,6 +550,22 @@ def test_release_preview_counts_from_the_semver_baseline(fake_repo, monkeypatch)
     assert preview["since"] == "v0.37.3"
     assert [c["sha"] for c in preview["commits"]] == ["abc123"]
     assert preview["omitted"] == 0
+
+
+def test_release_preview_skips_an_abandoned_version(fake_repo, monkeypatch):
+    """The resource records it as abandoned/<version> and never cuts it again."""
+    monkeypatch.setattr(github, "_in_flight_release_sync", lambda _slug: None)
+    today = datetime.now(tz=UTC).date()
+    abandoned = f"{today.year}.{today.month}.{today.day}.1"
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("v0.37.3"), _FakeTag(f"abandoned/{abandoned}")],
+            comparison=_FakeComparison("ahead", []),
+        )
+    )
+    preview = github._release_preview_sync("mitodl/thing")
+    assert preview["version"] == f"{today.year}.{today.month}.{today.day}.2"
+    assert preview["since"] == "v0.37.3", "an abandoned version is not a baseline"
 
 
 # ---------------------------------------------------------------------------
@@ -918,6 +949,17 @@ def test_cancel_hotfix_requests_deletes_only_requests(fake_repo):
     assert [r.ref for r in repo.refs] == ["refs/tags/2026.9.1.1"]
 
 
+def test_cancel_hotfix_requests_can_take_back_just_some(fake_repo):
+    """A request that failed part way withdraws its own, not what was pending."""
+    other = "b" * 40
+    repo = fake_repo(
+        _RefsRepo(f"refs/tags/hotfix/{_HOTFIX_SHA}", f"refs/tags/hotfix/{other}")
+    )
+
+    assert github._cancel_hotfix_requests_sync("mitodl/thing", [other]) == [other]
+    assert [r.ref for r in repo.refs] == [f"refs/tags/hotfix/{_HOTFIX_SHA}"]
+
+
 def test_hotfix_tags_not_named_for_a_full_sha_are_not_requests(fake_repo):
     """The release resource ignores these, so they must not block releases here."""
     repo = fake_repo(
@@ -1133,8 +1175,10 @@ def test_release_issue_for_version_matches_the_checklist_header(fake_repo):
     fake_repo(
         _FakeRepo(
             issues=[
-                _FakeIssue(7, "Release app 2026.9.1.1", "## Release 2026.9.1.1", []),
-                _FakeIssue(8, "Release app 2026.9.2.1", CHECKLIST_BODY, []),
+                _FakeIssue(
+                    7, "Release app 2026.9.1.1", "## Release 2026.9.1.1", ["release"]
+                ),
+                _FakeIssue(8, "Release app 2026.9.2.1", CHECKLIST_BODY, ["release"]),
             ]
         )
     )
@@ -1150,7 +1194,9 @@ def test_release_issue_for_version_finds_a_closed_issue(fake_repo):
     An open-only search would find nothing for exactly the announcement that
     most needs the link.
     """
-    closed = _FakeIssue(9, "Release app 2026.9.2.1", "## Release 2026.9.2.1", [])
+    closed = _FakeIssue(
+        9, "Release app 2026.9.2.1", "## Release 2026.9.2.1", ["ops:release"]
+    )
     closed.edit(state="closed")
     fake_repo(_FakeRepo(issues=[closed]))
     issue = github._release_issue_for_version_sync("mitodl/thing", "2026.9.2.1")
@@ -1159,6 +1205,193 @@ def test_release_issue_for_version_finds_a_closed_issue(fake_repo):
 
 def test_release_issue_for_version_is_none_when_no_issue_matches(fake_repo):
     fake_repo(
-        _FakeRepo(issues=[_FakeIssue(7, "Release app", "## Release 2026.9.1.1", [])])
+        _FakeRepo(
+            issues=[_FakeIssue(7, "Release app", "## Release 2026.9.1.1", ["release"])]
+        )
     )
     assert github._release_issue_for_version_sync("mitodl/thing", "2026.9.9.9") is None
+
+
+def test_release_issue_for_version_returns_the_labels(fake_repo):
+    """release-status renders the issue's state from them."""
+    issue = _FakeIssue(
+        9,
+        "Release app 2026.9.2.1",
+        "## Release 2026.9.2.1",
+        ["ops:release", "ops:consumed", "ops:refused"],
+    )
+    issue.edit(state="closed")
+    fake_repo(_FakeRepo(issues=[issue]))
+    found = github._release_issue_for_version_sync("mitodl/thing", "2026.9.2.1")
+    assert found["labels"] == ["ops:release", "ops:consumed", "ops:refused"]
+
+
+def test_release_issue_for_version_ignores_an_unlabelled_issue(fake_repo):
+    fake_repo(
+        _FakeRepo(issues=[_FakeIssue(7, "Release app", "## Release 2026.9.1.1", [])])
+    )
+    assert github._release_issue_for_version_sync("mitodl/thing", "2026.9.1.1") is None
+
+
+# ---------------------------------------------------------------------------
+# Release issue labels: both names, and their precedence
+# ---------------------------------------------------------------------------
+
+
+def test_open_release_issues_accepts_both_release_label_names(fake_repo):
+    """Renaming `release` to `ops:release` in a repo must not hide an issue."""
+    repo = fake_repo(
+        _FakeRepo(
+            issues=[
+                _FakeIssue(40, "Release app 2026.9.1.1", "", ["release"]),
+                _FakeIssue(41, "Release app 2026.9.2.1", "", ["ops:release"]),
+                _FakeIssue(
+                    42, "Release app 2026.9.3.1", "", ["release", "ops:release"]
+                ),
+                _FakeIssue(43, "Unrelated", "", ["bug"]),
+            ]
+        )
+    )
+    issues = github._open_release_issues_sync("mitodl/thing")
+    # Newest first, and an issue carrying both names is listed once.
+    assert [issue["number"] for issue in issues] == [42, 41, 40]
+    assert sorted(repo.label_queries) == ["ops:release", "release"]
+
+
+def test_open_release_issues_caps_the_merged_list(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            issues=[
+                _FakeIssue(
+                    n, f"Release app {n}", "", ["release" if n % 2 else "ops:release"]
+                )
+                for n in range(1, 25)
+            ]
+        )
+    )
+    issues = github._open_release_issues_sync("mitodl/thing")
+    assert [issue["number"] for issue in issues] == list(range(24, 14, -1))
+
+
+def test_refused_release_issues_reads_closed_refused_issues(fake_repo):
+    refused = _FakeIssue(
+        9, "Release app 2026.9.2.1", "## Release 2026.9.2.1", ["ops:refused"]
+    )
+    refused.edit(state="closed")
+    refused.pull_request = None
+    other = _FakeIssue(10, "Release app 2026.9.3.1", "", ["ops:consumed"])
+    other.edit(state="closed")
+    repo = fake_repo(_FakeRepo(issues=[refused, other]))
+    issues = github._refused_release_issues_sync(
+        "mitodl/thing", datetime(2026, 10, 29, tzinfo=UTC)
+    )
+    assert [issue["number"] for issue in issues] == [9]
+    assert issues[0]["labels"] == ["ops:refused"]
+    assert repo.label_queries == ["ops:refused"]
+
+
+def test_refused_release_issues_reads_every_issue_in_the_window(fake_repo):
+    """The window bounds the query, so no refusal is cut off by a page cap."""
+    issues = []
+    for n in range(1, 41):
+        issue = _FakeIssue(n, f"Release app 2026.9.{n}.1", "", ["ops:refused"])
+        issue.edit(state="closed")
+        issue.pull_request = None
+        issues.append(issue)
+    fake_repo(_FakeRepo(issues=issues))
+    found = github._refused_release_issues_sync(
+        "mitodl/thing", datetime(2026, 10, 29, tzinfo=UTC)
+    )
+    assert len(found) == 40
+
+
+def test_closed_release_issues_reads_both_label_names_once_each(fake_repo):
+    """An issue under both the ops: and legacy names is returned once."""
+    both = _FakeIssue(9, "Release app 2026.9.2.1", "", ["ops:release", "release"])
+    legacy = _FakeIssue(8, "Release app 2026.9.1.1", "", ["release"])
+    still_open = _FakeIssue(10, "Release app 2026.9.3.1", "", ["ops:release"])
+    pull = _FakeIssue(11, "Release app 2026.9.4.1", "", ["ops:release"])
+    for issue in (both, legacy, pull):
+        issue.edit(state="closed")
+    pull.pull_request = object()
+    repo = fake_repo(_FakeRepo(issues=[both, legacy, still_open, pull]))
+
+    issues = github._closed_release_issues_sync(
+        "mitodl/thing", datetime(2026, 10, 29, tzinfo=UTC)
+    )
+
+    assert [issue["number"] for issue in issues] == [9, 8]
+    assert issues[0]["closed_at"] == datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
+    assert issues[0]["labels"] == ["ops:release", "release"]
+    assert sorted(repo.label_queries) == ["ops:release", "release"]
+
+
+def _deployment_at(deployment_id, ref, created_at, state="success"):
+    deployment = _FakeDeployment(
+        deployment_id, ref, "Production", [_FakeDeploymentStatus(state)]
+    )
+    deployment.created_at = created_at
+    return deployment
+
+
+_CLOSED = datetime(2026, 11, 3, 13, 44, 52, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("deployments", "expected"),
+    [
+        # Newest first, as the API lists them.
+        ([_deployment_at(2, "2026.9.5.1", _CLOSED + timedelta(minutes=5))], True),
+        # Still running counts: Production took the issue.
+        (
+            [
+                _deployment_at(
+                    2, "2026.9.5.1", _CLOSED + timedelta(minutes=5), "in_progress"
+                )
+            ],
+            True,
+        ),
+        # Began before the close, even if it finished after: not this approval.
+        ([_deployment_at(1, "2026.9.5.1", _CLOSED - timedelta(minutes=5))], False),
+        # A newer release deployed after the close does not hide or stand in
+        # for this version's Deployment.
+        ([_deployment_at(3, "2026.9.6.1", _CLOSED + timedelta(minutes=9))], False),
+        (
+            [
+                _deployment_at(3, "2026.9.6.1", _CLOSED + timedelta(minutes=9)),
+                _deployment_at(2, "2026.9.5.1", _CLOSED + timedelta(minutes=5)),
+            ],
+            True,
+        ),
+        ([], False),
+    ],
+)
+def test_deployment_created_since_matches_version_and_start_time(
+    fake_repo, deployments, expected
+):
+    fake_repo(_FakeRepo(deployments=deployments))
+    assert (
+        github._deployment_created_since_sync(
+            "mitodl/thing", "Production", "2026.9.5.1", _CLOSED
+        )
+        is expected
+    )
+
+
+@pytest.mark.parametrize(
+    ("labels", "expected"),
+    [
+        (["ops:release"], "release"),
+        (["release"], "release"),
+        (["release", "promote-ready"], "promote-ready"),
+        (["ops:release", "ops:promote-ready", "ops:consumed"], "consumed"),
+        # Production took the issue and refused it.
+        (["ops:consumed", "ops:refused"], "refused"),
+        (["ops:consumed", "ops:refused", "ops:abandoned"], "abandoned"),
+        (["release", "abandoned"], "abandoned"),
+        (["bug"], None),
+        ([], None),
+    ],
+)
+def test_release_state_resolves_by_precedence(labels, expected):
+    assert github.release_state(labels) == expected

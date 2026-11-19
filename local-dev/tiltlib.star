@@ -106,7 +106,20 @@ def _stamp_workloads(content, fingerprint, image_tags):
         return None
     return encode_yaml_stream(docs)
 
-def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
+def _add_labels(content, labels):
+    """Add labels to metadata.labels of every object in a (possibly multi-doc)
+    manifest text, keeping the labels an object already has."""
+    docs = [d for d in decode_yaml_stream(content) if d != None]
+    for d in docs:
+        metadata = d.setdefault("metadata", {})
+        existing = metadata.get("labels") or {}
+        for key in labels:
+            existing[key] = labels[key]
+        metadata["labels"] = existing
+    # A string, like the content it replaces: blob() below takes only a string.
+    return str(encode_yaml_stream(docs))
+
+def k8s_yaml_local(paths, local_overrides=None, substitutions=None, labels=None):
     """Apply k8s YAML with root-domain substitution and a pod-template
     fingerprint annotation covering every applied ConfigMap/Secret, including
     an optional gitignored ConfigMap of per-developer overrides (see module
@@ -115,7 +128,14 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
     substitutions is an optional dict of literal token -> value replacements,
     applied after the root-domain pass so a token cannot be mangled by it. Use
     it for a value that varies per developer for some reason other than the
-    root domain."""
+    root domain, or one read from elsewhere in the repo, such as a version
+    pin.
+
+    labels is an optional dict of label key -> value added to every object the
+    call applies, the override ConfigMap included. An object Tilt applies
+    beside a Pulumi program on purpose carries ol.mit.edu/yaml-by-design, which
+    pulumi-app-apply.sh's leftover guard skips; a label written in the tracked
+    YAML cannot reach the gitignored override file, so the call adds it."""
     rd = current_root_domain()
 
     # read_file(default=...) also registers a watch on the override path —
@@ -146,6 +166,8 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
         # that collides with something the developer already runs, say.
         for token in (substitutions or {}):
             content = content.replace(token, substitutions[token])
+        if labels:
+            content = _add_labels(content, labels)
         contents.append((p, content))
 
     fingerprint = _config_fingerprint(contents)

@@ -47,6 +47,7 @@ def setup_typesense_operator(
             version=TYPESENSE_OPERATOR_CHART_VERSION,
             namespace=TYPESENSE_OPERATOR_NAMESPACE,
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://akyriako.github.io/typesense-operator/",

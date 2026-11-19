@@ -1,6 +1,8 @@
 """Regression tests for registry-driven, read-only SOPS deployment tracing."""
 
 import importlib.util
+import json
+import subprocess
 import sys
 from dataclasses import replace
 from importlib.machinery import SourceFileLoader
@@ -28,8 +30,21 @@ def script(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     monkeypatch.setattr(
         module, "_fly_curl", Mock(side_effect=AssertionError("fly call"))
     )
-    monkeypatch.setattr(module, "_fly_ready", Mock(return_value=True))
+    monkeypatch.setattr(
+        module, "_fly_access", Mock(return_value=module.FlyAccess(ok=True))
+    )
     return module
+
+
+def _logged_out(script: ModuleType) -> Mock:
+    """Diagnose Concourse access as a user with no fly login would see it."""
+    return Mock(
+        return_value=script.FlyAccess(
+            ok=False,
+            summary="fly has no 'infrastructure' target yet",
+            fix=(f"Log in: {script.LOGIN_COMMAND}",),
+        )
+    )
 
 
 @pytest.fixture
@@ -497,7 +512,7 @@ def test_credentials_unknown_and_logged_out(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Explain credential-only and unregistered files even without Concourse access."""
-    monkeypatch.setattr(script, "_fly_ready", Mock(return_value=False))
+    monkeypatch.setattr(script, "_fly_access", _logged_out(script))
     script._report_sops_secrets(
         pr,
         [
@@ -510,7 +525,8 @@ def test_credentials_unknown_and_logged_out(
     assert "Provider credentials only" in output
     assert "No registered Pulumi consumer" in output
     assert "applications/witan/" in output
-    assert "fly -t infrastructure login" in output
+    assert "no 'infrastructure' target yet" in output
+    assert "See 'Concourse access' above" in output
     assert "✓" not in output
 
 
@@ -561,7 +577,7 @@ def test_mixed_pr_keeps_existing_reports(
             ]
         ),
     )
-    monkeypatch.setattr(script, "_fly_ready", Mock(return_value=False))
+    monkeypatch.setattr(script, "_fly_access", _logged_out(script))
     app_report = Mock()
     monkeypatch.setattr(script, "_report_ol_infra_app", app_report)
     script._report_ol_infrastructure_pr(pr)
@@ -688,14 +704,14 @@ def test_non_registry_project_logged_out(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Explain how to get live evidence rather than silently skipping."""
-    monkeypatch.setattr(script, "_fly_ready", Mock(return_value=False))
+    monkeypatch.setattr(script, "_fly_access", _logged_out(script))
     script._report_pulumi_projects(
         pr,
         {"applications/ocw_site/": ["src/ol_infrastructure/applications/ocw_site/x"]},
     )
     output = capsys.readouterr().out
     assert "applications/ocw_site/" in output
-    assert "fly -t infrastructure login" in output
+    assert "See 'Concourse access' above" in output
 
 
 @pytest.mark.parametrize(
@@ -997,3 +1013,284 @@ def test_unresolved_stage_keeps_build_link(
     output = capsys.readouterr().out
     assert "?  QA" in output
     assert "/jobs/apply-qa/builds/12" in output
+
+
+def _completed(returncode: int, stdout: str = "", stderr: str = "") -> Mock:
+    return Mock(returncode=returncode, stdout=stdout, stderr=stderr)
+
+
+@pytest.fixture
+def fly_installed(script: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pretend fly is on PATH, so diagnosis reaches `fly status`."""
+    monkeypatch.setattr(script.shutil, "which", Mock(return_value="/usr/bin/fly"))
+
+
+def test_access_fly_not_installed(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing fly links the matching binary instead of failing later."""
+    monkeypatch.setattr(script.shutil, "which", Mock(return_value=None))
+    monkeypatch.setattr(script, "_run_fly", Mock(side_effect=AssertionError("run")))
+    access = script._diagnose_fly_access()
+    assert not access.ok
+    assert "isn't installed" in access.summary
+    assert any("/api/v1/cli?arch=" in step for step in access.fix)
+    assert any(script.LOGIN_COMMAND in step for step in access.fix)
+
+
+@pytest.mark.usefixtures("fly_installed")
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [
+        (_completed(1, stderr="error: unknown target: infrastructure"), "no '"),
+        (_completed(1, stderr="please login again.\ntoken expired"), "expired"),
+        (None, "didn't finish"),
+    ],
+)
+def test_access_fly_status_failures(
+    script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    result: Mock | None,
+    expected: str,
+) -> None:
+    """Each `fly status` failure gets its own explanation and fix."""
+    monkeypatch.setattr(script, "_run_fly", Mock(return_value=result))
+    access = script._diagnose_fly_access()
+    assert not access.ok
+    assert expected in access.summary
+    assert access.fix
+
+
+@pytest.mark.usefixtures("fly_installed")
+@pytest.mark.parametrize(
+    ("user", "ok", "expected"),
+    [
+        ({"is_admin": False, "teams": {"infrastructure": ["viewer"]}}, True, ""),
+        ({"is_admin": True, "teams": {"main": ["owner"]}}, True, ""),
+        (
+            {"connector": "oidc", "user_name": "dev", "teams": {}},
+            False,
+            "neither the 'developer' nor the 'admin' role",
+        ),
+        (
+            {"connector": "github", "user_name": "dev", "teams": {"main": []}},
+            False,
+            "mitodl org member",
+        ),
+        ({"connector": "local", "user_name": "dev", "teams": {}}, False, "via local"),
+    ],
+)
+def test_access_team_roles(
+    script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    user: dict[str, Any],
+    ok: bool,  # noqa: FBT001
+    expected: str,
+) -> None:
+    """A valid login still needs a role on the team (or Concourse admin)."""
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(side_effect=[_completed(0), _completed(0, stdout=json.dumps(user))]),
+    )
+    access = script._diagnose_fly_access()
+    assert access.ok is ok
+    assert expected in access.summary
+    if not ok:
+        assert any("fly -t infrastructure logout" in step for step in access.fix)
+
+
+@pytest.mark.usefixtures("fly_installed")
+@pytest.mark.parametrize(
+    ("lookup", "expected"),
+    [
+        (
+            _completed(
+                1,
+                stderr="fly version (8.2.0) is out of sync with the target (8.3.3).",
+            ),
+            "doesn't match",
+        ),
+        (_completed(1, stderr="connection refused"), "user info"),
+        (_completed(0, stdout="<html>not json</html>"), "user info"),
+        (None, "in time"),
+    ],
+)
+def test_access_user_lookup_failures(
+    script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    lookup: Mock | None,
+    expected: str,
+) -> None:
+    """`fly status` can pass while `fly curl` fails, e.g. on a minor version skew."""
+    monkeypatch.setattr(
+        script, "_run_fly", Mock(side_effect=[_completed(0, stdout="ok"), lookup])
+    )
+    access = script._diagnose_fly_access()
+    assert not access.ok
+    assert expected in access.summary
+    if expected == "doesn't match":
+        assert access.fix == ("Update it: fly -t infrastructure sync",)
+
+
+def test_access_report_is_silent_when_ok(
+    script: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Users with working access see no extra output."""
+    script._print_access_report()
+    assert capsys.readouterr().out == ""
+
+
+def test_access_report_numbers_fix_steps(
+    script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Missing access is explained once, with steps to fix it."""
+    monkeypatch.setattr(script, "_fly_access", _logged_out(script))
+    script._print_access_report()
+    output = capsys.readouterr().out
+    assert "Concourse access: fly has no 'infrastructure' target yet." in output
+    assert f"  1. Log in: {script.LOGIN_COMMAND}" in output
+
+
+@pytest.mark.parametrize(
+    ("which", "error", "expected"),
+    [
+        (None, "unused", "isn't installed"),
+        (
+            "/usr/bin/gh",
+            "gh pr view x failed: To get started with GitHub CLI, please run:  "
+            "gh auth login",
+            "isn't logged in",
+        ),
+        ("/usr/bin/gh", "gh api x failed: HTTP 401: Bad credentials", "expired"),
+        (
+            "/usr/bin/gh",
+            "gh pr view x failed: error connecting to api.github.com",
+            "wouldn't return that PR (error connecting to api.github.com)",
+        ),
+    ],
+)
+def test_github_problems_are_explained(  # noqa: PLR0913
+    *,
+    script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    which: str | None,
+    error: str,
+    expected: str,
+) -> None:
+    """Stop with a fix for gh problems; blame login only for auth errors."""
+    monkeypatch.setattr(script.shutil, "which", Mock(return_value=which))
+    monkeypatch.setattr(script, "_fetch_pr", Mock(side_effect=RuntimeError(error)))
+    with pytest.raises(SystemExit):
+        script._fetch_pr_or_explain("https://github.com/mitodl/learn-ai/pull/1")
+    assert expected in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("fly_installed")
+def test_login_steps_cover_github_not_a_member(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A user whose GitHub login failed has no target, but still sees org advice."""
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(return_value=_completed(1, stderr="error: unknown target: x")),
+    )
+    fix = " ".join(script._diagnose_fly_access().fix)
+    assert "https://github.com/settings/applications" in fix
+    assert "you are not a member of 'infrastructure'" in fix
+
+
+@pytest.mark.usefixtures("fly_installed")
+def test_patch_version_warning_keeps_live_checks(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fly warns about patch skew but still succeeds; that is not a failure."""
+    user = {"is_admin": False, "teams": {"infrastructure": ["viewer"]}}
+    warning = "WARNING:\n\nfly version (8.3.2) is out of sync with the target (8.3.3)."
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(
+            side_effect=[
+                _completed(0),
+                _completed(0, stdout=json.dumps(user), stderr=warning),
+            ]
+        ),
+    )
+    assert script._diagnose_fly_access().ok
+
+
+@pytest.mark.usefixtures("fly_installed")
+def test_status_version_skew_suggests_sync(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Suggest sync, not login, if `fly status` ever rejects version skew."""
+    monkeypatch.setattr(
+        script,
+        "_run_fly",
+        Mock(return_value=_completed(1, stderr="fly version is out of sync")),
+    )
+    assert script._diagnose_fly_access().fix == (
+        "Update it: fly -t infrastructure sync",
+    )
+
+
+def test_bad_pr_url_is_explained(
+    script: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A non-PR URL gets an example instead of a traceback."""
+    with pytest.raises(SystemExit):
+        script._fetch_pr_or_explain("https://github.com/mitodl/learn-ai")
+    assert "isn't a GitHub pull request URL" in capsys.readouterr().err
+
+
+def test_missing_packages_are_explained() -> None:
+    """Without the uv environment's packages, explain instead of a traceback."""
+    path = Path(__file__).resolve().parents[1] / "scripts" / "where-is-my-pr"
+    # -S hides site-packages, like running with a Python outside the venv.
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-S", str(path), "https://github.com/mitodl/x/pull/1"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 1
+    assert "can't import the 'cyclopts' package" in result.stderr
+    run_step = "uv run python scripts/where-is-my-pr https://github.com/mitodl/x/pull/1"
+    assert run_step in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("in_checkout", "in_repo_venv", "have_uv", "expected", "absent"),
+    [
+        (True, False, True, "Set up the environment (once)", "Install uv"),
+        (True, True, True, "Update the environment", "Set up"),
+        (True, False, False, "Install uv", "Clone"),
+        (False, False, True, "git clone", "Update"),
+    ],
+)
+def test_environment_fix_steps(  # noqa: PLR0913
+    *,
+    script: ModuleType,
+    in_checkout: bool,
+    in_repo_venv: bool,
+    have_uv: bool,
+    expected: str,
+    absent: str,
+) -> None:
+    """Fit setup advice to what's missing: uv, the checkout, or a fresh sync."""
+    steps = " ".join(
+        script._environment_fix(
+            in_checkout=in_checkout, in_repo_venv=in_repo_venv, have_uv=have_uv
+        )
+    )
+    assert expected in steps
+    assert absent not in steps
+    # The run step works when pasted anywhere, not only from the repo root.
+    assert "&& uv run python scripts/where-is-my-pr" in steps

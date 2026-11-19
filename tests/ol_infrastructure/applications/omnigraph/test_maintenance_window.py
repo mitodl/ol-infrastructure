@@ -40,7 +40,10 @@ SECONDS_TO_NEXT_WRITER = 40 * 60
 
 
 def _window(
-    *, suspend: bool = False, cleanup_iso_weekdays: tuple[int, ...] = (1, 3, 7)
+    *,
+    suspend: bool = False,
+    cleanup_iso_weekdays: tuple[int, ...] = (1, 3, 7),
+    cleanup_keep: int | None = None,
 ):
     return create_maintenance_window(
         stack_info=STACK_INFO,
@@ -56,6 +59,7 @@ def _window(
         cleanup_older_than="30d",
         cleanup_iso_weekdays=cleanup_iso_weekdays,
         depends_on=[],
+        cleanup_keep=cleanup_keep,
         suspend=suspend,
     )
 
@@ -182,6 +186,8 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS": str(COMMAND_TIMEOUT_SECONDS),
             # A server draining writes for its whole grace is not stuck.
             "OMNIGRAPH_SERVER_STOP_SECONDS": "180",
+            # The close after SIGTERM is fitted to this pod's own grace.
+            "OMNIGRAPH_TERMINATION_GRACE_SECONDS": str(TERMINATION_GRACE_SECONDS),
             "LANCE_MEM_POOL_SIZE": str(LANCE_MEM_POOL_BYTES),
         }
         assert container["resources"]["limits"]["memory"] == MAINTENANCE_MEMORY_LIMIT
@@ -223,6 +229,27 @@ def test_no_cleanup_days_render_as_an_empty_list():
 
 
 @pulumi.runtime.test
+def test_a_cleanup_count_replaces_the_age():
+    """The image refuses both retentions at once (agent-kit
+    docker/omnigraph_maintenance.py parse_cleanup_retention).
+    """
+    mocks = RecordingMocks()
+    pulumi.runtime.set_mocks(mocks, preview=False)
+    window = _window(cleanup_keep=1)
+
+    def check(_: object) -> None:
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
+        (container,) = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"][
+            "containers"
+        ]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        assert env["OMNIGRAPH_CLEANUP_KEEP"] == "1"
+        assert "OMNIGRAPH_CLEANUP_OLDER_THAN" not in env
+
+    return window.cron_job.urn.apply(check)
+
+
+@pulumi.runtime.test
 def test_an_armed_migration_suspends_the_window():
     mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
@@ -257,6 +284,9 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
         actor_tokens_file="/etc/omnigraph/tokens/tokens.json",
         apply_actor="svc-witan-admin",
         graph_removal_allowlist=["code-a"],
+        branch_drop_allowlist=["code-b", "code-bridge"],
+        view_drop_actor="svc-witan-ci",
+        server_url="http://omnigraph-server.omnigraph.svc.cluster.local:8080",
         config_hash=pulumi.Output.from_input("abc123"),
         depends_on=[],
     )
@@ -276,8 +306,13 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
             "AWS_REGION": "us-east-1",
             "OMNIGRAPH_CLUSTER_DIR": "/etc/omnigraph/cluster",
             "OMNIGRAPH_SERVER_BEARER_TOKENS_FILE": "/etc/omnigraph/tokens/tokens.json",
+            "OMNIGRAPH_VIEW_DROP_SERVER_URL": (
+                "http://omnigraph-server.omnigraph.svc.cluster.local:8080"
+            ),
             "OMNIGRAPH_APPLY_ACTOR": "svc-witan-admin",
             "OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST": "code-a",
+            "OMNIGRAPH_BRANCH_DROP_ALLOWLIST": "code-b,code-bridge",
+            "OMNIGRAPH_VIEW_DROP_ACTOR": "svc-witan-ci",
         }
         mounts = {m["name"]: m["mountPath"] for m in container["volumeMounts"]}
         assert mounts == {

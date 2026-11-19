@@ -639,5 +639,62 @@ policy_definition = {
             ],
             "Condition": {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com"}},
         },
+        {
+            # infrastructure/aws/iam/__main__.py manages the account's GitHub
+            # Actions OIDC provider, and the pipeline refreshes that stack on
+            # every run, so it needs reads as well as the lifecycle. Scoped to
+            # that one provider so the worker can't add another identity
+            # provider to the account.
+            "Effect": "Allow",
+            "Action": [
+                "iam:AddClientIDToOpenIDConnectProvider",
+                "iam:CreateOpenIDConnectProvider",
+                "iam:DeleteOpenIDConnectProvider",
+                "iam:GetOpenIDConnectProvider",
+                "iam:ListOpenIDConnectProviderTags",
+                "iam:RemoveClientIDFromOpenIDConnectProvider",
+                "iam:TagOpenIDConnectProvider",
+                "iam:UntagOpenIDConnectProvider",
+                "iam:UpdateOpenIDConnectProviderThumbprint",
+            ],
+            "Resource": (
+                "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"
+            ),
+        },
+        {
+            # The hindsight stack copies a foundation model into a tagged
+            # application inference profile so Cost Explorer can attribute its
+            # embedding spend. Creating the profile is authorized against the
+            # source (a foundation model or a system inference profile) as well
+            # as the new profile. No invoke actions: the worker only manages
+            # the profile, the app's IRSA role calls it.
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:CreateInferenceProfile",
+                "bedrock:GetFoundationModel",
+                "bedrock:GetInferenceProfile",
+            ],
+            "Resource": [
+                "arn:aws:bedrock:*::foundation-model/*",
+                "arn:aws:bedrock:*:*:inference-profile/*",
+                "arn:aws:bedrock:*:*:application-inference-profile/*",
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:DeleteInferenceProfile",
+                "bedrock:TagResource",
+                "bedrock:UntagResource",
+            ],
+            "Resource": "arn:aws:bedrock:*:*:application-inference-profile/*",
+        },
+        {
+            # Read-only, and it accepts some 30 Bedrock resource types, so
+            # Parliament's RESOURCE_MISMATCH would flag any narrower list.
+            "Effect": "Allow",
+            "Action": ["bedrock:ListTagsForResource"],
+            "Resource": "*",
+        },
     ],
 }

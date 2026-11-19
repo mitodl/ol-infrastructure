@@ -24,6 +24,9 @@ eks_substructure_code = git_repo(
     uri="https://github.com/mitodl/ol-infrastructure",
     paths=[
         "src/ol_infrastructure/substructure/aws/eks",
+        # clickhouse_operator.py derives the operator's StatefulSet timeout
+        # from CLICKHOUSE_TERMINATION_GRACE_SECONDS.
+        "src/bridge/lib/magic_numbers.py",
         *PULUMI_WATCHED_PATHS,
         *project_version_paths("substructure/aws/eks/"),
         *project_secrets_paths("substructure/aws/eks/"),

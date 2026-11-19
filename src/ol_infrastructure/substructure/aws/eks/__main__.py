@@ -258,6 +258,7 @@ if cluster_stack.require_output("has_ebs_storage"):
             version=VERSIONS["VANTAGE_K8S_AGENT_VERSION"],
             namespace="operations",
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://vantage-sh.github.io/helm-charts",
             ),

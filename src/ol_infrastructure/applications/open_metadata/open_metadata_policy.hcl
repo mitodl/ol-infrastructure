@@ -18,6 +18,11 @@ path "secret-operations/sso/superset" {
 path "secret-openmetadata/data/keycloak-team-sync" {
   capabilities = ["read"]
 }
+# The provisioner's Keycloak client, an OpenMetadata admin, for the same job's
+# role reconciliation
+path "secret-openmetadata/data/pulumi-provisioner" {
+  capabilities = ["read"]
+}
 # Connector credentials for OpenMetadata ingestion pipelines
 path "secret-openmetadata/data/connectors" {
   capabilities = ["read"]
@@ -25,8 +30,8 @@ path "secret-openmetadata/data/connectors" {
 path "secret-openmetadata/data/connectors/*" {
   capabilities = ["read"]
 }
-# Ingestion-bot JWT tokens for authenticating to the OpenMetadata server API.
-# One path per system bot (ingestion, lineage, profiler, data-insight).
+# System bot JWTs for authenticating to the OpenMetadata server API, written by
+# substructure/open_metadata. One path per bot the ingestion jobs use.
 path "secret-openmetadata/data/ingestion-bot" {
   capabilities = ["read"]
 }
@@ -36,15 +41,13 @@ path "secret-openmetadata/data/lineage-bot" {
 path "secret-openmetadata/data/profiler-bot" {
   capabilities = ["read"]
 }
-path "secret-openmetadata/data/data-insight-bot" {
-  capabilities = ["read"]
-}
 # Read-only StarRocks credentials for the StarRocks ingestion jobs. Only QA
-# and Production create the secret that reads this path.
-path "database-starrocks/creds/readonly" {
+# and Production create the secret that reads this path. batch_readonly holds
+# readonly's grants and puts the jobs' queries in the batch resource group.
+path "database-starrocks/creds/batch_readonly" {
   capabilities = ["read"]
 }
-path "database-starrocks/creds/readonly/*" {
+path "database-starrocks/creds/batch_readonly/*" {
   capabilities = ["read"]
 }
 # vault-secrets-operator is a little more particular about
@@ -54,12 +57,12 @@ path "database-starrocks/creds/readonly/*" {
 path "sys/leases/renew" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/readonly/*"]
+    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/batch_readonly/*"]
   }
 }
 path "sys/leases/revoke" {
   capabilities = ["update"]
   allowed_parameters = {
-    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/readonly/*"]
+    lease_id = ["postgres-open-metadata/creds/app/*", "database-starrocks/creds/batch_readonly/*"]
   }
 }

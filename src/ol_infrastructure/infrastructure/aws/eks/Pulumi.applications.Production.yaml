@@ -35,6 +35,7 @@ config:
   - micromasters-backend.odl.mit.edu
   - nb.learn.mit.edu
   - ocw-studio.odl.mit.edu
+  - paypal-adapter.ol.mit.edu
   - preview-backend.learn.mit.edu
   - preview.xpro.mit.edu
   - studio-backend.learn.mit.edu
@@ -76,6 +77,7 @@ config:
   - mitxonline-openedx
   - ocw-studio
   - odl-video-service
+  - paypal-adapter
   - tika
   - xpro
   - xpro-openedx

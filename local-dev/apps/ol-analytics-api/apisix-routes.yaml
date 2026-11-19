@@ -1,0 +1,87 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: ol-analytics-api-shared-plugins
+  namespace: ol-analytics-api
+spec:
+  plugins:
+  - name: redirect
+    enable: true
+    config:
+      http_to_https: true
+  - name: cors
+    enable: true
+    config:
+      # The MIT Learn frontend calls this host with credentials, as
+      # cors_frontend_origins names rc.learn.mit.edu in the QA stack.
+      allow_origins: "https://analytics.learn.mit.test,https://learn.mit.test"
+      allow_methods: "GET,HEAD,OPTIONS"
+      allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
+      allow_credential: true
+      max_age: 3600
+  - name: prometheus
+    enable: true
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: ol-analytics-api-tls
+  namespace: ol-analytics-api
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - analytics.learn.mit.test
+  secret:
+    name: local-dev-tls
+    namespace: ol-analytics-api
+---
+# The deployed stack's Learn-scoped route (ol-analytics-api-learn): it reads
+# mit-learn's session rather than starting its own, and never redirects, because
+# the dashboard calls it with fetch(). A logged-in browser gets X-Userinfo; an
+# anonymous one reaches the app without it and gets a JSON 401.
+#
+# The canonical analytics-<env>.ol.mit.edu host and the bearer-only
+# /api/v1/learner-records rule are not reproduced: the dashboard uses neither.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: ol-analytics-api-learn
+  namespace: ol-analytics-api
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: passauth
+    priority: 10
+    match:
+      hosts:
+      - analytics.learn.mit.test
+      paths:
+      - "/*"
+    backends:
+    - serviceName: ol-analytics-api
+      servicePort: 8000
+    plugin_config_name: ol-analytics-api-shared-plugins
+    plugins:
+    # secretRef supplies the mitlearn client's client_id, client_secret, realm,
+    # discovery and session.secret (_make_oidc_secret in
+    # local-dev/infra/modules/keycloak.py), the same values mit-learn's routes
+    # read, so this route can decrypt their session cookie.
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
+      config:
+        bearer_only: false
+        use_pkce: true
+        introspection_endpoint_auth_method: client_secret_basic
+        scope: "openid profile email ol-profile organization:*"
+        unauth_action: pass
+        session:
+          # The cookie mit-learn's login sets on the parent domain; see
+          # apps/mit-learn/apisix-routes.yaml.
+          cookie_name: mitlearn_apisix_session_dev
+          cookie_domain: ".learn.mit.test"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
+        ssl_verify: false

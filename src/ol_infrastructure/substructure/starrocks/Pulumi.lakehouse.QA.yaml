@@ -12,3 +12,45 @@ config:
   starrocks:aws_region: us-east-1
   starrocks:domain: lakehouse.qa.starrocks.ol.mit.edu
   starrocks:oidc_enabled: "true"
+  starrocks:gravitino_catalog_enabled: "true"
+  # The FE runs query queue v1 (enable_query_queue_v2 = false in the
+  # applications stack's fe.conf), which queues each resource group against its
+  # own concurrency_limit. SELECTs, loads (INSERT) and statistics jobs all go
+  # through the queue, so batch's INSERTs wait for a slot rather than being
+  # rejected by the CN.
+  # There is no global cap: interactive, with no concurrency_limit, never waits
+  # behind batch, and its exclusive cores isolate its CPU. See
+  # resource_groups.py.
+  starrocks:query_queue:
+    enable_query_queue_select: true
+    enable_query_queue_load: true
+    enable_query_queue_statistic: true
+    enable_group_level_query_queue: true
+    query_queue_concurrency_limit: 0
+    query_queue_pending_timeout_second: 300
+  # CN pods here request 1 CPU with a 4 CPU limit. StarRocks caps
+  # exclusive_cpu_cores at the smallest CN's reported cores minus one, and a
+  # CN reports its limit (4 cores), not its request.
+  # The request is 1 CPU, so the value below is the smallest one that
+  # dedicates any threads and stays within CPU the pod is guaranteed.
+  # Keep CN pods uniformly sized (applications/starrocks starrocks:cn_config)
+  # and revisit this when they change. mem_limit is a fraction of each CN's
+  # query pool, 0.729 of the pod memory limit (measured on the 6Gi CN), so
+  # batch's 1.0 is about 8.75Gi on the 12Gi CN. Batch is not memory-capped
+  # below the CN, and has no big_query_mem_limit. With 0.6 and a 4Gi
+  # big-query limit it refused dim_course_content (a 4294967296-byte request
+  # with 1955247216 used, against a 5635856085-byte group limit) and a mitx
+  # tracking-log test (at the 4Gi big-query limit) on 2026-11-13. Cap it
+  # again only once a measured conflict with interactive queries shows the
+  # need.
+  starrocks:resource_groups:
+    interactive:
+      exclusive_cpu_cores: 1
+      mem_limit: 0.4
+      concurrency_limit: 0
+    batch:
+      cpu_weight_percent: 100
+      mem_limit: 1.0
+      # Queries past this wait in the FE queue. Sized for one dbt build (4
+      # threads, ol_dbt profiles.yml).
+      concurrency_limit: 4

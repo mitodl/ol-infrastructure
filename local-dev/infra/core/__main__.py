@@ -276,7 +276,13 @@ k8s.core.v1.ConfigMap(
 
 create_cache(_k8s, namespaces["local-infra"])
 
-search = create_search(_k8s, namespaces["local-infra"])
+search = create_search(
+    _k8s,
+    namespaces["local-infra"],
+    apisix_release=ingress.apisix,
+    tls_secret=tls.tls_secret,
+    qdrant_hostname=f"qdrant.{root_domain}",
+)
 
 messaging = create_messaging(
     _k8s,
@@ -355,6 +361,7 @@ pulumi.export("keycloak_hostname", keycloak_hostname)
 pulumi.export("postgres_host", "local-pg-rw.local-infra.svc.cluster.local")
 pulumi.export("valkey_host", "valkey.local-infra.svc.cluster.local")
 pulumi.export("qdrant_url", "http://qdrant.local-infra.svc.cluster.local:6333")
+pulumi.export("qdrant_dashboard_url", f"https://qdrant.{root_domain}/dashboard")
 pulumi.export(
     "opensearch_url",
     "http://opensearch-cluster-master.local-infra.svc.cluster.local:9200",

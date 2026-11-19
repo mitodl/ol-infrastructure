@@ -7,6 +7,9 @@ import pulumi
 import pulumi_kubernetes as kubernetes
 
 from bridge.lib.magic_numbers import DEFAULT_REDIS_PORT
+from ol_infrastructure.applications.edxapp.k8s_configmaps import (
+    CMS_EXPORT_CELERY_QUEUE,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sKedaWebappScalingConfig,
@@ -403,3 +406,85 @@ def create_celery_autoscaling_resources(
         "lms_high_mem_celery_scaledobject": lms_high_mem_celery_scaledobject,
         "cms_celery_scaledobject": cms_celery_scaledobject,
     }
+
+
+def create_cms_export_celery_autoscaling(
+    edxapp_cache: OLAmazonCache,
+    replicas_dict: dict[str, Any],
+    namespace: str,
+    cms_export_celery_labels: dict[str, str],
+    cms_export_celery_deployment_name: str,
+    stack_info: StackInfo,
+    cms_export_celery_deployment: kubernetes.apps.v1.Deployment,
+) -> kubernetes.apiextensions.CustomResource:
+    """Create the KEDA ScaledObject for the CMS export celery worker.
+
+    Separate from create_celery_autoscaling_resources because the worker only
+    exists where uses_cms_export_queue() is true.
+    """
+    # Git exports carry a short debounce countdown. A worker with a free slot
+    # fetches a countdown task straight away and holds it until its ETA, and the
+    # Redis transport moves a fetched message off the list into the unacked hash,
+    # so git exports barely register as queue depth: the minReplicaCount pod is
+    # what serves them, and it cannot be 0. S3 course exports carry no countdown
+    # and arrive one per course in the request, so a bulk request fills the list
+    # and drives the scale-up.
+    #
+    # The long scale-down window makes it less likely a pod is removed mid-export:
+    # a running task no longer counts toward list length, so the queue reads empty
+    # well before the work is done.
+    cms_export_replicas = replicas_dict["celery"].get(
+        "cms_export", {"min": 1, "max": 2}
+    )
+    return kubernetes.apiextensions.CustomResource(
+        f"ol-{stack_info.env_prefix}-edxapp-cms-export-celery-scaledobject-{stack_info.env_suffix}",
+        api_version="keda.sh/v1alpha1",
+        kind="ScaledObject",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{cms_export_celery_deployment_name}-scaledobject",
+            namespace=namespace,
+            labels=cms_export_celery_labels,
+        ),
+        spec={
+            "scaleTargetRef": {
+                "kind": "Deployment",
+                "name": cms_export_celery_deployment_name,
+            },
+            "pollingInterval": 60,
+            "minReplicaCount": cms_export_replicas["min"],
+            "maxReplicaCount": cms_export_replicas["max"],
+            "advanced": {
+                "horizontalPodAutoscalerConfig": {
+                    "behavior": {
+                        "scaleUp": {"stabilizationWindowSeconds": 60},
+                        "scaleDown": {
+                            "stabilizationWindowSeconds": 1800,
+                            "policies": [
+                                {"type": "Pods", "value": 1, "periodSeconds": 300},
+                            ],
+                        },
+                    }
+                }
+            },
+            "triggers": [
+                {
+                    "type": "redis",
+                    "metadata": {
+                        "address": edxapp_cache.address.apply(
+                            lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
+                        ),
+                        "username": "default",
+                        "databaseIndex": "1",
+                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "listName": CMS_EXPORT_CELERY_QUEUE,
+                        # Target of 5 waiting tasks per pod, about 2.5 rounds at
+                        # --concurrency=2. Lower, a single bulk S3 export request
+                        # would start the second pod almost every time.
+                        "listLength": "5",
+                        "enableTLS": "true",
+                    },
+                }
+            ],
+        },
+        opts=pulumi.ResourceOptions(depends_on=[cms_export_celery_deployment]),
+    )

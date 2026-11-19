@@ -23,3 +23,13 @@ data:
   # registered with an https callback, and "false" would leave the callback's
   # scheme to whatever X-Forwarded-Proto APISIX sends rather than forcing it.
   SOCIAL_AUTH_REDIRECT_IS_HTTPS: "true"
+
+  # Studio's home view is a redirect into the authoring MFE, and the shared
+  # header template links to the same URL from every page, 500.html included.
+  # The master release has no legacy Studio home to fall back to, so while this
+  # is unset every Studio URL raises ImproperlyConfigured. The MFE is the
+  # mfe-authoring Deployment the Tiltfile builds, reached through
+  # apisix-routes.yaml's authoring-mfe-route. lehrer binds this variable to the
+  # Django setting only when its settings model declares the field; the
+  # README's Open edX section has the check.
+  COURSE_AUTHORING_MICROFRONTEND_URL: "https://studio.mit.test/authoring"

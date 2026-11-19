@@ -151,11 +151,28 @@ def _endpoint(props: dict[str, Any]) -> str:
     )
 
 
+def _restore_ints(value: Any) -> Any:
+    """Turn integral floats back into ints.
+
+    Dynamic provider inputs cross the engine as a protobuf ``Struct``, which
+    only has doubles, so ``300`` arrives as ``300.0``. The plugin rejects a
+    float for its integer attributes (e.g. ``retryIntervalInSeconds``), and the
+    spec declares no float attributes.
+    """
+    if isinstance(value, dict):
+        return {key: _restore_ints(entry) for key, entry in value.items()}
+    if isinstance(value, list):
+        return [_restore_ints(entry) for entry in value]
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
 def _declared(props: dict[str, Any]) -> dict[str, Any]:
     declared = dict(props["spec"])
     if props["authentication"] is not None:
         declared["authenticationList"] = props["authentication"]
-    return declared
+    return _restore_ints(declared)
 
 
 def _find_by_name(

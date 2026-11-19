@@ -26,11 +26,30 @@ MAX_SLACK_FIELDS = 10
 MAX_LABELS_DISPLAYED = 5
 SLACK_FIELD_BUFFER = 9  # Leave room for labels field
 
-RELEASE_VERSION_RE = re.compile(r"^\d{4}\.\d{2}\.\d{2}\.\d+$")
+# Month and day are unpadded (PEP 440), so 2026.6.5.1 is a release too.
+RELEASE_VERSION_RE = re.compile(r"^\d{4}\.\d{1,2}\.\d{1,2}\.\d+$")
+# Set by OLApplicationK8s from the release the pods run.
+RELEASE_VERSION_LABEL = "ol.mit.edu/version"
 
 
 def _is_release_image(image_tag: str) -> bool:
     return bool(RELEASE_VERSION_RE.match(image_tag))
+
+
+def release_version(deployment_details: dict[str, Any]) -> str:
+    """Return the release version a Deployment runs, or "" if it names none.
+
+    Release-workflow apps deploy by image digest, so their image reference
+    carries no version; it is on the ol.mit.edu/version label instead. The
+    image tag is the fallback for a Deployment whose image is referenced by tag.
+    """
+    labels = deployment_details.get("labels", {})
+    if version := labels.get(RELEASE_VERSION_LABEL):
+        return version
+    image = deployment_details.get("image", "")
+    if "@" in image:
+        return ""
+    return image.rsplit(":", 1)[-1] if ":" in image.rsplit("/", 1)[-1] else ""
 
 
 # Configure logging
@@ -493,8 +512,7 @@ def format_slack_message(  # noqa: C901
         )
 
     # Add "Promote to Production" button for RC (release version) deployments
-    image = deployment_details.get("image", "")
-    image_tag = image.rsplit(":", 1)[-1] if ":" in image else ""
+    version = release_version(deployment_details)
     # Prefer the ol.mit.edu/application label (set by OLApplicationK8s) since the
     # Deployment name is typically "{app}-app" but REPOS_CONFIG keys are "{app}".
     labels = deployment_details.get("labels", {})
@@ -505,7 +523,7 @@ def format_slack_message(  # noqa: C901
     if (
         notification_type == "finish"
         and deployment_succeeded
-        and _is_release_image(image_tag)
+        and _is_release_image(version)
     ):
         blocks.append(
             {
@@ -519,7 +537,7 @@ def format_slack_message(  # noqa: C901
                         },
                         "style": "primary",
                         "action_id": "promote_production",
-                        "value": f"{app_name}:{image_tag}",
+                        "value": f"{app_name}:{version}",
                         "confirm": {
                             "title": {
                                 "type": "plain_text",
@@ -528,8 +546,7 @@ def format_slack_message(  # noqa: C901
                             "text": {
                                 "type": "mrkdwn",
                                 "text": (
-                                    f"Deploy `{image_tag}` of "
-                                    f"`{app_name}` to Production?"
+                                    f"Deploy `{version}` of `{app_name}` to Production?"
                                 ),
                             },
                             "confirm": {"type": "plain_text", "text": "Promote"},

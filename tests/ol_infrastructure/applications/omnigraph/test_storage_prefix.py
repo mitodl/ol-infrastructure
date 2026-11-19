@@ -13,6 +13,7 @@ See ``docs/omnigraph-storage-format-upgrade-runbook.md``.
 import pytest
 
 from ol_infrastructure.applications.omnigraph.storage import (
+    next_written_internal_schema,
     storage_uri_for,
     validate_image_internal_schema,
     validate_internal_schema_version,
@@ -188,6 +189,30 @@ def test_image_agreeing_with_the_served_format_passes() -> None:
     validate_image_internal_schema(9, 9, "", migration_armed=False)
 
 
+@pytest.mark.parametrize("served", [14, 15, 16])
+def test_image_serving_the_root_in_place_passes(served: int) -> None:
+    """Omnigraph 0.14 writes 16 and opens 14 in place, so no migration is armed."""
+    validate_image_internal_schema(
+        16, served, "", migration_armed=False, image_min_internal_schema=14
+    )
+
+
+@pytest.mark.parametrize("served", [9, 17])
+def test_image_outside_its_served_range_is_refused(served: int) -> None:
+    with pytest.raises(ValueError, match="reads storage format 14 to 16"):
+        validate_image_internal_schema(
+            16, served, "", migration_armed=False, image_min_internal_schema=14
+        )
+
+
+def test_armed_migration_still_targets_the_written_format() -> None:
+    """The rebuild writes the image's own format; the served range doesn't apply."""
+    with pytest.raises(ValueError, match="targets format 14"):
+        validate_image_internal_schema(
+            16, 14, "fmt14", migration_armed=True, image_min_internal_schema=14
+        )
+
+
 def test_no_committed_schema_leaves_nothing_to_check() -> None:
     """A bucket-root (non-``fmt<N>``) prefix has no number to compare against.
 
@@ -323,3 +348,102 @@ def test_mistyped_rollback_override_says_what_to_set_it_to() -> None:
     """A typo on a real rollback must not read as "delete the override"."""
     with pytest.raises(ValueError, match="storage_rollback_from to 'fmt9'"):
         validate_storage_prefix_progression("fmt9", "fmt6", "fmt8")
+
+
+# ── next_written_internal_schema ─────────────────────────────────────────────
+# The in-place upgrade's rollback guard: a root a 0.14 image has been deployed
+# onto may hold format-16 branches, which a 0.13 image refuses, while the stack
+# config still says 14.
+
+
+def _next(
+    marks: dict[str, float] | None,
+    image: int | None,
+    *,
+    prefix: str = "fmt14",
+    armed: bool = False,
+    restored_to: int | None = None,
+) -> dict[str, int]:
+    return next_written_internal_schema(
+        marks, prefix, image, migration_armed=armed, restored_to=restored_to
+    )
+
+
+def test_first_deploy_records_what_the_image_writes() -> None:
+    assert _next(None, 14) == {"fmt14": 14}
+
+
+def test_an_upgrade_raises_the_mark() -> None:
+    assert _next({"fmt14": 14}, 16) == {"fmt14": 16}
+
+
+def test_marks_read_back_as_floats_are_ints_again() -> None:
+    """A numeric stack output comes back through a StackReference as a float."""
+    assert _next({"fmt14": 16.0}, 16) == {"fmt14": 16}
+
+
+def test_an_image_writing_less_than_the_mark_is_refused() -> None:
+    """The 0.13 rollback after a 0.14 deploy, without a restore."""
+    with pytest.raises(ValueError, match="storage_restored_to_format set to 14"):
+        _next({"fmt14": 16}, 14)
+
+
+@pytest.mark.parametrize("armed", [False, True])
+def test_an_unreadable_label_onto_a_root_with_a_mark_is_refused(*, armed: bool) -> None:
+    """A format-16 image deployed while ECR can't be read would leave the mark
+    at 14, and a later 0.13 image would then pass with no restore behind it.
+    """
+    with pytest.raises(ValueError, match="label could not be read"):
+        _next({"fmt14": 14}, None, armed=armed)
+
+
+def test_an_unreadable_label_onto_a_root_without_a_mark_is_skipped() -> None:
+    """The warn-and-skip data_tier applies to an unreadable label still holds
+    where there is nothing to protect yet.
+    """
+    assert _next({"fmt9": 9}, None) == {"fmt9": 9}
+    assert _next(None, None) == {}
+
+
+def test_a_root_never_served_starts_over_and_others_are_kept() -> None:
+    assert _next({"fmt9": 9}, 14) == {"fmt9": 9, "fmt14": 14}
+
+
+def test_a_rollback_onto_a_root_upgraded_in_place_keeps_its_mark() -> None:
+    """fmt14 was upgraded in place to 16, then rebuilt into fmt18. Rolling back
+    to fmt14 with a 0.13 image must still be refused.
+    """
+    with pytest.raises(ValueError, match="fmt14"):
+        _next({"fmt14": 16, "fmt18": 18}, 14)
+
+
+def test_the_bucket_root_is_a_root_too() -> None:
+    assert _next({"": 6}, 9, prefix="") == {"": 9}
+
+
+def test_an_armed_migration_does_not_move_the_mark() -> None:
+    """Disarming must be able to put the old image back."""
+    assert _next({"fmt9": 9}, 14, prefix="fmt9", armed=True) == {"fmt9": 9}
+
+
+def test_a_restore_lowers_the_mark_on_its_own_deploy() -> None:
+    assert _next({"fmt14": 16}, 14, restored_to=14) == {"fmt14": 14}
+
+
+@pytest.mark.parametrize(
+    ("marks", "image", "restored_to", "armed"),
+    [
+        ({"fmt14": 14}, 14, 14, False),  # left set after the rollback deployed
+        ({"fmt14": 16}, 16, 14, False),  # set ahead of time, image not rolled back
+        ({"fmt14": 16}, 14, 13, False),  # names a format the image doesn't write
+        (None, 14, 14, False),  # nothing to roll back from
+        # Armed leaves the server at zero replicas, so this deploy doesn't
+        # serve the restored root and must not use up the acknowledgment.
+        ({"fmt14": 16}, 14, 14, True),
+    ],
+)
+def test_a_restore_override_outside_its_deploy_is_refused(
+    marks: dict[str, float] | None, image: int, restored_to: int, *, armed: bool
+) -> None:
+    with pytest.raises(ValueError, match="accepted only on the deploy"):
+        _next(marks, image, restored_to=restored_to, armed=armed)

@@ -28,20 +28,17 @@ config:
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
     # Contact us support intake (hq#13712). Unset defaults. Field ids are minted
     # per Zendesk instance -- take them from this environment's own, never
-    # another's, since an unrecognised id rejects the whole ticket.
+    # another's. Zendesk silently drops an id it does not recognise.
     AI_ZENDESK_API_URL: ""
+    AI_ZENDESK_BRAND_ID: "0"
     AI_ZENDESK_NAME_FIELD_ID: "0"
+    AI_ZENDESK_TICKET_FORM_ID: "0"
     AI_ZENDESK_URL_FIELD_ID: "0"
     AI_ZENDESK_USERNAME_FIELD_ID: "0"
-    CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
-    CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
-    CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_COOKIE_NAME: learn_ai_ci_csrftoken
     CSRF_COOKIE_DOMAIN: "ci.learn.mit.edu"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
-    DEBUG: "false"
-    DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-ci"
     LANGSMITH_TRACING: "true"
     LOGIN_REDIRECT_ALLOWED_HOSTS: '["learn-ai-ci.ol.mit.edu", "ci.learn.mit.edu",
@@ -50,8 +47,6 @@ config:
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
     MITOL_ENVIRONMENT: "ci"
-    MITOL_FEATURES_DEFAULT: "true"
-    MITOL_SECURE_SSL_REDIRECT: "False"
     NODE_ENV: "development"
     PROBLEM_SET_URL: https://api.ci.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
@@ -67,7 +62,6 @@ config:
     OPENEDX_API_BASE_URL: https://courses.ci.learn.mit.edu/
     OPENEDX_LOGIN_URL: https://courses.ci.learn.mit.edu/auth/login/ol-oauth2/?auth_entry=login
   learn_ai:learn_backend_domain: "api.ci.learn.mit.edu"
-  learn_ai:use_granian: true
   redis:password:
     secure: v1:ObQfVCLRk72Bn9f3:7EKaqHGnHkYsurz0xWQcX9Cuhc4k0SSXcIIKSgYQnfFSu9uYHbUT0cpsic4M6SYG6ZuFxKXXeaZuLI2QC3s9Feo0oD+SEjetNxCZo0TPot8=
   vault:address: "https://vault-ci.odl.mit.edu"

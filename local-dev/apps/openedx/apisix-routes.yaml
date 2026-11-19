@@ -125,3 +125,28 @@ spec:
     - serviceName: notes
       servicePort: 8000
     plugin_config_name: openedx-shared-plugins
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: authoring-mfe-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: authoring-mfe
+    # Above studio-route's /* on the same host.
+    priority: 10
+    match:
+      hosts:
+      - "studio.mit.test"
+      paths:
+      # Both forms, as for learning-mfe-route: COURSE_AUTHORING_MICROFRONTEND_URL
+      # carries no trailing slash, so Studio's redirect into the MFE lands on
+      # the bare path, which /authoring/* does not match.
+      - "/authoring"
+      - "/authoring/*"
+    backends:
+    - serviceName: mfe-authoring
+      servicePort: 80
+    plugin_config_name: openedx-shared-plugins

@@ -55,20 +55,44 @@ class _Mocks(pulumi.runtime.Mocks):
         }
 
 
-def _build(
+@pytest.fixture(autouse=True)
+def _no_ecr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the HTTP-contract check off the network.
+
+    Pulumi mocks don't intercept boto3, so without this every case reaches the
+    real ECR. A test that wants a mismatch patches the reader again after this.
+    """
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda *_: ("0.14",),
+    )
+
+
+def _build(  # noqa: PLR0913
     monkeypatch: pytest.MonkeyPatch,
     *,
     served_format: int,
     image_format: int,
+    image_min_format: int | None = None,
     migration_armed: bool = False,
     boot_budget_seconds: int | None = None,
+    withheld_graphs: list[str] | None = None,
+    deployed_marks: dict[str, float] | None = None,
+    deployed_witan_http_api_contracts: list[str] | None = None,
+    memory: dict[str, str] | None = None,
 ) -> tuple[_Mocks, data_tier.OmnigraphDataTier]:
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     monkeypatch.setenv("OMNIGRAPH_DOCKER_SHA", "sha256:" + "a" * 64)
     monkeypatch.delenv("OMNIGRAPH_DOCKER_TAG", raising=False)
     monkeypatch.setattr(
-        data_tier, "read_image_internal_schema", lambda *_: image_format
+        data_tier,
+        "read_image_internal_schema_range",
+        lambda *_: (
+            image_format if image_min_format is None else image_min_format,
+            image_format,
+        ),
     )
     service_account = kubernetes.core.v1.ServiceAccount("omnigraph-server-sa")
     tier = data_tier.create_data_tier(
@@ -91,6 +115,12 @@ def _build(
         suspend_maintenance=migration_armed,
         migration_armed=migration_armed,
         boot_budget_seconds=boot_budget_seconds,
+        graph_removal_allowlist=withheld_graphs,
+        withheld_graphs=withheld_graphs,
+        deployed_written_internal_schema=deployed_marks,
+        storage_restored_to_format=None,
+        deployed_witan_http_api_contracts=deployed_witan_http_api_contracts,
+        **(memory or {}),
     )
     return mocks, tier
 
@@ -148,14 +178,102 @@ def test_format_14_has_the_plan_gate_and_one_stop_window(monkeypatch):
         }
         # No boot budget, no new inputs: the spec a deploy without one sees.
         assert "progressDeadlineSeconds" not in deployment["spec"]
-        (container,) = deployment["spec"]["template"]["spec"]["containers"]
-        assert container["startupProbe"]["failureThreshold"] == 24
+        pod_spec = deployment["spec"]["template"]["spec"]
+        (container,) = pod_spec["containers"]
+        # The entrypoint's SIGTERM cleanup and its wait for another server pod
+        # are sized from the grace this pod actually gets.
+        grace = pod_spec["terminationGracePeriodSeconds"]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        assert float(env["OMNIGRAPH_TERMINATION_GRACE_SECONDS"]) == grace
+        assert float(env["OMNIGRAPH_PEER_WAIT_SECONDS"]) > grace
 
     return pulumi.Output.all(
         tier.deployment.urn,
         tier.plan_gate_job.urn,
         *(cj.urn for cj in tier.maintenance.cron_jobs),
     ).apply(check)
+
+
+@pulumi.runtime.test
+def test_an_image_opening_the_root_in_place_deploys_without_a_migration(monkeypatch):
+    """A 0.14 image (opens 14 to 16) on a fmt14 root. Swapping the reader's
+    (oldest, written) order would make the range empty and refuse this.
+    """
+    _, tier = _build(
+        monkeypatch,
+        served_format=14,
+        image_format=16,
+        image_min_format=14,
+        deployed_marks={"": 14.0},
+    )
+    assert tier.written_internal_schema == {"": 16}
+    return tier.deployment.urn
+
+
+def test_the_mark_is_exported_before_the_server_deployment(monkeypatch):
+    """A failed update keeps the outputs registered so far, but a program
+    exception after the Deployment and before a later export would roll the
+    new image with the old mark. Stopping the program at the export shows
+    nothing running the image was registered ahead of it.
+    """
+
+    class _ExportedError(Exception):
+        pass
+
+    exported: dict[str, object] = {}
+
+    def export(name: str, value: object) -> None:
+        exported[name] = value
+        raise _ExportedError
+
+    deployments: list[str] = []
+    real_deployment = data_tier.kubernetes.apps.v1.Deployment
+
+    def deployment(name: str, *args: object, **kwargs: object) -> object:
+        deployments.append(name)
+        return real_deployment(name, *args, **kwargs)
+
+    monkeypatch.setattr(data_tier.pulumi, "export", export)
+    monkeypatch.setattr(data_tier.kubernetes.apps.v1, "Deployment", deployment)
+
+    with pytest.raises(_ExportedError):
+        _build(
+            monkeypatch,
+            served_format=14,
+            image_format=16,
+            image_min_format=14,
+            deployed_marks={"": 14.0},
+        )
+
+    assert exported == {"written_internal_schema": {"": 16}}
+    assert deployments == []
+
+
+def test_a_server_contract_the_deployed_witan_cannot_speak_is_refused(monkeypatch):
+    """The witan stack's export reaches the deploy-order guard."""
+    monkeypatch.setattr(
+        "ol_infrastructure.applications.omnigraph.image_schema."
+        "read_image_http_api_contracts",
+        lambda *_: ("0.14",),
+    )
+    with pytest.raises(ValueError, match="Release witan's gate first"):
+        _build(
+            monkeypatch,
+            served_format=16,
+            image_format=16,
+            deployed_witan_http_api_contracts=["0.13"],
+        )
+
+
+def test_a_rollback_below_the_roots_written_format_is_refused(monkeypatch):
+    """The stack's last export reaches the guard: a 0.13 image after 0.14."""
+    with pytest.raises(ValueError, match="already been deployed onto this root"):
+        _build(
+            monkeypatch,
+            served_format=14,
+            image_format=14,
+            deployed_marks={"": 16.0},
+        )
 
 
 @pulumi.runtime.test
@@ -241,26 +359,164 @@ def test_a_boot_budget_lengthens_the_probe_and_both_rollout_waits(monkeypatch):
     def check(_: object) -> None:
         (deployment,) = mocks.of_type(DEPLOYMENT)
         (container,) = deployment["spec"]["template"]["spec"]["containers"]
-        # 20 + (717 - 1) x 5 = 3600.
-        assert container["startupProbe"]["failureThreshold"] == 717
-        # 125s termination grace + 3600s boot + 300s slack.
-        assert deployment["spec"]["progressDeadlineSeconds"] == 4025
+        # 20 + (745 - 1) x 5 = 140s peer wait + 3600s boot.
+        assert container["startupProbe"]["failureThreshold"] == 745
+        # 125s termination grace + 140s peer wait + 3600s boot + 300s slack.
+        assert deployment["spec"]["progressDeadlineSeconds"] == 4165
         assert deployment["metadata"]["annotations"] == {
             "pulumi.com/patchForce": "true",
-            "pulumi.com/timeoutSeconds": "4025",
+            "pulumi.com/timeoutSeconds": "4165",
         }
 
     return tier.deployment.urn.apply(check)
 
 
+def _probe_kill_seconds(container: dict[str, Any]) -> float:
+    """When the startupProbe kills a container that never answers."""
+    probe = container["startupProbe"]
+    return (
+        probe["initialDelaySeconds"]
+        + (probe["failureThreshold"] - 1) * probe["periodSeconds"]
+    )
+
+
+@pytest.mark.parametrize("boot_budget_seconds", [None, 3600])
+@pulumi.runtime.test
+def test_the_probe_outlasts_the_peer_wait_and_the_boot(
+    monkeypatch, boot_budget_seconds
+):
+    """The lock-handoff entrypoint waits for another server pod to exit before
+    it converges, so a probe sized to the boot alone kills a healthy wait.
+    """
+    mocks, tier = _build(
+        monkeypatch,
+        served_format=14,
+        image_format=14,
+        boot_budget_seconds=boot_budget_seconds,
+    )
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        peer_wait = float(env["OMNIGRAPH_PEER_WAIT_SECONDS"])
+        assert peer_wait == data_tier.SERVER_PEER_WAIT_SECONDS
+        boot = boot_budget_seconds or data_tier.DEFAULT_BOOT_BUDGET_SECONDS
+        assert _probe_kill_seconds(container) >= peer_wait + boot
+
+    return tier.deployment.urn.apply(check)
+
+
+@pulumi.runtime.test
+def test_a_server_without_the_lock_handoff_keeps_the_default_probe(monkeypatch):
+    """Format 9's entrypoint waits for no peer."""
+    mocks, tier = _build(monkeypatch, served_format=9, image_format=9)
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        assert (
+            container["startupProbe"]["failureThreshold"]
+            == data_tier.DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD
+        )
+        assert _probe_kill_seconds(container) == data_tier.DEFAULT_BOOT_BUDGET_SECONDS
+        env = {e["name"] for e in container["env"]}
+        assert "OMNIGRAPH_PEER_WAIT_SECONDS" not in env
+
+    return tier.deployment.urn.apply(check)
+
+
 @pytest.mark.parametrize(
-    ("budget", "threshold"),
-    [(None, 24), (135, 24), (136, 25), (140, 25), (1800, 357)],
+    ("withheld_graphs", "expected"),
+    [
+        (None, "code-bridge,code-github-com-mitodl-ol-django"),
+        # The entrypoint refuses an id cluster.yaml does not declare, so a
+        # withheld graph in the list would refuse every boot.
+        (["code-github-com-mitodl-ol-django"], "code-bridge"),
+    ],
 )
-def test_the_failure_threshold_kills_no_sooner_than_the_budget(budget, threshold):
-    assert data_tier.startup_probe_failure_threshold(budget) == threshold
+@pulumi.runtime.test
+def test_the_gate_and_the_boot_may_drop_views_on_the_declared_code_graphs(
+    monkeypatch, withheld_graphs, expected
+):
+    """Never council, whose branches hold data. A gate with a different list
+    than the boot would pass a refusal the boot then keeps, or the reverse.
+    """
+    mocks, tier = _build(
+        monkeypatch,
+        served_format=14,
+        image_format=14,
+        withheld_graphs=withheld_graphs,
+    )
+
+    def check(_: object) -> None:
+        (gate,) = mocks.of_type(JOB)
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        for pod_spec in (
+            gate["spec"]["template"]["spec"],
+            deployment["spec"]["template"]["spec"],
+        ):
+            (container,) = pod_spec["containers"]
+            env = {e["name"]: e.get("value") for e in container["env"]}
+            assert env["OMNIGRAPH_BRANCH_DROP_ALLOWLIST"] == expected
+            assert env["OMNIGRAPH_VIEW_DROP_ACTOR"] == "svc-witan-ci"
+        (gate_container,) = gate["spec"]["template"]["spec"]["containers"]
+        gate_env = {e["name"]: e.get("value") for e in gate_container["env"]}
+        # The gate deletes views through the pod that is still serving.
+        assert gate_env["OMNIGRAPH_VIEW_DROP_SERVER_URL"] == (
+            "http://omnigraph-server.omnigraph.svc.cluster.local:8080"
+        )
+
+    return pulumi.Output.all(tier.deployment.urn, tier.plan_gate_job.urn).apply(check)
+
+
+@pytest.mark.parametrize(
+    ("memory", "expected"),
+    [
+        (None, ("512Mi", "2Gi")),
+        (
+            {"server_memory_request": "2Gi", "server_memory_limit": "4Gi"},
+            ("2Gi", "4Gi"),
+        ),
+    ],
+)
+@pulumi.runtime.test
+def test_the_server_memory_envelope_follows_the_stack(monkeypatch, memory, expected):
+    """The defaults (CI, QA) and an override (Production's values) reach the server."""
+    mocks, tier = _build(monkeypatch, served_format=14, image_format=14, memory=memory)
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        resources = container["resources"]
+        assert (resources["requests"]["memory"], resources["limits"]["memory"]) == (
+            expected
+        )
+
+    return tier.deployment.urn.apply(check)
+
+
+@pytest.mark.parametrize(
+    ("budget", "peer_wait", "threshold"),
+    [
+        (None, 0, 24),
+        (135, 0, 24),
+        (136, 0, 25),
+        (140, 0, 25),
+        (1800, 0, 357),
+        # 20 + (52 - 1) x 5 = 140 + 135.
+        (None, 140, 52),
+        (136, 140, 53),
+    ],
+)
+def test_the_failure_threshold_kills_no_sooner_than_the_budget(
+    budget, peer_wait, threshold
+):
+    assert data_tier.startup_probe_failure_threshold(budget, peer_wait) == threshold
 
 
 def test_a_boot_budget_shorter_than_the_default_is_refused():
     with pytest.raises(ValueError, match="shorter than the default 135s"):
-        data_tier.startup_probe_failure_threshold(120)
+        data_tier.startup_probe_failure_threshold(
+            120, data_tier.SERVER_PEER_WAIT_SECONDS
+        )

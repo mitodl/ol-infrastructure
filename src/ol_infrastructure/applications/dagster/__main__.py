@@ -24,6 +24,7 @@ from pulumi import (
     Config,
     Output,
     ResourceOptions,
+    StackReference,
     export,
 )
 from pulumi.config import get_config
@@ -91,6 +92,11 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.opik import (
+    OPIK_APP_ENVIRONMENTS,
+    opik_api_url,
+    opik_keycloak_vault_env,
+)
 from ol_infrastructure.lib.otel import (
     DEFAULT_TRACE_SAMPLING_RATE,
     OTLP_ENDPOINT,
@@ -123,39 +129,95 @@ cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 # Single-stack (default) because there is one Sentry org, and one Dagster
 # project within it shared by every environment.
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
-# Keycloak is deployed to CI/QA/Production only; the Dev Dagster stack has no
-# counterpart to reference, so its data_loading deployment simply goes without
-# the Keycloak host and that source stays unavailable there.
-keycloak_stack = (
-    make_stack_reference(projects.KEYCLOAK_APP, stack_info.name)
-    if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+# The application databases data_loading's dlt sources read, as
+# (<NAME>_DB_HOST variable, application project, the stack export holding its
+# RDS hosts). The variable is the ol_dlt source's env prefix plus _HOST. The
+# Dev Dagster stack goes without these hosts, so those sources stay unavailable
+# there. Each application stack's database admits the data VPC's pod subnets
+# (the shared OLAppDatabase component, or the stack's own security group).
+# Loading the QA applications is what lets the QA lake validate identity-bearing
+# features such as the B2B dashboard (RFC 12711).
+DATA_LOADING_DB_SOURCES = (
+    ("KEYCLOAK_DB_HOST", projects.KEYCLOAK_APP, "keycloak"),
+    ("MITXONLINE_APP_DB_HOST", projects.MITXONLINE, "mitxonline"),
+    ("XPRO_APP_DB_HOST", projects.XPRO, "xpro"),
+    ("MITLEARN_APP_DB_HOST", projects.MIT_LEARN, "mit_learn"),
+    ("LEARN_AI_APP_DB_HOST", projects.LEARN_AI, "learn_ai"),
+    ("OCW_STUDIO_APP_DB_HOST", projects.OCW_STUDIO, "ocw_studio"),
+    ("MICROMASTERS_APP_DB_HOST", projects.MICROMASTERS, "micromasters"),
 )
-# Same shape as Keycloak: MITx Online is deployed to CI/QA/Production only, so
-# the Dev Dagster stack goes without the host and that source stays unavailable
-# there. Its app database is what the mitxonline_app dlt source reads
-# (RFC 12711 step 8) -- the QA data lake cannot validate the B2B dashboard while
-# it holds nothing from the QA app.
-mitxonline_stack = (
-    make_stack_reference(projects.MITXONLINE, stack_info.name)
+data_loading_db_stacks = (
+    [
+        (env_var, make_stack_reference(project, stack_info.name), output_name)
+        for env_var, project, output_name in DATA_LOADING_DB_SOURCES
+    ]
     if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+    else []
 )
-# xPro is deployed to CI/QA/Production only, like MITx Online. Its app database
-# is what the xpro_app dlt source reads (RFC 12711).
-xpro_stack = (
-    make_stack_reference(projects.XPRO, stack_info.name)
+# The Open edX deployments whose edxapp MariaDB the edxapp dlt source reads, as
+# (<NAME>_DB_HOST variable, edxapp stack deployment). The edxapp stacks export
+# their hosts differently from the application stacks above; see
+# data_loading_edxapp_db_host.
+DATA_LOADING_EDXAPP_SOURCES = (
+    ("MITX_EDXAPP_DB_HOST", "mitx"),
+    ("XPRO_EDXAPP_DB_HOST", "xpro"),
+    ("MITXONLINE_EDXAPP_DB_HOST", "mitxonline"),
+)
+data_loading_edxapp_stacks = (
+    [
+        (
+            env_var,
+            make_stack_reference(projects.EDXAPP, f"{deployment}.{stack_info.name}"),
+        )
+        for env_var, deployment in DATA_LOADING_EDXAPP_SOURCES
+    ]
     if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
+    else []
 )
-# Opik is also deployed to CI/QA/Production only. The ml code location traces its
-# LLM calls there; on the Dev stack OPIK_URL_OVERRIDE stays unset and the ml
-# code's tracing is a no-op.
-opik_stack = (
-    make_stack_reference(projects.OPIK, stack_info.name)
-    if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
-)
+
+
+def data_loading_db_host(app_stack: StackReference, output_name: str) -> Output[str]:
+    """Pick the database host a data_loading dlt source reads.
+
+    Production reads the application's read replica so bulk extracts never load
+    the primary. The replica only exists where stack_defaults gives one
+    (production), so other environments read the primary. A production app stack
+    that stops exporting ``rds_replica_host`` fails this lookup rather than
+    silently sending the loader back to the primary.
+
+    :param app_stack: The application's stack reference.
+    :param output_name: The application stack's export holding its RDS hosts.
+
+    :returns: The host for the matching ``<NAME>_DB_HOST`` variable.
+    :rtype: Output[str]
+    """
+    host_key = (
+        "rds_replica_host" if stack_info.env_suffix == "production" else "rds_host"
+    )
+    return app_stack.require_output(output_name)[host_key]
+
+
+def data_loading_edxapp_db_host(edxapp_stack: StackReference) -> Output[str]:
+    """Pick the edxapp MariaDB host the edxapp dlt source reads.
+
+    Same rule as data_loading_db_host, for the edxapp stack's exports: the read
+    replica (``edxapp_read_replica``) in production, the primary
+    (``edxapp["mariadb"]``) elsewhere.
+
+    :param edxapp_stack: The edxapp deployment's stack reference.
+
+    :returns: The host for the deployment's ``<NAME>_EDXAPP_DB_HOST`` variable.
+    :rtype: Output[str]
+    """
+    if stack_info.env_suffix == "production":
+        return edxapp_stack.require_output("edxapp_read_replica")
+    return edxapp_stack.require_output("edxapp")["mariadb"]
+
+
+# The ml code location traces its LLM calls to the Production Opik from every
+# environment dagster-ml has an Opik client in (lib/opik.py); on the Dev stack
+# OPIK_URL_OVERRIDE stays unset and the ml code's tracing is a no-op.
+opik_enabled = stack_info.env_suffix in OPIK_APP_ENVIRONMENTS["dagster-ml"]
 # Azure OpenAI for the ml code location, federated to the data cluster's OIDC issuer
 # by infrastructure/azure/openai. Off unless a stack opts in: that project has no Dev
 # stack, and the StackReference only resolves once it has deployed the environment.
@@ -565,21 +627,48 @@ edxorg_courses_bucket = OLBucket(
 # mitx-etl-* buckets, laid out as {deployment}/{YYYYMMDD}/. Every night is a full
 # re-export, so drops expire instead of accumulating the way they do in the
 # legacy buckets, none of which expires anything (54-87 TB each as of 2026-08-30).
+#
+# Course tarballs are not part of a drop. Each exported version is copied once
+# to courses/{deployment}/{course_id}/{sha256}.xml.tar.gz and every night's
+# manifest points at the newest one, so they must outlive the drops. A lifecycle
+# filter can't exclude a prefix, hence one expiry rule per deployment prefix.
+IRX_EXPORT_DEPLOYMENTS = ("mitx", "mitxonline", "xpro")
 irx_export_bucket = OLBucket(
     "irx-export",
     config=S3BucketConfig(
         bucket_name=irx_export_bucket_name,
         versioning_enabled=False,
         server_side_encryption_enabled=True,
-        # Objects expire at 90 days, which is when tiering would first move them.
+        # Drops expire at 90 days, which is when tiering would first move them.
+        # courses/ tiers through its own rule below.
         intelligent_tiering_enabled=False,
         lifecycle_rules=[
+            *(
+                s3.BucketLifecycleConfigurationRuleArgs(
+                    id=f"expire-{deployment}-nightly-drops",
+                    status="Enabled",
+                    filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                        prefix=f"{deployment}/"
+                    ),
+                    expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(
+                        days=90
+                    ),
+                )
+                for deployment in IRX_EXPORT_DEPLOYMENTS
+            ),
+            # Only the newest version of a course is in a manifest, so older
+            # copies go cold. Same 90 days as the landing zone they're copied from.
             s3.BucketLifecycleConfigurationRuleArgs(
-                id="expire-nightly-drops",
+                id="tier-course-exports",
                 status="Enabled",
-                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
-                expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(days=90),
-            )
+                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix="courses/"),
+                transitions=[
+                    s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                        days=90,
+                        storage_class="INTELLIGENT_TIERING",
+                    )
+                ],
+            ),
         ],
         tags=aws_config.tags,
     ),
@@ -1033,6 +1122,33 @@ if stack_info.env_suffix in ("qa", "production"):
                 "developer_key": read_yaml_secrets(
                     Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml")
                 )["youtube_developer_key"]
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
+# The Google Ads API credentials for the data_loading Google Ads dlt source.
+# Copied from the google_ads_optimization Concourse pipeline's secret so the
+# source pulls from the same manager account (the service account's access to it
+# is granted in Google Ads, not GCP). Production only: that pipeline uses this
+# credential to apply bid changes, so it can write to the live ad accounts, and
+# QA Vault is readable by every QA code location and by QA Concourse. Same
+# reasoning as the GitHub App above.
+if stack_info.env_suffix == "production":
+    google_ads_secrets = read_yaml_secrets(
+        Path("concourse/operations.production.yaml")
+    )["pipelines"]["main/google_ads_optimization"]
+    vault.generic.Secret(
+        f"dagster-google-ads-{stack_info.env_suffix}",
+        path="secret-data/pipelines/google_ads",
+        data_json=json.dumps(
+            {
+                key: google_ads_secrets[key]
+                for key in (
+                    "google_ads_json",
+                    "google_developer_token",
+                    "google_manager_account",
+                )
             }
         ),
         opts=ResourceOptions(delete_before_replace=True),
@@ -1715,7 +1831,7 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
                 "port": "metrics",
                 "path": "/metrics",
                 "scheme": "http",
-                "interval": "30s",
+                "interval": "60s",
                 "scrapeTimeout": "10s",
                 "relabelings": [
                     {
@@ -2665,13 +2781,13 @@ OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 # this one. requests and urllib3 each emit http.client.* duration and size
 # histograms. The canvas API client uses httpx2, which is not instrumented, but
 # S3 IO goes through botocore over urllib3 and Vault through hvac over
-# requests. The run workers that inherit this env (canvas, see
+# requests. The run workers that inherit this env (data_loading and ml, see
 # OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS) are short-lived processes, each with
 # its own random service.instance.id, and so is every step subprocess the
 # multiprocess executor spawns inside one. Production started ~440-475 canvas
 # run-worker Jobs a day in the week to 2026-09-18, each minting at least one
-# fresh set of series. Measure the series count on QA before setting this in
-# Production.
+# fresh set of series; those are data_loading's now. Measure the series count
+# on QA before setting this in Production.
 dagster_otel_metrics_enabled = dagster_config.get_bool("otel_metrics_enabled") or False
 
 
@@ -2757,22 +2873,42 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
 # last and kubelet therefore honours. Read the flush-policy comment in that file
 # before adding to this set.
 #
-# canvas is the pilot: 7 days of kube_job_labels on data-production put it at a
+# The pilot was canvas: 7 days of kube_job_labels on data-production put it at a
 # mean of 87 concurrent run-worker Jobs against a peak of 106 -- steady rather
 # than bursty, so its trace volume is predictable -- while openedx runs a mean
 # of 221 against a peak of 13823. Enough traffic to produce a real per-worker
 # connection footprint, two orders of magnitude less blast radius than the
 # location that would otherwise dominate the signal.
 #
+# canvas was retired into data_loading (mitodl/ol-data-platform#2260), and its
+# course export, which is that traffic, runs there now, so the pilot follows it.
+# It also takes in data_loading's own dlt runs. Over the 7 days to 2026-10-21
+# those peaked at 8 concurrent Jobs (kube_job_labels, data-production) against
+# the canvas export's 133, which arrives as a burst at each six-hourly tick.
+# Job counts understate the change, though. The canvas API client is httpx2,
+# which nothing instruments, while the dlt runs go through requests/urllib3,
+# botocore and sqlalchemy, all instrumented, so one dlt run can emit many more
+# spans than a canvas export did. Not measured.
+#
+# ml is listed for a different reason: ol-llm sends its model spans (with token
+# usage and cost) to Opik through its own SDK TracerProvider, and that provider
+# hands out NoOp tracers under OTEL_SDK_DISABLED=true like any other, so ml's
+# model calls reach Opik only with the flag off. ml is bursty rather than steady:
+# in the 7 days to 2026-10-27 it peaked at 122 concurrent run-worker Jobs (canvas
+# 123) but started 245 Jobs in all against canvas's 3048. Its run workers also
+# export metrics where otel_metrics_enabled is set, including PydanticAI's
+# gen_ai token usage histograms (ol-llm passes no meter provider, so PydanticAI
+# takes the agent's global one).
+#
 # Run workers inherit the code location's OTEL_SERVICE_NAME, so their spans
-# arrive as `production-dagster-code-canvas` alongside the code server's and
+# arrive as `production-dagster-code-data-loading` alongside the code server's and
 # cannot be told apart by service.name -- the launcher cannot override it,
 # because the code location sets that key and the code location's value is the
 # one kubelet keeps. Separate them on `k8s.pod.name` (a run worker's is
 # `dagster-run-<run-id>`, the server's is the deployment's) or on
 # `service.instance.id`, which the SDK makes unique per process. Both are
 # already present on the spans #5733 is producing.
-OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas"}
+OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"data_loading", "ml"}
 
 
 def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
@@ -2781,7 +2917,8 @@ def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
     The value rides on the code location's own env, which the chart copies into
     the container context every one of its run workers inherits.
 
-    :param location_name: the code location's unhyphenated name, e.g. ``canvas``.
+    :param location_name: the code location's unhyphenated name, e.g.
+        ``data_loading``.
     """
     if not ships_telemetry(stack_info):
         return []
@@ -2814,7 +2951,6 @@ def grpc_health_check_command(port: int) -> list[str]:
 # Define the user code deployments before the main helm chart so they can be referenced
 # Define all code locations based on ol-data-platform structure
 code_locations: list[dict[str, str | int]] = [
-    {"name": "canvas", "module": "canvas.definitions", "port": 4000},
     {"name": "data_loading", "module": "data_loading.definitions", "port": 4000},
     {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
     {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
@@ -2830,8 +2966,12 @@ code_locations: list[dict[str, str | int]] = [
 
 # Build deployments list for user code
 # Code locations that run 2 replicas for resilience. Criteria: OOM-prone,
-# slow-starting (making restarts expensive), or high sensor-tick frequency.
-multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading"}
+# slow-starting (making restarts expensive), high sensor-tick frequency, or
+# running long asset backfills. The backfill daemon fails a backfill and
+# cancels its queued runs when it evaluates it while the location is down:
+# ml lost a 7,363-partition Learn embeddings backfill to the minute its one
+# replica took to come back after a node termination on 2026-11-18.
+multi_replica_locations = {"legacy_openedx", "lakehouse", "data_loading", "ml"}
 
 deployments = []
 for location in code_locations:
@@ -2964,34 +3104,20 @@ for location in code_locations:
     # data_loading's dlt database sources connect by host and take their
     # credentials from Vault at run time, so only the host is passed through
     # here -- from the owning application's stack, not duplicated in config.
-    if name == "data_loading" and keycloak_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "KEYCLOAK_DB_HOST",
-                "value": keycloak_stack.require_output("keycloak")["rds_host"],
-            }
+    if name == "data_loading":
+        deployment["env"].extend(
+            {"name": env_var, "value": data_loading_db_host(app_stack, output_name)}
+            for env_var, app_stack, output_name in data_loading_db_stacks
         )
-
-    if name == "data_loading" and mitxonline_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "MITXONLINE_APP_DB_HOST",
-                "value": mitxonline_stack.require_output("mitxonline")["rds_host"],
-            }
-        )
-
-    if name == "data_loading" and xpro_stack is not None:
-        deployment["env"].append(
-            {
-                "name": "XPRO_APP_DB_HOST",
-                "value": xpro_stack.require_output("xpro")["rds_host"],
-            }
+        deployment["env"].extend(
+            {"name": env_var, "value": data_loading_edxapp_db_host(edxapp_stack)}
+            for env_var, edxapp_stack in data_loading_edxapp_stacks
         )
 
     # ml's Opik tracing and Prompt Library. Only the non-secret settings live
-    # here: the code reads the Keycloak client-credentials from Vault at
-    # secret-operations/sso/opik itself (dagster_server_policy.hcl), the same
-    # secret learn_ai syncs. No OPIK_API_KEY -- the Keycloak auth hook owns the
+    # here: the code reads the Keycloak client-credentials from Vault itself, at
+    # OPIK_KEYCLOAK_VAULT_MOUNT/OPIK_KEYCLOAK_VAULT_PATH (dagster_server_policy.hcl).
+    # No OPIK_API_KEY -- the Keycloak auth hook owns the
     # Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
     # The chart copies a code location's env, volumes and volumeMounts into the
     # run pods it launches (includeConfigInLaunchedRuns), so ml's run workers
@@ -3003,17 +3129,20 @@ for location in code_locations:
         deployment.setdefault("volumes", []).extend(ml_gcp_volumes)
         deployment.setdefault("volumeMounts", []).extend(ml_gcp_volume_mounts)
 
-    if name == "ml" and opik_stack is not None:
+    if name == "ml" and opik_enabled:
         deployment["env"].extend(
             [
-                {
-                    "name": "OPIK_URL_OVERRIDE",
-                    "value": opik_stack.require_output("opik_url").apply(
-                        lambda url: f"{url}/api/"
-                    ),
-                },
+                {"name": "OPIK_URL_OVERRIDE", "value": opik_api_url()},
                 {"name": "OPIK_WORKSPACE", "value": "default"},
                 {"name": "OPIK_PROJECT_NAME", "value": "dagster-ml"},
+                # Set with the URL so ml moves to the Production Opik and its
+                # client in the same pod start, whichever deploys first.
+                *(
+                    {"name": env_name, "value": env_value}
+                    for env_name, env_value in opik_keycloak_vault_env(
+                        "dagster-ml"
+                    ).items()
+                ),
             ]
         )
 
@@ -3226,6 +3355,30 @@ dagster_run_priority_class = kubernetes.scheduling.v1.PriorityClass(
     ),
 )
 
+# Lakehouse dbt steps, which ol-data-platform's lakehouse/lib/executor.py runs in
+# their own pods. A dbt step pod that is preempted fails the step, and
+# run_retries re-runs the whole dbt selection (30-40 minutes on Trino, replacing
+# every table it builds). At dagster-run's -100 any ordinary pod can preempt it;
+# at 0 it ranks with ordinary pods, so only higher-priority ones can. Still
+# preemption_policy Never, so it queues for capacity like a run worker and
+# never evicts anything, the daemon included. Step pods naming a class that
+# doesn't exist are rejected, so this has to be applied before the code
+# location that references it deploys.
+dagster_dbt_step_priority_class = kubernetes.scheduling.v1.PriorityClass(
+    f"dagster-dbt-step-priority-class-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-dbt-step",
+        labels=k8s_global_labels.model_dump(),
+    ),
+    value=0,
+    preemption_policy="Never",
+    global_default=False,
+    description=(
+        "Dagster dbt step pods: not preemptible by ordinary pods, and never "
+        "preempt anything themselves."
+    ),
+)
+
 # How many runs the QueuedRunCoordinator will have in flight at once.
 #
 # This has to be sized against the environment's PgBouncer connection budget,
@@ -3274,6 +3427,16 @@ dagster_event_log_max_overflow = dagster_config.get_int("event_log_max_overflow"
 if dagster_event_log_max_overflow is None:
     dagster_event_log_max_overflow = 10
 
+# learn_embeddings/model_calls tag limit, sized against each environment's
+# dagster-ml text-embedding-3-large deployment. QA's is 300K TPM, above one
+# run's largest (250K-token) request but not several, so stacks that set
+# nothing keep one run at a time.
+dagster_learn_embeddings_run_limit = dagster_config.get_int(
+    "learn_embeddings_run_limit"
+)
+if dagster_learn_embeddings_run_limit is None:
+    dagster_learn_embeddings_run_limit = 1
+
 # Custom Dagster instance ConfigMap with dynamic credentials support
 # Note: We create this before the Helm release so it gets proper ownership
 dagster_instance_yaml = (
@@ -3283,6 +3446,7 @@ dagster_instance_yaml = (
     .replace("MAX_CONCURRENT_RUNS", str(dagster_max_concurrent_runs))
     .replace("EVENT_LOG_POOL_SIZE", str(dagster_event_log_pool_size))
     .replace("EVENT_LOG_MAX_OVERFLOW", str(dagster_event_log_max_overflow))
+    .replace("LEARN_EMBEDDINGS_RUN_LIMIT", str(dagster_learn_embeddings_run_limit))
 )
 # The daemon and webserver mount dagster.yaml from the dagster-instance
 # ConfigMap via subPath, which kubelet never live-refreshes, and the chart's
@@ -3593,6 +3757,7 @@ dagster_helm_release = kubernetes.helm.v3.Release(
         chart="dagster",
         version=DAGSTER_CHART_VERSION,
         cleanup_on_fail=True,
+        max_history=10,
         values=dagster_helm_values,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://dagster-io.github.io/helm"
@@ -3664,6 +3829,7 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
         chart="dagster-user-deployments",
         version=DAGSTER_CHART_VERSION,
         cleanup_on_fail=True,
+        max_history=10,
         disable_openapi_validation=True,
         values=dagster_user_code_values,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
@@ -3685,6 +3851,16 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
     ),
 )
 
+# Run and step workers are Job pods, and Jobs have no scale subresource, so a
+# budget with maxUnavailable can't count its expected pods: the disruption
+# controller reports SyncFailed and emits CalculateExpectedPodCountFailed on
+# every sync (18,021 events from the run worker budget by 2026-11-09, though
+# evictions still failed closed). An integer minAvailable is the form
+# Kubernetes supports for pods without a scalable controller; it counts the
+# matching pods directly. Set above any number that can run at once, it keeps
+# disruptionsAllowed at 0: no worker is ever evicted.
+DAGSTER_WORKER_PDB_MIN_AVAILABLE = 10_000
+
 # Pod Disruption Budget for run workers
 dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
     f"dagster-run-worker-pdb-{stack_info.env_suffix}",
@@ -3694,10 +3870,33 @@ dagster_run_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
         labels=k8s_global_labels.model_dump(),
     ),
     spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
-        max_unavailable=0,
+        min_available=DAGSTER_WORKER_PDB_MIN_AVAILABLE,
         selector=kubernetes.meta.v1.LabelSelectorArgs(
             match_labels={
                 "app.kubernetes.io/component": "run_worker",
+            },
+        ),
+    ),
+    opts=ResourceOptions(depends_on=[dagster_helm_release, dagster_user_code_release]),
+)
+
+# Step pods, launched by k8s_job_executor (lakehouse), carry
+# app.kubernetes.io/component: step_worker, so the run worker budget above does
+# not cover them and a drain evicts a step mid-run. The run worker that launched
+# it survives, but the step fails; for a dbt step that means run_retries
+# re-runs the whole selection. Same budget as run workers.
+dagster_step_worker_pdb = kubernetes.policy.v1.PodDisruptionBudget(
+    f"dagster-step-worker-pdb-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="dagster-step-worker-pdb",
+        namespace=dagster_namespace,
+        labels=k8s_global_labels.model_dump(),
+    ),
+    spec=kubernetes.policy.v1.PodDisruptionBudgetSpecArgs(
+        min_available=DAGSTER_WORKER_PDB_MIN_AVAILABLE,
+        selector=kubernetes.meta.v1.LabelSelectorArgs(
+            match_labels={
+                "app.kubernetes.io/component": "step_worker",
             },
         ),
     ),

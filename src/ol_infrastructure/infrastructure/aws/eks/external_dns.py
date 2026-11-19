@@ -131,6 +131,7 @@ def setup_external_dns(
             version=versions["EXTERNAL_DNS_CHART"],
             namespace="operations",
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://kubernetes-sigs.github.io/external-dns/",
             ),

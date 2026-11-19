@@ -61,6 +61,7 @@ def create_meilisearch_resources(
         plugin_config=OLApisixSharedPluginsConfig(
             application_name="meilisearch",
             resource_suffix="ol-shared-plugins",
+            render_only=True,
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
             # Meilisearch is queried straight from the browser by Open edX's
@@ -197,6 +198,7 @@ def create_meilisearch_resources(
             version=MEILISEARCH_CHART_VERSION,
             namespace=namespace,
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://meilisearch.github.io/meilisearch-kubernetes",
             ),

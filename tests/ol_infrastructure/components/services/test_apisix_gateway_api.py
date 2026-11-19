@@ -253,3 +253,25 @@ def test_rule_extension_ref_names_the_created_plugin_config():
             assert extension_ref["group"] == "apisix.apache.org"
 
     return pulumi.Output.all(component.http_route_resource.spec, created).apply(check)
+
+
+@pulumi.runtime.test
+def test_render_only_shared_plugins_still_reach_the_route():
+    """render_only drops the shared CRs, not the shared plugins: each route's
+    own PluginConfig still carries the merged defaults.
+    """
+    plugins = shared_plugins("render-only", render_only=True)
+    component = OLApisixHTTPRoute(
+        "render-only-httproute",
+        route_configs=[route(shared_plugins=plugins)],
+        k8s_namespace="myapp-ns",
+        k8s_labels={"app": "myapp"},
+    )
+    assert plugins.shared_plugin_pluginconfig_resource is None
+    (plugin_config,) = component.plugin_config_resources.values()
+
+    def check(spec):
+        names = {plugin["name"] for plugin in spec["plugins"]}
+        assert {"cors", "prometheus", "gzip", "request-id"} <= names, names
+
+    return plugin_config.spec.apply(check)

@@ -121,7 +121,7 @@ mitxonline = [
     OpenEdxVars(
         about_us_url="https://ci.mitxonline.mit.edu/about-us/",
         accessibility_url="https://accessibility.mit.edu/",
-        account_settings_url="https://ci.mitxonline.mit.edu/account-settings",
+        account_settings_url="https://ci.learn.mit.edu/dashboard/settings",
         contact_url="https://support.learn.mit.edu/",
         deployment_name="mitxonline",
         display_feedback_widget="false",
@@ -156,7 +156,7 @@ mitxonline = [
     OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
         accessibility_url="https://accessibility.mit.edu/",
-        account_settings_url="https://rc.mitxonline.mit.edu/account-settings",
+        account_settings_url="https://rc.learn.mit.edu/dashboard/settings",
         contact_url="https://support.learn.mit.edu/",
         deployment_name="mitxonline",
         display_feedback_widget="false",
@@ -191,7 +191,7 @@ mitxonline = [
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
         accessibility_url="https://accessibility.mit.edu/",
-        account_settings_url="https://mitxonline.mit.edu/account-settings/",
+        account_settings_url="https://learn.mit.edu/dashboard/settings",
         contact_url="https://support.learn.mit.edu/",
         deployment_name="mitxonline",
         display_feedback_widget="false",
@@ -206,10 +206,7 @@ mitxonline = [
         mit_base_url="https://web.mit.edu",
         mit_learn_base_url="https://learn.mit.edu",
         mit_learn_api_url="https://api.learn.mit.edu",
-        # contact_us_support_api_url is deliberately unset here. Production
-        # Zendesk is not configured yet (ol-infrastructure#6548), so the bot
-        # would converse and then fail to file. Set it to
-        # https://api.learn.mit.edu/ai/http/support_agent/ after rc verifies.
+        contact_us_support_api_url="https://api.learn.mit.edu/ai/http/support_agent/",
         feedback_csrf_cookie_name="learn_csrftoken",
         privacy_policy_url="https://mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501
@@ -222,7 +219,6 @@ mitxonline = [
         enable_video_upload_page_link_in_content_dropdown="true",
         enable_jumpnav="true",
         enable_ai_drawer_slot="true",
-        appzi_url="https://w.appzi.io/w.js?token=Q2pSI",
         enable_auto_language_selection="true",
         enable_tagging_taxonomy_pages="true",
         enable_course_import_in_library="true",

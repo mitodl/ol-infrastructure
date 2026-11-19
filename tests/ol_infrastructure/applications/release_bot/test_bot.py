@@ -83,6 +83,18 @@ def _no_running_release_build(monkeypatch):
     monkeypatch.setattr(bot.concourse, "active_build_url", AsyncMock(return_value=None))
 
 
+# The real one, before the release_build_watch fixture replaces it for every test.
+_start_release_build_watch = bot._start_release_build_watch
+
+
+@pytest.fixture(autouse=True)
+def release_build_watch(monkeypatch):
+    """Record build watches instead of polling Concourse after every trigger."""
+    watch = MagicMock()
+    monkeypatch.setattr(bot, "_start_release_build_watch", watch)
+    return watch
+
+
 @pytest.fixture(autouse=True)
 def _no_pending_hotfix(monkeypatch):
     """Default to no pending hotfix, since one changes what /doof release does."""
@@ -572,6 +584,243 @@ async def test_release_status_reports_checklist_progress(repos, slack, monkeypat
     )
 
 
+_INFRA_GATE = {
+    "number": 7,
+    "title": "Release my-app infrastructure @ 2026.11.16.1",
+    "url": "https://github.com/mitodl/my-app/issues/7",
+    "body": "## Infrastructure changes (Production preview)\n",
+    "labels": ["ops:release"],
+}
+
+
+def _cut_today(version: str) -> dict[str, Any]:
+    return _in_flight(version, timedelta(0))
+
+
+async def test_release_status_explains_a_cut_release_waiting_for_its_issue(
+    repos, slack, monkeypatch
+):
+    """Between the cut and QA opening its issue, the old gate is still open.
+
+    Shown side by side as two unrelated versions, that read as a mismatch
+    (2026.11.16.1's infrastructure gate next to 2026.11.18.2 in flight).
+    """
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_INFRA_GATE])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    monkeypatch.setattr(
+        bot.github, "release_issue_for_version", AsyncMock(return_value=None)
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    said = slack.said
+    assert "2026.11.18.2>" in said
+    assert said.endswith(
+        "no release issue found for it (QA opens one after deploying a release)"
+        " · open: <https://github.com/mitodl/my-app/issues/7|"
+        "Release my-app infrastructure @ 2026.11.16.1>"
+    )
+    assert "🟡" not in said
+    assert "checked" not in said
+
+
+async def test_release_status_keeps_the_superseded_issue_s_progress_and_state(
+    repos, slack, monkeypatch
+):
+    old = {
+        "number": 6,
+        "title": "Release my-app 2026.11.16.1",
+        "url": "https://github.com/mitodl/my-app/issues/6",
+        "body": (
+            "## Release 2026.11.16.1\n- [x] **A** (#1) by a@x\n"
+            "- [ ] **B** (#2) by b@x\n"
+        ),
+        "labels": ["ops:release", "ops:consumed", "ops:refused"],
+    }
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[old])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    monkeypatch.setattr(
+        bot.github, "release_issue_for_version", AsyncMock(return_value=None)
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert slack.said.endswith(
+        "open: <https://github.com/mitodl/my-app/issues/6|"
+        "Release my-app 2026.11.16.1> (1/2 checked) · ⛔ refused by Production"
+    )
+
+
+async def test_release_status_links_the_in_flight_release_s_closed_issue(
+    repos, slack, monkeypatch
+):
+    """A promoted release that never finished still has an issue to link."""
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_INFRA_GATE])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "release_issue_for_version",
+        AsyncMock(
+            return_value={
+                "url": "https://github.com/mitodl/my-app/issues/9",
+                "labels": ["ops:release", "ops:consumed"],
+            }
+        ),
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    said = slack.said
+    assert "🟡 <https://github.com/mitodl/my-app/issues/7|" in said
+    # Named and bracketed, so its state cannot read as the open issue's.
+    assert said.endswith(
+        "<https://github.com/mitodl/my-app/issues/9|its release issue>"
+        " (taken by Production)"
+    )
+    assert "no release issue found" not in said
+
+
+async def test_release_status_does_not_take_a_same_version_infra_gate_for_the_release(
+    repos, slack, monkeypatch
+):
+    """A release stuck after Production, re-gated by an infrastructure merge.
+
+    The infra gate's title names the in-flight version, but it is not the
+    release's own issue, so that issue is still looked up and linked.
+    """
+    gate = {**_INFRA_GATE, "title": "Release my-app infrastructure @ 2026.11.18.2"}
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[gate])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    lookup = AsyncMock(
+        return_value={
+            "url": "https://github.com/mitodl/my-app/issues/9",
+            "labels": ["ops:release", "ops:consumed"],
+        }
+    )
+    monkeypatch.setattr(bot.github, "release_issue_for_version", lookup)
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    lookup.assert_awaited_once()
+    assert slack.said.endswith(
+        "<https://github.com/mitodl/my-app/issues/9|its release issue>"
+        " (taken by Production)"
+    )
+
+
+@pytest.mark.parametrize("issues", [[], [_INFRA_GATE]])
+async def test_release_status_flags_a_failed_in_flight_check(
+    repos, slack, monkeypatch, issues
+):
+    """A failed branch lookup must not read as nothing in flight."""
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=issues)
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(side_effect=RuntimeError("GitHub is down")),
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert slack.said.endswith(" · ⚠️ could not check for an in-flight release")
+
+
+async def test_release_status_falls_back_when_the_issue_lookup_fails(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_INFRA_GATE])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "release_issue_for_version",
+        AsyncMock(side_effect=RuntimeError("GitHub is down")),
+    )
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    said = slack.said
+    assert "🟡 <https://github.com/mitodl/my-app/issues/7|" in said
+    assert "no release issue found" not in said
+    assert "🚧 in flight: " in said
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Release my-app 2026.11.18.2", "Release my-app"],
+)
+async def test_release_status_does_not_look_up_the_issue_it_already_shows(
+    repos, slack, monkeypatch, title
+):
+    issue = {
+        "number": 8,
+        "title": title,
+        "url": "https://github.com/mitodl/my-app/issues/8",
+        "body": "## Release 2026.11.18.2\n- [ ] **A** (#1) by a@x\n",
+        "labels": ["ops:release"],
+    }
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[issue])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_cut_today("2026.11.18.2")),
+    )
+    lookup = AsyncMock()
+    monkeypatch.setattr(bot.github, "release_issue_for_version", lookup)
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    lookup.assert_not_awaited()
+    assert "(0/1 checked) · 🚧 in flight: " in slack.said
+
+
 # ---------------------------------------------------------------------------
 # /doof wait-for-checkboxes
 # ---------------------------------------------------------------------------
@@ -1039,6 +1288,41 @@ async def test_a_failed_post_keeps_the_requester_for_the_next_poll(repos, monkey
     assert bot._release_requesters["my-app"] == "UDANA"
 
 
+@pytest.mark.parametrize("label", ["ops:promote-ready", "promote-ready"])
+async def test_ready_to_promote_skips_either_ready_label_name(
+    repos, monkeypatch, label
+):
+    """Renaming `promote-ready` in a repo must not re-announce every release."""
+    issue = _ready_issue()
+    issue["labels"] = ["release", label]
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[issue])
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_ready_to_promote_writes_the_ops_label(repos, monkeypatch):
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_ready_issue()])
+    )
+    add = AsyncMock()
+    monkeypatch.setattr(bot.github, "add_issue_label", add)
+    monkeypatch.setattr(
+        bot.slack_channels, "resolve", AsyncMock(side_effect=lambda _c, ch: ch)
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    add.assert_awaited_once_with("mitodl/my-app", 1, "ops:promote-ready")
+
+
 # ---------------------------------------------------------------------------
 # Deploy milestone announcements
 # ---------------------------------------------------------------------------
@@ -1406,15 +1690,25 @@ async def test_a_failed_post_is_retried_on_the_next_poll(repos, slack_app, monke
 # ---------------------------------------------------------------------------
 
 
+# 10:05 ET, inside the daily reminder window.
+_IN_NAG_WINDOW = datetime(2026, 10, 28, 14, 5, tzinfo=UTC)
+
+
+@pytest.fixture
+def _in_nag_window(monkeypatch):
+    monkeypatch.setattr(bot, "_now", lambda: _IN_NAG_WINDOW)
+
+
 def _in_flight(version: str, age: timedelta) -> dict[str, Any]:
     return {
         "version": version,
         "branch": f"releases/{version}",
         "url": f"https://github.com/mitodl/my-app/tree/releases/{version}",
-        "cut_at": datetime.now(tz=UTC) - age,
+        "cut_at": bot._now() - age,
     }
 
 
+@pytest.mark.usefixtures("_in_nag_window")
 async def test_a_young_release_is_not_reported_as_stuck(repos, slack_app, monkeypatch):
     monkeypatch.setattr(
         bot.github,
@@ -1427,7 +1721,7 @@ async def test_a_young_release_is_not_reported_as_stuck(repos, slack_app, monkey
     slack_app.client.chat_postMessage.assert_not_called()
 
 
-@pytest.mark.usefixtures("_no_release_issue")
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
     repos, slack_app, monkeypatch
 ):
@@ -1469,7 +1763,7 @@ async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
     assert state.nagged_at[("my-app", "2026.8.3.1")] is not None
 
 
-@pytest.mark.usefixtures("_no_release_issue")
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_a_release_that_never_reached_rc_says_so(repos, slack_app, monkeypatch):
     monkeypatch.setattr(
         bot.github,
@@ -1486,7 +1780,7 @@ async def test_a_release_that_never_reached_rc_says_so(repos, slack_app, monkeyp
     assert "has not reached RC" in text
 
 
-@pytest.mark.usefixtures("_no_release_issue")
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_a_stuck_release_is_not_re_reported_every_poll(
     repos, slack_app, monkeypatch
 ):
@@ -1508,7 +1802,122 @@ async def test_a_stuck_release_is_not_re_reported_every_poll(
     slack_app.client.chat_postMessage.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    ("now", "in_window"),
+    [
+        pytest.param(datetime(2026, 10, 28, 13, 59, tzinfo=UTC), False, id="09:59"),
+        pytest.param(datetime(2026, 10, 28, 14, 0, tzinfo=UTC), True, id="10:00"),
+        pytest.param(datetime(2026, 10, 28, 14, 29, tzinfo=UTC), True, id="10:29"),
+        pytest.param(datetime(2026, 10, 28, 14, 30, tzinfo=UTC), False, id="10:30"),
+        # After the switch to EST, 10:00 ET is 15:00 UTC.
+        pytest.param(datetime(2026, 12, 1, 14, 0, tzinfo=UTC), False, id="est-09:00"),
+        pytest.param(datetime(2026, 12, 1, 15, 0, tzinfo=UTC), True, id="est-10:00"),
+    ],
+)
+def test_the_reminder_window_is_10_to_10_30_eastern(now, in_window):
+    assert (bot._stuck_nag_window_start(now) is not None) == in_window
+
+
+@pytest.mark.parametrize(
+    ("age", "reported"),
+    [
+        # Cut at 14:00 ET the day before: 20h old when the window opens.
+        pytest.param(timedelta(hours=20, minutes=5), True, id="cut-14:00"),
+        pytest.param(timedelta(hours=16, minutes=5), True, id="cut-18:00"),
+        pytest.param(timedelta(hours=15, minutes=5), False, id="cut-19:00"),
+    ],
+)
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
+async def test_a_release_cut_by_18_00_is_reported_the_next_morning(
+    repos, slack_app, monkeypatch, age, reported
+):
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.10.27.1", age)),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+
+    await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+
+    assert slack_app.client.chat_postMessage.called == reported
+
+
 @pytest.mark.usefixtures("_no_release_issue")
+async def test_a_restart_outside_the_window_does_not_re_report(
+    repos, slack_app, monkeypatch
+):
+    """The xpro 2026.10.27.1 repeats: each new pod re-posted on its first poll.
+
+    A fresh state is what a restarted bot has. Outside the window it says
+    nothing, and does not even ask GitHub.
+    """
+    monkeypatch.setattr(bot, "_now", lambda: datetime(2026, 10, 28, 17, 35, tzinfo=UTC))
+    in_flight = AsyncMock(return_value=_in_flight("2026.10.27.1", timedelta(days=1)))
+    monkeypatch.setattr(bot.github, "in_flight_release", in_flight)
+
+    assert (
+        await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+        is True
+    )
+
+    slack_app.client.chat_postMessage.assert_not_called()
+    in_flight.assert_not_called()
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_a_stuck_release_is_reported_again_the_next_day(
+    repos, slack_app, monkeypatch
+):
+    cut_at = _IN_NAG_WINDOW - timedelta(days=2)
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(
+            return_value=dict(_in_flight("2026.9.1.1", timedelta()), cut_at=cut_at)
+        ),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+    state = bot.ReleaseProgressState()
+
+    for now in (
+        _IN_NAG_WINDOW,
+        _IN_NAG_WINDOW + timedelta(minutes=10),
+        _IN_NAG_WINDOW + timedelta(days=1),
+    ):
+        monkeypatch.setattr(bot, "_now", lambda now=now: now)
+        await bot._nag_stuck_releases(slack_app, repos, state)
+
+    assert slack_app.client.chat_postMessage.call_count == 2
+
+
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
+async def test_a_failed_reminder_is_retried_within_the_window(
+    repos, slack_app, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.1.1", timedelta(days=2))),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+    slack_app.client.chat_postMessage.side_effect = [RuntimeError("slack down"), None]
+    state = bot.ReleaseProgressState()
+
+    assert await bot._nag_stuck_releases(slack_app, repos, state) is False
+    assert await bot._nag_stuck_releases(slack_app, repos, state) is True
+
+    assert slack_app.client.chat_postMessage.call_count == 2
+    assert ("my-app", "2026.9.1.1") in state.nagged_at
+
+
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch):
     monkeypatch.setenv("RELEASE_STUCK_AFTER_HOURS", "1")
     monkeypatch.setattr(
@@ -1527,6 +1936,7 @@ async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch
 
 async def _nag_stuck(repos, slack_app, monkeypatch, deployed_to, issue):
     """Report 2026.9.2.1, cut 3d ago and deployed to *deployed_to*; return the text."""
+    monkeypatch.setattr(bot, "_now", lambda: _IN_NAG_WINDOW)
     slack_app.client = _slack_client(
         {"alice@example.com": "UALICE", "bob@example.com": "UBOB"}
     )
@@ -2152,7 +2562,7 @@ async def test_hotfix_rejects_something_that_is_not_a_sha(repos, slack, hotfix_a
     await bot._cmd_hotfix(repos, slack.ack, slack.respond, _command("my-app main"), {})
 
     assert slack.said.startswith("`main` is not a commit SHA.")
-    assert "Usage: `/doof hotfix <app> <sha>`" in slack.said
+    assert "Usage: `/doof hotfix <app> <sha> [<sha> ...]`" in slack.said
     assert hotfix_api.calls == []
 
 
@@ -2183,6 +2593,37 @@ async def test_hotfix_refuses_while_a_release_is_in_flight(repos, slack, hotfix_
     )
 
     assert "is in flight" in slack.said
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_refuses_while_a_release_build_is_running(
+    repos, slack, hotfix_api, monkeypatch
+):
+    """A triggered hotfix has no release branch until its cut, so GitHub misses it."""
+    running = AsyncMock(return_value="http://ci/builds/7")
+    monkeypatch.setattr(bot.concourse, "active_build_url", running)
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command(f"my-app {_SHA}"), {}
+    )
+
+    running.assert_awaited_once_with("my-app-pipeline", "build-my-app-release-image")
+    assert "already running: http://ci/builds/7" in slack.said
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_refuses_when_the_running_build_lookup_fails(
+    repos, slack, hotfix_api, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.concourse, "active_build_url", AsyncMock(side_effect=RuntimeError("boom"))
+    )
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command(f"my-app {_SHA}"), {}
+    )
+
+    assert "Could not check whether a release build" in slack.said
     assert hotfix_api.calls == []
 
 
@@ -2351,6 +2792,327 @@ async def test_concurrent_hotfixes_for_one_app_cannot_both_be_requested(
     assert "`aaaaaaa` is already pending" in slack.said
 
 
+_THIRD_SHA = "c" * 40
+
+
+async def test_hotfix_requests_every_commit_then_checks_then_triggers(
+    repos, slack, hotfix_api
+):
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+
+    await bot._cmd_hotfix(
+        repos,
+        slack.ack,
+        slack.respond,
+        _command("my-app aaaaaaa bbbbbbb"),
+        {"user_id": "UDANA"},
+    )
+
+    assert hotfix_api.calls == [
+        ("request", "mitodl/my-app", _SHA),
+        ("request", "mitodl/my-app", _OTHER_SHA),
+        ("check", "my-app-pipeline", "my-app-release"),
+        ("trigger", "my-app-pipeline", "build-my-app-release-image"),
+    ]
+    assert "Hotfix of `aaaaaaa`, `bbbbbbb` triggered" in slack.said
+    assert "plus those commits" in slack.said
+
+
+@pytest.mark.usefixtures("hotfix_api")
+async def test_hotfix_of_one_commit_still_says_that_commit(repos, slack):
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa"), {}
+    )
+
+    assert "plus that commit." in slack.said
+
+
+async def test_hotfix_takes_commas_and_counts_a_commit_typed_twice_once(
+    repos, slack, hotfix_api
+):
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+
+    await bot._cmd_hotfix(
+        repos,
+        slack.ack,
+        slack.respond,
+        _command("my-app AAAAAAA, bbbbbbb aaaaaaa"),
+        {},
+    )
+
+    requests = [c for c in hotfix_api.calls if c[0] == "request"]
+    assert requests == [
+        ("request", "mitodl/my-app", _SHA),
+        ("request", "mitodl/my-app", _OTHER_SHA),
+    ]
+
+
+async def test_hotfix_requests_nothing_when_one_commit_cannot_be_found(
+    repos, slack, hotfix_api
+):
+    """A typo in the third hash must not leave two requests for a release to cut."""
+
+    async def _resolve(_repo, ref):
+        if ref == "ccccccc":
+            msg = "404"
+            raise RuntimeError(msg)
+        return ref[0] * 40
+
+    hotfix_api.resolve_commit.side_effect = _resolve
+
+    await bot._cmd_hotfix(
+        repos,
+        slack.ack,
+        slack.respond,
+        _command("my-app aaaaaaa bbbbbbb ccccccc"),
+        {},
+    )
+
+    assert "Could not find commit `ccccccc` in `mitodl/my-app`." in slack.said
+    assert "Nothing was requested." in slack.said
+    assert hotfix_api.calls == []
+    hotfix_api.in_flight_release.assert_not_awaited()
+
+
+async def test_hotfix_names_every_commit_it_cannot_find(repos, slack, hotfix_api):
+    hotfix_api.resolve_commit.side_effect = RuntimeError("404")
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa bbbbbbb"), {}
+    )
+
+    assert "`aaaaaaa`, `bbbbbbb`" in slack.said
+
+
+async def test_hotfix_withdraws_what_it_requested_when_a_request_fails(
+    repos, slack, hotfix_api, monkeypatch
+):
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+
+    async def _request(repo, sha):
+        if sha == _OTHER_SHA:
+            msg = "422"
+            raise RuntimeError(msg)
+        hotfix_api.calls.append(("request", repo, sha))
+
+    hotfix_api.request_hotfix.side_effect = _request
+    cancel = AsyncMock(return_value=[_SHA])
+    monkeypatch.setattr(bot.github, "cancel_hotfix_requests", cancel)
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa bbbbbbb"), {}
+    )
+
+    # The failed one too: GitHub can create a tag and still fail the response.
+    cancel.assert_awaited_once_with("mitodl/my-app", [_SHA, _OTHER_SHA])
+    assert "Failed to request a hotfix of `bbbbbbb`. Nothing was requested." in (
+        slack.said
+    )
+    assert not [c for c in hotfix_api.calls if c[0] in ("check", "trigger")]
+
+
+async def test_a_single_failed_request_keeps_its_message(
+    repos, slack, hotfix_api, monkeypatch
+):
+    hotfix_api.request_hotfix.side_effect = RuntimeError("timeout")
+    cancel = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot.github, "cancel_hotfix_requests", cancel)
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa"), {}
+    )
+
+    cancel.assert_awaited_once_with("mitodl/my-app", [_SHA])
+    assert slack.said == "❌ Failed to request a hotfix of `aaaaaaa`."
+
+
+async def test_a_single_failed_request_that_cannot_be_withdrawn_says_abandon(
+    repos, slack, hotfix_api, monkeypatch
+):
+    hotfix_api.request_hotfix.side_effect = RuntimeError("timeout")
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(side_effect=RuntimeError("x"))
+    )
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa"), {}
+    )
+
+    assert "If it was created anyway, `/doof abandon my-app` cancels it." in (
+        slack.said
+    )
+
+
+def test_retry_commands_name_commits_that_share_seven_digits_in_full():
+    """The same seven digits twice would ask for one commit, not two."""
+    first, second = "abcdef1" + "0" * 33, "abcdef1" + "1" * 33
+
+    assert bot._hotfix_command("my-app", [first, second]) == (
+        f"/doof hotfix my-app {first} {second}"
+    )
+    assert bot._short_shas([first, second]) == f"`{first}`, `{second}`"
+    assert bot._hotfix_command("my-app", [_SHA, _OTHER_SHA]) == (
+        "/doof hotfix my-app aaaaaaa bbbbbbb"
+    )
+
+
+async def test_hotfix_says_so_when_it_cannot_withdraw_a_partial_request(
+    repos, slack, hotfix_api, monkeypatch
+):
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+
+    async def _request(_repo, sha):
+        if sha == _OTHER_SHA:
+            msg = "422"
+            raise RuntimeError(msg)
+
+    hotfix_api.request_hotfix.side_effect = _request
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(side_effect=RuntimeError("x"))
+    )
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa bbbbbbb"), {}
+    )
+
+    assert "The 1 already requested could not be withdrawn" in slack.said
+    assert "`/doof abandon my-app` cancels them" in slack.said
+
+
+async def test_hotfix_reuses_requests_that_are_part_of_this_one(
+    repos, slack, hotfix_api
+):
+    """Re-running after a failed trigger names every commit, some already tagged."""
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+    hotfix_api.pending_hotfix_requests.return_value = [_SHA]
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa bbbbbbb"), {}
+    )
+
+    assert [c for c in hotfix_api.calls if c[0] == "request"] == [
+        ("request", "mitodl/my-app", _OTHER_SHA)
+    ]
+
+
+async def test_hotfix_refuses_a_pending_request_that_is_not_part_of_it(
+    repos, slack, hotfix_api
+):
+    """Every pending request is cut as one hotfix, so a stranger would ride along."""
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+    hotfix_api.pending_hotfix_requests.return_value = [_SHA, _THIRD_SHA]
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa bbbbbbb"), {}
+    )
+
+    assert "A hotfix of `ccccccc` is already pending" in slack.said
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_refuses_more_commits_than_the_cap(repos, slack, hotfix_api):
+    shas = " ".join(f"{n:07x}" for n in range(bot._MAX_HOTFIX_COMMITS + 1))
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command(f"my-app {shas}"), {}
+    )
+
+    assert "at most 10 commits and 11 were given" in slack.said
+    assert "/doof release my-app" in slack.said
+    hotfix_api.resolve_commit.assert_not_awaited()
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_names_every_argument_that_is_not_a_sha(repos, slack, hotfix_api):
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa main HEAD"), {}
+    )
+
+    assert slack.said.startswith("`main`, `head` are not commit SHAs.")
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_trigger_failure_retry_names_every_commit(
+    repos, slack, hotfix_api
+):
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+    hotfix_api.trigger_job.side_effect = RuntimeError("boom")
+
+    await bot._cmd_hotfix(
+        repos, slack.ack, slack.respond, _command("my-app aaaaaaa bbbbbbb"), {}
+    )
+
+    assert "`/doof hotfix my-app aaaaaaa bbbbbbb` retries" in slack.said
+
+
+async def test_hotfix_watches_its_build_with_every_commit(
+    repos, slack, hotfix_api, release_build_watch
+):
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+
+    await bot._cmd_hotfix(
+        repos,
+        slack.ack,
+        slack.respond,
+        _command("my-app aaaaaaa bbbbbbb"),
+        {"user_id": "UDANA"},
+    )
+
+    release_build_watch.assert_called_once_with(
+        "my-app",
+        repos["my-app"],
+        "http://build/1",
+        requester="UDANA",
+        hotfix_shas=[_SHA, _OTHER_SHA],
+    )
+
+
+async def test_release_refuses_while_a_hotfix_of_several_commits_is_pending(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github,
+        "pending_hotfix_requests",
+        AsyncMock(return_value=[_SHA, _OTHER_SHA]),
+    )
+
+    await bot._release(slack.respond, "my-app", repos["my-app"], {})
+
+    assert "A hotfix of `aaaaaaa`, `bbbbbbb` is pending" in slack.said
+    assert "`/doof hotfix my-app aaaaaaa bbbbbbb` continues it" in slack.said
+
+
+async def test_preview_reports_a_pending_hotfix_of_several_commits(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github,
+        "pending_hotfix_requests",
+        AsyncMock(return_value=[_SHA, _OTHER_SHA]),
+    )
+
+    await bot._cmd_preview(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    assert "a hotfix of `aaaaaaa`, `bbbbbbb` is pending" in slack.said
+    assert "plus those commits" in slack.said
+    assert "/doof hotfix my-app aaaaaaa bbbbbbb" in slack.said
+
+
+async def test_a_failed_hotfix_build_of_several_commits_says_to_name_them_all(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "failed")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    text = (await _watch(repos, hotfix_shas=[_SHA, _OTHER_SHA])).call_args.kwargs[
+        "text"
+    ]
+
+    assert "hotfix build of `aaaaaaa`, `bbbbbbb` failed" in text
+    assert "To try again: `/doof hotfix my-app aaaaaaa bbbbbbb`" in text
+    assert "A failed cut spends every request, so retrying names every commit." in text
+
+
 # ---------------------------------------------------------------------------
 # the promote button's own message
 # ---------------------------------------------------------------------------
@@ -2416,9 +3178,9 @@ async def test_promote_button_is_removed_once_the_promotion_lands(repos):
     ]
     assert edit["blocks"][:-1] == kept
     assert edit["blocks"][-1]["type"] == "context"
-    assert "<@U1> promoted this to Production" in edit["text"]
+    assert "<@U1> approved this for Production" in edit["text"]
     # The edit is silent, so the channel post is what actually notifies.
-    assert "promoted `my-app`" in str(say.call_args.args[0])
+    assert "approved `my-app`" in str(say.call_args.args[0])
 
 
 async def test_promote_button_is_left_alone_when_the_promotion_fails(
@@ -2505,7 +3267,7 @@ async def test_a_broken_message_edit_does_not_stop_the_promotion(repos, promote_
     promote_api.check_resource.assert_awaited_once_with(
         "my-app-pipeline", "my-app-release-gate"
     )
-    assert "promoted `my-app`" in str(say.call_args.args[0])
+    assert "approved `my-app`" in str(say.call_args.args[0])
 
 
 # ---------------------------------------------------------------------------
@@ -2644,6 +3406,12 @@ def test_promote_button_asks_for_confirmation():
     assert len(confirm["deny"]["text"]) <= 30
 
 
+_JOB = (
+    f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
+    "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
+)
+
+
 @pytest.mark.usefixtures("promote_api")
 async def test_promote_button_links_the_production_deploy_job(repos):
     client = AsyncMock()
@@ -2651,12 +3419,8 @@ async def test_promote_button_links_the_production_deploy_job(repos):
 
     await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
 
-    job = (
-        f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
-        "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
-    )
-    assert f"Production deploy triggered: {job}" in str(say.call_args.args[0])
-    assert job in client.chat_update.call_args.kwargs["text"]
+    assert _JOB in str(say.call_args.args[0])
+    assert _JOB in client.chat_update.call_args.kwargs["text"]
 
 
 async def test_promote_command_links_the_production_deploy_job(
@@ -2670,31 +3434,525 @@ async def test_promote_command_links_the_production_deploy_job(
         repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
     )
 
-    assert (
-        "Production deploy triggered: "
-        f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
-        "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
-    ) in slack.said
+    assert _JOB in slack.said
+    assert "approved" in slack.said
 
 
-async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_failed(
-    repos, slack, promote_api
+@pytest.mark.parametrize("check_fails", [False, True])
+async def test_promote_never_claims_a_deploy_started(
+    repos, slack, promote_api, check_fails
 ):
-    """The issue is closed either way, but no deploy is promised."""
+    """Closing the issue approves; only a gate check that records it deploys.
+
+    mitxonline 2026.10.28.1: Slack said "Production deploy triggered", the
+    forced check found nothing, and the hourly check that did find the close an
+    hour later was refused.
+    """
     promote_api.open_release_issues.return_value = [
         {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
     ]
-    promote_api.check_resource.side_effect = RuntimeError("Concourse is down")
+    if check_fails:
+        promote_api.check_resource.side_effect = RuntimeError("Concourse is down")
 
     await bot._cmd_promote(
         repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
     )
 
     said = slack.said
-    assert "promoted" in said
-    assert "Production deploy triggered" not in said
-    assert "no Production deploy was triggered" in said
-    assert "only after a later check of the gate succeeds" in said
+    assert "approved" in said
+    assert "triggered" not in said
+    assert "deploy started" not in said
+    assert "within 5m" in said
+    assert ("could not confirm that Concourse checked" in said) is check_fails
+
+
+async def test_promote_button_reports_success_when_the_gate_check_fails(
+    repos, promote_api
+):
+    """The issue is closed, so the approval stands; the gate checks itself."""
+    promote_api.check_resource.side_effect = RuntimeError("Concourse is down")
+    client = AsyncMock()
+    say = AsyncMock()
+
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
+
+    posted = str(say.call_args.args[0])
+    assert "approved `my-app` `2026.9.5.1` for Production" in posted
+    assert "could not confirm that Concourse checked it sooner" in posted
+    # A terminal outcome: the button goes.
+    edit = client.chat_update.call_args.kwargs
+    assert [b for b in edit["blocks"] if b.get("type") == "actions"] == []
+
+
+async def test_promote_does_not_wait_on_a_hung_gate_check(
+    repos, slack, promote_api, monkeypatch
+):
+    """A check that hangs must not hold the reply; the gate checks itself."""
+    promote_api.open_release_issues.return_value = [
+        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
+    ]
+    monkeypatch.setattr(bot, "_GATE_NUDGE_TIMEOUT_SECONDS", 0.05)
+
+    async def _hang(*_args):
+        await asyncio.sleep(3600)
+
+    promote_api.check_resource.side_effect = _hang
+
+    await asyncio.wait_for(
+        bot._cmd_promote(
+            repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
+        ),
+        timeout=5,
+    )
+
+    assert "could not confirm that Concourse checked" in slack.said
+
+
+async def test_promote_asks_for_one_gate_check_and_reads_no_versions(
+    repos, promote_api
+):
+    """No Concourse version-history read: the acknowledgement is asynchronous."""
+    await bot._handle_promote_button(
+        repos, AsyncMock(), _promote_body(), AsyncMock(), AsyncMock()
+    )
+
+    promote_api.check_resource.assert_awaited_once_with(
+        "my-app-pipeline", "my-app-release-gate"
+    )
+    assert not hasattr(bot.concourse, "has_version")
+    promote_api.close_release_issue.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# release state labels: refusals and release-status
+# ---------------------------------------------------------------------------
+
+
+def _refused_issue(number=7, title="Release my-app 2026.9.5.1", labels=None):
+    return {
+        "number": number,
+        "title": title,
+        "url": f"https://github.com/mitodl/my-app/issues/{number}",
+        "body": "## Release 2026.9.5.1\n",
+        "labels": labels
+        if labels is not None
+        else ["ops:release", "ops:consumed", "ops:refused"],
+        "updated_at": datetime.now(tz=UTC),
+    }
+
+
+@pytest.fixture
+def refusals(monkeypatch):
+    """Stub the refused-issue lookup and capture what is posted."""
+    lookup = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot.github, "refused_release_issues", lookup)
+    monkeypatch.setattr(
+        bot.slack_channels, "resolve", AsyncMock(side_effect=lambda _c, ch: ch)
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+    return lookup, app
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Release my-app 2026.9.5.1",
+        "Release my-app infrastructure @ 2026.9.5.1",
+        "Release my-app",
+    ],
+)
+async def test_a_refusal_is_announced_once(repos, refusals, title):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    # The first poll seeds: a refusal already there when the bot starts is old.
+    assert await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [_refused_issue(title=title)]
+
+    assert await bot._announce_refusals(app, repos, state)
+    assert await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+    text = app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "`my-app` 2026.9.5.1 was not deployed" in text
+    assert "|#7>" in text
+    assert "/jobs/deploy-ol-application-my-app-production" in text
+
+
+async def test_an_old_refusal_present_at_startup_is_not_announced(
+    repos, refusals, monkeypatch
+):
+    """Like deployments: seeding is cheaper than repeating old news on restart."""
+    lookup, app = refusals
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    old = _refused_issue()
+    old["updated_at"] = datetime.now(tz=UTC) - timedelta(hours=2)
+    lookup.return_value = [old]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_refusals(app, repos, state)
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_refusal_during_a_restart_is_announced(repos, refusals, monkeypatch):
+    """A deploy of the bot is the likeliest restart; a refusal in it is news."""
+    lookup, app = refusals
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    recent = _refused_issue()
+    recent["updated_at"] = datetime.now(tz=UTC) - timedelta(minutes=3)
+    lookup.return_value = [recent]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_refusals(app, repos, state)
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+
+
+async def test_an_abandoned_refusal_is_not_announced(repos, refusals):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [
+        _refused_issue(labels=["ops:consumed", "ops:refused", "ops:abandoned"])
+    ]
+
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_another_apps_refusal_in_a_shared_repo_is_not_announced(repos, refusals):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [_refused_issue(title="Release my-app-nextjs 2026.9.5.1")]
+
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_failed_refusal_post_is_retried(repos, refusals):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [_refused_issue()]
+    app.client.chat_postMessage.side_effect = [RuntimeError("Slack is down"), None]
+
+    assert not await bot._announce_refusals(app, repos, state)
+    assert await bot._announce_refusals(app, repos, state)
+
+    assert app.client.chat_postMessage.await_count == 2
+
+
+async def test_a_failed_refusal_lookup_is_reported_not_raised(repos, refusals):
+    lookup, app = refusals
+    lookup.side_effect = RuntimeError("GitHub is down")
+
+    assert not await bot._announce_refusals(app, repos, bot.ReleaseProgressState())
+
+
+# ---------------------------------------------------------------------------
+# closed release issues Production never took
+# ---------------------------------------------------------------------------
+
+
+def _closed_issue(
+    number=7,
+    title="Release my-app 2026.9.5.1",
+    labels=None,
+    closed_ago=timedelta(minutes=50),
+):
+    return {
+        "number": number,
+        "title": title,
+        "url": f"https://github.com/mitodl/my-app/issues/{number}",
+        "labels": labels if labels is not None else ["ops:release"],
+        "closed_at": datetime.now(tz=UTC) - closed_ago,
+    }
+
+
+@pytest.fixture
+def stranded(monkeypatch):
+    """Stub the closed-issue and deployment lookups and capture what is posted."""
+    lookup = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot.github, "closed_release_issues", lookup)
+    report = AsyncMock(return_value=False)
+    monkeypatch.setattr(bot.github, "deployment_created_since", report)
+    monkeypatch.setattr(
+        bot.slack_channels, "resolve", AsyncMock(side_effect=lambda _c, ch: ch)
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+    return lookup, report, app
+
+
+async def _seeded(app, repos, lookup):
+    """Return state past the first poll, which seeds and posts nothing old."""
+    state = bot.ReleaseProgressState()
+    assert await bot._announce_stranded_approvals(app, repos, state)
+    lookup.return_value = []
+    return state
+
+
+async def test_a_stranded_tag_release_links_the_jobs_its_pipeline_defines(
+    tag_repos, stranded
+):
+    """A tag-only pipeline has deploy-<app>-rc and promote-<app>-production."""
+    lookup, _report, app = stranded
+    state = await _seeded(app, tag_repos, lookup)
+    lookup.return_value = [_closed_issue(title="Release my-theme 2026.9.5.1")]
+
+    assert await bot._announce_stranded_approvals(app, tag_repos, state)
+
+    text = app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "/jobs/deploy-my-theme-rc" in text
+    assert "/jobs/promote-my-theme-production" in text
+    assert "deploy-ol-application" not in text
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Release my-app 2026.9.5.1",
+        "Release my-app infrastructure @ 2026.9.5.1",
+    ],
+)
+async def test_an_unconsumed_closed_issue_is_announced_once(repos, stranded, title):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(title=title)]
+
+    assert await bot._announce_stranded_approvals(app, repos, state)
+    assert await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+    text = app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "|#7>" in text
+    assert "was closed 50 minutes ago" in text
+    assert "/jobs/deploy-ol-application-my-app-qa" in text
+    assert "/jobs/deploy-ol-application-my-app-production" in text
+
+
+async def test_a_recently_closed_issue_is_not_announced_yet(repos, stranded):
+    """The gate check and a queued QA job can take most of the wait."""
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(closed_ago=timedelta(minutes=20))]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        ["ops:release", "ops:consumed"],
+        ["ops:release", "ops:consumed", "ops:refused"],
+        ["ops:release", "ops:abandoned"],
+        ["release", "abandoned"],
+    ],
+)
+async def test_a_taken_or_retired_issue_is_not_announced(repos, stranded, labels):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(labels=labels)]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_production_deployment_after_the_close_counts_as_taken(repos, stranded):
+    """The consumed label is best-effort; the Deployment says Production ran."""
+    lookup, deployment_created_since, app = stranded
+    state = await _seeded(app, repos, lookup)
+    deployment_created_since.return_value = True
+    issue = _closed_issue()
+    lookup.return_value = [issue]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+    deployment_created_since.assert_awaited_once_with(
+        "mitodl/my-app", "Production", "2026.9.5.1", issue["closed_at"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("title", "version"),
+    [
+        ("Release my-app 2026.9.5.1", "2026.9.5.1"),
+        ("Release my-app infrastructure @ 2026.9.5.1", "2026.9.5.1"),
+    ],
+)
+async def test_the_deployment_lookup_uses_the_issues_version(
+    repos, stranded, title, version
+):
+    lookup, deployment_created_since, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue(title=title)]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    assert deployment_created_since.await_args.args[2] == version
+    app.client.chat_postMessage.assert_awaited_once()
+
+
+async def test_a_shared_repo_relies_on_the_label_alone(repos, stranded):
+    """Two apps in one repository record Deployments under the same versions."""
+    lookup, deployment_created_since, app = stranded
+    shared = dict(
+        repos,
+        **{
+            "my-app-nextjs": bot_config.AppConfig(
+                pipeline="my-app-nextjs-pipeline",
+                repo="mitodl/my-app",
+                branch="main",
+                channel="C123",
+                release_workflow=True,
+            )
+        },
+    )
+    state = await _seeded(app, shared, lookup)
+    deployment_created_since.return_value = True
+    lookup.return_value = [_closed_issue()]
+
+    await bot._announce_stranded_approvals(app, shared, state)
+
+    deployment_created_since.assert_not_awaited()
+    app.client.chat_postMessage.assert_awaited_once()
+    assert "`my-app`" in app.client.chat_postMessage.call_args.kwargs["text"]
+
+
+async def test_an_issue_already_due_at_startup_is_not_announced(
+    repos, stranded, monkeypatch
+):
+    lookup, _report, app = stranded
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    lookup.return_value = [_closed_issue(closed_ago=timedelta(hours=3))]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_stranded_approvals(app, repos, state)
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_an_issue_that_fell_due_during_a_restart_is_announced(
+    repos, stranded, monkeypatch
+):
+    lookup, _report, app = stranded
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    lookup.return_value = [_closed_issue(closed_ago=timedelta(minutes=50))]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "issue",
+    [
+        _closed_issue(title="Release my-app-nextjs 2026.9.5.1"),
+        _closed_issue(title="[CONSUMED #22]Release my-app"),
+        _closed_issue(closed_ago=timedelta(days=2)),
+        dict(_closed_issue(), closed_at=None),
+    ],
+)
+async def test_issues_that_are_not_live_approvals_are_ignored(repos, stranded, issue):
+    """Another app's issue, a title-consumed one, one too old, or not closed."""
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [issue]
+
+    await bot._announce_stranded_approvals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_failed_unconsumed_post_is_retried(repos, stranded):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue()]
+    app.client.chat_postMessage.side_effect = [RuntimeError("Slack is down"), None]
+
+    assert not await bot._announce_stranded_approvals(app, repos, state)
+    assert await bot._announce_stranded_approvals(app, repos, state)
+
+    assert app.client.chat_postMessage.await_count == 2
+
+
+@pytest.mark.parametrize(
+    "failing", ["closed_release_issues", "deployment_created_since"]
+)
+async def test_a_failed_lookup_is_reported_not_raised(
+    repos, stranded, monkeypatch, failing
+):
+    lookup, _report, app = stranded
+    state = await _seeded(app, repos, lookup)
+    lookup.return_value = [_closed_issue()]
+    monkeypatch.setattr(
+        bot.github, failing, AsyncMock(side_effect=RuntimeError("GitHub is down"))
+    )
+
+    assert not await bot._announce_stranded_approvals(app, repos, state)
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("labels", "shown", "hidden"),
+    [
+        (["ops:release"], "", "·"),
+        (["release", "promote-ready"], "· ready to promote", "refused"),
+        (["ops:release", "ops:promote-ready"], "· ready to promote", "refused"),
+    ],
+)
+async def test_release_status_shows_the_issue_label_state(  # noqa: PLR0913
+    repos, slack, monkeypatch, labels, shown, hidden
+):
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(
+            return_value=[
+                {
+                    "number": 1,
+                    "title": "Release my-app 2026.9.5.1",
+                    "url": "https://github.com/mitodl/my-app/issues/1",
+                    "body": "## Release 2026.9.5.1\n- [x] **A** (#1) by a\n",
+                    "labels": labels,
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert shown in slack.said
+    assert hidden not in slack.said
+
+
+@pytest.mark.parametrize(
+    ("labels", "expected"),
+    [
+        (["ops:consumed", "ops:refused"], " · ⛔ refused by Production"),
+        (["ops:consumed", "ops:refused", "abandoned"], " · abandoned"),
+        (["release", "ops:consumed"], " · taken by Production"),
+        (["ops:release"], ""),
+        ([], ""),
+    ],
+)
+def test_release_state_suffix_follows_label_precedence(labels, expected):
+    assert bot._release_state_suffix({"labels": labels}) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -2976,6 +4234,20 @@ async def test_help_is_a_subcommand_not_only_a_parse_failure(mixed_repos, slack)
         assert f"/doof {subcommand}" in bot._USAGE
 
 
+@pytest.mark.parametrize("text", ["", "relase my-app"])
+async def test_bare_or_unknown_doof_replies_exactly_as_help(text, mixed_repos, slack):
+    await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command("help"), {})
+    help_acks = slack.ack.call_args_list
+    help_calls = slack.respond.call_args_list
+    slack.ack.reset_mock()
+    slack.respond.reset_mock()
+
+    await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command(text), {})
+
+    assert slack.ack.call_args_list == help_acks
+    assert slack.respond.call_args_list == help_calls
+
+
 def _live_deployment(version, sha, environment, url="", age=timedelta(hours=5)):
     return {
         "id": 1,
@@ -3204,6 +4476,10 @@ async def test_poll_loops_record_a_heartbeat_even_when_an_iteration_fails(
         bot, "_notify_ready_to_promote", AsyncMock(side_effect=RuntimeError("boom"))
     )
     monkeypatch.setattr(bot, "_announce_deployments", AsyncMock(return_value=True))
+    monkeypatch.setattr(bot, "_announce_refusals", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        bot, "_announce_stranded_approvals", AsyncMock(return_value=True)
+    )
     monkeypatch.setattr(bot, "_nag_stuck_releases", AsyncMock(return_value=True))
 
     async def _stop(_seconds):
@@ -3268,3 +4544,376 @@ async def test_a_clean_pass_reports_success(repos, monkeypatch):
     assert await bot._notify_ready_to_promote(MagicMock(), repos) is True
     assert await bot._announce_deployments(MagicMock(), repos, state) is True
     assert await bot._nag_stuck_releases(MagicMock(), repos, state) is True
+
+
+class _FakeSlackError(Exception):
+    """Stand-in for slack_sdk's SlackApiError, which isn't installed here."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.response = {"error": code}
+
+
+class _FakeLookupClient:
+    """Records email lookups so a test can prove none was needed."""
+
+    def __init__(self):
+        self.lookups: list[str] = []
+
+    async def users_lookupByEmail(self, email):  # noqa: N802
+        self.lookups.append(email)
+        raise _FakeSlackError(_NOT_FOUND)
+
+
+async def test_create_app_installs_the_slack_user_overrides(monkeypatch):
+    """The boot wiring, not the resolver, is what makes the overrides real.
+
+    Every slack_users test calls `configure_overrides` itself, so the resolver
+    can be entirely correct while nothing in the running bot ever loads the
+    list -- which is exactly how this shipped broken the first time. Drive
+    `create_app()` and assert the environment reached the module.
+    """
+    # Fresh dicts that monkeypatch puts back, so this test cannot leak an
+    # override or a cached mention into the rest of the suite.
+    monkeypatch.setattr(slack_users, "_overrides", {})
+    monkeypatch.setattr(slack_users, "_cache", {})
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
+    monkeypatch.setenv(
+        "REPOS_CONFIG",
+        '{"my-app": {"pipeline": "my-app-pipeline", "repo": "mitodl/my-app",'
+        ' "branch": "main", "release_workflow": true}}',
+    )
+    monkeypatch.setenv("LIBRARIES_CONFIG", "{}")
+    monkeypatch.setenv("UNPUBLISHABLE_LIBRARIES", "{}")
+    monkeypatch.setenv("SLACK_USER_OVERRIDES", '{"octocat": "UTESTUSER1"}')
+
+    bot.create_app()
+
+    client = _FakeLookupClient()
+    assert (
+        await slack_users.mention(client, "octocat@users.noreply.github.com")
+        == "<@UTESTUSER1>"
+    )
+    assert client.lookups == []
+
+
+async def test_main_reports_unusable_overrides_at_boot(mixed_repos, monkeypatch):
+    """A stale id in the list fails exactly like the bug the list fixes.
+
+    Same reasoning as the channel check above: the report being correct proves
+    nothing if `main()` never calls it.
+    """
+    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-test")
+    checked = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot, "create_app", lambda: (MagicMock(), mixed_repos))
+    monkeypatch.setattr(bot, "_report_unreachable_channels", AsyncMock())
+    monkeypatch.setattr(slack_users, "unusable_overrides", checked)
+
+    async def _loop(_app, _repos):
+        return
+
+    monkeypatch.setattr(bot, "_poll_ready_to_promote_loop", _loop)
+    monkeypatch.setattr(bot, "_poll_release_progress_loop", _loop)
+    handler = MagicMock()
+    handler.start_async = AsyncMock()
+    monkeypatch.setattr(bot, "AsyncSocketModeHandler", MagicMock(return_value=handler))
+
+    await bot.main()
+    await asyncio.sleep(0)
+
+    checked.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Job names from the registry (tag-only releases)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def tag_repos():
+    """Return a tag-only app, whose pipeline names its jobs differently."""
+    return {
+        "my-theme": bot_config.AppConfig(
+            pipeline="my-theme-pipeline",
+            repo="mitodl/my-theme",
+            branch="main",
+            channel="C789",
+            release_workflow=True,
+            release_job="cut-my-theme-release",
+            qa_job="deploy-my-theme-rc",
+            production_job="promote-my-theme-production",
+            abandon_job="abandon-my-theme-release",
+        )
+    }
+
+
+def test_job_names_default_to_the_k8s_pipeline(repos):
+    cfg = repos["my-app"]
+    assert bot_config.job_name("my-app", cfg, "release_job") == (
+        "build-my-app-release-image"
+    )
+    assert bot_config.job_name("my-app", cfg, "qa_job") == (
+        "deploy-ol-application-my-app-qa"
+    )
+    assert bot_config.job_name("my-app", cfg, "production_job") == (
+        "deploy-ol-application-my-app-production"
+    )
+    assert bot_config.job_name("my-app", cfg, "abandon_job") == "abandon-my-app-release"
+
+
+async def test_release_triggers_the_configured_release_job(
+    tag_repos, slack, monkeypatch
+):
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger(calls))
+    )
+
+    await bot._cmd_release(
+        tag_repos, slack.ack, slack.respond, _command("my-theme"), {}
+    )
+
+    assert calls == [("trigger", "my-theme-pipeline", "cut-my-theme-release")]
+    bot.concourse.active_build_url.assert_awaited_once_with(
+        "my-theme-pipeline", "cut-my-theme-release"
+    )
+
+
+async def test_abandon_triggers_the_configured_abandon_job(
+    tag_repos, slack, monkeypatch
+):
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.9.1", timedelta(days=1))),
+    )
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger(calls))
+    )
+
+    await bot._cmd_abandon(
+        tag_repos, slack.ack, slack.respond, _command("my-theme"), {}
+    )
+
+    assert calls == [("trigger", "my-theme-pipeline", "abandon-my-theme-release")]
+
+
+def test_production_link_names_the_configured_production_job(tag_repos):
+    url = bot._production_job_url("my-theme", tag_repos["my-theme"])
+    assert url.endswith("/pipelines/my-theme-pipeline/jobs/promote-my-theme-production")
+
+
+# ---------------------------------------------------------------------------
+# Reporting a release build that does not succeed
+# ---------------------------------------------------------------------------
+
+_BUILD_URL = "https://cicd.example/builds/42"
+
+
+def _slack_unreachable() -> AsyncMock:
+    """Return a `respond` that raises, as Bolt's does when Slack is unreachable."""
+    return AsyncMock(side_effect=OSError("Slack is unreachable"))
+
+
+async def test_release_watches_its_build_even_if_the_reply_fails(
+    repos, slack, monkeypatch, release_build_watch
+):
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(return_value=_BUILD_URL)
+    )
+
+    with pytest.raises(OSError, match="unreachable"):
+        await bot._cmd_release(
+            repos,
+            slack.ack,
+            _slack_unreachable(),
+            _command("my-app"),
+            {"user_id": "UDANA"},
+        )
+
+    release_build_watch.assert_called_once_with(
+        "my-app", repos["my-app"], _BUILD_URL, requester="UDANA"
+    )
+
+
+@pytest.mark.usefixtures("hotfix_api")
+async def test_hotfix_watches_its_build_even_if_the_reply_fails(
+    repos, slack, release_build_watch
+):
+    with pytest.raises(OSError, match="unreachable"):
+        await bot._cmd_hotfix(
+            repos,
+            slack.ack,
+            _slack_unreachable(),
+            _command("my-app aaaaaaa"),
+            {"user_id": "UDANA"},
+        )
+
+    release_build_watch.assert_called_once_with(
+        "my-app",
+        repos["my-app"],
+        "http://build/1",
+        requester="UDANA",
+        hotfix_shas=[_SHA],
+    )
+
+
+def test_a_build_watch_runs_in_the_background(repos, monkeypatch):
+    started: list[object] = []
+
+    def _capture(coro):
+        started.append(coro.cr_code.co_name)
+        coro.close()
+
+    monkeypatch.setattr(bot.asyncio, "create_task", _capture)
+
+    _start_release_build_watch("my-app", repos["my-app"], _BUILD_URL, requester=None)
+
+    assert started == ["_watch_release_build"]
+
+
+def _build_statuses(monkeypatch, *statuses):
+    """Make the build report *statuses* in turn, raising any exception given."""
+    queue = list(statuses)
+
+    async def _status(build_id):
+        assert build_id == 42
+        status = queue.pop(0)
+        if isinstance(status, Exception):
+            raise status
+        return status
+
+    monkeypatch.setattr(bot.concourse, "build_status", _status)
+    monkeypatch.setattr(bot.asyncio, "sleep", AsyncMock())
+
+
+async def _watch(repos, hotfix_shas=None):
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+    await bot._watch_release_build(
+        app,
+        "my-app",
+        repos["my-app"],
+        _BUILD_URL,
+        "C123",
+        requester="UDANA",
+        hotfix_shas=hotfix_shas,
+    )
+    return app.client.chat_postMessage
+
+
+async def test_a_failed_release_build_says_how_to_supersede_what_it_cut(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "pending", "started", "failed")
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_IN_FLIGHT)
+    )
+
+    post = await _watch(repos)
+
+    post.assert_awaited_once()
+    assert post.call_args.kwargs["channel"] == "C123"
+    text = post.call_args.kwargs["text"]
+    assert text.splitlines()[0] == (
+        f"❌ <@UDANA> `my-app` release build failed: {_BUILD_URL}"
+    )
+    assert "`/doof release my-app supersede 2026.8.3.1`" in text
+    assert "`/doof abandon my-app`" in text
+    assert "Concourse" not in text
+
+
+async def test_a_release_build_that_failed_before_the_cut_says_release_again(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "errored")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    text = (await _watch(repos)).call_args.kwargs["text"]
+
+    assert "release build errored" in text
+    assert "To try again: `/doof release my-app`" in text
+    assert "supersede" not in text
+
+
+async def test_a_failed_hotfix_build_says_abandon_then_hotfix_again(repos, monkeypatch):
+    """Superseding would cut the tracked branch, not the hotfix."""
+    _build_statuses(monkeypatch, "aborted")
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_IN_FLIGHT)
+    )
+
+    text = (await _watch(repos, hotfix_shas=[_SHA])).call_args.kwargs["text"]
+
+    assert "hotfix build of `aaaaaaa` was aborted" in text
+    assert (
+        "`/doof abandon my-app`, and once that build finishes, "
+        "`/doof hotfix my-app aaaaaaa`"
+    ) in text
+    assert "supersede" not in text
+
+
+async def test_a_hotfix_build_that_failed_before_the_cut_says_hotfix_again(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "failed")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    text = (await _watch(repos, hotfix_shas=[_SHA])).call_args.kwargs["text"]
+
+    assert "To try again: `/doof hotfix my-app aaaaaaa`" in text
+    assert "/doof release" not in text
+
+
+async def test_a_successful_release_build_posts_nothing(repos, monkeypatch):
+    _build_statuses(monkeypatch, "started", "succeeded")
+
+    post = await _watch(repos)
+
+    post.assert_not_awaited()
+
+
+async def test_a_build_watch_survives_a_failed_status_poll(repos, monkeypatch):
+    _build_statuses(monkeypatch, RuntimeError("Concourse is down"), "failed")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    post = await _watch(repos)
+
+    post.assert_awaited_once()
+
+
+async def test_a_failure_report_that_slack_rejects_is_retried(repos, monkeypatch):
+    _build_statuses(monkeypatch, "failed", "failed")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock(side_effect=[RuntimeError("Slack"), None])
+
+    await bot._watch_release_build(
+        app, "my-app", repos["my-app"], _BUILD_URL, "C123", requester=None
+    )
+
+    assert app.client.chat_postMessage.await_count == 2
+
+
+async def test_a_failure_report_survives_not_knowing_what_is_in_flight(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "failed")
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(side_effect=RuntimeError("GitHub is down")),
+    )
+
+    text = (await _watch(repos)).call_args.kwargs["text"]
+
+    assert "release build failed" in text
+    assert "To try again: `/doof release my-app`, which says if" in text

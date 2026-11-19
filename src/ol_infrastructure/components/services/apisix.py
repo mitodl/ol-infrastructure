@@ -22,6 +22,7 @@ from bridge.lib.constants import (
     DEFAULT_OIDC_SESSION_COOKIE_NAME,
     GATEWAY_IDENTITY_HEADERS,
     OIDC_VAULT_FIELDS,
+    LearnSession,
     oidc_secret_data,
 )
 from ol_infrastructure.components.services.vault import (
@@ -56,6 +57,22 @@ NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
 # falls back to the guard cookie alone.
 OIDC_RECOVERY_SHARED_DICT = "ol-oidc-recovery"
 OIDC_RECOVERY_SHARED_DICT_SIZE = "1m"
+
+# access_token_expires_leeway for applications whose upstream reuses the
+# forwarded X-Access-Token (e.g. exchanging it at Keycloak for an ol-memory
+# token).  lua-resty-openidc refreshes only once expires_in - 1 - leeway has
+# passed on the gateway's clock, so with 0 a token can reach the upstream with
+# about 1s left and expire before Keycloak sees the exchange.  60s covers the
+# request's own processing time and gateway/Keycloak clock skew, and stays
+# well under the olapps realm's 300s access token lifespan (unset, so
+# Keycloak's default), so the gateway does not refresh on every request.
+#
+# The leeway is applied when a route stores a refreshed token in the session
+# (lua-resty-openidc saves the expiry with it subtracted), not when a route
+# reads one.  So every resource that writes a shared session has to set it,
+# not only the one whose upstream needs the headroom: learn_session_oidc_config
+# sets it for every participant in the MIT Learn session.
+FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS = 60
 
 # A serialized Origin header: scheme, lower-case host and optional port, with no
 # path, query or trailing slash.  APISIX's cors plugin compares the request
@@ -104,8 +121,9 @@ def stale_session_cookie_cleanup_plugin(
     present on the request, so it costs nothing on the overwhelming majority of
     responses and stops firing for a given browser after the one response that
     clears it.  Chunked cookies are handled too -- lua-resty-session splits an
-    oversized payload across ``<name>``, ``<name>_2``, ``<name>_3``... and each
-    chunk is its own cookie that has to be expired individually.
+    oversized payload across ``<name>``, ``<name>2``, ``<name>3``... (4.x;
+    3.x used ``<name>_2``) and each chunk is its own cookie that has to be
+    expired individually.
 
     A cookie's identity is (name, domain, path), so the domain-scoped and
     host-only variants are separate entries in the browser's jar and each needs
@@ -132,6 +150,10 @@ def stale_session_cookie_cleanup_plugin(
         f'Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax{scope}")'
         for scope in scopes
     )
+    # lua-resty-session 4.x names chunks <name>2, <name>3 (session.lua's
+    # fmt("%s%d", cookie_name, i)); 3.x, bundled with APISIX up to 3.14.1,
+    # used <name>_2.  We ran 3.14.1 until February 2026 and these cookies are
+    # session-scoped, so chunks in the 3.x form can still be in browsers.
     cleanup_function = f"""return function(conf, ctx)
     local cookie = ngx.var.http_cookie
     if not cookie then
@@ -141,7 +163,7 @@ def stale_session_cookie_cleanup_plugin(
     for pair in cookie:gmatch("[^;]+") do
         local name = pair:match("^%s*([^=%s]+)=")
         if name and (name == "{stale_cookie_name}"
-                     or name:match("^{stale_cookie_name}_%d+$")) then
+                     or name:match("^{stale_cookie_name}_?%d+$")) then
 {expirations}
         end
     end
@@ -687,6 +709,10 @@ class OLApisixOIDCConfig(BaseModel):
         Field(discriminator="source"),
     ]
 
+    # Seconds before expiry at which the plugin refreshes the session's access
+    # token; see FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS.  0 is the
+    # plugin's own default, so it is only emitted when set.
+    oidc_access_token_expires_leeway: NonNegativeInt = 0
     oidc_bearer_only: bool = False
     oidc_introspection_endpoint_auth_method: str = "client_secret_basic"
     oidc_logout_path: str = "/logout/oidc"
@@ -712,6 +738,11 @@ class OLApisixOIDCConfig(BaseModel):
     # that uses this component, so no caller needs it off; the field exists to
     # make that a choice.
     oidc_session_cookie_secure: bool = True
+    # lua-resty-session 4.x already defaults to HttpOnly and SameSite=Lax.
+    # They are emitted anyway so the cookie's attributes are read off the
+    # rendered route, not off whichever library version the gateway runs.
+    oidc_session_cookie_http_only: bool = True
+    oidc_session_cookie_same_site: Literal["Strict", "Lax", "None", "Default"] = "Lax"
     oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
     # 3600s rolling) untouched for callers that haven't opted in. 0
@@ -720,6 +751,15 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
+    # What the plugin forwards to the upstream.  X-Userinfo (base64 JSON, keyed
+    # by ``sub``) is the identity every Django app authenticates off through
+    # mitol-apigateway.  The tokens are opt-in: an upstream that never reads
+    # X-Access-Token or X-ID-Token should not receive a credential it could
+    # leak into logs or replay.  The plugin's own defaults forward all three.
+    # X-Raw-ID-Token and X-Refresh-Token are always off.
+    oidc_set_userinfo_header: bool = True
+    oidc_set_access_token_header: bool = False
+    oidc_set_id_token_header: bool = False
     # Sends code_challenge (S256) on the authorization request and
     # code_verifier on the token request. Keycloak accepts both from a client
     # that does not require PKCE, so this has to be on, and deployed in every
@@ -818,8 +858,10 @@ class OLApisixOIDCResources(ComponentResource):
         # Always emitted, so the session block now exists for every caller.
         # That block already reaches APISIX for all of them anyway: the
         # secretRef merges session.secret into it.
-        session_config.setdefault("session", {})["cookie_secure"] = (
-            oidc_config.oidc_session_cookie_secure
+        session_config.setdefault("session", {}).update(
+            cookie_secure=oidc_config.oidc_session_cookie_secure,
+            cookie_http_only=oidc_config.oidc_session_cookie_http_only,
+            cookie_same_site=oidc_config.oidc_session_cookie_same_site,
         )
 
         if oidc_config.oidc_session_absolute_timeout:
@@ -851,8 +893,18 @@ class OLApisixOIDCResources(ComponentResource):
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
             "use_pkce": oidc_config.oidc_use_pkce,
+            "set_userinfo_header": oidc_config.oidc_set_userinfo_header,
+            "set_access_token_header": oidc_config.oidc_set_access_token_header,
+            "set_id_token_header": oidc_config.oidc_set_id_token_header,
+            "set_raw_id_token_header": False,
+            "set_refresh_token_header": False,
             **session_config,
         }
+
+        if oidc_config.oidc_access_token_expires_leeway:
+            self.base_oidc_config["access_token_expires_leeway"] = (
+                oidc_config.oidc_access_token_expires_leeway
+            )
 
         if oidc_config.oidc_session_contents:
             self.base_oidc_config["session_contents"] = (
@@ -878,17 +930,224 @@ class OLApisixOIDCResources(ComponentResource):
         }
 
 
+class OLApisixOIDCRouteGroup(BaseModel):
+    """The paths one OIDC resource's routes answer on, and what follows from them.
+
+    The openid-connect plugin compares ``logout_path`` against the request URI
+    *before* any proxy-rewrite, so a group served under a path prefix needs the
+    prefix in its logout path, in the ``logout-redirect`` route's target, and in
+    its post-logout landing.  Setting those by hand in each place is how a
+    prefixed group ended up redirecting to the unprefixed group's plugin and
+    leaving its own logout settings dead.  Deriving all of them from ``hosts``
+    and ``path_prefix`` keeps a prefixed and an unprefixed group from drifting.
+
+    There is no callback path to keep in step: the plugin derives
+    ``redirect_uri`` per request by appending ``/.apisix/redirect`` to the
+    login URI, which the ``reqauth`` patterns already match.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # The first host is the one the post-logout landing is served from.
+    hosts: list[str] = Field(min_length=1)
+    # Without slashes, e.g. "learn"; empty for an unprefixed group.
+    path_prefix: str = Field(default="", pattern=r"^[^/]*$")
+    # Paths under the prefix that require a login, e.g. ["/login", "/login/*"].
+    login_paths: list[str] = []
+    # Further spellings under the prefix that redirect onto ``logout_path``,
+    # e.g. ["/logout", "/logout/"] for an application with no logout view.
+    logout_entry_paths: list[str] = []
+    # None lands on the group's own /logout/ under its prefix.
+    post_logout_redirect_uri: str | None = None
+
+    def path(self, path: str) -> str:
+        """Return ``path`` under this group's prefix."""
+        return f"/{self.path_prefix}{path}" if self.path_prefix else path
+
+    @property
+    def logout_path(self) -> str:
+        """The request URI the openid-connect plugin performs a logout on."""
+        return self.path("/logout/oidc")
+
+    @property
+    def post_logout_uri(self) -> str:
+        """Where Keycloak sends the browser once the session is ended."""
+        return (
+            self.post_logout_redirect_uri
+            or f"https://{self.hosts[0]}{self.path('/logout/')}"
+        )
+
+    def route_configs(  # noqa: PLR0913
+        self,
+        oidc: OLApisixOIDCResources,
+        *,
+        backend_service_name: str,
+        backend_service_port: str | NonNegativeInt,
+        backend_resolve_granularity: Literal["endpoint", "service"] = "service",
+        shared_plugin_config_name: str | None = None,
+        route_name_prefix: str = "",
+        passauth_priority: int = 0,
+        priority: int = 10,
+        rewrite_plugins: Sequence[OLApisixPluginConfig | dict[str, Any]] = (),
+        extra_plugins: Sequence[OLApisixPluginConfig | dict[str, Any]] = (),
+        exprs: list[dict[str, Any]] | None = None,
+    ) -> list[OLApisixRouteConfig]:
+        """Return the passauth, logout-redirect and reqauth routes for this group.
+
+        :param oidc: The OIDC resources whose plugin the routes attach.  Built
+            from a config carrying this group's ``logout_path`` and
+            ``post_logout_uri``.
+        :param backend_service_name: Service the routes proxy to.
+        :param backend_service_port: Port name or number on that Service.
+        :param backend_resolve_granularity: ``"endpoint"`` to proxy to pod IPs
+            instead of the Service's ClusterIP.
+        :param shared_plugin_config_name: ApisixPluginConfig the routes reference.
+        :param route_name_prefix: Prepended to each route name, e.g. "fastly-".
+        :param passauth_priority: Priority of the catch-all ``passauth`` route.
+        :param priority: Priority of ``logout-redirect`` and ``reqauth``.
+        :param rewrite_plugins: Plugins placed before the openid-connect plugin
+            on the routes that reach the upstream, e.g. a prefix-stripping
+            proxy-rewrite.  ``logout-redirect`` answers with a 302 and never
+            reaches the upstream, so it gets none.
+        :param extra_plugins: Plugins appended to every route.
+        :param exprs: ``match.exprs`` for every route.
+        :returns: ``[passauth, logout-redirect, reqauth]``.
+        :rtype: list[OLApisixRouteConfig]
+        """
+        common: dict[str, Any] = {
+            "hosts": self.hosts,
+            "exprs": exprs,
+            "shared_plugin_config_name": shared_plugin_config_name,
+            "backend_service_name": backend_service_name,
+            "backend_service_port": backend_service_port,
+            "backend_resolve_granularity": backend_resolve_granularity,
+        }
+        return [
+            OLApisixRouteConfig(
+                route_name=f"{route_name_prefix}passauth",
+                priority=passauth_priority,
+                paths=[self.path("/*")],
+                plugins=[
+                    *rewrite_plugins,
+                    oidc.get_full_oidc_plugin_config(unauth_action="pass"),
+                    *extra_plugins,
+                ],
+                **common,
+            ),
+            # "/logout/oidc/*" is a prefix match on "/logout/oidc/" and does not
+            # match "/logout/oidc" itself, which falls through to passauth, whose
+            # plugin performs the logout.  Listing the bare logout path here
+            # would redirect it to itself forever.
+            OLApisixRouteConfig(
+                route_name=f"{route_name_prefix}logout-redirect",
+                priority=priority,
+                paths=[
+                    *(self.path(p) for p in self.logout_entry_paths),
+                    self.path("/logout/oidc/*"),
+                ],
+                plugins=[
+                    OLApisixPluginConfig(
+                        name="redirect", config={"uri": self.logout_path}
+                    ),
+                    *extra_plugins,
+                ],
+                **common,
+            ),
+            OLApisixRouteConfig(
+                route_name=f"{route_name_prefix}reqauth",
+                priority=priority,
+                paths=[self.path(p) for p in self.login_paths],
+                plugins=[
+                    *rewrite_plugins,
+                    oidc.get_full_oidc_plugin_config(unauth_action="auth"),
+                    *extra_plugins,
+                ],
+                **common,
+            ),
+        ]
+
+
+def learn_session_oidc_config(  # noqa: PLR0913
+    session: LearnSession,
+    route_group: OLApisixOIDCRouteGroup,
+    *,
+    application_name: str,
+    k8s_namespace: str,
+    k8s_labels: dict[str, str],
+    credentials: OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials,
+    set_access_token_header: bool = False,
+    set_id_token_header: bool = False,
+) -> OLApisixOIDCConfig:
+    """Return the OIDC config for a route group that shares MIT Learn's session.
+
+    Everything that decides whether one participant accepts a cookie another
+    wrote comes from ``session``; only the logout settings, which depend on
+    where the group is served, come from ``route_group``.  Which tokens reach
+    the upstream is per participant: the session stores all of them either
+    way, so forwarding a header to one group's upstream changes nothing for
+    another's.
+
+    :param session: The shared MIT Learn session for this environment.
+    :param route_group: Where this resource's routes are served.
+    :param application_name: Names the resource's credential Secret.
+    :param k8s_namespace: Namespace the routes live in.
+    :param k8s_labels: Labels for the credential Secret.
+    :param credentials: Where the plugin's client credentials come from.  Vault
+        credentials have to name the shared client's path.
+    :param set_access_token_header: Forward X-Access-Token to this group's
+        upstream.
+    :param set_id_token_header: Forward X-ID-Token to this group's upstream.
+    :returns: The config to hand to ``OLApisixOIDCResources``.
+    :rtype: OLApisixOIDCConfig
+    """
+    if (
+        isinstance(credentials, OLApisixOIDCVaultCredentials)
+        and credentials.path != session.vault_path
+    ):
+        msg = (
+            f"The MIT Learn session is encrypted with {session.vault_path}'s "
+            f"session secret; {credentials.path} cannot read it."
+        )
+        raise ValueError(msg)
+    return OLApisixOIDCConfig(
+        application_name=application_name,
+        k8s_labels=k8s_labels,
+        k8s_namespace=k8s_namespace,
+        credentials=credentials,
+        oidc_logout_path=route_group.logout_path,
+        oidc_post_logout_redirect_uri=route_group.post_logout_uri,
+        oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
+        oidc_scope=session.scope,
+        oidc_session_contents=dict(session.session_contents),
+        oidc_session_absolute_timeout=session.absolute_timeout_seconds,
+        oidc_session_idling_timeout=session.idling_timeout_seconds,
+        oidc_session_rolling_timeout=session.rolling_timeout_seconds,
+        oidc_session_cookie_domain=session.cookie_domain,
+        oidc_session_cookie_name=session.cookie_name,
+        oidc_use_session_secret=True,
+        oidc_set_access_token_header=set_access_token_header,
+        oidc_set_id_token_header=set_id_token_header,
+    )
+
+
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
 class OLApisixSharedPluginsConfig(BaseModel):
     """Configuration for OLApisixSharedPlugins.
 
     Defines the plugin list that will be materialised as both a v2
     ApisixPluginConfig (for legacy ApisixRoute/Ingress) and a v1alpha1
-    PluginConfig (for Gateway API HTTPRoute).
+    PluginConfig, unless ``render_only`` is set.
     """
 
     application_name: str
     resource_suffix: str = "shared-plugins"
+    # Build ``plugin_list`` without creating either CR.  For an application
+    # whose routes are all Gateway API HTTPRoutes: OLApisixHTTPRoute merges
+    # ``plugin_list`` into a PluginConfig of its own per route, so nothing
+    # references the shared CRs by name.  Leave it off for anything that passes
+    # ``resource_name`` to an ApisixRoute/Ingress, or that references the name
+    # from outside Pulumi (marimo_data's per-notebook routes).
+    render_only: bool = False
     enable_defaults: bool = True
     # Origins the cors default plugin will echo back with
     # Access-Control-Allow-Credentials: true.  Required whenever
@@ -951,8 +1210,11 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # each plugin's ``policy: redis``/``redis-cluster`` option (or
     # limit-count), just not configured by this component today.
     enable_rate_limiting: bool = False
-    # Key used to bucket requests.  ``remote_addr`` resolves to the real client
-    # IP because the gateway trusts Fastly's X-Forwarded-For (see trustedAddresses).
+    # Key used to bucket requests.  ``remote_addr`` is the TCP peer, which is the
+    # real client only because the NLB preserves client IPs
+    # (preserve_client_ip.enabled in apisix_official.py).  trustedAddresses does
+    # not rewrite it, so a request relayed through Fastly is keyed on the Fastly
+    # edge address and shares that bucket with everyone behind it.
     rate_limit_key: str = "remote_addr"
     rate_limit_rejected_code: int = Field(default=429, ge=200, le=599)
     # Thresholds are ~10x the observed worst-case single browser IP.  Measured
@@ -1025,7 +1287,8 @@ class OLApisixSharedPlugins(ComponentResource):
     ``OLApisixHTTPRouteConfig(shared_plugins=...)``, which reads
     ``self.plugin_list`` to merge these defaults into each route's own plugins
     (HTTPRoute allows only one ExtensionRef per rule, so the merge has to happen
-    here rather than in APISIX).
+    here rather than in APISIX).  An application with only Gateway API callers
+    sets ``render_only`` so neither CR is created.
     """
 
     def __init__(
@@ -1234,7 +1497,8 @@ class OLApisixSharedPlugins(ComponentResource):
         if plugin_config.enable_gzip:
             plugins.append(__gzip_plugin)
 
-        self.resource_name = (
+        self._render_only = plugin_config.render_only
+        self._resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
         )
         # The rendered plugin list, exposed so OLApisixHTTPRoute can merge these
@@ -1245,15 +1509,23 @@ class OLApisixSharedPlugins(ComponentResource):
         self.plugin_list: list[OLApisixPluginConfig] = [
             OLApisixPluginConfig(**p) for p in plugins
         ]
+        self.shared_plugin_apisix_pluginconfig_resource: (
+            kubernetes.apiextensions.CustomResource | None
+        ) = None
+        self.shared_plugin_pluginconfig_resource: (
+            kubernetes.apiextensions.CustomResource | None
+        ) = None
+        if plugin_config.render_only:
+            return
         # v2/ApisixPluginConfig — consumed by legacy ApisixRoute/Ingress resources
         # via ``plugin_config_name`` in the route spec.
         self.shared_plugin_apisix_pluginconfig_resource = (
             kubernetes.apiextensions.CustomResource(
-                f"OLApisixSharedPlugin-{self.resource_name}",
+                f"OLApisixSharedPlugin-{self._resource_name}",
                 api_version="apisix.apache.org/v2",
                 kind="ApisixPluginConfig",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=self.resource_name,
+                    name=self._resource_name,
                     labels=plugin_config.k8s_labels,
                     namespace=plugin_config.k8s_namespace,
                 ),
@@ -1263,11 +1535,9 @@ class OLApisixSharedPlugins(ComponentResource):
                 opts=resource_options,
             )
         )
-        # v1alpha1/PluginConfig — consumed by Gateway API HTTPRoute resources
-        # via ExtensionRef filters (kind: PluginConfig).  Both resources share
-        # the same metadata.name; callers pass self.resource_name to either
-        # OLApisixRouteConfig (legacy) or OLApisixHTTPRouteConfig (Gateway API)
-        # without distinction.
+        # v1alpha1/PluginConfig — the Gateway API kind, under the same
+        # metadata.name.  OLApisixHTTPRoute does not reference it: it merges
+        # plugin_list into a PluginConfig of its own per route.
         #
         # The v1alpha1 schema only allows ``name`` and ``config`` per plugin;
         # ``enable`` and ``secretRef`` are v2-only fields.  Plugins with
@@ -1280,11 +1550,11 @@ class OLApisixSharedPlugins(ComponentResource):
         ]
         self.shared_plugin_pluginconfig_resource = (
             kubernetes.apiextensions.CustomResource(
-                f"OLApisixSharedPluginConfig-{self.resource_name}",
+                f"OLApisixSharedPluginConfig-{self._resource_name}",
                 api_version="apisix.apache.org/v1alpha1",
                 kind="PluginConfig",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=self.resource_name,
+                    name=self._resource_name,
                     labels=plugin_config.k8s_labels,
                     namespace=plugin_config.k8s_namespace,
                 ),
@@ -1295,14 +1565,34 @@ class OLApisixSharedPlugins(ComponentResource):
             )
         )
 
+    @property
+    def resource_name(self) -> str:
+        """Return the CRs' ``metadata.name``, for a route's ``plugin_config_name``.
+
+        :raises ValueError: if the config is ``render_only``, since no CR
+            exists under that name for a route to reference.
+        :returns: ``<application_name>-<resource_suffix>``.
+        :rtype: str
+        """
+        if self._render_only:
+            msg = (
+                f"{self._resource_name} is render_only, so no ApisixPluginConfig "
+                "exists for a route to reference by name. Pass the component to "
+                "OLApisixHTTPRouteConfig(shared_plugins=...) instead, or drop "
+                "render_only."
+            )
+            raise ValueError(msg)
+        return self._resource_name
+
 
 # User-Agent of the first-party server-side callers that must not be treated
 # as browsers.  ``mit-learn-ssr`` is what the mit-learn Next.js SSR layer sets
 # on purpose (frontends/main/src/bootstrap/api.ts), with or without a
-# ``/<version>`` suffix.  ``axios/`` is the HTTP client default it sent before
-# that, kept until every environment runs a release that sends the explicit
-# one -- see browser_traffic_match_exprs.
-FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^(?:axios/|mit-learn-ssr(?:/|$))"
+# ``/<version>`` suffix.  Stock ``axios/`` is deliberately not excluded: the SSR
+# layer stopped sending it in mitodl/mit-learn#4061, and any other caller that
+# still does is a single actor the per-IP limit should catch -- see
+# browser_traffic_match_exprs.
+FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^mit-learn-ssr(?:/|$)"
 
 
 def browser_traffic_match_exprs(
@@ -1465,8 +1755,8 @@ def ol_apisix_shared_plugins_variants(
 class OLApisixExternalUpstreamConfig(BaseModel):
     """Configuration for OLApisixExternalUpstream.
 
-    Defines an external (non-Kubernetes) upstream service to be proxied
-    through APISIX.
+    Defines an upstream APISIX reaches by DNS name: a host outside Kubernetes,
+    or a Service in another namespace.
     """
 
     application_name: str
@@ -1475,6 +1765,10 @@ class OLApisixExternalUpstreamConfig(BaseModel):
     k8s_namespace: str
     external_hostname: str
     scheme: str = "https"
+    # Unset means the scheme's default port.
+    port: PositiveInt | None = None
+    # Unset leaves the controller's default. "pass" sends the client's Host on.
+    pass_host: Literal["pass", "node", "rewrite"] | None = None
 
 
 class OLApisixExternalUpstream(ComponentResource):
@@ -1510,10 +1804,20 @@ class OLApisixExternalUpstream(ComponentResource):
                 ),
                 spec={
                     "scheme": external_upstream_config.scheme,
+                    **(
+                        {"passHost": external_upstream_config.pass_host}
+                        if external_upstream_config.pass_host is not None
+                        else {}
+                    ),
                     "externalNodes": [
                         {
                             "type": "Domain",
                             "name": external_upstream_config.external_hostname,
+                            **(
+                                {"port": external_upstream_config.port}
+                                if external_upstream_config.port is not None
+                                else {}
+                            ),
                         },
                     ],
                 },

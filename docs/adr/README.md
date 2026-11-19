@@ -171,6 +171,7 @@ graph LR
 | [0011](0011-playwright-canary-specs-in-ol-infrastructure.md) | Playwright Canary Specs Live in ol-infrastructure, on the Stock Playwright Image | Accepted | 2026-09-01 |
 | [0012](0012-trino-to-starrocks-cutover.md) | Replace Trino/Starburst Galaxy with StarRocks as the Sole Query Engine | Accepted | 2026-09-25 |
 | [0013](0013-apisix-leaves-bearer-tokens-to-mitxonline-and-mit-learn.md) | APISIX Leaves Bearer Tokens to MITx Online and MIT Learn | Accepted | 2026-09-30 |
+| [0014](0014-self-hosted-lgtm-long-term-telemetry-retention.md) | Dual-Ship Telemetry to a Self-Hosted Loki/Mimir/Tempo Archive for Long-Term Retention | Proposed | 2026-10-08 |
 
 ## Creating a New ADR
 

@@ -131,7 +131,7 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   `mit-learn` unless it's renamed again live.
 - `project_witan` / `key_witan`: added by hand, same reason as
   `project_ol_analytics_api`/`project_dagster` -- the witan Sentry project
-  does not exist live yet, so `pulumi up` creates both. One project covers
+  did not exist live when it was added, so `pulumi up` created both. One project covers
   CI/QA/Production, distinguished by the SDK's `environment` tag rather than
   by separate projects. The hand-added export is `witan_sentry_dsn`, consumed
   by the witan application stack, which writes it to Vault at
@@ -140,3 +140,8 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   and `bin/import-sentry-config` is re-run, diff the regenerated
   `key_witan_default_*` block against this one before accepting it -- a
   `pulumi state rename` may be needed to converge onto the live key's id.
+- The witan "new or regressed issue in production" email alert is not in
+  Pulumi. `POST /projects/<org>/witan/rules/` returned 404 from the sentry
+  provider (0.0.9) even though the project exists, so it has to be created in
+  Sentry directly. A later `bin/import-sentry-config` run will list that rule;
+  drop the generated block unless the provider can manage it by then.

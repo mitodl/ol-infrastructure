@@ -70,6 +70,38 @@ from ol_infrastructure.lib.vault import postgres_role_statements
 # the username, which is the username itself when it's a valid DNS label.
 _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
+# PVC names for homes: KubeSpawner's default for the efs-sc homes, and a
+# distinct one for the efs-jovyan-sc homes that replace them.
+# bin/migrate-jupyterhub-data-homes maps claim-<x> to home-<x>.
+EFS_SC_HOME_PVC_NAME_TEMPLATE = "claim-{user_server}"
+JOVYAN_HOME_PVC_NAME_TEMPLATE = "home-{user_server}"
+# See the home_owned_by_jovyan flag in provision_jupyterhub_data_deployment.
+_HOME_PVC_FROM_TEMPLATE_CONFIG = "\nc.KubeSpawner.remember_pvc_name = False\n"
+
+# uv's cache, which also holds every notebook's sandbox environment. The image
+# builds the shipped templates' environments into a seed directory
+# (UV_CACHE_SEED_DIR, set by the image), and an init container copies that into
+# the node-local volume mounted here. The path must match the one the image
+# built with: uv environments hold their own absolute path.
+_UV_CACHE_DIR = "/var/cache/uv"
+_UV_CACHE_VOLUME = "uv-cache"
+# The seed is about 1Gi. Each further notebook environment hardlinks into the
+# wheel cache, so it adds only the packages that notebook is first to use. The
+# kubelet evicts the pod if the volume grows past this.
+_UV_CACHE_SIZE_LIMIT = "10Gi"
+# One cp call, so hardlinks between the wheel cache and the environments
+# survive (without them the copy is 2.4x the size and uv recompiles every
+# module). It copies the seed's entries rather than the directory itself:
+# `cp -a seed/. cache/` also tries to set the times of the mount point, which
+# the notebook user doesn't own, and exits non-zero.
+#
+# KubeSpawner runs every init container string through str.format to expand
+# {username} and friends, so the command has no ${VAR} braces and find's
+# placeholder is written {{}}.
+_UV_CACHE_SEED_COMMAND = (
+    'find "$UV_CACHE_SEED_DIR" -mindepth 1 -maxdepth 1 '
+    '-exec cp -a -t "$UV_CACHE_DIR" {{}} +'
+)
 _MARIMO_AI_DEFAULTS_SCRIPT = "/etc/marimo/marimo_ai_defaults.py"
 _MARIMO_AI_DEFAULTS_JSON = "/etc/marimo/ai_defaults.json"
 # JupyterLab reads overrides.json from <sys.prefix>/share/jupyter/lab/settings,
@@ -125,6 +157,53 @@ c.GenericOAuthenticator.client_id = os.environ.get("OAUTH_CLIENT_ID", "")
 c.GenericOAuthenticator.client_secret = os.environ.get("OAUTH_CLIENT_SECRET", "")
 """
 
+# Hands the user's Keycloak name and email to the singleuser postStart hook,
+# which makes them the git identity unless the user has set their own. Only
+# identity goes through the environment, never a token: the pod's environment
+# is fixed for its lifetime.
+#
+# auth_state is None for a user with no stored state, e.g. one an admin spawns
+# before they have logged in. A claim that is absent or null becomes "", which
+# the postStart step skips. The value is escaped twice: KubeSpawner runs
+# environment values through str.format (braces doubled), and Kubernetes
+# expands $(VAR) in an env value and reduces $$ to $ (each $ doubled).
+_GIT_IDENTITY_HOOK = """
+def set_git_identity_env(spawner, auth_state):
+    if auth_state is None:
+        return
+    userinfo = auth_state["oauth_user"]
+    identity = {
+        "OL_GIT_USER_NAME": userinfo.get("name") or "",
+        "OL_GIT_USER_EMAIL": userinfo.get("email") or "",
+    }
+    spawner.environment = {
+        **spawner.environment,
+        **{
+            key: value.replace("{", "{{")
+            .replace("}", "}}")
+            .replace("$", "$$")
+            for key, value in identity.items()
+        },
+    }
+
+
+c.KubeSpawner.auth_state_hook = set_git_identity_env
+"""
+
+# Runs in the singleuser postStart hook. For each of user.name and user.email:
+# skip if the hub had no value, keep the user's own setting if their global
+# git config (on the persistent home volume, includes followed) already has
+# one, otherwise set it. Once seeded, the value counts as the user's own, so a
+# later change in Keycloak does not reach git.
+_GIT_IDENTITY_SEED_COMMAND = (
+    '[ -z "$OL_GIT_USER_NAME" ] || '
+    "git config --global --includes user.name >/dev/null || "
+    'git config --global user.name "$OL_GIT_USER_NAME"; '
+    '[ -z "$OL_GIT_USER_EMAIL" ] || '
+    "git config --global --includes user.email >/dev/null || "
+    'git config --global user.email "$OL_GIT_USER_EMAIL"; '
+)
+
 
 def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     stack_info: StackInfo,
@@ -162,6 +241,32 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         jupyterhub_data_config.get("trino_catalog") or "ol_data_lake_production"
     )
     aws_region = Config("aws").require("region")
+    # Homes on efs-sc show every file as the access point's uid (50000), not
+    # jovyan's 1000, so git refuses every repository in them as "dubious
+    # ownership". efs-jovyan-sc homes are owned by jovyan. The shared notebooks
+    # volume stays on efs-sc on purpose: git must keep refusing other users'
+    # repositories under shared_nb, since trusting one would let its config
+    # (e.g. core.fsmonitor) run commands as whoever browses into it.
+    #
+    # A new PVC name keeps the efs-sc homes intact for rollback. An environment
+    # turns this on only after bin/migrate-jupyterhub-data-homes has copied its
+    # existing homes, since a user's next server start gets the new PVC.
+    #
+    # KubeSpawner saves each server's PVC name in its state and reuses it over
+    # pvc_name_template (remember_pvc_name, on by default). The hub turns that
+    # off, so the template alone picks the PVC and flipping the flag moves
+    # users in either direction; otherwise turning it on would leave existing
+    # users on claim-<x>, and turning it off again would leave them on home-<x>.
+    if jupyterhub_data_config.get_bool("home_owned_by_jovyan"):
+        home_storage = {
+            "storageClass": cluster_stack.require_output("efs_jovyan_storageclass"),
+            "pvcNameTemplate": JOVYAN_HOME_PVC_NAME_TEMPLATE,
+        }
+    else:
+        home_storage = {
+            "storageClass": "efs-sc",
+            "pvcNameTemplate": EFS_SC_HOME_PVC_NAME_TEMPLATE,
+        }
     # A cross-Region inference profile ID (e.g. us.anthropic.claude-sonnet-5);
     # newer models can't be invoked on demand by bare foundation-model ID.
     bedrock_model = f"bedrock/{jupyterhub_data_config.require('bedrock_chat_model')}"
@@ -183,11 +288,15 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     # This role's policy covers JupyterHub hub secrets (OIDC creds, crypt key, DB
     # creds) and must not be shared with other namespaces. The marimo namespace
     # has its own dedicated Vault policy and auth role in the marimo_data stack.
+    # Only VSO's ServiceAccount, which OLVaultK8SResources names
+    # f"{application_name}-vault", logs in here. Single-user pods share this
+    # namespace, so binding "*" would leave the role open to any SA in it that
+    # is ever granted system:auth-delegator.
     vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
         f"ol-{base_name}-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
         role_name=base_name,
         backend=cluster_stack.require_output("vault_auth_endpoint"),
-        bound_service_account_names=["*"],
+        bound_service_account_names=[f"{base_name}-vault"],
         bound_service_account_namespaces=[namespace],
         token_policies=[vault_policy.name],
     )
@@ -328,16 +437,15 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     )
 
     # APISIX shared plugins (cors, redirect, response-rewrite, prometheus,
-    # opentelemetry, gzip) — creates both v2 ApisixPluginConfig (legacy) and
-    # v1alpha1 PluginConfig (Gateway API) resources under the same name.
-    # OLApisixHTTPRoute merges this list into each referencing route's own
-    # plugins, so request-id (added by OLApisixHTTPRouteConfig's validator) no
-    # longer has to be restated here.
+    # opentelemetry, gzip).  OLApisixHTTPRoute merges this list into each
+    # referencing route's own plugins, so request-id (added by
+    # OLApisixHTTPRouteConfig's validator) no longer has to be restated here.
     shared_plugins = OLApisixSharedPlugins(
         name=f"ol-{base_name}-external-service-apisix-plugins",
         plugin_config=OLApisixSharedPluginsConfig(
             application_name=base_name,
             resource_suffix="ol-shared-plugins",
+            render_only=True,
             k8s_namespace=namespace,
             k8s_labels=application_labels,
             # JupyterHub serves its own UI, its API and every single-user server
@@ -425,7 +533,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     )
 
     # Kubernetes ServiceAccount annotated with the IRSA role ARN so that
-    # single-user pods can read S3 and Glue without long-lived credentials.
+    # single-user pods can invoke Bedrock without long-lived credentials.
     kubernetes.core.v1.ServiceAccount(
         f"jupyterhub-data-service-account-{namespace}-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -455,6 +563,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         kubernetes.helm.v3.ReleaseArgs(
             chart="jupyterhub",
             cleanup_on_fail=True,
+            max_history=10,
             version=JUPYTERHUB_CHART_VERSION,
             namespace=namespace,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
@@ -548,7 +657,12 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         },
                     ],
                     "extraConfig": {
-                        "hubDataConfig.py": (_COMMON_HUB_CONFIG + _PROFILE_LIST),
+                        "hubDataConfig.py": (
+                            _COMMON_HUB_CONFIG
+                            + _PROFILE_LIST
+                            + _GIT_IDENTITY_HOOK
+                            + _HOME_PVC_FROM_TEMPLATE_CONFIG
+                        ),
                     },
                     "config": auth_config,
                     "resources": {
@@ -567,12 +681,38 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "image": {
                         "name": "ghcr.io/mitodl/marimo-jupyterlab",
                         "tag": MARIMO_JUPYTERLAB_VERSION,
-                        # Use Always while MARIMO_JUPYTERLAB_VERSION is "latest";
-                        # switch to IfNotPresent once pinned to a versioned tag.
-                        "pullPolicy": "Always",
+                        "pullPolicy": "IfNotPresent",
                         "pullSecrets": [ghcr_pull_secret_name],
                     },
                     "cmd": ["jupyterhub-singleuser"],
+                    # A postStart hook would race the first notebook open, and
+                    # uv would then build the environment the seed already has.
+                    "initContainers": [
+                        {
+                            "name": "seed-uv-cache",
+                            "image": (
+                                "ghcr.io/mitodl/marimo-jupyterlab:"
+                                f"{MARIMO_JUPYTERLAB_VERSION}"
+                            ),
+                            "command": [
+                                "sh",
+                                "-c",
+                                _UV_CACHE_SEED_COMMAND,
+                            ],
+                            "env": [{"name": "UV_CACHE_DIR", "value": _UV_CACHE_DIR}],
+                            "securityContext": {
+                                "runAsUser": 1000,
+                                "runAsGroup": 100,
+                                "allowPrivilegeEscalation": False,
+                            },
+                            "volumeMounts": [
+                                {
+                                    "name": _UV_CACHE_VOLUME,
+                                    "mountPath": _UV_CACHE_DIR,
+                                },
+                            ],
+                        },
+                    ],
                     # The postStart hook below re-seeds any missing template on
                     # every server start, so this file exists even for a user
                     # who deleted it.
@@ -595,7 +735,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # directory is ever empty.
                     #
                     # It then fills in the Bedrock assistant defaults for any key
-                    # the user hasn't set (see marimo_ai_defaults.py).
+                    # the user hasn't set (see marimo_ai_defaults.py), and the
+                    # git identity (see _GIT_IDENTITY_SEED_COMMAND).
                     "lifecycleHooks": {
                         "postStart": {
                             "exec": {
@@ -605,6 +746,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "mkdir -p /home/jovyan/notebooks && "
                                     "cp -n /usr/local/share/marimo/templates/* "
                                     "/home/jovyan/notebooks/ || true; "
+                                    f"{_GIT_IDENTITY_SEED_COMMAND}"
                                     f"python3 {_MARIMO_AI_DEFAULTS_SCRIPT} "
                                     f"{_MARIMO_AI_DEFAULTS_JSON} || true",
                                 ]
@@ -617,9 +759,8 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # which the image installs and an ad hoc uvx environment
                     # doesn't have. --sandbox is still passed, so each notebook
                     # still runs in its own uv environment built from its
-                    # `/// script` PEP 723 header. UV_CACHE_DIR points to the EFS
-                    # home volume so those environments persist across pod
-                    # restarts. timeout=120 covers building one on first open.
+                    # `/// script` PEP 723 header. timeout=120 covers building one
+                    # on first open.
                     "extraFiles": {
                         "jupyter-server-config": {
                             "mountPath": "/etc/jupyter/jupyter_server_config.py",
@@ -663,8 +804,13 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         "JUPYTERHUB_SINGLEUSER_APP": (
                             "jupyter_server.serverapp.ServerApp"
                         ),
-                        # uv cache on EFS so per-notebook venvs survive pod restarts
-                        "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
+                        # Node-local, not the EFS home volume. uv builds each
+                        # notebook's environment inside its cache, and on EFS
+                        # that took 161s for a template against 37.5s on local
+                        # disk (marimo 0.25.0, data-qa, 2026-10-01). The cost is
+                        # that environments for a user's own notebooks are
+                        # rebuilt after a pod restart.
+                        "UV_CACHE_DIR": _UV_CACHE_DIR,
                         # marimo writes a session cache (cell outputs) to a
                         # __marimo__/ directory next to each notebook it opens.
                         # A viewer's copy of someone else's shared_nb folder is
@@ -691,9 +837,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "storage": {
                         "type": "dynamic",
                         "capacity": "5Gi",
-                        "dynamic": {
-                            "storageClass": "efs-sc",
-                        },
+                        "dynamic": home_storage,
                         "extraVolumes": [
                             {
                                 "name": "shared-notebooks",
@@ -701,10 +845,18 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "claimName": shared_notebooks_pvc.metadata.name,
                                 },
                             },
+                            {
+                                "name": _UV_CACHE_VOLUME,
+                                "emptyDir": {"sizeLimit": _UV_CACHE_SIZE_LIMIT},
+                            },
                         ],
                         # kubelet creates the subPath directory on first mount.
                         # {username} is expanded by KubeSpawner, not Helm.
                         "extraVolumeMounts": [
+                            {
+                                "name": _UV_CACHE_VOLUME,
+                                "mountPath": _UV_CACHE_DIR,
+                            },
                             {
                                 "name": "shared-notebooks",
                                 "mountPath": _SHARED_NOTEBOOKS_MOUNT_PATH,
@@ -723,6 +875,15 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # Resource defaults; overridden per-user by KubeSpawner profile_list
                     "memory": {"limit": "8G", "guarantee": "2G"},
                     "cpu": {"guarantee": 0.5},
+                    # The uv cache volume counts against the pod's ephemeral
+                    # storage. Requesting about the seed's size keeps the
+                    # scheduler from packing more of these onto a node than its
+                    # disk holds. There is no pod-level limit: one would also
+                    # cap what notebooks write to /tmp and /opt/conda, which
+                    # nothing caps today. The volume's sizeLimit bounds the cache.
+                    "extraResource": {
+                        "guarantees": {"ephemeral-storage": "2Gi"},
+                    },
                 },
             },
             skip_await=False,

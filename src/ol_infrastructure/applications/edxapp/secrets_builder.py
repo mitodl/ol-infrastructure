@@ -141,6 +141,8 @@ def _apply_deployment_secret_overrides(
             "client_id": '{{ get .Secrets "proctortrack_client_id" }}',
             "client_secret": '{{ get .Secrets "proctortrack_client_secret" }}',
             "base_url": proctortrack_url,
+            # Tells Studio to show, require and save the exam escalation contact.
+            "requires_escalation_email": True,
         }
         secrets["PROCTORING_USER_OBFUSCATION_KEY"] = (
             '{{ get .Secrets "proctortrack_user_obfuscation_key" }}'

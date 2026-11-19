@@ -12,10 +12,12 @@ from typing import Any
 
 import pytest
 
-from bridge.settings.apps import APPS, release_resource_workflow
+from bridge.settings.apps import APPS, release_kind, release_resource_workflow
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import build_app_pipeline
 
-RELEASE_APPS = [app for app in APPS if release_resource_workflow(app)]
+RELEASE_APPS = [
+    app for app in APPS if release_resource_workflow(app) and release_kind(app) == "k8s"
+]
 
 
 def _resource(app: str) -> dict[str, Any]:

@@ -9,6 +9,7 @@ test can import them without credentials.
 """
 
 import re
+from collections.abc import Mapping
 
 # One path segment, starting alphanumeric. Everything else is rejected — see
 # validate_storage_prefix for why this is stricter than S3 requires.
@@ -185,6 +186,7 @@ def validate_image_internal_schema(
     migrate_to_prefix: str,
     *,
     migration_armed: bool,
+    image_min_internal_schema: int | None = None,
 ) -> None:
     """Cross-check the DEPLOYING IMAGE's declared storage format against config.
 
@@ -212,7 +214,12 @@ def validate_image_internal_schema(
       is expected to differ and is not compared.
     * Steady state: the image must read the format the cluster SERVES. This is
       the check that would have refused the deploy on 2026-09-16 instead of
-      letting the cluster-apply Job discover it.
+      letting the cluster-apply Job discover it. "Reads" is a range:
+      ``image_min_internal_schema`` (the image's
+      ``edu.mit.ol.omnigraph.min-internal-schema`` label) up to
+      ``image_internal_schema``. omnigraph 0.14 writes 16 and opens 14 in place,
+      so a 0.14 image is accepted against a fmt14 root with no migration armed.
+      An image without the label serves only the format it writes.
 
     ``migration_armed`` IS PASSED IN RATHER THAN INFERRED FROM
     ``migrate_to_prefix``, so this cannot disagree with the rest of the program
@@ -259,10 +266,20 @@ def validate_image_internal_schema(
         # against — validate_internal_schema_version has already established
         # that this pairing is self-consistent.
         return
-    if image_internal_schema != internal_schema_version:
+    oldest = (
+        image_internal_schema
+        if image_min_internal_schema is None
+        else image_min_internal_schema
+    )
+    if not oldest <= internal_schema_version <= image_internal_schema:
+        served = (
+            f"{image_internal_schema}"
+            if oldest == image_internal_schema
+            else f"{oldest} to {image_internal_schema}"
+        )
         msg = (
             f"the deploying omnigraph image reads storage format "
-            f"{image_internal_schema}, but this cluster serves format "
+            f"{served}, but this cluster serves format "
             f"{internal_schema_version} (omnigraph:internal_schema_version, "
             "fmt<N> in omnigraph:storage_prefix). The server would refuse "
             "every graph. Arm the migration — set omnigraph:migrate_from_image "
@@ -369,5 +386,128 @@ def validate_storage_prefix_progression(
         f"omnigraph:storage_rollback_from to {deployed_prefix!r} in the same "
         "change and deploy the old image with it. See the Rollback section of "
         "docs/omnigraph-storage-format-upgrade-runbook.md."
+    )
+    raise ValueError(msg)
+
+
+def next_written_internal_schema(
+    deployed_marks: Mapping[str, float] | None,
+    storage_prefix: str,
+    image_internal_schema: int | None,
+    *,
+    migration_armed: bool,
+    restored_to: int | None,
+) -> dict[str, int]:
+    """Refuse an image that cannot open what has been written, and track it.
+
+    An in-place format upgrade (omnigraph 0.14 opens a format-14 root and
+    stamps each branch 16 on its first write) changes what a root holds
+    without changing ``storage_prefix`` or ``internal_schema_version``. From
+    then on an image that writes only 14 refuses the root, and
+    ``validate_image_internal_schema`` can't see that, because the config
+    still says 14. So the stack exports, per root, the highest format any
+    image it deployed onto that root writes (``written_internal_schema``), and
+    a deploy is refused if its image writes less than the served root's mark.
+    Deploying an image is taken as writing: a 0.14 server rewrites its S3 lock
+    in a form 0.13 refuses on its first start, before any graph write.
+
+    Keyed by root because a root the stack has left keeps what was written to
+    it. A rollback from a rebuild cutover onto a root that had earlier been
+    upgraded in place is checked against that root's own mark, and a root the
+    stack has never served starts with none. While a migration is armed the
+    mark doesn't move: the served root isn't being written by the new image,
+    and disarming must be able to put the old image back.
+
+    ``restored_to`` (``omnigraph:storage_restored_to_format``) is the one way
+    down, after restoring the root from a backup taken before the upgrade. It
+    is accepted only on that deploy: no migration armed (an armed deploy
+    leaves the server at zero replicas, so it isn't the deploy that serves the
+    restored root), the image must write exactly that format, and it must be
+    below the mark. Left set afterwards it is refused, so it can't quietly
+    permit a later rollback that has no restore behind it.
+
+    An image whose label can't be read is refused on a root that has a mark:
+    neither guard could tell whether it can open the root, and recording
+    nothing would let a later, older image past the mark if this one wrote a
+    newer format. A root without a mark keeps the warn-and-skip that
+    ``data_tier`` applies to an unreadable label.
+
+    :param deployed_marks: The ``written_internal_schema`` map this stack last
+        exported, root (``storage_prefix``, ``""`` for the bucket root) to
+        format. Numbers come back from a stack output as floats.
+    :param storage_prefix: The normalized ``storage_prefix`` being deployed.
+    :param image_internal_schema: The deploying image's written format, or
+        ``None`` when its label couldn't be read.
+    :param migration_armed: Whether a storage-format migration is armed.
+    :param restored_to: ``omnigraph:storage_restored_to_format``, or ``None``.
+    :returns: The map to export.
+    :rtype: dict[str, int]
+    :raises ValueError: on an image that writes less than the mark, an image
+        whose label can't be read onto a root with a mark, or a
+        ``restored_to`` outside the deploy it is for.
+    """
+    marks = {root: int(mark) for root, mark in (deployed_marks or {}).items()}
+    prior = marks.get(storage_prefix)
+    root = storage_prefix or "bucket root"
+    if restored_to is not None:
+        if (
+            migration_armed
+            or prior is None
+            or image_internal_schema is None
+            or not image_internal_schema == restored_to < prior
+        ):
+            msg = (
+                f"omnigraph:storage_restored_to_format is {restored_to}, but "
+                "it is accepted only on the deploy that rolls this root back "
+                "into service after a restore: no migration armed, the image "
+                "must write exactly that format, and the root must have been "
+                f"written at a newer one ({root} was last at {prior}; this "
+                f"image writes {image_internal_schema}; migration armed: "
+                f"{migration_armed}). If the rollback has already deployed, "
+                "remove the setting."
+            )
+            raise ValueError(msg)
+        return {**marks, storage_prefix: restored_to}
+    if image_internal_schema is None:
+        if prior is not None:
+            msg = (
+                "the deploying omnigraph image's storage-format label could "
+                f"not be read, and {root} has been written at format {prior} "
+                "by an image this stack deployed. Without the label, preview "
+                "can't tell whether this image opens that root, or record what "
+                "it writes for the next deploy to check against. Re-run once "
+                "the image's labels can be read from ECR (the warning above "
+                "says why they couldn't)."
+            )
+            raise ValueError(msg)
+        return marks
+    if migration_armed:
+        if prior is not None:
+            _refuse_below_mark(image_internal_schema, prior, root)
+        return marks
+    if prior is not None:
+        _refuse_below_mark(image_internal_schema, prior, root)
+    return {**marks, storage_prefix: max(prior or 0, image_internal_schema)}
+
+
+def _refuse_below_mark(image_internal_schema: int, prior: int, root: str) -> None:
+    """Raise when the image writes an older format than ``root`` has been at.
+
+    :param image_internal_schema: The deploying image's written format.
+    :param prior: The root's mark.
+    :param root: The root, for the message.
+    :raises ValueError: when ``image_internal_schema`` is below ``prior``.
+    """
+    if image_internal_schema >= prior:
+        return
+    msg = (
+        f"the deploying omnigraph image writes storage format "
+        f"{image_internal_schema}, but an image writing format {prior} has "
+        f"already been deployed onto this root ({root}), so it may hold "
+        "branches this image refuses. An in-place upgrade has no rollback by "
+        "image alone. Restore the root from the backup taken before the "
+        "upgrade, then deploy this image with "
+        f"omnigraph:storage_restored_to_format set to {image_internal_schema}. "
+        "See docs/omnigraph-storage-format-upgrade-runbook.md."
     )
     raise ValueError(msg)

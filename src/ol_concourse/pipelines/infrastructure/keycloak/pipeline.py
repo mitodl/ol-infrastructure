@@ -91,9 +91,12 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
         paths=[
             *PULUMI_WATCHED_PATHS,
             str(PULUMI_CODE_PATH.joinpath("applications/keycloak/")),
-            # KEYCLOAK_VERSION is what tag_filters the SPI releases and the
-            # upstream image below, so the deploy has to follow it even though
-            # nothing under applications/keycloak/ imports it.
+            # KEYCLOAK_VERSION tag_filters the CAS SPI release, picks the SCIM
+            # jar, and sets the upstream image tag that triggers the build, so
+            # the deploy has to follow it even though nothing under
+            # applications/keycloak/ imports it. It does not set the server
+            # version: that is the FROM line in ol-keycloak's
+            # Dockerfile.hosted, which has to move with it.
             *version_pin_paths("KEYCLOAK_VERSION"),
             *project_version_paths("applications/keycloak/"),
             *project_secrets_paths("applications/keycloak/"),
@@ -199,14 +202,20 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                     "DOCKERFILE": (
                         f"{keycloak_customization_repo.name}/Dockerfile.hosted"
                     ),
-                    "IMAGE_PLATFORM": "linux/amd64",
+                    # arm64 is for Apple-silicon local-dev clusters, which
+                    # otherwise run Keycloak under amd64 emulation; it is
+                    # cross-built with the workers' QEMU. Hosted nodes are all
+                    # amd64 and pull that entry of the index. More than one
+                    # platform makes oci-build-task write an OCI layout
+                    # directory (image/image) instead of image.tar.
+                    "IMAGE_PLATFORM": "linux/amd64,linux/arm64",
                 },
                 build_args=[],
             ),
             PutStep(
                 put=keycloak_registry_image.name,
                 params={
-                    "image": "image/image.tar",
+                    "image": "image/image",
                     "additional_tags": (
                         f"./{keycloak_customization_repo.name}/.git/describe_ref"
                     ),

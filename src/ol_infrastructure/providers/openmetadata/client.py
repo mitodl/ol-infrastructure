@@ -80,6 +80,14 @@ class OpenMetadataClient:
         raise_for_status_with_body(response)
         return response.json()
 
+    def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+        """POST a create request."""
+        response = self._session.post(
+            f"{self._base_url}/{path}", json=body, timeout=REQUEST_TIMEOUT_SECONDS
+        )
+        raise_for_status_with_body(response)
+        return response.json()
+
     def put(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         """PUT a create-or-update request."""
         response = self._session.put(
@@ -107,3 +115,22 @@ class OpenMetadataClient:
         if response.status_code == requests.codes.not_found:
             return
         raise_for_status_with_body(response)
+
+    def references(
+        self, collection: str, entity_type: str, names: list[str]
+    ) -> list[dict[str, str]]:
+        """Resolve entity names to the references a PATCH expects.
+
+        :param collection: The API collection, e.g. ``roles``.
+        :param entity_type: The reference type, e.g. ``role``.
+        :param names: Entity names, every one of which must exist.
+        :raises ValueError: If a named entity does not exist.
+        """
+        refs = []
+        for name in names:
+            entity = self.get(f"{collection}/name/{name}")
+            if entity is None:
+                msg = f"{entity_type} {name!r} does not exist"
+                raise ValueError(msg)
+            refs.append({"id": entity["id"], "type": entity_type})
+        return refs

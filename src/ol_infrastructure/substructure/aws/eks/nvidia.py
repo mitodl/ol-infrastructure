@@ -57,6 +57,7 @@ def setup_nvidia(  # noqa: PLR0913
                 repo="https://nvidia.github.io/k8s-device-plugin"
             ),
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=True,
             values={
                 "affinity": {
@@ -153,6 +154,7 @@ def setup_nvidia(  # noqa: PLR0913
                 repo="https://nvidia.github.io/dcgm-exporter/helm-charts"
             ),
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=True,
             values={
                 "tolerations": [

@@ -30,6 +30,30 @@ def _read_script(script_name: str) -> str:
     return (Path(__file__).parent / "scripts" / script_name).read_text()
 
 
+def _generate_apis_step(
+    image: Identifier, source_input: Input, api_clients_repo: Identifier
+) -> TaskStep:
+    """Run the clients repo's generator over every config/*.yaml.
+
+    The configs name the spec as ``<source_repo_name>/openapi/specs/...``
+    relative to the build directory, so *source_input* must be mounted at that
+    directory name whatever its resource is called.
+    """
+    return TaskStep(
+        task=Identifier("generate-apis"),
+        image=image,
+        config=TaskConfig(
+            platform="linux",
+            inputs=[source_input, Input(name=api_clients_repo)],
+            outputs=[Output(name=api_clients_repo)],
+            run=Command(
+                path="/bin/bash",
+                args=[f"{api_clients_repo}/scripts/generate-inner.sh"],
+            ),
+        ),
+    )
+
+
 def generate_api_client_pipeline(  # noqa: PLR0913
     source_repo_name: str,
     source_repo_uri: str,
@@ -39,6 +63,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     client_repo_branch: str,
     client_repo_subpath: str | list[str],
     source_repo_tag_regex: str | None = None,
+    prerelease_branch: str | None = None,
 ) -> Pipeline:
     """
     Generate a pipeline definition for building and publishing API clients.
@@ -57,13 +82,29 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         publishes several specs and each is packaged separately -- one npm package is
         published per entry, all sharing the repo-root VERSION.
     :param source_repo_tag_regex: Regenerate on tags matching this regex rather than
-        on spec changes landing on a branch. For a repo that cuts releases as tags
-        and has no long-lived release branch. Note the tradeoff: the git resource
-        consults ``paths`` only when versioning on commits, so under a tag regex
-        every matching tag rebuilds the client whether or not a spec actually
-        moved -- the "only when the interface changed" property comes from the
-        release cadence instead. ``branch`` stops applying too, so a matching tag
-        anywhere in the repo triggers it.
+        on spec changes landing on a branch. For a repo that releases through the
+        release-resource workflow and has no long-lived release branch: match
+        its ``production/<version>`` tags, which the Production job writes
+        once a release is live, so a client is published only for a release
+        that was promoted (never for one that was cut and then abandoned). The
+        client version is then the release's, not a bumpver date (see
+        ``scripts/api_clients_version_from_tag.py``). The git resource consults
+        ``paths`` only when versioning on commits, so every matching tag
+        regenerates the client; one that comes out unchanged publishes
+        nothing. ``branch`` stops applying too, so a matching tag anywhere in
+        the repo triggers it.
+    :param prerelease_branch: Also publish a prerelease of each package under the
+        npm ``next`` dist-tag whenever a spec change lands on this branch of the
+        source repo and changes the client, so a consumer branch can develop
+        against an API that has merged but not yet been released. The version
+        (``<CalVer date>.0-dev.<unix time>.g<sha7>``) exists only on npm: nothing
+        is committed to the client repo, and ``latest`` stays on the stable
+        channel above. A build whose client matches the current ``next`` or
+        ``latest`` package publishes nothing.
+
+    Either way, ``generate-clients`` versions, commits and publishes only a
+    client that changed: a spec edit or a release that regenerates the same
+    sources publishes nothing.
 
     :return: A Pipeline object representing the Concourse pipeline definition.
     """
@@ -79,10 +120,13 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     openapi_generator_tag = OPENAPI_GENERATOR_VERSION
 
     # Define script names
-    generate_script: str = "generate-inner.sh"
+    detect_change_script: str = "api-clients-detect-change.sh"
     bump_script: str = "api-clients-bumpver.sh"
+    version_from_tag_script: str = "api_clients_version_from_tag.py"
     commit_script: str = "api-clients-commit-changes.sh"
     publish_script: str = "api-clients-publish-node.sh"
+    publish_prerelease_script: str = "api-clients-publish-node-prerelease.sh"
+    check_source_current_script: str = "api-clients-check-source-current.sh"
 
     openapi_generator_image = registry_image(
         name=Identifier("openapi-generator-image"),
@@ -138,6 +182,60 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         branch=client_repo_branch,
         private_key="((npm_publish.odlbot_private_ssh_key))",
     )
+    git_task_image = AnonymousResource(
+        source={
+            "repository": dockerhub_ecr_image_uri("concourse/buildroot"),
+            "tag": "git",
+            "aws_region": ECR_REGION,
+        },
+        type="registry-image",
+    )
+
+    # A source on release tags takes the client version from the tag; any
+    # other bumps it with the clients repo's bumpver config. Either step does
+    # nothing unless detect-client-change found a change, and writes the
+    # version the put tags the client repo with.
+    if source_repo_tag_regex:
+        set_version_step = TaskStep(
+            task=Identifier("version-from-tag"),
+            image=python_image.name,
+            config=TaskConfig(
+                platform="linux",
+                inputs=[
+                    Input(name=api_clients_repository.name),
+                    Input(name=source_repository.name),
+                ],
+                outputs=[Output(name=api_clients_repository.name)],
+                params={
+                    "SOURCE_DIR": f"../{source_repository.name}",
+                    "TAG_REGEX": source_repo_tag_regex,
+                    "PACKAGES": " ".join(client_repo_subpaths),
+                },
+                run=Command(
+                    path="python3",
+                    dir=api_clients_repository.name,
+                    args=["-c", _read_script(version_from_tag_script)],
+                ),
+            ),
+        )
+    else:
+        set_version_step = TaskStep(
+            task=Identifier("bump-version"),
+            image=python_image.name,
+            config=TaskConfig(
+                platform="linux",
+                inputs=[Input(name=api_clients_repository.name)],
+                outputs=[Output(name=api_clients_repository.name)],
+                run=Command(
+                    path="sh",
+                    dir=api_clients_repository.name,
+                    args=[
+                        "-xc",
+                        _read_script(bump_script),
+                    ],
+                ),
+            ),
+        )
 
     # Define the 'generate-clients' job
     generate_clients_job = Job(
@@ -147,23 +245,10 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             GetStep(get=source_repository.name, trigger=True),
             GetStep(get=api_clients_repository.name, trigger=False),
             GetStep(get=openapi_generator_image.name),
-            TaskStep(
-                task=Identifier("generate-apis"),
-                image=openapi_generator_image.name,
-                config=TaskConfig(
-                    platform="linux",
-                    inputs=[
-                        Input(name=source_repository.name),
-                        Input(name=api_clients_repository.name),
-                    ],
-                    outputs=[Output(name=api_clients_repository.name)],
-                    run=Command(
-                        path="/bin/bash",
-                        args=[
-                            f"{api_clients_repository.name}/scripts/{generate_script}"
-                        ],
-                    ),
-                ),
+            _generate_apis_step(
+                openapi_generator_image.name,
+                Input(name=source_repository.name),
+                api_clients_repository.name,
             ),
             LoadVarStep(
                 load_var=Identifier(f"{source_repo_name}-git-rev"),
@@ -176,37 +261,26 @@ def generate_api_client_pipeline(  # noqa: PLR0913
                 reveal=True,
             ),
             TaskStep(
-                task="bump-version",
-                image=python_image.name,
+                task=Identifier("detect-client-change"),
                 config=TaskConfig(
-                    platform="linux",
                     inputs=[Input(name=api_clients_repository.name)],
                     outputs=[Output(name=api_clients_repository.name)],
+                    image_resource=git_task_image,
+                    platform="linux",
                     run=Command(
                         path="sh",
                         dir=api_clients_repository.name,
-                        args=[
-                            "-xc",
-                            _read_script(bump_script),
-                        ],
+                        args=["-xc", _read_script(detect_change_script)],
                     ),
                 ),
             ),
+            set_version_step,
             TaskStep(
                 task="commit-changes",
                 config=TaskConfig(
                     inputs=[Input(name=api_clients_repository.name)],
                     outputs=[Output(name=api_clients_repository.name)],
-                    image_resource=AnonymousResource(
-                        source={
-                            "repository": dockerhub_ecr_image_uri(
-                                "concourse/buildroot"
-                            ),
-                            "tag": "git",
-                            "aws_region": ECR_REGION,
-                        },
-                        type="registry-image",
-                    ),
+                    image_resource=git_task_image,
                     platform="linux",
                     params={
                         "SOURCE_REPO_NAME": source_repo_name,
@@ -219,11 +293,16 @@ def generate_api_client_pipeline(  # noqa: PLR0913
                     ),
                 ),
             ),
+            # With an unchanged client there is no new commit, so this pushes
+            # nothing, and the empty tag file adds no tag. The publish jobs
+            # then see the HEAD they last published, unless it is not a
+            # generated commit; api-clients-publish-node.sh skips a version
+            # npm already has.
             PutStep(
                 put=api_clients_repository.name,
                 params={
                     "repository": api_clients_repository.name,
-                    "tag": f"{api_clients_repository.name}/VERSION",
+                    "tag": f"{api_clients_repository.name}/.git/publish-tag",
                 },
             ),
         ],
@@ -242,7 +321,11 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         Job(
             name=Identifier(f"publish-{subpath}"),
             plan=[
-                GetStep(get=node_image.name, trigger=True),
+                # An input to the build, never a reason to publish. VERSION
+                # only moves when generate-clients bumps it, so a new image
+                # digest would republish a version npm already has and fail
+                # (403). The clients repo get below is the only trigger.
+                GetStep(get=node_image.name),
                 GetStep(
                     get=api_clients_repository.name,
                     passed=[generate_clients_job.name],
@@ -267,6 +350,94 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         for subpath in client_repo_subpaths
     ]
 
+    prerelease_resources = []
+    prerelease_jobs = []
+    if prerelease_branch:
+        prerelease_source = git_repo(
+            name=Identifier(f"{source_repo_name}-{prerelease_branch}"),
+            uri=source_repo_uri,
+            branch=prerelease_branch,
+            paths=["openapi/specs/*.yaml"],
+        )
+        prerelease_rev = Identifier(f"{prerelease_source.name}-git-rev")
+        prerelease_resources.append(prerelease_source)
+        # Generated afresh in each job and never committed: the clients repo
+        # get is only the generator configs and package skeleton.
+        prerelease_jobs = [
+            Job(
+                name=Identifier(f"publish-next-{subpath}"),
+                # In trigger order, so `next` ends on the newest spec even when
+                # two merges land minutes apart.
+                serial=True,
+                plan=[
+                    GetStep(get=openapi_generator_image.name),
+                    # Not a trigger, for the same reason as the stable publish
+                    # jobs: here a new digest would mint a prerelease for a
+                    # spec that did not change.
+                    GetStep(get=node_image.name),
+                    GetStep(get=prerelease_source.name, trigger=True),
+                    GetStep(get=api_clients_repository.name, trigger=False),
+                    _generate_apis_step(
+                        openapi_generator_image.name,
+                        Input(name=prerelease_source.name, path=source_repo_name),
+                        api_clients_repository.name,
+                    ),
+                    LoadVarStep(
+                        load_var=prerelease_rev,
+                        file=f"{prerelease_source.name}/.git/ref",
+                        reveal=True,
+                    ),
+                    # Serial keeps builds in trigger order, but a re-run
+                    # replays an older build's inputs after newer ones have
+                    # published. This marks such a build stale, so it leaves
+                    # `next` to the newer one.
+                    TaskStep(
+                        task=Identifier("check-source-current"),
+                        config=TaskConfig(
+                            platform="linux",
+                            image_resource=git_task_image,
+                            inputs=[
+                                Input(
+                                    name=prerelease_source.name,
+                                    path=source_repo_name,
+                                ),
+                                Input(name=api_clients_repository.name),
+                            ],
+                            outputs=[Output(name=api_clients_repository.name)],
+                            params={
+                                "SOURCE_DIR": f"../{source_repo_name}",
+                                "SOURCE_URI": source_repo_uri,
+                                "SOURCE_BRANCH": prerelease_branch,
+                            },
+                            run=Command(
+                                path="sh",
+                                dir=api_clients_repository.name,
+                                args=["-xc", _read_script(check_source_current_script)],
+                            ),
+                        ),
+                    ),
+                    TaskStep(
+                        task=Identifier(f"publish-next-{subpath}"),
+                        image=node_image.name,
+                        config=TaskConfig(
+                            platform="linux",
+                            inputs=[Input(name=api_clients_repository.name)],
+                            params={
+                                "NPM_TOKEN": "((npm_publish.npmjs_token))",
+                                "SOURCE_SHA": f"((.:{prerelease_rev}))",
+                            },
+                            run=Command(
+                                path="bash",
+                                dir=f"{api_clients_repository.name}/src/typescript/{subpath}",
+                                args=["-xc", _read_script(publish_prerelease_script)],
+                            ),
+                        ),
+                    ),
+                ],
+            )
+            for subpath in client_repo_subpaths
+        ]
+
     # Construct the final pipeline
     return Pipeline(
         resources=[
@@ -275,10 +446,12 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             openapi_generator_image,
             python_image,
             node_image,
+            *prerelease_resources,
         ],
         jobs=[
             generate_clients_job,
             *publish_jobs,
+            *prerelease_jobs,
         ],
     )
 
@@ -303,10 +476,28 @@ if __name__ == "__main__":
                 "description": (
                     f"Generates the TypeScript API client for "
                     f"`{variant_config['source_repo_name']}` from its OpenAPI "
-                    f"spec (`openapi/specs/*.yaml`) via openapi-generator, "
-                    f"bumps and commits the version in "
-                    f"`{variant_config['client_repo_name']}`, then publishes "
-                    "the package to npm."
+                    f"spec (`openapi/specs/*.yaml`) via openapi-generator"
+                    + (
+                        " when a release reaches Production"
+                        if variant_config.get("source_repo_tag_regex")
+                        else ""
+                    )
+                    + ". When the client changed, it versions"
+                    + (
+                        " it after the release"
+                        if variant_config.get("source_repo_tag_regex")
+                        else " it with bumpver"
+                    )
+                    + f", commits it to `{variant_config['client_repo_name']}`"
+                    " and publishes the package to npm."
+                    + (
+                        " Spec changes on "
+                        f"`{variant_config['prerelease_branch']}` that change "
+                        "the client also publish an uncommitted prerelease "
+                        "under the npm `next` tag."
+                        if variant_config.get("prerelease_branch")
+                        else ""
+                    )
                 ),
                 "team": "main",
                 "category": "package-publishing",

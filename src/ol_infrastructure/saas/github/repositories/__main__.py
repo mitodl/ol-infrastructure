@@ -45,3 +45,4 @@ for repo in fleet:
     rulesets.build(repo, built_repository)
     rulesets.build_release_branches(repo, built_repository)
     rulesets.build_copilot_review(repo, built_repository)
+    rulesets.build_production_tags(repo, built_repository)

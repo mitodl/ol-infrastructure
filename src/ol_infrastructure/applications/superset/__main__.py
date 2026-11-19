@@ -642,6 +642,7 @@ superset_chart = kubernetes.helm.v3.Release(
         version=SUPERSET_CHART_VERSION,
         namespace=superset_namespace,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://apache.github.io/superset",
         ),

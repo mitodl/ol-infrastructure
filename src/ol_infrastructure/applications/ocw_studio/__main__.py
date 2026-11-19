@@ -301,7 +301,7 @@ ocw_studio_db_security_group = ec2.SecurityGroup(
         )
     ],
     tags=aws_config.merged_tags(
-        {"name": "ocw-studio-db-access-applications-{stack_info.env_suffix}"}
+        {"Name": f"ocw-studio-db-access-applications-{stack_info.env_suffix}"}
     ),
     vpc_id=apps_vpc["id"],
 )
@@ -720,6 +720,7 @@ ocw_studio_shared_plugins = OLApisixSharedPlugins(
     plugin_config=OLApisixSharedPluginsConfig(
         application_name="ocw-studio",
         resource_suffix="ol-shared-plugins",
+        render_only=True,
         k8s_namespace=ocw_studio_namespace,
         k8s_labels=k8s_app_labels,
         # Studio's pages and API share one origin and Django sets no CORS
@@ -842,6 +843,11 @@ export(
         "redis": redis_cache.address,
         "redis_token": redis_cache.cache_cluster.auth_token,
         "rds_host": ocw_studio_db.db_instance.address,
+        **(
+            {"rds_replica_host": ocw_studio_db.db_replica.address}
+            if ocw_studio_db_config.read_replica
+            else {}
+        ),
         "mediaconvert_queue": ocw_studio_mediaconvert.queue.id,
     },
 )

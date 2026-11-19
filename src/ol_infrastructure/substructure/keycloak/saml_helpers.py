@@ -2,19 +2,22 @@
 
 import ssl
 import xml.etree.ElementTree as ET
+from http.client import HTTPException
 from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import certifi
+import pulumi
 
 
 class SamlMetadataError(Exception):
     """A SAML IdP's metadata could not be fetched or parsed.
 
     Raised instead of returning empty metadata so that an unreachable partner
-    endpoint fails the deploy. Returning empty dropped the IdP resource from the
-    Pulumi program, which Pulumi then deleted along with the working integration.
+    endpoint with no saved copy fails the deploy. Returning empty dropped the IdP
+    resource from the Pulumi program, which Pulumi then deleted along with the
+    working integration.
     """
 
 
@@ -26,6 +29,8 @@ class SamlMetadataError(Exception):
 # of certifi replacing the system/enterprise trust store.
 _SSL_CONTEXT = ssl.create_default_context()
 _SSL_CONTEXT.load_verify_locations(cafile=certifi.where())
+
+_ENTITY_DESCRIPTOR = "{urn:oasis:names:tc:SAML:2.0:metadata}EntityDescriptor"
 
 SAML_FRIENDLY_NAMES = {
     "firstName": [
@@ -78,18 +83,15 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element:
 
     Args:
         metadata_url: The URL of the SAML IdP metadata XML file.
+            load_saml_metadata has already checked that it is HTTPS.
 
     Returns:
         The root ElementTree element of the parsed XML.
 
     Raises:
-        SamlMetadataError: The URL is not HTTPS, the fetch failed, the body
-            exceeded the size limit, or the payload was not parseable XML.
+        SamlMetadataError: The fetch failed, the body exceeded the size limit,
+            or the payload was not a SAML EntityDescriptor.
     """
-    parsed_url = urlparse(metadata_url)
-    if parsed_url.scheme != "https":
-        msg = f"SAML metadata URL must use HTTPS, got {metadata_url}"
-        raise SamlMetadataError(msg)
     try:
         # Set timeout and limit response size
         MAX_METADATA_SIZE = 10 * 1024 * 1024  # 10MB
@@ -109,10 +111,23 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element:
                     f"{MAX_METADATA_SIZE} byte maximum"
                 )
                 raise SamlMetadataError(msg)
-            return ET.fromstring(metadata_bytes)  # noqa: S314
-    except (OSError, ET.ParseError) as e:
+            root = ET.fromstring(metadata_bytes)  # noqa: S314
+    # urllib wraps connection errors in URLError (an OSError) but lets a
+    # malformed response surface as http.client.HTTPException.
+    except (OSError, HTTPException, ET.ParseError) as e:
         msg = f"Unable to fetch or parse SAML metadata from {metadata_url}: {e}"
         raise SamlMetadataError(msg) from e
+    return _check_entity_descriptor(root, metadata_url)
+
+
+def _check_entity_descriptor(root: ET.Element, source: str) -> ET.Element:
+    if root.tag != _ENTITY_DESCRIPTOR:
+        msg = (
+            f"Unable to use SAML metadata from {source}: the document's root "
+            f"element is {root.tag}, not an EntityDescriptor"
+        )
+        raise SamlMetadataError(msg)
+    return root
 
 
 def _parse_saml_metadata_string(metadata_xml: str) -> ET.Element:
@@ -125,37 +140,82 @@ def _parse_saml_metadata_string(metadata_xml: str) -> ET.Element:
         The root ElementTree element of the parsed XML.
 
     Raises:
-        SamlMetadataError: The string was not parseable XML.
+        SamlMetadataError: The string was not parseable XML, or not a SAML
+            EntityDescriptor.
     """
     try:
-        return ET.fromstring(metadata_xml)  # noqa: S314
+        root = ET.fromstring(metadata_xml)  # noqa: S314
     except ET.ParseError as e:
         msg = f"Unable to parse the supplied SAML metadata XML: {e}"
         raise SamlMetadataError(msg) from e
+    return _check_entity_descriptor(root, "the supplied XML")
 
 
-def extract_saml_metadata(metadata_source: str) -> dict[str, str | None]:
+def load_saml_metadata(metadata_url: str | None, saved_xml: str | None) -> ET.Element:
+    """Return an IdP's SAML metadata, from the partner's URL when it answers.
+
+    A saved copy keeps the stack deployable while the partner's endpoint is
+    down: the fetch failure becomes a warning and the IdP is built from the
+    copy. When both are available the live metadata wins, and a difference in
+    the fields we deploy is logged so the copy can be refreshed.
+
+    :param metadata_url: The HTTPS URL of the IdP's metadata, if it publishes one.
+    :param saved_xml: A saved copy of the IdP's metadata XML.
+    :returns: The root element of the metadata document.
+    :rtype: ET.Element
+    :raises SamlMetadataError: The URL is not HTTPS, the saved copy does not
+        parse, or the fetch failed with no saved copy to fall back to.
     """
-    Extract relevant information from a SAML IdP metadata XML file or string.
+    if metadata_url is None:
+        if saved_xml is None:
+            msg = "Either a SAML metadata URL or saved metadata XML is required"
+            raise SamlMetadataError(msg)
+        return _parse_saml_metadata_string(saved_xml)
+    if urlparse(metadata_url).scheme != "https":
+        msg = f"SAML metadata URL must use HTTPS, got {metadata_url}"
+        raise SamlMetadataError(msg)
+    try:
+        live = _fetch_and_parse_saml_metadata(metadata_url)
+    except SamlMetadataError as e:
+        if saved_xml is None:
+            raise
+        pulumi.log.warn(f"{e}. Building the IdP from the saved copy instead.")
+        return _parse_saml_metadata_string(saved_xml)
+    if saved_xml is not None:
+        live_fields = _drift_fields(live)
+        saved_fields = _drift_fields(_parse_saml_metadata_string(saved_xml))
+        changed = sorted(
+            field for field in live_fields if live_fields[field] != saved_fields[field]
+        )
+        if changed:
+            pulumi.log.warn(
+                f"SAML metadata from {metadata_url} differs from the saved copy in "
+                f"{', '.join(changed)}. Deploying the live values; refresh the saved "
+                "copy so a later outage doesn't roll them back."
+            )
+    return live
 
-    Args:
-        metadata_source (str): Either the URL of the SAML IdP metadata XML file,
-                               or the XML string itself.
 
-    Returns:
-        dict: A dictionary containing the extracted metadata attributes.
+def _drift_fields(root: ET.Element) -> dict[str, object]:
+    # An IdP without an attribute map gets its mappers from the metadata's
+    # FriendlyNames, so those are deployed values too.
+    return {
+        **extract_saml_metadata(root),
+        "attributes": sorted(
+            (element.get("Name") or "", element.get("FriendlyName") or "")
+            for element in root.iter()
+            if element.get("FriendlyName")
+        ),
+    }
 
-    Raises:
-        SamlMetadataError: The metadata could not be fetched or parsed.
+
+def extract_saml_metadata(root: ET.Element) -> dict[str, str | None]:
+    """Extract the fields we deploy from a SAML IdP's metadata.
+
+    :param root: The root element of the metadata, from load_saml_metadata.
+    :returns: The entity ID, SSO and SLO URLs, and signing certificate.
+    :rtype: dict[str, str | None]
     """
-    # Determine if this is a URL or XML string
-    if metadata_source.strip().startswith(
-        "<?xml"
-    ) or metadata_source.strip().startswith("<"):
-        root = _parse_saml_metadata_string(metadata_source)
-    else:
-        root = _fetch_and_parse_saml_metadata(metadata_source)
-
     # Define namespaces
     namespaces = {
         "md": "urn:oasis:names:tc:SAML:2.0:metadata",
@@ -226,8 +286,8 @@ def generate_pulumi_args_dict(metadata: dict[str, str | None]) -> dict[str, str]
     return args_dict
 
 
-def get_saml_attribute_mappers(  # noqa: C901, PLR0912
-    metadata_source: str,
+def get_saml_attribute_mappers(  # noqa: C901
+    root: ET.Element,
     idp_alias: str,
     attribute_map: dict[str, str] | None = None,
     attribute_name_map: dict[str, str] | None = None,
@@ -239,8 +299,7 @@ def get_saml_attribute_mappers(  # noqa: C901, PLR0912
     list of candidate attribute names.
 
     Args:
-        metadata_source: Either the URL to the SAML IdP metadata XML or the
-            XML string itself.
+        root: The root element of the metadata, from load_saml_metadata.
         idp_alias: The alias for the Keycloak identity provider.
         attribute_map: Optional mapping of Keycloak user attributes to SAML
             friendly names.
@@ -251,18 +310,7 @@ def get_saml_attribute_mappers(  # noqa: C901, PLR0912
     Returns:
         A dictionary of attribute mapper configurations suitable for Pulumi.
 
-    Raises:
-        SamlMetadataError: The metadata could not be fetched or parsed.
-
     """
-    # Determine if this is a URL or XML string
-    if metadata_source.strip().startswith(
-        "<?xml"
-    ) or metadata_source.strip().startswith("<"):
-        root = _parse_saml_metadata_string(metadata_source)
-    else:
-        root = _fetch_and_parse_saml_metadata(metadata_source)
-
     namespaces = {
         "md": "urn:oasis:names:tc:SAML:2.0:metadata",
         "saml": "urn:oasis:names:tc:SAML:2.0:assertion",

@@ -52,11 +52,11 @@ This is the closest thing to Vagrant: Vagrant gave you a disposable VM that beha
 
 ### k8s manifests + apisix — the declarative "compose file"
 
-The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Secrets) and `apisix-routes.yaml`; mitxonline's Deployments and routes are rendered by a Pulumi program instead. This is the big conceptual leap from compose; see [Compose → Kubernetes](#docker-compose--kubernetes-translated) below.
+The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Secrets) and `apisix-routes.yaml`; the Deployments and routes of mitxonline and learn-ai (learn-ai's sandbox aside) are rendered by a Pulumi program instead. This is the big conceptual leap from compose; see [Compose → Kubernetes](#docker-compose--kubernetes-translated) below.
 
 ### Pulumi — the shared-services installer
 
-Pulumi is an infrastructure-as-code tool (same family as Terraform): you describe resources in a real programming language and `pulumi up` creates or updates the real thing to match. It's what this repo uses to define OL's rc/prod cloud infrastructure — which is why application engineers usually meet it as "the place env vars go to affect rc/prod." In local-dev that role is small: per-developer env vars for the YAML-applied apps go in a gitignored [`app-env.local.yaml` override](README.md#local-configuration-overrides), and for mitxonline in the gitignored stack file of its program (`mitxonline:vars`, the same key the deployed stacks use). Pulumi's jobs here are two: Python programs under `local-dev/infra/` install the shared in-cluster services every app needs (PostgreSQL, Valkey, Keycloak, APISIX, OpenSearch, …), and `local-dev/apps/mitxonline/pulumi/` renders the app itself and its gateway routes from the deployed definition in `src/`, so local-dev runs what RC and production run (see `docs/plans/local-dev-deployed-parity.md`). Tilt runs `pulumi up` for you at startup and whenever those files change; you touch Pulumi to change shared infrastructure or a rendered app's local bindings (see [EXTENDING.md](EXTENDING.md)).
+Pulumi is an infrastructure-as-code tool (same family as Terraform): you describe resources in a real programming language and `pulumi up` creates or updates the real thing to match. It's what this repo uses to define OL's rc/prod cloud infrastructure — which is why application engineers usually meet it as "the place env vars go to affect rc/prod." In local-dev that role is small: per-developer env vars for the YAML-applied apps go in a gitignored [`app-env.local.yaml` override](README.md#local-configuration-overrides), and for mitxonline and learn-ai in the gitignored stack file of their programs (`mitxonline:vars` and `learn_ai:env_vars`, the same keys the deployed stacks use). Pulumi's jobs here are two: Python programs under `local-dev/infra/` install the shared in-cluster services every app needs (PostgreSQL, Valkey, Keycloak, APISIX, OpenSearch, …), and `local-dev/apps/mitxonline/pulumi/` and `local-dev/apps/learn-ai/pulumi/` render each app and its gateway routes from the deployed definition in `src/`, so local-dev runs what RC and production run (see `docs/plans/local-dev-deployed-parity.md`). Tilt runs `pulumi up` for you at startup and whenever those files change; you touch Pulumi to change shared infrastructure or a rendered app's local bindings (see [EXTENDING.md](EXTENDING.md)).
 
 ### Tilt — the dev loop
 
@@ -130,7 +130,7 @@ flowchart TB
     browser["Browser<br/>https://learn.mit.test"] --> lb
     lb --> api
     tilt -->|kubectl apply| api
-    tilt -->|pulumi up (mitxonline)| api
+    tilt -->|pulumi up (mitxonline, learn-ai)| api
     tilt -->|build| docker
     docker -->|push changed layers| reg
     reg -.->|pull on pod create| k0 & k1
@@ -167,7 +167,7 @@ Inside the cluster, workloads are grouped into namespaces: one per app, plus `lo
 │  │  (ns)     │  │   (ns)    │  │   (ns)   │  │ video  │ │   │
 │  │ Next.js   │  │ granian   │  │ granian  │  │  uwsgi │ │   │
 │  │ Django    │  │ Celery×2  │  │  Celery  │  │ Celery │ │   │
-│  │ Celery×3  │  │           │  │          │  │        │ │   │
+│  │ Celery×3  │  │ LLM stub  │  │          │  │        │ │   │
 │  └───────────┘  └───────────┘  └──────────┘  └────────┘ │   │
 └──────────────────────────────────────────────────────────────┘
          ▲
@@ -202,15 +202,17 @@ The whole stack is roughly 2.9GB and can be switched off with `observability_ena
 
 ## Design decisions
 
-**Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra, and mitxonline's app via its own program) or Tilt (the other apps' manifests, and mitxonline's `ApisixTls`). This prevents drift and conflicts.
+**Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra, and the mitxonline and learn-ai apps via their own programs) or Tilt (the other apps' manifests, learn-ai's sandbox, and the `ApisixTls` of mitxonline and learn-ai). This prevents drift and conflicts.
 
-**APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs (mitxonline's routes are rendered by its Pulumi program; its `ApisixTls` is `apisix-tls.yaml`).
+**APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs (the routes of mitxonline and learn-ai are rendered by their Pulumi programs and their `ApisixTls` is `apisix-tls.yaml`; the learn-ai sandbox's are in `sandbox.yaml`). APISIX's Helm values, the `apisix` `GatewayClass` and `Gateway`, and the `identity-header-strip` global rule come from the same code the deployed clusters use (`src/ol_infrastructure/infrastructure/aws/eks/apisix_definition.py`); `local-dev/infra/modules/ingress.py` only supplies the local inputs (one pod, NodePort, the mkcert trusted CA).
 
 **Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low.
 
 **Shared Valkey:** one Valkey in `local-infra`; each app gets its own logical DBs, or Celery and RedBeat pick up another app's tasks. In use: mit-learn 0-2, Open edX 3 (cache) and 12 (broker), ocw-studio 4-5, mitxonline 6-7, learn-ai 8-9, odl-video-service 10-11, micromasters 13-14.
 
 **TLS:** mkcert issues one certificate whose wildcard SANs (`*.mit.test`, `*.learn.mit.test`, …) cover every local hostname under the root domain (`mit.test` by default). The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
+
+**Trusting local TLS from pods:** an app pod that calls a local hostname over HTTPS (Keycloak's discovery document, another app's API) has to trust the mkcert root as well as the public roots. The core stack writes one bundle holding both (certifi's public roots plus the mkcert root, built in `local-dev/infra/modules/tls.py`) into every app namespace as the `local-dev-ca-bundle` ConfigMap, under the key `ca-certificates.crt`. APISIX's upstream trust store (`apisix-trusted-ca`) is the same bundle. A Pulumi-rendered app mounts the ConfigMap as a directory at `/etc/ssl/local-dev` and points `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` at `/etc/ssl/local-dev/ca-certificates.crt`; the mitxonline and learn-ai programs are the examples. ocw-studio's Concourse worker mounts it as its `CONCOURSE_CERTS_DIR`. The older hand-written app manifests still build the bundle per pod with a `ca-bundle-merge` init container into `/etc/ssl/local-dev/rootCA.pem`; they go away as each app moves to a Pulumi program, so don't copy that pattern into a new app. The bundle changes only when mkcert's root or the locked `certifi` version does. Kubelet refreshes a directory-mounted ConfigMap in place, but a process that read the file at startup sees the change only after a restart.
 
 **Keycloak realm:** The `olapps` realm mirrors production, including the fake-Touchstone SAML IdP, all OIDC clients, and organizations support. Test accounts are listed in the [README](README.md#test-accounts).
 
@@ -241,7 +243,7 @@ On raw Kubernetes, the naive dev loop is brutal:
 edit code → rebuild image → load into cluster → roll the Deployment → wait for pod
 ```
 
-That is seconds-to-minutes per change. Tilt's **`live_update`** fixes it: it watches your files and syncs the changed ones straight into the running container (conceptually a bind mount, but push-based), then either runs a small command (`uv sync` when the lockfile changes) or lets the process inside hot-reload on its own:
+That is seconds-to-minutes per change. Tilt's **`live_update`** fixes it: it watches your files and syncs the changed ones straight into the running container (conceptually a bind mount, but push-based), then either runs a small command (`yarn install` when the Next.js lockfile changes) or lets the process inside hot-reload on its own:
 
 - Django: `granian --reload`
 - Frontend: `next dev` HMR
@@ -254,7 +256,7 @@ There are two entirely separate paths, and knowing which one is in play explains
 
 **Transport 1 — `live_update` (the everyday one).** When you save a file, Tilt tars just the changed files and streams them into the *running container's* filesystem over the Kubernetes exec API — the same plumbing as `kubectl cp`. No image build, no registry, no pod restart; `granian --reload` / `next dev` notice the file change. This is the compose bind-mount feeling, implemented as push-based sync.
 
-**Transport 2 — image rebuild → push → pull.** Used only when a file-copy can't express the change: Dockerfile edits, dependency changes the `live_update` `run()` steps can't handle, Tiltfile config changes, or a manual rebuild. This path exists because every container runtime has its own private **image store**: your Mac's Docker daemon has one (`docker images`), and each k3d node's containerd has its own. None of them can read each other's. The **registry** (`k3d-registry.localhost`, the zot container) is the network service that bridges them: Tilt pushes the freshly built image there, and each node's kubelet pulls from it like it would from Docker Hub.
+**Transport 2 — image rebuild → push → pull.** Used only when a file-copy can't express the change: Dockerfile edits, Python dependency changes (a `pyproject.toml`/`uv.lock` edit rebuilds instead of running `uv sync` in the pod, because Celery doesn't reload and an in-pod sync would leave running processes on the old packages), mitxonline frontend edits, Tiltfile config changes, or a manual rebuild. This path exists because every container runtime has its own private **image store**: your Mac's Docker daemon has one (`docker images`), and each k3d node's containerd has its own. None of them can read each other's. The **registry** (`k3d-registry.localhost`, the zot container) is the network service that bridges them: Tilt pushes the freshly built image there, and each node's kubelet pulls from it like it would from Docker Hub.
 
 What actually crosses the wire is negotiated, not the whole image. An image is a small JSON manifest plus content-addressed **layers**; push and pull both start by comparing digests and transfer only the layers the other side is missing. A rebuild typically changes only the top (code) layer, so the multi-GB base layers cross once and never again.
 
@@ -290,12 +292,13 @@ Then, for each enabled app (apps deploy independently of each other):
 └── kubectl apply apisix-routes.yaml
       APISIX picks up new routes → app reachable at its mit.test URL
 
-mitxonline instead:
+mitxonline and learn-ai instead:
 ├── docker build (as above)
-└── pulumi up (local-dev/apps/mitxonline/pulumi, run by Tilt as a custom deploy)
-      pre-deploy Job: migrate, then createcachetable, then (local only) re-assert the
+└── pulumi up (local-dev/apps/<app>/pulumi, run by Tilt as a custom deploy)
+      pre-deploy Job: migrate, then createcachetable, then (mitxonline, local only) re-assert the
         OAuth2 Application the composed Open edX signs in through
-      Deployments, Service, ApisixPluginConfig, ApisixRoutes from the deployed definition
+      Deployments, Service, ApisixPluginConfig, ApisixRoutes (and learn-ai's ApisixConsumer) from the deployed definition
+      learn-ai only, local only: a model stub (Deployment, Service, ConfigMap) learn-ai calls until a model backend is chosen
 ```
 
 ## The raw k8s dev flow (what Tilt automates)
@@ -315,4 +318,4 @@ Tilt collapses all of that into a file-watch + in-container sync, and shows the 
 - [README.md](README.md) — setup and day-to-day usage
 - [EXTENDING.md](EXTENDING.md) — adding a new app, modifying shared infrastructure
 - `local-dev/apps/*/Tiltfile` — per-app build + live_update config
-- `local-dev/apps/*/deployment.yaml` — per-app k8s manifests (mitxonline's come from `local-dev/apps/mitxonline/pulumi/`)
+- `local-dev/apps/*/deployment.yaml` — per-app k8s manifests (those of mitxonline and learn-ai come from `local-dev/apps/<app>/pulumi/`)

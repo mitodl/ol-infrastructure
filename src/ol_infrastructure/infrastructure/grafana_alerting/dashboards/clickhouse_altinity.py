@@ -1,6 +1,6 @@
 """Altinity's ClickHouse operator and Keeper dashboards, vendored unchanged.
 
-Source: grafana-dashboard/ in Altinity/clickhouse-operator at release-0.26.0,
+Source: grafana-dashboard/ in Altinity/clickhouse-operator at release-0.27.4,
 matching CLICKHOUSE_OPERATOR_VERSION. The operator dashboard is grafana.com
 12163. Kept as upstream JSON rather than rebuilt with base.py's panel helpers:
 they are large, maintained upstream against the exporter's own metric names,

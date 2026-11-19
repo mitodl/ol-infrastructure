@@ -8,8 +8,10 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+    MANAGED_CLIENT_ARGS,
     PKCE_REQUIRED_CLIENT_ARGS,
-    create_pkce_client_policy,
+    create_client_policies,
 )
 from ol_infrastructure.substructure.keycloak.learner_records import (
     create_learner_records_clients,
@@ -36,8 +38,32 @@ from ol_infrastructure.substructure.keycloak.registration_flow import (
     create_recaptcha_registration_flow,
 )
 
+# Saved copies of partner IdPs' SAML metadata and OIDC discovery documents. An
+# IdP with a URL is built from the live document; its copy is the fallback that
+# keeps the stack deployable while that partner's endpoint is down. Refresh a
+# copy when a run warns that it differs from the live document.
+SAVED_IDP_METADATA_DIR = Path(__file__).parent.joinpath("files/olapps")
 
-def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
+# Default scopes for the service-account clients that call the Admin API, before
+# kc-admin-api is added. ClientDefaultScopes replaces the whole set, and Keycloak
+# rejects a token request naming a scope the client lacks (invalid_scope), so
+# these keep what the apps request (e.g. mitxonline's "openid profile email").
+# service_account is left out: it is not a default scope in this realm.
+SERVICE_ACCOUNT_DEFAULT_SCOPES = [
+    "acr",
+    "basic",
+    "email",
+    "profile",
+    "roles",
+    "web-origins",
+]
+
+
+def _saved_idp_metadata(filename: str) -> str:
+    return SAVED_IDP_METADATA_DIR.joinpath(filename).read_text()
+
+
+def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -91,6 +117,13 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         display_name="MIT Learn",
         display_name_html="<b>MIT Learn</b>",
         enabled=True,
+        # Both are declared because the provider cannot clear a theme: it omits
+        # an empty theme from the PUT and Keycloak keeps the stored value, so a
+        # theme saved once from the admin console showed up as a removal on
+        # every apply that never took effect. ol-keycloakify builds no admin
+        # theme, so the admin console stays on the server default.
+        account_theme="ol-learn",
+        admin_theme="keycloak.v2",
         email_theme=keycloak_realm_config.get("olapps_email_theme") or "ol",
         login_theme="ol-learn",
         duplicate_emails_allowed=False,
@@ -200,7 +233,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         opts=resource_options,
     )
 
-    create_pkce_client_policy(ol_apps_realm.id, "olapps", resource_options)
+    create_client_policies(ol_apps_realm.id, "olapps", resource_options)
 
     keycloak.RealmUserProfile(
         "olapps-user-profile",
@@ -299,6 +332,18 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             keycloak.RealmUserProfileAttributeArgs(
                 name="emailOptIn",
                 display_name="${emailOptIn}",
+                # ol-learn-scim declares emailOptIn as an integer, and
+                # scim-for-keycloak validates each PATCH locally before sending it.
+                # One user holding "false" fails that validation, which aborts and
+                # rolls back the whole retry run for the provider.
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="options",
+                        config={
+                            "options": json.dumps(["0", "1"], separators=(",", ":"))
+                        },
+                    ),
+                ],
                 required_for_roles=[],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]
@@ -412,7 +457,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         standard_token_exchange_enabled=ol_memory_enabled or None,
         valid_redirect_uris=keycloak_realm_config.get_object(
@@ -513,7 +558,6 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            implicit_flow_enabled=False,
             service_accounts_enabled=False,
             **PKCE_REQUIRED_CLIENT_ARGS,
             valid_redirect_uris=keycloak_realm_config.get_object(
@@ -578,11 +622,22 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=True,
-            implicit_flow_enabled=False,
+            **MANAGED_CLIENT_ARGS,
             service_accounts_enabled=False,
-            # Not PKCE_REQUIRED_CLIENT_ARGS yet. mit-learn's AccountActionStartView
-            # sends its own authorization request with this client (change email
-            # and password) and that request has no code_challenge.
+            # Not PKCE_REQUIRED_CLIENT_ARGS yet. Masai School sends its learners
+            # to Keycloak's authorize endpoint with this client, kc_idp_hint and
+            # no code_challenge (mitodl/hq#12760), from a link in its own system;
+            # Board Infinity was given the same link (mitodl/hq#13793). Once
+            # pkce_code_challenge_method is set on this client, with or without
+            # the marker, Keycloak rejects those requests and those logins fail.
+            # The upGrad and Apply7 IdPs below also log in through direct
+            # kc_idp_hint links; which client those use is unchecked.
+            # mitxonline#4119's IdP login_url builds the same link when
+            # B2B_IDP_LOGIN_CLIENT_ID is this client. Move the partners to a
+            # mit-learn redirect that sends a challenge (witan task
+            # tk-serve-partner-kc-idp-hint-logins-from-per-partne-89e73f) before
+            # adding PKCE_REQUIRED_CLIENT_ARGS. mit-learn's AccountActionStartView
+            # sends S256 since mit-learn#4167.
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-mitlearn-client-redirect-uris"
             ),
@@ -663,11 +718,19 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             enabled=True,
             access_type="CONFIDENTIAL",
             standard_flow_enabled=False,
-            implicit_flow_enabled=False,
-            direct_access_grants_enabled=False,
+            **MANAGED_CLIENT_ARGS,
             service_accounts_enabled=True,
             valid_redirect_uris=[],
             opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        # Service account only, so kc-admin-api is a default scope (the Admin
+        # API audience required since Keycloak 26.8.2).
+        keycloak.openid.ClientDefaultScopes(
+            "olapps-mitlearn-admin-client-default-scopes",
+            realm_id=ol_apps_realm.id,
+            client_id=olapps_mitlearn_admin_client.id,
+            default_scopes=[*SERVICE_ACCOUNT_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+            opts=resource_options,
         )
         mitlearn_realm_management_client = keycloak.openid.get_client(
             realm_id=ol_apps_realm.id,
@@ -721,7 +784,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=False,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "olapps-open-discussions-client-redirect-uris"
@@ -760,7 +823,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.require_object(
             "olapps-mitxonline-client-redirect-uris"
@@ -791,10 +854,11 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # MITXONLINE SCIM [END]
 
     # MITXONLINE B2B [START]
-    # This client is used by MITx Online for B2B operations via the Keycloak
-    # Admin API. It requires service account roles to view realms, users, and
-    # organizations, to manage organization membership, and to manage the
-    # identity providers organizations are linked to.
+    # This client is used by MITx Online for B2B provisioning via the Keycloak
+    # Admin API: organizations, the identity providers they are linked to, and
+    # the drift reconciler. mitxonline-b2b-membership-client below is for adding
+    # a user to an organization on an enrollment request, so that these roles
+    # can come off the per-request path once mitxonline reads it.
     olapps_mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
@@ -803,11 +867,21 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=False,
-        implicit_flow_enabled=False,
-        direct_access_grants_enabled=False,
+        **MANAGED_CLIENT_ARGS,
         service_accounts_enabled=True,
         valid_redirect_uris=[],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Service account only, so kc-admin-api is a default scope (the Admin API
+    # audience required since Keycloak 26.8.2). mitxonline requests "openid
+    # profile email" (KEYCLOAK_ADMIN_CLIENT_SCOPES).
+    keycloak.openid.ClientDefaultScopes(
+        "olapps-mitxonline-b2b-client-default-scopes",
+        realm_id=ol_apps_realm.id,
+        client_id=olapps_mitxonline_b2b_client.id,
+        default_scopes=[*SERVICE_ACCOUNT_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
 
     # Get realm-management client to assign roles
@@ -880,6 +954,56 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             client_secret=olapps_mitxonline_b2b_client.client_secret,
             realm_id=olapps_mitxonline_b2b_client.realm_id,
             realm_name="olapps",
+        ).apply(json.dumps),
+    )
+
+    # MITx Online adds a user to an organization while handling an enrollment
+    # code, through OrganizationMemberResource.addMember(). That calls
+    # auth.orgs().requireManage(organization), which manage-organizations
+    # satisfies, and auth.users().requireManage(user), which only manage-users
+    # does. The user is not a member yet, so FGAP v2 cannot narrow the second
+    # check to the organization. GET /admin/realms (the client's realm check)
+    # lists any realm the caller holds a realm-management role in.
+    olapps_mitxonline_b2b_membership_client = keycloak.openid.Client(
+        "olapps-mitxonline-b2b-membership-client",
+        name="mitxonline-b2b-membership-client",
+        realm_id=ol_apps_realm.id,
+        client_id="mitxonline-b2b-membership-client",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
+        service_accounts_enabled=True,
+        valid_redirect_uris=[],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    keycloak.openid.ClientDefaultScopes(
+        "olapps-mitxonline-b2b-membership-client-default-scopes",
+        realm_id=ol_apps_realm.id,
+        client_id=olapps_mitxonline_b2b_membership_client.id,
+        # Same KEYCLOAK_ADMIN_CLIENT_SCOPES request as the b2b client above.
+        default_scopes=[*SERVICE_ACCOUNT_DEFAULT_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
+    for role in ("manage-organizations", "manage-users"):
+        keycloak.openid.ClientServiceAccountRole(
+            f"olapps-mitxonline-b2b-membership-client-{role}-role",
+            realm_id=ol_apps_realm.id,
+            service_account_user_id=olapps_mitxonline_b2b_membership_client.service_account_user_id,
+            client_id=realm_management_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    vault.generic.Secret(
+        "olapps-mitxonline-b2b-membership-client-vault-credentials",
+        path="secret-mitxonline/keycloak-admin-b2b-membership",
+        data_json=Output.all(
+            url=olapps_mitxonline_b2b_membership_client.realm_id.apply(
+                lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+            ),
+            client_id=olapps_mitxonline_b2b_membership_client.client_id,
+            client_secret=olapps_mitxonline_b2b_membership_client.client_secret,
         ).apply(json.dumps),
     )
 
@@ -1098,6 +1222,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="HHC",
                 idp_display_name="Hartford Health Care",
                 org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
+                org_saml_metadata_xml=_saved_idp_metadata("hhc_metadata.xml"),
                 keycloak_url=keycloak_url,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
@@ -1119,6 +1244,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="NTUA",
                 idp_display_name="National Technical University of Athens",
                 org_saml_metadata_url="https://login.ntua.gr/metadata-signed.xml",
+                org_saml_metadata_xml=_saved_idp_metadata("ntua_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
                 name_id_format=NameIdFormat.transient,
@@ -1159,9 +1285,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             SamlIdpConfig(
                 idp_alias="CEIDE",
                 idp_display_name="Coordinación de Evaluación, Innovación y Desarrollo Educativos, UNAM",  # noqa: E501
-                org_saml_metadata_xml=Path(__file__)
-                .parent.joinpath("files/olapps/ceide_metadata.xml")
-                .read_text(),
+                org_saml_metadata_xml=_saved_idp_metadata("ceide_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="Email",
                 name_id_format=NameIdFormat.unspecified,
@@ -1190,6 +1314,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="SEU",
                 idp_display_name="Georgian National University Seu",
                 org_saml_metadata_url="https://emis1.seu.edu.ge/saml/metadata",
+                org_saml_metadata_xml=_saved_idp_metadata("seu_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:0.9.2342.19200300.100.1.3",
                 name_id_format=NameIdFormat.email,
@@ -1221,6 +1346,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="IBSU",
                 idp_display_name="International Black Sea University",
                 org_saml_metadata_url="https://emis.ibsu.edu.ge/saml/metadata",
+                org_saml_metadata_xml=_saved_idp_metadata("ibsu_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:0.9.2342.19200300.100.1.3",
                 name_id_format=NameIdFormat.email,
@@ -1252,14 +1378,10 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UKM",
                 idp_display_name="Universiti Kebangsaan Malaysia",
                 org_saml_metadata_url="https://sso.ukm.my/saml2/idp/metadata.php",
-                # The endpoint went unreachable on 2026-10-21 and every run that
-                # fetched it failed. This copy is the Wayback Machine's capture
-                # of 2025-07-29, whose SSO/SLO URLs and signing cert match what
-                # Production had deployed. Remove it once metadata.php answers
-                # again, or a moved endpoint or rotated cert won't be picked up.
-                org_saml_metadata_xml=Path(__file__)
-                .parent.joinpath("files/olapps/ukm_metadata.xml")
-                .read_text(),
+                # Copied from metadata.php on 2026-11-03, after UKM rotated its
+                # signing cert (the new one is valid from 2026-10-24). The copy
+                # before that was a Wayback Machine capture from 2025-07-29.
+                org_saml_metadata_xml=_saved_idp_metadata("ukm_metadata.xml"),
                 # UKM gave one value per field for "attribute name and friendly
                 # name", so the plain name (SimpleSAMLphp's basic format) is
                 # the identifier; matching on the Name attribute works whether
@@ -1278,6 +1400,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                     attr: {"attribute.name.format": "ATTRIBUTE_FORMAT_BASIC"}
                     for attr in ("email", "fullName")
                 },
+                # UKM asked for a signing certificate in our SP metadata;
+                # Keycloak publishes one only when it signs AuthnRequests.
+                want_authn_requests_signed=True,
             ),
             org=OrgConfig(
                 org_domains=[
@@ -1311,6 +1436,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/dafbbeb4-3113-49c7-bce6-faeb84139bf6/federationmetadata/2007-06/federationmetadata.xml?appid=3b4d02b1-8482-4837-b8c4-2db32d8a93ee",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "istanbul_aydin_staff_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.email",
                 login_hint=False,
@@ -1336,6 +1464,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="stu.aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/1220f94e-b228-4761-9501-da9e83e540ac/federationmetadata/2007-06/federationmetadata.xml?appid=d134d48b-ca70-46fd-a008-ab83b9a565fe",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "istanbul_aydin_students_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.email",
                 login_hint=False,
@@ -1374,6 +1505,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/b250b687-5037-48da-a6d7-7471164c4b43/federationmetadata/2007-06/federationmetadata.xml?appid=09b2e0c2-79e9-4498-bf8f-560a6647d53d",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "cyprus_aydin_staff_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1399,6 +1533,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="stu.cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "cyprus_aydin_students_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1423,6 +1560,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="University_Of_Dubai",
                 idp_display_name="University Of Dubai",
                 org_saml_metadata_url="https://login.microsoftonline.com/5813cc51-31c7-4d29-a1be-fc6cb1b77e1c/federationmetadata/2007-06/federationmetadata.xml?appid=cbe26906-056e-49b5-92c3-a01836310582",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "university_of_dubai_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1455,6 +1595,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="RobCol",
                 idp_display_name="American Robert College of Istanbul",
                 org_saml_metadata_url="https://login.microsoftonline.com/d4bc61be-6893-44c0-8f85-a6e62e5bebee/federationmetadata/2007-06/federationmetadata.xml?appid=90601514-0347-4331-99cc-e2947959d287",
+                org_saml_metadata_xml=_saved_idp_metadata("robcol_metadata.xml"),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1483,11 +1624,45 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
+                idp_alias="SLB",
+                idp_display_name="SLB",
+                org_saml_metadata_url="https://login.microsoftonline.com/41ff26dc-250f-4b13-8981-739be8610c21/federationmetadata/2007-06/federationmetadata.xml?appid=2315aa57-e3f2-40ab-8ac9-2b2fb03b9f70",
+                org_saml_metadata_xml=_saved_idp_metadata("slb_metadata.xml"),
+                principal_type="SUBJECT",
+                login_hint=False,
+                name_id_format=NameIdFormat.email,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                # Claim names as SLB submitted them; fullName is left unmapped
+                # because they listed the UPN for it.
+                attribute_name_map={
+                    "email": "user.givenname",
+                    "firstName": "user.userprincipalname",
+                    "lastName": "user.surname",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=False,
+            ),
+            org=OrgConfig(
+                org_domains=["slb.com"],
+                org_name="SLB",
+                org_alias="SLB",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                # Imported from an org created outside Pulumi with alias "SLB";
+                # Keycloak refuses to change an org's alias once set.
+                resource_options=resource_options.merge(
+                    ResourceOptions(ignore_changes=["alias"])
+                ),
+            ),
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
                 idp_alias="UCV",
                 idp_display_name="Universidad Cesar Vallejo",
-                org_saml_metadata_xml=Path(__file__)
-                .parent.joinpath("files/olapps/ucv_metadata.xml")
-                .read_text(),
+                org_saml_metadata_xml=_saved_idp_metadata("ucv_metadata.xml"),
                 # Google Workspace SAML reliably provides NameID as email.
                 # Use SUBJECT to avoid login failures when custom attributes
                 # like "Email" are not included in the assertion.
@@ -1526,6 +1701,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="DUTH",
                 idp_display_name="Democritus University of Thrace",
                 org_oidc_metadata_url="https://sso.duth.gr/realms/main/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("duth_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1586,6 +1762,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="HAEF",
                 idp_display_name="Hellenic American Educational Foundation",
                 org_oidc_metadata_url="https://login.microsoftonline.com/35a07f23-c5cb-4b42-81ad-10d269586c9a/v2.0/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("haef_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1605,6 +1782,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="NUST",
                 idp_display_name="Namibia University of Science and Technology",
                 org_oidc_metadata_url="https://login.microsoftonline.com/d5cf20c2-4a84-4902-a3e6-c4a3190ea239/v2.0/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("nust_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1628,6 +1806,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UPGRAD",
                 idp_display_name="upGrad",
                 org_oidc_metadata_url="https://idp.upgrad.com/realms/upgrad/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "upgrad_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1651,6 +1832,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="DYNIDEAS",
                 idp_display_name="Dynamic Ideas, LLC.",
                 org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "google_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1671,6 +1855,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="VELTISTON",
                 idp_display_name="Veltiston AI",
                 org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "google_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1691,6 +1878,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UCR",
                 idp_display_name="Universidad de Costa Rica",
                 org_oidc_metadata_url="https://sso.ucr.ac.cr/realms/UCR/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("ucr_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1710,6 +1898,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="USEK",
                 idp_display_name="Holy Spirit University of Kaslik",
                 org_oidc_metadata_url="https://login.microsoftonline.com/06d0a2c4-59b9-4cf8-a36a-9190f22cd1f6/v2.0/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("usek_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1732,6 +1921,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UBSU",
                 idp_display_name="University of Business and Science",
                 org_oidc_metadata_url="https://sso.ubsu.uz/o/.well-known/openid-configuration/",
+                org_oidc_discovery_json=_saved_idp_metadata("ubsu_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1760,6 +1950,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="MASAI",
                 idp_display_name="Masai School",
                 org_oidc_metadata_url="https://admissions-api.masaischool.com/oidc/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "masai_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1784,6 +1977,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="APPLY7",
                 idp_display_name="Apply7",
                 org_oidc_metadata_url="https://keycloak.apply7.cn/realms/mit-learn/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "apply7_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1845,6 +2041,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="BOARDINFINITY",
                 idp_display_name="Board Infinity",
                 org_oidc_metadata_url="https://platform.boardinfinity.com/auth-api/oidc/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "boardinfinity_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1906,6 +2105,73 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             opts=resource_options,
         )
         # BOARD INFINITY [END]
+
+        # ISFT ORG [START]
+        # Same private_key_jwt + PKCE S256 pattern as Board Infinity; their
+        # discovery doc offers only private_key_jwt for token endpoint auth.
+        isft_oidc_identity_provider = onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="ISFT",
+                idp_display_name=(
+                    "International School of Finance Technology and Science"
+                ),
+                org_oidc_metadata_url="https://sso.isft.uz/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("isft_oidc_discovery.json"),
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+                extra_config={
+                    "pkceEnabled": "true",
+                    "pkceMethod": "S256",
+                },
+            ),
+            org=OrgConfig(
+                # Unlike Board Infinity, ISFT staff sign in with their
+                # institutional @isft.uz address, so the domain routes them
+                # here and limits this IdP to asserting isft.uz emails.
+                org_domains=["isft.uz"],
+                org_name="International School of Finance Technology and Science",
+                org_alias="ISFT",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-full-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="fullName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-first-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="given_name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-isft-oidc-last-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="family_name",
+            identity_provider_alias=isft_oidc_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        # ISFT ORG [END]
 
     # B2B Organizations [END]
 
