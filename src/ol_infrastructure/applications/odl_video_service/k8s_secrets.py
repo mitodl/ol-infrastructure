@@ -263,7 +263,9 @@ def create_ovs_k8s_secrets(
             "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": '{{ get .Secrets "realm_public_key" }}',
             "SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL": '{{ printf "%s/protocol/openid-connect/auth" (get .Secrets "url") }}',
             "SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL": '{{ printf "%s/protocol/openid-connect/token" (get .Secrets "url") }}',
-            # Admin API settings for the Keycloak migration management commands
+            # Admin API settings for the request-path group and member lookups
+            # (view-users only). assign_group_users needs the separate
+            # odl-video-group-admin client from secret-operations/sso/ovs-group-admin.
             "KEYCLOAK_SERVER_URL": '{{ get .Secrets "server_url" }}',
             "KEYCLOAK_REALM": '{{ get .Secrets "realm_name" }}',
             "KEYCLOAK_SVC_ADMIN": '{{ get .Secrets "client_id" }}',

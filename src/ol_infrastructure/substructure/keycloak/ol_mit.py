@@ -409,25 +409,66 @@ def create_ol_mit_realm(  # noqa: PLR0913
     # OVS looks up users by email and reads groups, a user's groups, group members
     # and group attributes, which view-users covers (it is a composite of
     # query-users and query-groups).
-    # manage-users is for the assign_group_users management command, which adds
-    # existing users to a group.
     realm_management_client = keycloak.openid.get_client(
         realm_id=ol_mit_realm.id,
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
     )
-    for resource_name, role in [
-        ("ol-mit-ovs-sa-manage-users", "manage-users"),
-        ("ol-mit-ovs-sa-view-users", "view-users"),
-    ]:
-        keycloak.openid.ClientServiceAccountRole(
-            resource_name,
-            realm_id=ol_mit_realm.id,
-            service_account_user_id=ol_mit_ovs_client.service_account_user_id,
-            client_id=realm_management_client.id,
-            role=role,
-            opts=resource_options,
-        )
+    keycloak.openid.ClientServiceAccountRole(
+        "ol-mit-ovs-sa-view-users",
+        realm_id=ol_mit_realm.id,
+        service_account_user_id=ol_mit_ovs_client.service_account_user_id,
+        client_id=realm_management_client.id,
+        role="view-users",
+        opts=resource_options,
+    )
+
+    # OVS's assign_group_users management command adds existing users to a group,
+    # which needs manage-users. It has its own client so that the login client,
+    # whose credentials every OVS pod holds, has no write role. The credentials go
+    # under secret-operations/sso/, which the OVS Vault policy cannot read beyond
+    # sso/ovs, and the operator passes them with --keycloak-client-id and
+    # --keycloak-client-secret.
+    ol_mit_ovs_group_admin_client = keycloak.openid.Client(
+        "ol-mit-ovs-group-admin-client",
+        name="odl-video-group-admin",
+        realm_id=ol_mit_realm.id,
+        client_id="odl-video-group-admin",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        **MANAGED_CLIENT_ARGS,
+        service_accounts_enabled=True,
+        valid_redirect_uris=[],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    keycloak.openid.ClientDefaultScopes(
+        "ol-mit-ovs-group-admin-client-default-scopes",
+        realm_id=ol_mit_realm.id,
+        client_id=ol_mit_ovs_group_admin_client.id,
+        default_scopes=["basic", "roles", ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
+    # manage-users also covers viewing users, groups and group members, which
+    # the command does to look them up.
+    keycloak.openid.ClientServiceAccountRole(
+        "ol-mit-ovs-group-admin-sa-manage-users",
+        realm_id=ol_mit_realm.id,
+        service_account_user_id=ol_mit_ovs_group_admin_client.service_account_user_id,
+        client_id=realm_management_client.id,
+        role="manage-users",
+        opts=resource_options,
+    )
+    vault.generic.Secret(
+        "ol-mit-ovs-group-admin-client-vault-credentials",
+        path="secret-operations/sso/ovs-group-admin",
+        data_json=Output.all(
+            server_url=keycloak_url,
+            realm_name="ol-mit",
+            client_id=ol_mit_ovs_group_admin_client.client_id,
+            client_secret=ol_mit_ovs_group_admin_client.client_secret,
+        ).apply(json.dumps),
+    )
 
     # The OVS pipeline (assign_user_groups) reads the `user_groups` claim to map
     # Keycloak groups to Django is_staff / is_superuser flags.

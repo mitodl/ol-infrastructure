@@ -20,3 +20,9 @@ path "secret-operations/sso/ol-memory-admin" {
 path "secret-operations/sso/ol-memory-forget-lookup" {
   capabilities = ["deny"]
 }
+
+# Operators read this to run OVS's assign_group_users. Its manage-users role
+# can edit any user in the ol-mit realm.
+path "secret-operations/sso/ovs-group-admin" {
+  capabilities = ["deny"]
+}
