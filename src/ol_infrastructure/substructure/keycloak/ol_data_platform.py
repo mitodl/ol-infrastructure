@@ -345,27 +345,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ).apply(json.dumps),
     )
 
-    # Provision service account with necessary roles for API operations
-    # This enables users calling the Superset API to have their tokens validated
-    # and user details looked up via Keycloak admin API
     realm_mgmt_client = keycloak.openid.get_client(
         realm_id="ol-data-platform",
         client_id="realm-management",
         opts=InvokeOptions(provider=keycloak_provider),
     )
-
-    for resource_name, role in [
-        ("ol-superset-service-account-view-realm", "view-realm"),
-        ("ol-superset-service-account-view-users", "view-users"),
-    ]:
-        keycloak.openid.ClientServiceAccountRole(
-            resource_name,
-            realm_id=ol_data_platform_realm.id,
-            service_account_user_id=ol_data_platform_superset_client.service_account_user_id,
-            client_id=realm_mgmt_client.id,
-            role=role,
-            opts=resource_options,
-        )
 
     # Grant the service account the ol_platform_admin Superset client role so that
     # client_credentials JWTs include it in the role_keys claim (via the
@@ -464,13 +448,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ],
         opts=resource_options,
     )
-    # Optional, not default: this client also signs users in, and their tokens
-    # should not carry the Admin API audience. The service account requests it.
+    # No kc-admin-api: Superset never calls the Keycloak Admin API.
     keycloak.openid.ClientOptionalScopes(
         "ol-data-platform-superset-client-optional-scopes",
         realm_id=ol_data_platform_realm.id,
         client_id=ol_data_platform_superset_client.id,
-        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        optional_scopes=REALM_DEFAULT_OPTIONAL_SCOPES,
         opts=resource_options,
     )
 
