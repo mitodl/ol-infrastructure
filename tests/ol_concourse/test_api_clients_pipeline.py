@@ -314,6 +314,32 @@ def test_a_prerelease_publishes_only_a_changed_client(variant):
         assert compare < retag < script.index("yarn npm publish")
 
 
+@pytest.mark.parametrize("variant", PRERELEASE_VARIANTS)
+def test_a_stale_prerelease_build_touches_neither_tag(variant):
+    """A re-run of an older build must not move `next` back or publish over it."""
+    config = PIPELINE_CONFIGS[variant]
+    for job in _prerelease_jobs(variant):
+        names = _step_names(job)
+        assert names.index("generate-apis") < names.index("check-source-current")
+        assert names.index("check-source-current") < names.index(job["name"])
+        (check,) = [s for s in job["plan"] if s.get("task") == "check-source-current"]
+        assert {
+            "name": _prerelease_source(variant),
+            "path": config["source_repo_name"],
+        } in check["config"]["inputs"]
+        assert check["config"]["outputs"] == [{"name": config["client_repo_name"]}]
+        assert check["config"]["params"] == {
+            "SOURCE_DIR": f"../{config['source_repo_name']}",
+            "SOURCE_URI": config["source_repo_uri"],
+            "SOURCE_BRANCH": config["prerelease_branch"],
+        }
+        (publish,) = [s for s in job["plan"] if s.get("task") == job["name"]]
+        script = publish["config"]["run"]["args"][-1]
+        stale = script.index("if [ -e ../../../.git/source-stale ]; then")
+        assert stale < script.index("for channel in next latest; do")
+        assert stale < script.index("yarn npm publish")
+
+
 @pytest.mark.parametrize(
     ("tag", "version"),
     [
@@ -577,6 +603,78 @@ def test_a_changed_client_is_committed(generated_repo):
         f"Generated clients for mitxonline from rev: {'a' * 40}\n"
     )
     assert _git(generated_repo, "status", "--porcelain", "--untracked-files=no") == ""
+
+
+def _commit(repo: Path, message: str) -> None:
+    _git(repo, "add", "-A")
+    _git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", message)
+
+
+@pytest.fixture
+def prerelease_checkout(tmp_path):
+    """Make an upstream source repo on main, and a build's clone of it."""
+    upstream = tmp_path / "upstream"
+    (upstream / "openapi" / "specs").mkdir(parents=True)
+    (upstream / "openapi" / "specs" / "v1.yaml").write_text("openapi: 3.0.0\n")
+    _git(tmp_path, "init", "-q", "-b", "main", str(upstream))
+    _commit(upstream, "spec")
+    _git(tmp_path, "clone", "-q", str(upstream), str(tmp_path / "mitxonline"))
+    return upstream
+
+
+def _check_current(clients: Path, upstream: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(  # noqa: S603
+        ["sh", "-c", (SCRIPTS / "api-clients-check-source-current.sh").read_text()],  # noqa: S607
+        cwd=clients,
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "HOME": str(clients.parent),
+            "SOURCE_DIR": "../mitxonline",
+            "SOURCE_URI": str(upstream),
+            "SOURCE_BRANCH": "main",
+        },
+    )
+
+
+def test_a_build_of_main_s_specs_is_current(generated_repo, prerelease_checkout):
+    _check_current(generated_repo, prerelease_checkout)
+
+    assert not (generated_repo / ".git" / "source-stale").exists()
+
+
+def test_a_later_commit_that_leaves_the_specs_keeps_a_build_current(
+    generated_repo, prerelease_checkout
+):
+    (prerelease_checkout / "README.md").write_text("docs\n")
+    _commit(prerelease_checkout, "docs")
+    (generated_repo / ".git" / "source-stale").touch()
+
+    _check_current(generated_repo, prerelease_checkout)
+
+    assert not (generated_repo / ".git" / "source-stale").exists()
+
+
+def test_a_build_whose_specs_main_has_moved_past_is_stale(
+    generated_repo, prerelease_checkout
+):
+    (prerelease_checkout / "openapi" / "specs" / "v1.yaml").write_text(
+        "openapi: 3.1.0\n"
+    )
+    _commit(prerelease_checkout, "newer spec")
+
+    result = _check_current(generated_repo, prerelease_checkout)
+
+    assert (generated_repo / ".git" / "source-stale").exists()
+    assert "publishes nothing" in result.stdout
+
+
+@pytest.mark.usefixtures("prerelease_checkout")
+def test_a_failed_fetch_fails_the_check(tmp_path, generated_repo):
+    with pytest.raises(subprocess.CalledProcessError):
+        _check_current(generated_repo, tmp_path / "missing")
 
 
 def test_a_rerun_after_a_change_starts_from_a_clean_marker(generated_repo):

@@ -14,7 +14,16 @@
 # was publishes nothing. When it matches `latest` but not `next` (main reverted
 # an API change that `next` still has), `next` is moved to the `latest`
 # version, so `@next` never serves an API main no longer has.
+#
+# A build whose specs are no longer main's (a re-run of an older build) touches
+# neither tag: api-clients-check-source-current.sh leaves .git/source-stale in
+# the client repo, three levels up from this package directory.
 set -euo pipefail
+
+if [ -e ../../../.git/source-stale ]; then
+	echo "This build is older than the specs on main: publishing nothing and leaving next as it is."
+	exit 0
+fi
 
 export YARN_NPM_PUBLISH_REGISTRY=https://registry.npmjs.org/
 set +x

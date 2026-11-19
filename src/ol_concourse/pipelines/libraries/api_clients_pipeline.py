@@ -126,6 +126,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     commit_script: str = "api-clients-commit-changes.sh"
     publish_script: str = "api-clients-publish-node.sh"
     publish_prerelease_script: str = "api-clients-publish-node-prerelease.sh"
+    check_source_current_script: str = "api-clients-check-source-current.sh"
 
     openapi_generator_image = registry_image(
         name=Identifier("openapi-generator-image"),
@@ -385,6 +386,35 @@ def generate_api_client_pipeline(  # noqa: PLR0913
                         load_var=prerelease_rev,
                         file=f"{prerelease_source.name}/.git/ref",
                         reveal=True,
+                    ),
+                    # Serial keeps builds in trigger order, but a re-run
+                    # replays an older build's inputs after newer ones have
+                    # published. This marks such a build stale, so it leaves
+                    # `next` to the newer one.
+                    TaskStep(
+                        task=Identifier("check-source-current"),
+                        config=TaskConfig(
+                            platform="linux",
+                            image_resource=git_task_image,
+                            inputs=[
+                                Input(
+                                    name=prerelease_source.name,
+                                    path=source_repo_name,
+                                ),
+                                Input(name=api_clients_repository.name),
+                            ],
+                            outputs=[Output(name=api_clients_repository.name)],
+                            params={
+                                "SOURCE_DIR": f"../{source_repo_name}",
+                                "SOURCE_URI": source_repo_uri,
+                                "SOURCE_BRANCH": prerelease_branch,
+                            },
+                            run=Command(
+                                path="sh",
+                                dir=api_clients_repository.name,
+                                args=["-xc", _read_script(check_source_current_script)],
+                            ),
+                        ),
                     ),
                     TaskStep(
                         task=Identifier(f"publish-next-{subpath}"),
