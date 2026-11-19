@@ -32,6 +32,9 @@ PIPELINE_CONFIGS = {
             "ol-analytics-dashboard-api-axios",
             "ol-analytics-learner-records-api-axios",
         ],
+        # The stable client waits for Production, so an API that has merged,
+        # or is cut and in RC, is only on `next` until it is promoted.
+        "prerelease_branch": "main",
     },
     # mit-learn is still on the legacy flow and watches its `release` branch,
     # which Doof merges a release candidate into only when it is promoted.
@@ -60,5 +63,8 @@ PIPELINE_CONFIGS = {
         "client_repo_uri": "git@github.com:mitodl/mitxonline-api-clients.git",
         "client_repo_branch": "main",
         "client_repo_subpath": "mitxonline-api-axios",
+        # As for ol-analytics-api: `next` carries what main has until a release
+        # with it reaches Production.
+        "prerelease_branch": "main",
     },
 }

@@ -125,19 +125,25 @@ def test_a_publish_still_triggers_on_a_generated_client(variant):
         assert step["passed"] == [GENERATE_JOB]
 
 
-def test_mit_learn_publishes_prereleases_off_main():
-    assert PRERELEASE_VARIANTS == ["mit-learn"]
-    assert PIPELINE_CONFIGS["mit-learn"]["prerelease_branch"] == "main"
+def test_every_variant_publishes_prereleases_off_main():
+    """The stable client waits for promotion (Production for a tag variant,
+    the `release` branch for mit-learn), so `next` is the only client for an
+    API that has merged or is in RC.
+    """
+    assert list(PIPELINE_CONFIGS) == PRERELEASE_VARIANTS
+    for config in PIPELINE_CONFIGS.values():
+        assert config["prerelease_branch"] == "main"
 
 
-@pytest.mark.parametrize(
-    "variant", [v for v in PIPELINE_CONFIGS if v not in PRERELEASE_VARIANTS]
-)
+@pytest.mark.parametrize("variant", PIPELINE_CONFIGS)
 def test_no_prerelease_jobs_without_a_prerelease_branch(variant):
-    assert [job["name"] for job in _pipeline(variant)["jobs"]] == [
-        GENERATE_JOB,
-        *(job["name"] for job in _publish_jobs(variant)),
-    ]
+    config = {**PIPELINE_CONFIGS[variant], "prerelease_branch": None}
+    pipeline = json.loads(
+        generate_api_client_pipeline(**config).model_dump_json(exclude_none=True)
+    )
+    assert not [j for j in pipeline["jobs"] if j["name"].startswith("publish-next-")]
+    resources = [r["name"] for r in pipeline["resources"]]
+    assert _prerelease_source(variant) not in resources
 
 
 @pytest.mark.parametrize("variant", PRERELEASE_VARIANTS)
