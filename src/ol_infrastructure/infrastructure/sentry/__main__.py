@@ -1677,16 +1677,6 @@ github_repository_mitodl_superset_marimo = sentry.SentryOrganizationRepositoryGi
     opts=sentry_opts,
 )
 
-github_repository_mitodl_superset_nl_explorer = (
-    sentry.SentryOrganizationRepositoryGithub(
-        "github_repository_mitodl_superset_nl_explorer",
-        organization=ORGANIZATION,
-        identifier="mitodl/superset-nl-explorer",
-        integration_id="29144",
-        opts=sentry_opts,
-    )
-)
-
 github_repository_mitodl_superset_sup = sentry.SentryOrganizationRepositoryGithub(
     "github_repository_mitodl_superset_sup",
     organization=ORGANIZATION,
