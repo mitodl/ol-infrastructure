@@ -991,6 +991,17 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         service_accounts_enabled=True,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
+    # Optional, not default: a default list would replace the scopes Gravitino
+    # reads this token through (preferred_username for the principal, the
+    # catalog audience), so the optional set is the one that leaves them alone.
+    # The reconciler requests it with scope=kc-admin-api.
+    keycloak.openid.ClientOptionalScopes(
+        "ol-gravitino-admin-client-optional-scopes",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_gravitino_admin_client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
+    )
     for resource_name, role in [
         ("ol-gravitino-admin-service-account-view-users", "view-users"),
         ("ol-gravitino-admin-service-account-view-clients", "view-clients"),

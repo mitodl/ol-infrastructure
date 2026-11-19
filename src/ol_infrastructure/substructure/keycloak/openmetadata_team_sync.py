@@ -15,7 +15,10 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import InvokeOptions, Output, ResourceOptions
 
-from ol_infrastructure.substructure.keycloak.client_policies import MANAGED_CLIENT_ARGS
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    ADMIN_API_SCOPE_NAME,
+    MANAGED_CLIENT_ARGS,
+)
 
 REALM_NAME = "ol-data-platform"
 
@@ -53,6 +56,17 @@ def create_openmetadata_team_sync_resources(
         standard_flow_enabled=False,
         **MANAGED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # basic carries sub, roles carries the realm-management roles, and
+    # kc-admin-api the audience the Admin API requires since 26.8.2. Service
+    # account only, so it is a default scope.
+    keycloak.openid.ClientDefaultScopes(
+        "ol-openmetadata-team-sync-default-scopes",
+        realm_id=realm.id,
+        client_id=sync_client.id,
+        default_scopes=["basic", "roles", ADMIN_API_SCOPE_NAME],
+        opts=resource_options,
     )
 
     # manage-users is the one realm-management role that allows creating
