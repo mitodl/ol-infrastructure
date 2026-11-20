@@ -30,7 +30,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DOCKERFILE="${REPO_ROOT}/local-dev/keycloak/Dockerfile"
 TILT_CONFIG="${REPO_ROOT}/tilt_config.json"
-CORE_STACK="${REPO_ROOT}/local-dev/infra/core/__main__.py"
+# The projection of LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST in src/bridge/lib/versions.py
+# that the sync-version-pins hook keeps in step with it.
+BASE_DIGEST_PIN="${REPO_ROOT}/src/bridge/lib/version_pins/LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST"
 
 DOCKER="${DOCKER:-docker}"
 # The daemon treats `localhost` as insecure automatically but insists on TLS for
@@ -81,8 +83,8 @@ curl -sf "http://${PUSH_REGISTRY}/v2/" >/dev/null \
 
 # The Dockerfile's base must be the image the core stack runs by default, so
 # read the digest from the one place it is pinned rather than duplicating it.
-BASE_DIGEST="$(grep -o 'sha256:[0-9a-f]\{64\}' "${CORE_STACK}" | head -1)"
-[[ -n "${BASE_DIGEST}" ]] || die "no mitodl/keycloak digest found in ${CORE_STACK}"
+BASE_DIGEST="$(grep -o '^sha256:[0-9a-f]\{64\}$' "${BASE_DIGEST_PIN}")"
+[[ -n "${BASE_DIGEST}" ]] || die "no mitodl/keycloak digest in ${BASE_DIGEST_PIN}"
 
 # The base is published for amd64 and arm64. Build for the k3d nodes'
 # architecture, not the builder's default: a remote buildx builder would build

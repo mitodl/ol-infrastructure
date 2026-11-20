@@ -131,6 +131,23 @@
         'Before approving, run `cosign verify` against the new `PAYPAL_ADAPTER_IMAGE_DIGEST` as the Stripe adapter docs show. Merging deploys to QA; Production waits on the preview gate.',
       ],
     },
+    {
+      // LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST follows mitodl/keycloak:latest, so these
+      // are digest-only PRs. local-dev/keycloak/Dockerfile reruns `kc.sh build`
+      // on that base with Dockerfile.hosted's build flags, and a flag the new
+      // build added would make a theme image differ from the base, so someone
+      // has to compare them before merging.
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'mitodl/keycloak',
+      ],
+      automerge: false,
+      prBodyNotes: [
+        "Before approving, compare the `kc.sh build` flags in `local-dev/keycloak/Dockerfile` with `Dockerfile.hosted` in mitodl/ol-keycloak at the commit this digest was built from (the image's short-sha tag on Docker Hub), and update the local Dockerfile in this PR if they differ.",
+      ],
+    },
   ],
   pip_requirements: {
     managerFilePatterns: [

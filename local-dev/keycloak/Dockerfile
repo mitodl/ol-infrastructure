@@ -12,8 +12,9 @@
 # when a jar in providers/ no longer matches the one it was built against, so
 # a new theme cannot be mounted or copied into a running pod: it has to be
 # baked in and `kc.sh build` rerun. BASE_IMAGE has no default on purpose: the
-# script reads the digest the core stack pins in
-# local-dev/infra/core/__main__.py and passes it in, so the two cannot drift.
+# script reads LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST, the digest the core stack also
+# runs (src/bridge/lib/versions.py, kept current by Renovate), and passes it in,
+# so the two cannot drift.
 ARG BASE_IMAGE
 
 # The jar is platform-independent, so build it on the host's own architecture.
