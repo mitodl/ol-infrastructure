@@ -136,7 +136,7 @@ repos:
     # template text naming Vault keys, never a value. JSON has no comments, so
     # the keyword detector's hits on `dest_secret_name` can't be allowlisted inline.
     - --exclude-files
-    - tests/ol_infrastructure/applications/mitxonline/fixtures/vso_secrets_main\.json
+    - tests/ol_infrastructure/applications/[^/]+/fixtures/vso_secrets_main\.json
     # Written by `bin/gcp-credential-usage snapshot`. Trips the hex-entropy
     # detector on service-account key ids and reCAPTCHA name digests, which are
     # identifiers. The command reads only list endpoints, which return no key
