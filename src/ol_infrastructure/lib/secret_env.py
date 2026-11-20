@@ -101,6 +101,18 @@ def env_names(secrets: Iterable[VaultSecret]) -> list[str]:
     return names
 
 
+def secret_named(secrets: Iterable[VaultSecret], name: str) -> VaultSecret:
+    """Return the secret called ``name``.
+
+    :raises KeyError: If there is none. A bare ``StopIteration`` would surface
+        from inside a Pulumi ``apply`` as a ``RuntimeError`` that names nothing.
+    """
+    secret = next((secret for secret in secrets if secret.name == name), None)
+    if secret is None:
+        raise KeyError(name)
+    return secret
+
+
 def vault_k8s_secrets(  # noqa: PLR0913
     secrets: Iterable[VaultSecret],
     *,

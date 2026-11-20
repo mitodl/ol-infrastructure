@@ -17,7 +17,12 @@ from ol_infrastructure.lib.opik import (
     OPIK_SDK_VAULT_MOUNT,
     opik_sdk_vault_path,
 )
-from ol_infrastructure.lib.secret_env import Template, VaultSecret, env_names
+from ol_infrastructure.lib.secret_env import (
+    Template,
+    VaultSecret,
+    env_names,
+    secret_named,
+)
 
 
 def vault_secrets(
@@ -86,18 +91,6 @@ def vault_secrets(
             },
         ),
     ]
-
-
-def secret_named(secrets: Iterable[VaultSecret], name: str) -> VaultSecret:
-    """Return the secret called ``name``.
-
-    :raises KeyError: If there is none. A bare ``StopIteration`` would surface
-        from inside a Pulumi ``apply`` as a ``RuntimeError`` that names nothing.
-    """
-    secret = next((secret for secret in secrets if secret.name == name), None)
-    if secret is None:
-        raise KeyError(name)
-    return secret
 
 
 def undescribed_static_keys(keys: Iterable[str]) -> list[str]:

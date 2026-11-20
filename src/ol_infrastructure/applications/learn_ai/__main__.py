@@ -30,7 +30,6 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.learn_ai import definition
 from ol_infrastructure.applications.learn_ai.vault_secrets import (
-    secret_named,
     undescribed_static_keys,
     vault_secrets,
 )
@@ -103,6 +102,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
 )
+from ol_infrastructure.lib.secret_env import secret_named
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import setup_vault_provider
 

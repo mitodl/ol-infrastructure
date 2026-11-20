@@ -83,7 +83,6 @@ from pulumi_aws import ec2
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.ol_analytics_api import definition
 from ol_infrastructure.applications.ol_analytics_api.vault_secrets import (
-    secret_named,
     vault_keys,
     vault_secrets,
 )
@@ -124,6 +123,7 @@ from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
 )
+from ol_infrastructure.lib.secret_env import secret_named
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 APPLICATION_NAME = definition.APPLICATION_NAME

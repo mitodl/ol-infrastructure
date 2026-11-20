@@ -15,6 +15,9 @@ from pulumi import Output
 from pydantic import BaseModel, ConfigDict, Field
 
 from bridge.lib.constants import LearnSession
+from ol_infrastructure.applications.ol_analytics_api.vault_secrets import (
+    vault_secrets,
+)
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
@@ -34,6 +37,7 @@ from ol_infrastructure.lib.app_bindings import (
     oidc_credentials,
 )
 from ol_infrastructure.lib.pulumi_helper import merge_otel_resource_attributes
+from ol_infrastructure.lib.secret_env import secret_named
 
 __all__ = [
     "APPLICATION_NAME",
@@ -69,8 +73,6 @@ APPLICATION_PORT = 8000
 # The Vault database engine the pod reads its StarRocks credentials from. Not
 # environment-specific: each environment has its own Vault server.
 STARROCKS_VAULT_MOUNT = "database-starrocks"
-# The canonical host's dedicated Keycloak client (substructure/keycloak/olapps.py).
-CANONICAL_OIDC_VAULT_PATH = "sso/ol-analytics-api"
 
 _BACKEND: dict[str, Any] = {
     "backend_service_name": SERVICE_NAME,
@@ -242,6 +244,9 @@ def application_config(bindings: OlAnalyticsApiBindings) -> OLApplicationK8sConf
             log_level="info",
             application_module="ol_analytics_api.main:app",
             reload=bindings.synced_source,
+            # Every reload waits this long for a worker an in-flight request
+            # keeps from stopping, so it stays short.
+            workers_kill_timeout=1 if bindings.synced_source else None,
         ),
         application_port=APPLICATION_PORT,
         import_nginx_config=False,
@@ -347,6 +352,9 @@ def canonical_oidc_config(bindings: OlAnalyticsApiBindings) -> OLApisixOIDCConfi
     if vault_auth_name is None:
         msg = "The canonical host's OIDC reads its client from Vault"
         raise ValueError(msg)
+    canonical_client = secret_named(
+        vault_secrets(), "ol-analytics-api-learner-records-oidc"
+    )
     return OLApisixOIDCConfig(
         application_name=APPLICATION_NAME,
         k8s_labels=bindings.k8s_labels,
@@ -354,10 +362,13 @@ def canonical_oidc_config(bindings: OlAnalyticsApiBindings) -> OLApisixOIDCConfi
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{canonical}/",
         oidc_use_session_secret=True,
+        # The canonical host's dedicated Keycloak client
+        # (substructure/keycloak/olapps.py), the same entry the learner-records
+        # tenant reads its issuer and audience from.
         credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path=CANONICAL_OIDC_VAULT_PATH,
+            mount=canonical_client.mount,
+            mount_type=canonical_client.mount_type,
+            path=canonical_client.path,
             vaultauth=vault_auth_name,
         ),
     )

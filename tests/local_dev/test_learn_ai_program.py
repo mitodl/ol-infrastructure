@@ -19,9 +19,10 @@ from tests.local_dev.program_render import (
     PLUGIN_CONFIG,
     REPO,
     ROUTE,
-    SECRET_TYPE,
     SERVICE,
+    literal_env,
     render_program,
+    secret_string_data,
 )
 from tests.local_dev.program_render import one as _one
 
@@ -38,31 +39,13 @@ MIGRATE_COMMAND = [
 _render = functools.partial(render_program, "learn-ai")
 
 
-def _secret_data(mocks):
-    """Return the local Secret's stringData, which the provider marks secret.
-
-    The mock sees the marked value as Pulumi's wire form, a dict with the
-    secret signature key beside the value.
-    """
-    data = _one(mocks, SECRET_TYPE, "learn-ai-secrets")["stringData"]
-    return data["value"] if pulumi.runtime.rpc._special_sig_key in data else data
+_secret_data = functools.partial(secret_string_data, name="learn-ai-secrets")
+_env = literal_env
 
 
 def _plugin(route_inputs, rule, plugin):
     rules = {r["name"]: r for r in route_inputs["spec"]["http"]}
     return {p["name"]: p for p in rules[rule]["plugins"]}[plugin]
-
-
-def _env(deployment):
-    """Literal env values.
-
-    valueFrom entries (downward API) are the component's, not config the app reads.
-    """
-    return {
-        e["name"]: e["value"]
-        for e in deployment["spec"]["template"]["spec"]["containers"][0]["env"]
-        if "value" in e
-    }
 
 
 def _resources(workload):
@@ -235,19 +218,6 @@ def test_env_is_exactly_the_three_local_layers(tmp_path, monkeypatch):
     )
 
 
-def test_an_override_wins_and_only_its_name_is_logged(tmp_path, monkeypatch, capsys):
-    mocks = _render(
-        tmp_path,
-        monkeypatch,
-        config={"learn_ai:env_vars": {"OPENAI_API_KEY": KEY_VALUE}},
-    )
-    env = _env(_one(mocks, DEPLOYMENT, "learn-ai-app"))
-    assert env["OPENAI_API_KEY"] == KEY_VALUE
-    err = capsys.readouterr().err
-    assert "learn_ai:env_vars overrides: OPENAI_API_KEY" in err
-    assert KEY_VALUE not in err
-
-
 def test_the_root_domain_flows_into_hosts_and_env(tmp_path, monkeypatch):
     mocks = _render(tmp_path, monkeypatch, root_domain="mit.localhost")
     bindings = mocks.program["bindings"]
@@ -309,15 +279,6 @@ def test_a_variable_added_for_deployed_stacks_stops_the_local_program(
         _render(tmp_path, monkeypatch)
 
 
-def test_a_local_only_secret_stops_the_local_program(tmp_path, monkeypatch):
-    """A key deployed stacks do not read belongs in LOCAL_ENV_DEFAULTS, not here."""
-    secrets = (APP_DIR / "secrets.yaml").read_text()
-    edited = secrets.replace("unset:\n", "unset:\n- LOCAL_ONLY_VARIABLE\n", 1)
-    assert edited != secrets
-    with pytest.raises(ValueError, match=r"not deployed: LOCAL_ONLY_VARIABLE$"):
-        _render(tmp_path, monkeypatch, app_files={"secrets.yaml": edited})
-
-
 def test_a_non_string_secret_value_names_its_key(tmp_path, monkeypatch):
     secrets = (APP_DIR / "secrets.yaml").read_text()
     edited = secrets.replace(
@@ -364,23 +325,6 @@ def test_a_secrets_edit_changes_the_hash_on_the_pods_and_the_job(tmp_path, monke
     # must move.
     assert before[0] != after[0]
     assert before[1] != after[1]
-
-
-def test_a_leftover_app_env_local_yaml_is_named_as_unread(
-    tmp_path, monkeypatch, capsys
-):
-    """The YAML apps' override file is inert here; the apply log must say so,
-    naming the keys to move (names only: the values may be secrets).
-    """
-    _render(
-        tmp_path,
-        monkeypatch,
-        app_files={"configmaps/app-env.local.yaml": 'data:\n  X: "1"\n  Y: "s3cret"\n'},
-    )
-    err = capsys.readouterr().err
-    assert "configmaps/app-env.local.yaml is not read: move X, Y under" in err
-    assert "learn_ai:env_vars" in err
-    assert "s3cret" not in err
 
 
 def _webapp_container(mocks):

@@ -8,7 +8,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCSecretCredentials,
     OLApisixOIDCVaultCredentials,
 )
-from ol_infrastructure.lib.secret_env import Template, VaultSecret
+from ol_infrastructure.lib.secret_env import Template, VaultSecret, secret_named
 
 OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
 VAULT_ENV = {
@@ -121,15 +121,13 @@ def test_cors_origins_lead_with_the_canonical_host_when_there_is_one():
 
 def test_the_templated_secrets_render_the_deployed_text():
     secrets = vault_secrets.vault_secrets()
-    oauth = vault_secrets.secret_named(secrets, "ol-analytics-api-mitxonline-oauth")
+    oauth = secret_named(secrets, "ol-analytics-api-mitxonline-oauth")
     assert oauth.templates == {
         vault_secrets.MITXONLINE_CLIENT_ID: '{{ get .Secrets "client_id" }}',
         vault_secrets.MITXONLINE_CLIENT_SECRET: '{{ get .Secrets "client_secret" }}',
     }
     assert vault_secrets.vault_keys(oauth) == ["client_id", "client_secret"]
-    records = vault_secrets.secret_named(
-        secrets, "ol-analytics-api-learner-records-oidc"
-    )
+    records = secret_named(secrets, "ol-analytics-api-learner-records-oidc")
     assert vault_secrets.vault_keys(records) == ["url", "client_id"]
 
 

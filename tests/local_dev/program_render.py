@@ -137,3 +137,25 @@ def one(mocks: ProgramMocks, typ: str, name: str) -> dict[str, Any]:
     ]
     assert len(matches) == 1, f"{typ} {name}: {len(matches)} found"
     return matches[0]
+
+
+def secret_string_data(mocks: ProgramMocks, name: str) -> dict[str, Any]:
+    """Return the stringData of the Secret ``name``.
+
+    The provider marks stringData secret, which the mock sees in Pulumi's wire
+    form: a dict with the secret signature key beside the value.
+    """
+    data = one(mocks, SECRET_TYPE, name)["stringData"]
+    return data["value"] if pulumi.runtime.rpc._special_sig_key in data else data
+
+
+def literal_env(deployment: dict[str, Any]) -> dict[str, str]:
+    """Return the first container's literal env values.
+
+    valueFrom entries (downward API) are the component's, not config the app reads.
+    """
+    return {
+        e["name"]: e["value"]
+        for e in deployment["spec"]["template"]["spec"]["containers"][0]["env"]
+        if "value" in e
+    }

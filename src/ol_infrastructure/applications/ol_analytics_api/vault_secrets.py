@@ -9,8 +9,6 @@ not here: the app reads those from Vault itself (see
 ``definition.StarRocksVaultLogin``).
 """
 
-from collections.abc import Iterable
-
 from ol_infrastructure.lib.secret_env import VaultSecret, env_names
 
 MITXONLINE_CLIENT_ID = "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID"
@@ -58,17 +56,6 @@ def vault_secrets() -> list[VaultSecret]:
             },
         ),
     ]
-
-
-def secret_named(secrets: Iterable[VaultSecret], name: str) -> VaultSecret:
-    """Return the secret called ``name``.
-
-    :raises KeyError: If there is none.
-    """
-    secret = next((secret for secret in secrets if secret.name == name), None)
-    if secret is None:
-        raise KeyError(name)
-    return secret
 
 
 def vault_keys(secret: VaultSecret) -> list[str]:

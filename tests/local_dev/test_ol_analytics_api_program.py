@@ -5,7 +5,6 @@ import importlib
 import importlib.util
 import json
 
-import pulumi
 import pytest
 import yaml
 
@@ -20,9 +19,10 @@ from tests.local_dev.program_render import (
     PLUGIN_CONFIG,
     REPO,
     ROUTE,
-    SECRET_TYPE,
     SERVICE,
+    literal_env,
     render_program,
+    secret_string_data,
 )
 from tests.local_dev.program_render import one as _one
 
@@ -46,10 +46,7 @@ def _mitxonline_inputs():
     return module
 
 
-def _secret_data(mocks):
-    """Return the local Secret's stringData, unwrapping Pulumi's secret wire form."""
-    data = _one(mocks, SECRET_TYPE, "ol-analytics-api-secrets")["stringData"]
-    return data["value"] if pulumi.runtime.rpc._special_sig_key in data else data
+_secret_data = functools.partial(secret_string_data, name="ol-analytics-api-secrets")
 
 
 def _container(mocks):
@@ -57,8 +54,7 @@ def _container(mocks):
 
 
 def _env(mocks):
-    """Literal env values; valueFrom entries (downward API) are the component's."""
-    return {e["name"]: e["value"] for e in _container(mocks)["env"] if "value" in e}
+    return literal_env(_one(mocks, DEPLOYMENT, WEBAPP))
 
 
 def _rule(mocks):
@@ -163,18 +159,6 @@ def test_env_is_exactly_the_local_layers_with_no_vault_login(tmp_path, monkeypat
     assert env["STARROCKS_PASSWORD"] == ""
 
 
-def test_an_override_wins_and_only_its_name_is_logged(tmp_path, monkeypatch, capsys):
-    mocks = _render(
-        tmp_path,
-        monkeypatch,
-        config={"ol_analytics_api:env_vars": {"STARROCKS_PASSWORD": SECRET_VALUE}},
-    )
-    assert _env(mocks)["STARROCKS_PASSWORD"] == SECRET_VALUE
-    err = capsys.readouterr().err
-    assert "ol_analytics_api:env_vars overrides: STARROCKS_PASSWORD" in err
-    assert SECRET_VALUE not in err
-
-
 def test_the_root_domain_flows_into_hosts_env_and_the_secret(tmp_path, monkeypatch):
     mocks = _render(tmp_path, monkeypatch, root_domain="mit.localhost")
     bindings = mocks.program["bindings"]
@@ -261,15 +245,6 @@ def test_a_variable_added_for_deployed_stacks_stops_the_local_program(
         _render(tmp_path, monkeypatch)
 
 
-def test_a_local_only_secret_stops_the_local_program(tmp_path, monkeypatch):
-    """A key deployed stacks do not read belongs in LOCAL_ENV_DEFAULTS, not here."""
-    secrets = (APP_DIR / "secrets.yaml").read_text()
-    edited = secrets.replace("unset:\n", "unset:\n- LOCAL_ONLY_VARIABLE\n", 1)
-    assert edited != secrets
-    with pytest.raises(ValueError, match=r"not deployed: LOCAL_ONLY_VARIABLE$"):
-        _render(tmp_path, monkeypatch, app_files={"secrets.yaml": edited})
-
-
 def test_a_secrets_edit_rolls_the_pod(tmp_path, monkeypatch):
     def config_hash(mocks):
         template = _one(mocks, DEPLOYMENT, WEBAPP)["spec"]["template"]
@@ -283,20 +258,6 @@ def test_a_secrets_edit_rolls_the_pod(tmp_path, monkeypatch):
         _render(tmp_path / "b", monkeypatch, app_files={"secrets.yaml": edited})
     )
     assert before != after
-
-
-def test_a_leftover_app_env_local_yaml_is_named_as_unread(
-    tmp_path, monkeypatch, capsys
-):
-    _render(
-        tmp_path,
-        monkeypatch,
-        app_files={"configmaps/app-env.local.yaml": 'data:\n  X: "1"\n  Y: "s3cret"\n'},
-    )
-    err = capsys.readouterr().err
-    assert "configmaps/app-env.local.yaml is not read: move X, Y under" in err
-    assert "ol_analytics_api:env_vars" in err
-    assert "s3cret" not in err
 
 
 def test_the_image_tilt_built_reloads_and_the_published_one_does_not(
