@@ -267,8 +267,12 @@ def create_object_store(
             # The Job body is idempotent but its spec is immutable, so bumping
             # the bucket list means Pulumi replaces the Job rather than
             # patching it.
+            #
+            # No ttlSecondsAfterFinished: the finished Job stays in the
+            # cluster. With a TTL, Kubernetes deleted it after it succeeded,
+            # every refresh (each Tilt start) dropped it from the state, and
+            # every `pulumi up` created it again and waited for it to finish.
             "backoffLimit": 6,
-            "ttlSecondsAfterFinished": 600,
             "template": {
                 "metadata": {"labels": {"app": "rustfs-bootstrap"}},
                 "spec": {
