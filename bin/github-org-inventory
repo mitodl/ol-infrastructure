@@ -96,7 +96,7 @@ FORK_NAME_EXACT = {
 }
 # GitHub forks we develop and publish ourselves. `fork: true` would file them as upstream
 # forks (tier `unmanaged`, no org rulesets), so they go through the normal heuristics.
-DETACHED_FORKS = frozenset({"open-learning-ai-tutor"})
+DETACHED_FORKS = frozenset({"ol-parliament", "open-learning-ai-tutor"})
 INFRASTRUCTURE_NAME_HINTS = ("infrastructure", "concourse", "dagster", "salt", "packer")
 INFRASTRUCTURE_TOPIC_HINTS = ("infrastructure", "devops", "pulumi", "terraform")
 

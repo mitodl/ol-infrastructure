@@ -240,7 +240,6 @@ fork:
 - mitxpro-zendesk-theme
 - mynumbers
 - ocw-zendesk-theme
-- ol-parliament
 - open-edx-proposals
 - openedx-events
 - openedx-ledger
@@ -306,6 +305,7 @@ library:
 - ol-keycloak
 - ol-keycloakify
 - ol-notebook-extensions
+- ol-parliament
 - oldevops-scratch
 - open-collaboration
 - open-edx-plugins
