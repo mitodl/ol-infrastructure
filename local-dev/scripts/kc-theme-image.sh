@@ -56,7 +56,7 @@ write_keycloak_image() {
   cat "${tmp}" > "${TILT_CONFIG}" && rm -f "${tmp}"
 }
 
-for tool in "${DOCKER}" jq curl git shasum; do
+for tool in "${DOCKER}" jq curl git shasum kubectl; do
   command -v "${tool}" >/dev/null || die "${tool} is required"
 done
 
@@ -102,13 +102,16 @@ PUSH_REF="${PUSH_REGISTRY}/${REPO}:${TAG}"
 PULL_REF="${PULL_REGISTRY}/${REPO}:${TAG}"
 
 echo "Building ${PUSH_REF} from ${CHECKOUT} ..."
-# The base image is linux/amd64 only. --provenance=false --sbom=false keeps the
-# push a single image manifest: BuildKit's default attestation turns it into an
-# OCI index, and containerd on the arm64 k3d nodes then looks for an arm64
-# entry, finds none, and fails the pull with "no match for platform in
-# manifest". A plain amd64 manifest is pulled as-is, like the published base.
+# The base is published for amd64 and arm64. Build for the k3d nodes'
+# architecture, not the builder's default: a remote buildx builder would build
+# its own, and containerd runs a lone manifest for another arch under
+# emulation. --provenance=false --sbom=false keeps the push a single image
+# manifest: BuildKit's default attestation turns it into an OCI index.
+node_arch="$(kubectl --context local-dev get nodes \
+  -o jsonpath='{.items[0].status.nodeInfo.architecture}')"
+[[ -n "${node_arch}" ]] || die "could not read the k3d node architecture"
 "${DOCKER}" build \
-  --platform linux/amd64 \
+  --platform "linux/${node_arch}" \
   --provenance=false --sbom=false \
   --build-arg "BASE_IMAGE=mitodl/keycloak@${BASE_DIGEST}" \
   -f "${DOCKERFILE}" \

@@ -144,7 +144,7 @@ keycloak_image = (
     or os.environ.get("LOCAL_DEV_KEYCLOAK_IMAGE")
     or (
         "mitodl/keycloak"
-        "@sha256:bac56d272e02121668a3d339b55585820525db248ce83aa58618f5e4f89ec9e0"
+        "@sha256:dccce37b6550894f601967c544ada45536fd83dbf7a22cfc1d8fa1f2aa3a38fb"
     )
 )
 

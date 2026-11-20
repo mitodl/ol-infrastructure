@@ -654,7 +654,7 @@ Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's sho
 
 The realm, clients, and seeded users live in Postgres and are untouched by the image swap. Under the hood, Tilt forwards `keycloak_image` to the core Pulumi stack as `LOCAL_DEV_KEYCLOAK_IMAGE`, so the same value works for a hand-run `pulumi up`.
 
-Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to (the script reads it from `local-dev/infra/core/__main__.py`) and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak); when bumping the digest, check those flags still match.
+Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to (the script reads it from `local-dev/infra/core/__main__.py`) and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak); when bumping the digest, check those flags still match. A theme image is built on the digest that was pinned when you ran the script, so after pulling a digest bump re-run the script (or `--reset`) to move onto the new base.
 
 ### S3 Storage (RustFS)
 
