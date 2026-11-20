@@ -175,6 +175,14 @@ DOMAIN_CONFIG: dict[str, dict[str, str]] = {
             "video, problem, discussion and navigation activity, and chatbot use."
         ),
     },
+    "marketing": {
+        "displayName": "Marketing",
+        "description": (
+            "Reaching prospective learners: HubSpot contacts, deals, marketing "
+            "emails and CRM activity, and Google Ads campaigns, keywords, spend "
+            "and conversions."
+        ),
+    },
 }
 
 _DOMAIN_TYPE = "Aggregate"
