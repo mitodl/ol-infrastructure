@@ -82,6 +82,10 @@ CONSUMED_LABEL = "ops:consumed"
 REFUSED_LABEL = "ops:refused"
 # The abandon job and the QA job's supersede step label an issue they retire.
 ABANDONED_LABELS = ("ops:abandoned", "abandoned")
+# Waives the checklist: Production's assert-gate-names-deploy refuses an issue
+# closed with unchecked boxes unless it carries this label. Kept in step with
+# OVERRIDE_LABEL in that script. `/doof promote <app> override <reason>` adds it.
+CHECKLIST_OVERRIDE_LABEL = "ops:skip-checklist"
 
 # Highest precedence first.
 _STATE_LABELS = (
@@ -484,6 +488,15 @@ def is_fully_checked(body: str) -> bool:
     """Return True if the body has at least one checklist line and all are checked."""
     checked, total = checklist_status(body)
     return total > 0 and checked == total
+
+
+def unchecked_items(body: str) -> list[str]:
+    """Return the unchecked checklist lines in an issue body, as written."""
+    return [
+        line.rstrip()
+        for line in body.splitlines()
+        if (match := _CHECKLIST_LINE_RE.match(line)) and match.group(1) == " "
+    ]
 
 
 def unchecked_authors(body: str) -> set[str]:

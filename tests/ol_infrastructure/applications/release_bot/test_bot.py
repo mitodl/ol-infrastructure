@@ -4917,3 +4917,131 @@ async def test_a_failure_report_survives_not_knowing_what_is_in_flight(
 
     assert "release build failed" in text
     assert "To try again: `/doof release my-app`, which says if" in text
+
+
+# ---------------------------------------------------------------------------
+# promote refuses an unchecked checklist, unless overridden
+# ---------------------------------------------------------------------------
+
+_UNCHECKED_BODY = (
+    "## Release 2026.9.5.1\n\n"
+    "- [x] **A** (#1) by alice@example.com\n"
+    "- [ ] **B** (#2) by bob@example.com\n"
+)
+
+
+@pytest.fixture
+def checklist_api(monkeypatch):
+    """Stub the calls behind `/doof promote`, with one box left unchecked."""
+    api = MagicMock()
+    api.open_release_issues = AsyncMock(
+        return_value=[
+            {
+                "number": 7,
+                "title": "Release my-app",
+                "url": "http://issue/7",
+                "body": _UNCHECKED_BODY,
+                "labels": ["ops:release"],
+            }
+        ]
+    )
+    api.close_release_issue = AsyncMock()
+    api.add_issue_label = AsyncMock()
+    for name in ("open_release_issues", "close_release_issue", "add_issue_label"):
+        monkeypatch.setattr(bot.github, name, getattr(api, name))
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(
+        slack_users, "format_authors", AsyncMock(return_value="<@UBOB>")
+    )
+    monkeypatch.setattr(bot.slack_channels, "resolve", AsyncMock(return_value="C123"))
+    app = MagicMock()
+    app.client = AsyncMock()
+    monkeypatch.setattr(bot, "_slack_app", app)
+    api.slack_client = app.client
+    return api
+
+
+async def test_promote_refuses_unchecked_boxes_and_names_who(
+    repos, slack, checklist_api
+):
+    """Production would refuse the close, so the bot refuses it first."""
+    await bot._cmd_promote(repos, slack.ack, slack.respond, _command("my-app"), _ctx())
+
+    checklist_api.close_release_issue.assert_not_awaited()
+    checklist_api.add_issue_label.assert_not_awaited()
+    assert "1 box(es)" in slack.said
+    assert "waiting on <@UBOB>" in slack.said
+    assert "/doof promote my-app override <reason>" in slack.said
+
+
+async def test_promote_override_labels_before_closing_and_records_why(
+    repos, slack, checklist_api
+):
+    """The gate reads the label when the close fires it, so it must come first."""
+    calls = MagicMock()
+    calls.attach_mock(checklist_api.add_issue_label, "label")
+    calls.attach_mock(checklist_api.close_release_issue, "close")
+    command = dict(_command("my-app override prod is down"), channel_id="CELSEWHERE")
+
+    await bot._cmd_promote(repos, slack.ack, slack.respond, command, _ctx())
+
+    assert [name for name, *_ in calls.mock_calls] == ["label", "close"]
+    checklist_api.add_issue_label.assert_awaited_once_with(
+        "mitodl/my-app", 7, "ops:skip-checklist"
+    )
+    comment = checklist_api.close_release_issue.call_args.kwargs["comment"]
+    assert "<@U1>" in comment
+    assert "> prod is down" in comment
+    assert "- [ ] **B** (#2) by bob@example.com" in comment
+    assert "skipping the checklist" in slack.said
+    # Run from another channel, so the app's channel hears about it too.
+    post = checklist_api.slack_client.chat_postMessage.call_args.kwargs
+    assert post["channel"] == "C123"
+    assert "prod is down" in post["text"]
+
+
+async def test_promote_override_is_not_posted_twice_in_the_apps_channel(
+    repos, slack, checklist_api
+):
+    command = dict(_command("my-app override hotfix"), channel_id="C123")
+
+    await bot._cmd_promote(repos, slack.ack, slack.respond, command, _ctx())
+
+    checklist_api.close_release_issue.assert_awaited_once()
+    checklist_api.slack_client.chat_postMessage.assert_not_awaited()
+
+
+@pytest.mark.parametrize("text", ["my-app override", "my-app now", "my-app overide x"])
+async def test_promote_refuses_a_malformed_override(repos, slack, checklist_api, text):
+    """An override needs the word and a reason; anything else is a typo."""
+    await bot._cmd_promote(repos, slack.ack, slack.respond, _command(text), _ctx())
+
+    checklist_api.close_release_issue.assert_not_awaited()
+    assert "Usage: `/doof promote <app> [override <reason>]`" in slack.said
+
+
+async def test_promote_passes_an_issue_with_no_checklist(repos, slack, checklist_api):
+    """An infrastructure-only release has no boxes to check."""
+    checklist_api.open_release_issues.return_value[0]["body"] = "## Release x\n"
+
+    await bot._cmd_promote(repos, slack.ack, slack.respond, _command("my-app"), _ctx())
+
+    checklist_api.close_release_issue.assert_awaited_once()
+    checklist_api.add_issue_label.assert_not_awaited()
+
+
+async def test_promote_button_rechecks_the_checklist_on_click(repos, checklist_api):
+    """A box unchecked after the button was posted makes the click a refusal."""
+    say = AsyncMock()
+    client = AsyncMock()
+
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
+
+    checklist_api.close_release_issue.assert_not_awaited()
+    # Left clickable: checking the box and clicking again is the retry.
+    client.chat_update.assert_not_awaited()
+    assert "1 box(es)" in str(say.call_args.args[0])
+
+
+def _ctx():
+    return {"user_id": "U1"}

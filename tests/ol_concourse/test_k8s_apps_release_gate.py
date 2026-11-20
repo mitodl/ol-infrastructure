@@ -119,6 +119,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
     body: ClassVar[str | None] = ""
     closed: ClassVar[bool] = True
     closed_at: ClassVar[str | None] = CLOSED_AT
+    labels: ClassVar[list[str]] = []
     # Replaces the whole GraphQL response when set.
     graphql_response: ClassVar[dict[str, Any] | None] = None
     last_edited_at: ClassVar[str | None] = "2026-10-15T19:33:53Z"
@@ -162,6 +163,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
             "closed": self.closed,
             "closedAt": self.closed_at,
             "lastEditedAt": self.last_edited_at,
+            "labels": {"nodes": [{"name": name} for name in self.labels]},
         }
         self._reply({"data": {"repository": {"issue": issue}}})
 
@@ -173,6 +175,7 @@ def fake_github():
     _FakeGitHub.body = f"<!-- ol-infrastructure-revision: {SHA} -->\n## Release x\n"
     _FakeGitHub.closed = True
     _FakeGitHub.closed_at = CLOSED_AT
+    _FakeGitHub.labels = []
     _FakeGitHub.graphql_response = None
     _FakeGitHub.last_edited_at = "2026-10-15T19:33:53Z"
     _FakeGitHub.calls = []
@@ -448,6 +451,63 @@ def test_tag_only_mode_still_refuses_another_version(
 
     assert result.returncode != 0
     assert "approved 2026.9.17.1" in result.stderr
+
+
+CHECKLIST = (
+    "## Release 2026.9.22.1\n"
+    "- [x] a verified change by someone@example.com\n"
+    "- [ ] an unverified change by other@example.com\n"
+)
+
+
+@pytest.mark.parametrize("revision", [SHA, None], ids=["app", "tag-only"])
+@pytest.mark.parametrize(
+    ("body", "labels", "allowed"),
+    [
+        # A box left unchecked: nobody verified that change on RC.
+        (CHECKLIST, [], False),
+        # The same issue closed with the override, for an urgent release.
+        (CHECKLIST, [assert_gate_names_deploy.OVERRIDE_LABEL], True),
+        # Every box checked, case-insensitively as GitHub renders them.
+        (CHECKLIST.replace("- [ ]", "- [X]"), [], True),
+        # No checklist at all: an infrastructure-only release.
+        ("## Release 2026.9.22.1\n", [], True),
+        # Another label does not waive it.
+        (CHECKLIST, ["ops:consumed"], False),
+        # GitHub stores bodies edited in the browser with CRLF line endings.
+        (CHECKLIST.replace("\n", "\r\n"), [], False),
+    ],
+)
+def test_script_refuses_an_unchecked_checklist(  # noqa: PLR0913
+    tmp_path, fake_github, private_key, revision, body, labels, allowed
+):
+    """Every box must be checked unless the issue carries the override label."""
+    marker = f"<!-- ol-infrastructure-revision: {SHA} -->\n" if revision else ""
+    _FakeGitHub.body = marker + body
+    _FakeGitHub.labels = labels
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1", revision)
+
+    assert (result.returncode == 0) is allowed, result.stderr
+    assert (tmp_path / "refusal" / "refused").exists() is not allowed
+    if not allowed:
+        assert "1 unchecked checklist item(s)" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (CHECKLIST, 1),
+        ("- [ ] a\n- [ ] b\n- [x] c", 2),
+        # Only a box at the start of a line is a checklist item.
+        ("text - [ ] quoted\n  - [ ] indented", 0),
+        ("", 0),
+        (None, 0),
+    ],
+)
+def test_unchecked_items_counts_only_checklist_boxes(body, expected):
+    """A box counts only at the start of a line, as GitHub renders it."""
+    assert assert_gate_names_deploy.unchecked_items(body) == expected
 
 
 def test_script_refuses_a_ref_that_is_not_a_commit(tmp_path, fake_github, private_key):

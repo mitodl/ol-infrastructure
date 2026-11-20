@@ -31,6 +31,18 @@ close it, since an author can close their own issue. Only the App opens gate
 issues, so its bot is the only author that approves anything. The App's name
 is read from the API with its own credentials, not configured.
 
+Every box in the issue's checklist has to be checked. Each merged change has a
+box for its author to tick once they have verified it on RC, and closing the
+issue by hand, the Slack button or ``/doof promote`` all close it regardless.
+This is the backstop for all three. An issue carrying the override label
+(``/doof promote <app> override <reason>`` adds it, and only users with triage
+access can add labels) passes with boxes unchecked, for urgent releases. An
+issue with no checklist (an infrastructure-only release) passes. For an app
+release the checklist is read from the body the issue was closed with, since an
+edit after the close is already refused; for a tag-only release it is the
+current body, so a box ticked after the close does not count either way: the
+gate has consumed the issue and will not fire on it again.
+
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the
 release GitHub App the same way ``supersede_gate_issues.py`` does, signing the
@@ -72,6 +84,11 @@ from typing import Any, NoReturn
 #: Kept in step with ``REVISION_MARKER`` in ``classify_promotion.py``.
 _REVISION_MARKER = re.compile(r"<!-- ol-infrastructure-revision: ([0-9a-f]{40}) -->")
 _SHA = re.compile(r"[0-9a-f]{40}")
+#: Kept in step with ``_CHECKLIST_LINE_RE`` in the release bot's
+#: ``github_client.py``, which decides when to offer the promote button.
+_UNCHECKED_ITEM = re.compile(r"^- \[ \]")
+#: Kept in step with ``CHECKLIST_OVERRIDE_LABEL`` in ``github_client.py``.
+OVERRIDE_LABEL = "ops:skip-checklist"
 _ATTEMPTS = 3
 _ISSUE_QUERY = """
 query($owner: String!, $name: String!, $number: Int!) {
@@ -79,6 +96,7 @@ query($owner: String!, $name: String!, $number: Int!) {
     issue(number: $number) {
       author { __typename login }
       body closed closedAt lastEditedAt
+      labels(first: 100) { nodes { name } }
     }
   }
 }
@@ -111,6 +129,17 @@ def approved_revision(body: str) -> str | None:
     """
     revisions = set(_REVISION_MARKER.findall(body or ""))
     return revisions.pop() if len(revisions) == 1 else None
+
+
+def unchecked_items(body: str) -> int:
+    """Return how many checklist boxes in *body* are unchecked."""
+    return sum(1 for line in (body or "").splitlines() if _UNCHECKED_ITEM.match(line))
+
+
+def overridden(issue: dict[str, Any]) -> bool:
+    """Return whether *issue* carries the label that waives its checklist."""
+    labels = (issue.get("labels") or {}).get("nodes") or []
+    return any(label.get("name") == OVERRIDE_LABEL for label in labels)
 
 
 def _b64(data: bytes) -> str:
@@ -239,6 +268,22 @@ def refuse(message: str) -> NoReturn:
     sys.exit(message)
 
 
+def _refuse_unchecked(
+    app: str, deploying: str, number: int, title: str, issue: dict[str, Any]
+) -> None:
+    """Refuse unless every box in *issue*'s checklist is checked, or it is waived."""
+    unchecked = unchecked_items(issue.get("body") or "")
+    if unchecked and not overridden(issue):
+        refuse(
+            f"Refusing to deploy {app} {deploying}: gate issue #{number} "
+            f"({title!r}) was closed with {unchecked} unchecked checklist "
+            "item(s). Nothing was deployed. Re-run the QA job to post a new "
+            "release issue, have its boxes checked, and close that one. For "
+            f"an urgent release, `/doof promote {app} override <reason>` closes "
+            f"it with the {OVERRIDE_LABEL} label instead."
+        )
+
+
 def main() -> None:
     """Exit non-zero unless the gate issue approves this version and commit."""
     app = os.environ["APP_NAME"]
@@ -290,6 +335,7 @@ def main() -> None:
                 f"this issue again: re-run deploy-{app}-rc to post a new one for "
                 f"{deploying}, and close that one."
             )
+        _refuse_unchecked(app, deploying, number, title, issue)
         print(  # noqa: T201
             f"Gate issue #{number} ({title!r}) approves promoting {app} {deploying}."
         )
@@ -319,6 +365,7 @@ def main() -> None:
             f"Close the open release issue that previews {revision[:8]}, or "
             "re-run the QA job if there is none."
         )
+    _refuse_unchecked(app, deploying, number, title, issue)
     print(  # noqa: T201
         f"Gate issue #{number} ({title!r}) approves deploying {app} {deploying} "
         f"at ol-infrastructure {revision[:8]}."
