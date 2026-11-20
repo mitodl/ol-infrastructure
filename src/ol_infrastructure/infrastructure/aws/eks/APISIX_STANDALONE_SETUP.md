@@ -196,25 +196,14 @@ Key values configured in `apisix_official.py`:
                 "ingressClass": "apache-apisix",
             },
         },
+        # Chart 3.0.0+ creates the GatewayProxy (apache-apisix-config) itself,
+        # pointing it at apache-apisix-admin with apisix.admin.credentials.admin.
+        # Only publishService and pluginMetadata are set here.
         "gatewayProxy": {
-            "createDefault": True,
-            "provider": {
-                "type": "ControlPlane",
-                "controlPlane": {
-                    # Use service reference (same namespace)
-                    "service": {
-                        "name": "apache-apisix-admin",
-                        "port": 9180,
-                    },
-                    "auth": {
-                        "type": "AdminKey",
-                        "adminKey": {
-                            "value": "<from-vault>",
-                        },
-                    },
-                },
-            },
+            "publishService": "apache-apisix-gateway",
         },
+        # The fleet's Gateway API CRDs come from setup_traefik.
+        "crds": {"gatewayAPI": {"enabled": False}},
     },
 }
 ```

@@ -31,7 +31,8 @@ APISIX_CHART_REPOSITORY = "https://apache.github.io/apisix-helm-chart"
 APISIX_RELEASE_NAME = "apache-apisix"
 APISIX_INGRESS_CLASS = "apache-apisix"
 APISIX_NAMESPACE = "operations"
-# The chart's gatewayProxy.createDefault names it "<release>-config".
+# The apisix chart creates it for the bundled controller (chart 3.0.0+) and
+# names it ingress-controller.gatewayProxy.name, "<release>-config" by default.
 APISIX_GATEWAY_PROXY_NAME = f"{APISIX_RELEASE_NAME}-config"
 GATEWAY_NAME = "apisix"
 GATEWAY_ERROR_PAGES_CONFIGMAP_NAME = "apache-apisix-error-pages"
@@ -63,8 +64,8 @@ GATEWAY_SSL_CIPHERS = (
 )
 
 # APISIX's default enabled-plugins list for the version shipped by the pinned
-# chart (chart 2.19.x => APISIX 3.20.x), taken from
-# https://github.com/apache/apisix/blob/3.20.0/apisix/cli/config.lua
+# chart (chart 3.1.x => APISIX 3.21.x), taken from
+# https://github.com/apache/apisix/blob/3.21.0/apisix/cli/config.lua
 #
 # Setting ``apisix.plugins`` in the Helm values REPLACES this default list
 # rather than extending it, so the full list must be reproduced here.  We do
@@ -73,18 +74,19 @@ GATEWAY_SSL_CIPHERS = (
 #
 # ``server-info`` is absent here because upstream comments it out of its own
 # default list ("deprecated and will be removed in a future release") in both
-# 3.17 through 3.20.  This list is the active set, so it stays out -- no local
+# 3.17 through 3.21.  This list is the active set, so it stays out -- no local
 # exception to carry forward on the next upgrade.
 #
 # 3.18 adds ``ai-cache``, ``ai-lakera-guard`` and ``ldap-auth-advanced`` to the
 # defaults and removes none.  3.19 adds ``openapi-to-mcp`` and
 # ``websocket-proxy``.  3.20 adds ``request-decompress`` and removes
-# ``mcp-bridge``, whose module no longer ships.
+# ``mcp-bridge``, whose module no longer ships.  3.21's config.lua is
+# identical to 3.20's.
 #
 # IMPORTANT: revisit this list on every APISIX major/minor upgrade.  If it
 # drifts from the APISIX default for the running version, plugins omitted here
 # will stop loading.  ``opentelemetry`` is appended at the end below.
-APISIX_DEFAULT_PLUGINS_3_20: list[str] = [
+APISIX_DEFAULT_PLUGINS_3_21: list[str] = [
     "real-ip",
     "ai",
     "client-control",
@@ -199,7 +201,7 @@ APISIX_DEFAULT_PLUGINS_3_20: list[str] = [
 # Full enabled-plugins list applied via the Helm chart: APISIX defaults plus the
 # opentelemetry plugin, which emits OTLP traces (not metrics) for every request.
 APISIX_ENABLED_PLUGINS: list[str] = [
-    *APISIX_DEFAULT_PLUGINS_3_20,
+    *APISIX_DEFAULT_PLUGINS_3_21,
     "opentelemetry",
 ]
 
@@ -308,6 +310,10 @@ class ApisixGatewayConfig(BaseModel):
     # PluginConfigs already exist; OLApisixRoute names the PluginConfig by a
     # plain string, so Pulumi does not order a new pair either.
     admission_webhook_enabled: bool
+    # Whether the controller subchart installs the standard-channel Gateway
+    # API CRDs. Since chart 3.0.0 they are templates, so skip_crds no longer
+    # keeps them out; clusters that install the bundle themselves turn this off.
+    install_gateway_api_crds: bool
     trusted_ca: ApisixTrustedCA | None = None
     pod_annotations: dict[str, str] | None = None
 
@@ -1002,8 +1008,12 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
                     "port": 9180,
                 },
             },
+            "crds": {"gatewayAPI": {"enabled": config.install_gateway_api_crds}},
+            # Since chart 3.0.0 the apisix chart itself renders this
+            # GatewayProxy from these fields, pointing it at its own Admin API
+            # Service with apisix.admin.credentials.admin, so neither the
+            # service nor the admin key is repeated here.
             "gatewayProxy": {
-                "createDefault": True,
                 "publishService": "apache-apisix-gateway",
                 # Global plugin metadata, keyed by plugin name, shared by
                 # every instance of that plugin.  The ingress controller
@@ -1018,21 +1028,6 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
                     if config.otel_tracing_enabled
                     else {}
                 ),
-                "provider": {
-                    "type": "ControlPlane",
-                    "controlPlane": {
-                        "service": {
-                            "name": "apache-apisix-admin",
-                            "port": 9180,
-                        },
-                        "auth": {
-                            "type": "AdminKey",
-                            "adminKey": {
-                                "value": config.admin_key,
-                            },
-                        },
-                    },
-                },
             },
             "deployment": _ingress_controller_deployment_values(config),
             # The ingress-controller sub-chart's built-in PDB is disabled because

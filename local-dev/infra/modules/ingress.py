@@ -128,12 +128,13 @@ def create_ingress(  # noqa: PLR0913
         # PluginConfig, including Pulumi-rendered ones (a depends_on, since
         # the route names the PluginConfig by string).
         admission_webhook_enabled=False,
+        # Nothing else here installs the Gateway API CRDs that the Gateway
+        # below needs. The deployed clusters turn this off and install the
+        # bundle at GATEWAY_API_VERSION themselves (setup_traefik).
+        install_gateway_api_crds=True,
     )
 
-    # Helm installs the chart's CRDs on first install, including the Gateway
-    # API CRDs the ingress controller subchart bundles. The deployed clusters
-    # skip those and install the Gateway API bundle at GATEWAY_API_VERSION
-    # themselves (setup_traefik).
+    # Helm installs the chart's apisix.apache.org CRDs on first install.
     apisix = k8s.helm.v3.Release(
         "apisix",
         k8s.helm.v3.ReleaseArgs(

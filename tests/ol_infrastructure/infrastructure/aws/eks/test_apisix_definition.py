@@ -37,6 +37,7 @@ def _single_pod(**overrides: Any) -> ApisixGatewayConfig:
             "otel_collector_address": None,
             "service_monitor_enabled": False,
             "admission_webhook_enabled": True,
+            "install_gateway_api_crds": True,
             **overrides,
         },
     )
@@ -58,7 +59,25 @@ def _fleet() -> ApisixGatewayConfig:
         otel_collector_address="collector.example:4318",
         service_monitor_enabled=True,
         admission_webhook_enabled=True,
+        install_gateway_api_crds=False,
     )
+
+
+def test_gateway_proxy_admin_key_comes_from_apisix_credentials():
+    # Chart 3.0.0+ renders the GatewayProxy from apisix.admin.credentials;
+    # a second copy under gatewayProxy would make the controller chart
+    # render its own and fight the apisix chart's.
+    for config in (_single_pod(), _fleet()):
+        gateway_proxy = apisix_helm_values(config)["ingress-controller"]["gatewayProxy"]
+        assert "createDefault" not in gateway_proxy
+        assert "provider" not in gateway_proxy
+
+
+def test_gateway_api_crds_follow_config():
+    # The fleet's Gateway API CRDs are Traefik's experimental bundle.
+    for config, expected in ((_single_pod(), True), (_fleet(), False)):
+        crds = apisix_helm_values(config)["ingress-controller"]["crds"]
+        assert crds == {"gatewayAPI": {"enabled": expected}}
 
 
 def test_http_redirects_go_to_443_everywhere():
@@ -192,4 +211,5 @@ def test_cluster_capabilities_must_be_stated():
         "otel_collector_address",
         "service_monitor_enabled",
         "admission_webhook_enabled",
+        "install_gateway_api_crds",
     }
