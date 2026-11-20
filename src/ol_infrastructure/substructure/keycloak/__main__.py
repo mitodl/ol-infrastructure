@@ -64,7 +64,7 @@ keycloak_provider = keycloak.Provider(
     url=keycloak_url,
     realm="master",
     client_id=keycloak_config.get("client_id"),
-    client_secret=keycloak_config.get("client_secret"),
+    client_secret=keycloak_config.get_secret("client_secret"),
     client_timeout=KEYCLOAK_CLIENT_TIMEOUT_SECONDS,
     initial_login=True,
 )

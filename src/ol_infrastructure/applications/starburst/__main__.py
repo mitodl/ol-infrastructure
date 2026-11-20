@@ -112,11 +112,14 @@ def _create_roles(
             props={
                 "domain": starburst_domain,
                 "client_id": client_id_val,
-                "client_secret": client_secret_val,
+                # Resolved inside an apply, so the secret marking from config is
+                # gone; wrap it again so state holds ciphertext.
+                "client_secret": pulumi.Output.secret(client_secret_val),
                 "role_name": role_name,
                 "description": role_definition.get("description", ""),
                 "privileges": role_definition.get("privileges", []),
             },
+            opts=pulumi.ResourceOptions(additional_secret_outputs=["client_secret"]),
         )
 
         created_roles[role_name] = role_resource

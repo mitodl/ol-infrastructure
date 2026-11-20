@@ -144,7 +144,9 @@ class OLVaultDatabaseBackend(ComponentResource):
         }
         credentials_dict = {
             "username": db_config.db_admin_username,
-            "password": db_config.db_admin_password,
+            # The connection's `data` is not marked sensitive by the provider, so
+            # an unwrapped password is stored in plaintext in the stack state.
+            "password": Output.secret(db_config.db_admin_password),
         }
 
         if hasattr(db_config, "db_connection"):
