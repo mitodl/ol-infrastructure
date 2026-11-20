@@ -15,6 +15,14 @@ and 5.  ``useRolesFromProvider`` was false when our authorizer row was seeded,
 and CI's authentication row still carries ``clientType: public`` from before
 the switch to confidential.
 
+``adminPrincipals`` is the one key the YAML and the row both feed.
+``UserRepository.initializeUsers`` makes every name in the YAML's list an admin
+at boot, while the API (``/v1/system/security/config``) and OIDC logins read
+the row.  The QA and Production rows predate the provisioner's service account
+in ``initialAdmins``, so the team-keycloak-sync job, which clears ``isAdmin``
+outside the row's list, demoted the account it authenticates as.  Writing the
+list here keeps the two the same.
+
 Writing the keys straight into the row is what OM's own 2.0.2 native migration
 does to the authentication row for ``tokenValidity``.  ``jsonb ||`` merges at
 the top level, so every other key is preserved.
@@ -46,6 +54,7 @@ DESIRED: dict[str, dict[str, Any]] = {
     },
     "authorizerConfiguration": {
         "useRolesFromProvider": json.loads(os.environ["OM_USE_ROLES_FROM_PROVIDER"]),
+        "adminPrincipals": json.loads(os.environ["OM_ADMIN_PRINCIPALS"]),
     },
 }
 

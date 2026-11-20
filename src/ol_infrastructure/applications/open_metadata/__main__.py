@@ -135,18 +135,20 @@ open_metadata_service_account_name = "openmetadata"
 # hour and clears isAdmin on anyone outside adminPrincipals, after which a
 # user's tokens carry only what they now hold.
 #
-# To demote an admin: remove them from initialAdmins below and from
-# adminPrincipals in the authorizerConfiguration row. That job then clears their
-# isAdmin within the hour (or OpenMetadata does at their next login); revoke
-# their personal access tokens by hand if they should lose those too.
+# To demote an admin: remove them from initialAdmins below. The om-auth-config
+# Job writes the shortened list into the authorizerConfiguration row, and the
+# team-keycloak-sync job then clears their isAdmin within the hour (or
+# OpenMetadata does at their next login); revoke their personal access tokens by
+# hand if they should lose those too.
 open_metadata_use_roles_from_provider = True
 # CI's authenticationConfiguration row was seeded while this was still "public",
 # and public means the implicit flow, which ol-open_metadata-client no longer
 # allows. The auth-config Job reconciles the row to this value.
 open_metadata_client_type = "confidential"
 # The chart renders this into AUTHORIZER_ADMIN_PRINCIPALS in a Secret the server
-# reads through envFrom, with no checksum on the pods, so its hash is a pod
-# annotation below: the server only creates the admins at startup.
+# reads through envFrom, with no checksum on the pods. It is an input to the
+# om-auth-config hash, whose pod annotation rolls the server when this changes:
+# the server only creates the admins at startup.
 open_metadata_initial_admins = [
     "tmacey",
     "shaidar",
@@ -848,9 +850,10 @@ open_metadata_assets_policy_attachment = iam.RolePolicyAttachment(
     opts=ResourceOptions(parent=open_metadata_irsa_role),
 )
 
-# Reconcile the two 2.0 session settings, clientType and useRolesFromProvider into the
-# database rows the server actually reads.  The AUTHENTICATION_* entries in
-# extraEnvs below and the authorizer Helm values only bind on an install whose
+# Reconcile the two 2.0 session settings, clientType, useRolesFromProvider and
+# adminPrincipals into the database rows the server actually reads.  The
+# AUTHENTICATION_* entries in extraEnvs below and the authorizer Helm values only
+# bind on an install whose
 # `authenticationConfiguration` / `authorizerConfiguration` row does not exist
 # yet, because `SettingsCache.createDefaultConfiguration` seeds each row from the
 # YAML only when it is absent and `SecurityConfigurationManager` reads them back
@@ -875,6 +878,7 @@ _auth_config_hash = hashlib.sha256(
             str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
             open_metadata_client_type,
             json.dumps(open_metadata_use_roles_from_provider),
+            json.dumps(open_metadata_initial_admins),
         ]
     ).encode()
 ).hexdigest()[:8]
@@ -932,6 +936,10 @@ open_metadata_auth_config_job = kubernetes.batch.v1.Job(
                                 name="OM_USE_ROLES_FROM_PROVIDER",
                                 value=json.dumps(open_metadata_use_roles_from_provider),
                             ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_ADMIN_PRINCIPALS",
+                                value=json.dumps(open_metadata_initial_admins),
+                            ),
                         ],
                         env_from=[
                             kubernetes.core.v1.EnvFromSourceArgs(
@@ -980,9 +988,6 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
             "podAnnotations": {
                 "ol.mit.edu/om-auth-config": _auth_config_hash,
-                "ol.mit.edu/om-initial-admins": hashlib.sha256(
-                    json.dumps(open_metadata_initial_admins).encode()
-                ).hexdigest()[:8],
             },
             "openmetadata": {
                 "config": {
@@ -992,8 +997,9 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "className": "org.openmetadata.service.security.DefaultAuthorizer",  # noqa: E501
                         "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",  # noqa: E501
                         # Not bootstrap-only. The chart renders this into
-                        # adminPrincipals, which the authorizerConfiguration row
-                        # keeps (om_auth_config.py merges around it), and every
+                        # adminPrincipals, the om-auth-config Job writes the same
+                        # list into the authorizerConfiguration row (the copy the
+                        # API and logins read), and every
                         # OIDC login makes anyone in adminPrincipals an admin
                         # again (AuthenticationCodeFlowHandler.getOrCreateOidcUser).
                         # These are the only admins: no Keycloak role maps to
