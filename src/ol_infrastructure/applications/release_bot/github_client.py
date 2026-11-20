@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from typing import Any
 
-from github import Auth, Github
+from github import Auth, Github, GithubException, UnknownObjectException
 
 log = logging.getLogger(__name__)
 
@@ -543,6 +543,63 @@ async def close_release_issue(repo_slug: str, issue_number: int, comment: str) -
     Concourse's github-issues resource polls for closed issues.
     """
     await asyncio.to_thread(_close_release_issue_sync, repo_slug, issue_number, comment)
+
+
+def _ensure_label(repo: Any, name: str) -> None:
+    """Create label *name* in *repo* unless it exists.
+
+    What GitHub does when an issue is given a label the repository lacks is
+    undocumented, so the label is created first, as label_gate_issue.py does.
+    """
+    try:
+        repo.get_label(name)
+    except UnknownObjectException:
+        try:
+            repo.create_label(
+                name,
+                "d93f0b",
+                "Production deploys this release issue with unchecked boxes.",
+            )
+        except GithubException as error:
+            if error.status != 422:  # noqa: PLR2004
+                raise  # 422: created meanwhile by another writer
+
+
+def _override_and_close_sync(repo_slug: str, issue_number: int, comment: str) -> None:
+    repo = _get_client().get_repo(repo_slug)
+    issue = repo.get_issue(issue_number)
+    _ensure_label(repo, CHECKLIST_OVERRIDE_LABEL)
+    issue.add_to_labels(CHECKLIST_OVERRIDE_LABEL)
+    labels = {label.name for label in repo.get_issue(issue_number).labels}
+    if CHECKLIST_OVERRIDE_LABEL not in labels:
+        msg = f"{CHECKLIST_OVERRIDE_LABEL} did not stick on {repo_slug}#{issue_number}"
+        raise RuntimeError(msg)
+    try:
+        issue.create_comment(comment)
+        issue.edit(state="closed")
+    except Exception:
+        # A waiver left on an open issue would let a later hand close skip
+        # the checklist, with no comment saying who waived it.
+        try:
+            issue.remove_from_labels(CHECKLIST_OVERRIDE_LABEL)
+        except Exception:
+            log.exception(
+                "Failed to remove %s from %s#%s after a failed close",
+                CHECKLIST_OVERRIDE_LABEL,
+                repo_slug,
+                issue_number,
+            )
+        raise
+
+
+async def override_and_close(repo_slug: str, issue_number: int, comment: str) -> None:
+    """Close a release issue with its checklist waived (approves Production).
+
+    The label goes on, and is read back, before the comment and the close:
+    the gate reads labels when the close fires it, so a close without the
+    label would be refused after the bot had announced the release.
+    """
+    await asyncio.to_thread(_override_and_close_sync, repo_slug, issue_number, comment)
 
 
 def _refused_release_issues_sync(

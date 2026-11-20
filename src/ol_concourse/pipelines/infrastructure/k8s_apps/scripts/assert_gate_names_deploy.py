@@ -40,8 +40,9 @@ access can add labels) passes with boxes unchecked, for urgent releases. An
 issue with no checklist (an infrastructure-only release) passes. For an app
 release the checklist is read from the body the issue was closed with, since an
 edit after the close is already refused; for a tag-only release it is the
-current body, so a box ticked after the close does not count either way: the
-gate has consumed the issue and will not fire on it again.
+body when the gate reads it, a few seconds to minutes after the close. Either
+way a refused issue stays refused: the gate has consumed it and will not fire
+on it again.
 
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the

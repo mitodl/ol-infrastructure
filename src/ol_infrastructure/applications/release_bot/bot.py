@@ -681,7 +681,10 @@ async def _cmd_promote(repos, ack, respond, command, context):  # noqa: PLR0911
     issue = issues[0]
     unchecked = github.unchecked_items(issue["body"])
     if unchecked and not override:
-        await _refuse(respond, await _unchecked_refusal(app_name, issue, unchecked))
+        client = _slack_app.client if _slack_app else None
+        await _refuse(
+            respond, await _unchecked_refusal(client, app_name, issue, unchecked)
+        )
         return
     user = context["user_id"]
     comment = f"Promoted to Production by <@{user}> via `/doof promote`."
@@ -689,11 +692,9 @@ async def _cmd_promote(repos, ack, respond, command, context):  # noqa: PLR0911
         comment = _override_comment(user, reason, unchecked)
     try:
         if override:
-            # Before the close: the gate reads the label when the close fires it.
-            await github.add_issue_label(
-                cfg.repo, issue["number"], github.CHECKLIST_OVERRIDE_LABEL
-            )
-        await github.close_release_issue(cfg.repo, issue["number"], comment=comment)
+            await github.override_and_close(cfg.repo, issue["number"], comment)
+        else:
+            await github.close_release_issue(cfg.repo, issue["number"], comment=comment)
     except Exception:
         log.exception("Failed to promote %s", app_name)
         await respond(f"❌ Failed to promote `{app_name}`.")
@@ -712,9 +713,8 @@ async def _cmd_promote(repos, ack, respond, command, context):  # noqa: PLR0911
     await respond(f"✅ `{app_name}` {issue['title']} approved. {deploy}")
 
 
-async def _unchecked_refusal(app_name: str, issue, unchecked: list[str]) -> str:
+async def _unchecked_refusal(client, app_name: str, issue, unchecked: list[str]) -> str:
     """Say why a promotion was refused, naming who still has boxes to check."""
-    client = _slack_app.client if _slack_app else None
     waiting = await _outstanding_mentions(client, issue) if client else ""
     return (
         f"❌ Not promoting `{app_name}`: {len(unchecked)} box(es) on the "
@@ -727,12 +727,14 @@ async def _unchecked_refusal(app_name: str, issue, unchecked: list[str]) -> str:
 
 def _override_comment(user: str, reason: str, unchecked: list[str]) -> str:
     """Record on the issue who skipped its checklist, why, and what was skipped."""
-    quoted = "\n".join(f"> {line}" for line in reason.splitlines())
+    # An indented code block: an @mention typed in Slack must not notify
+    # anyone on GitHub, and no line of it can end the block early.
+    quoted = "\n".join(f"    {line}" for line in reason.splitlines())
     skipped = "\n".join(unchecked) or "(none)"
     return (
         f"Promoted to Production by <@{user}> via `/doof promote ... override`, "
         f"skipping the checklist (`{github.CHECKLIST_OVERRIDE_LABEL}`).\n\n"
-        f"Reason:\n{quoted}\n\nUnchecked when promoted:\n{skipped}"
+        f"Reason:\n\n{quoted}\n\nUnchecked when promoted:\n{skipped}"
     )
 
 
@@ -1083,7 +1085,7 @@ async def _promote_from_button(repos, body, say, client):
     # unchecked since, and Production refuses an issue closed that way.
     unchecked = github.unchecked_items(matching[0]["body"])
     if unchecked:
-        await say(await _unchecked_refusal(app_name, matching[0], unchecked))
+        await say(await _unchecked_refusal(client, app_name, matching[0], unchecked))
         return
     try:
         await github.close_release_issue(

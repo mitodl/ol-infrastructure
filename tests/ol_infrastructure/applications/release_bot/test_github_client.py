@@ -3,10 +3,11 @@ selection, and PyGithub-backed API wrappers.
 """
 
 from datetime import UTC, date, datetime, timedelta
+from unittest.mock import MagicMock
 
 import github_client as github
 import pytest
-from github import Auth
+from github import Auth, UnknownObjectException
 
 CHECKLIST_BODY = """## Release 2026.7.22.1
 
@@ -215,6 +216,9 @@ class _FakeIssue:
 
     def add_to_labels(self, label):
         self.labels.append(_FakeLabel(label))
+
+    def remove_from_labels(self, label):
+        self.labels = [lbl for lbl in self.labels if lbl.name != label]
 
     def create_comment(self, body):
         self.comments.append(body)
@@ -449,6 +453,66 @@ def test_close_release_issue_comments_and_closes(fake_repo):
     issue = repo.get_issue(42)
     assert issue.comments == ["Promoted by @tmacey."]
     assert issue.state == "closed"
+
+
+class _LabelRepo(_FakeRepo):
+    """A repo that tracks its labels and can be told to misbehave."""
+
+    def __init__(self, issue, labels=(), *, drop_label=False, fail_close=False):
+        super().__init__(issues=[issue])
+        self.repo_labels = set(labels)
+        self.drop_label = drop_label
+        if fail_close:
+            issue.edit = MagicMock(side_effect=RuntimeError("GitHub is down"))
+        if drop_label:
+            issue.add_to_labels = lambda _label: None
+
+    def get_label(self, name):
+        if name not in self.repo_labels:
+            raise UnknownObjectException(404, {}, {})
+        return _FakeLabel(name)
+
+    def create_label(self, name, _color, _description):
+        self.repo_labels.add(name)
+
+
+def _release_issue():
+    return _FakeIssue(42, "Release app", "- [ ] x by a@example.com", ["release"])
+
+
+def test_override_creates_the_label_then_comments_and_closes(fake_repo):
+    repo = fake_repo(_LabelRepo(_release_issue()))
+    github._override_and_close_sync("mitodl/thing", 42, "Overridden.")
+
+    issue = repo.get_issue(42)
+    assert github.CHECKLIST_OVERRIDE_LABEL in repo.repo_labels
+    assert github.CHECKLIST_OVERRIDE_LABEL in [lbl.name for lbl in issue.labels]
+    assert issue.comments == ["Overridden."]
+    assert issue.state == "closed"
+
+
+def test_override_does_not_close_when_the_label_does_not_stick(fake_repo):
+    """Closing without the label would be refused after the bot announced it."""
+    repo = fake_repo(
+        _LabelRepo(_release_issue(), [github.CHECKLIST_OVERRIDE_LABEL], drop_label=True)
+    )
+    with pytest.raises(RuntimeError, match="did not stick"):
+        github._override_and_close_sync("mitodl/thing", 42, "Overridden.")
+
+    assert repo.get_issue(42).state == "open"
+    assert repo.get_issue(42).comments == []
+
+
+def test_override_takes_the_label_back_when_the_close_fails(fake_repo):
+    """A waiver left on an open issue would let a later hand close skip the check."""
+    repo = fake_repo(
+        _LabelRepo(_release_issue(), [github.CHECKLIST_OVERRIDE_LABEL], fail_close=True)
+    )
+    with pytest.raises(RuntimeError, match="GitHub is down"):
+        github._override_and_close_sync("mitodl/thing", 42, "Overridden.")
+
+    labels = [lbl.name for lbl in repo.get_issue(42).labels]
+    assert github.CHECKLIST_OVERRIDE_LABEL not in labels
 
 
 # ---------------------------------------------------------------------------

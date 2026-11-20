@@ -4946,8 +4946,8 @@ def checklist_api(monkeypatch):
         ]
     )
     api.close_release_issue = AsyncMock()
-    api.add_issue_label = AsyncMock()
-    for name in ("open_release_issues", "close_release_issue", "add_issue_label"):
+    api.override_and_close = AsyncMock()
+    for name in ("open_release_issues", "close_release_issue", "override_and_close"):
         monkeypatch.setattr(bot.github, name, getattr(api, name))
     monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
     monkeypatch.setattr(
@@ -4968,36 +4968,49 @@ async def test_promote_refuses_unchecked_boxes_and_names_who(
     await bot._cmd_promote(repos, slack.ack, slack.respond, _command("my-app"), _ctx())
 
     checklist_api.close_release_issue.assert_not_awaited()
-    checklist_api.add_issue_label.assert_not_awaited()
+    checklist_api.override_and_close.assert_not_awaited()
     assert "1 box(es)" in slack.said
     assert "waiting on <@UBOB>" in slack.said
     assert "/doof promote my-app override <reason>" in slack.said
 
 
-async def test_promote_override_labels_before_closing_and_records_why(
+async def test_promote_override_closes_with_the_label_and_records_why(
     repos, slack, checklist_api
 ):
-    """The gate reads the label when the close fires it, so it must come first."""
-    calls = MagicMock()
-    calls.attach_mock(checklist_api.add_issue_label, "label")
-    calls.attach_mock(checklist_api.close_release_issue, "close")
-    command = dict(_command("my-app override prod is down"), channel_id="CELSEWHERE")
+    """The override closes through the path that labels first, never a bare close."""
+    command = dict(
+        _command("my-app override prod is down @mitodl/everyone"),
+        channel_id="CELSEWHERE",
+    )
 
     await bot._cmd_promote(repos, slack.ack, slack.respond, command, _ctx())
 
-    assert [name for name, *_ in calls.mock_calls] == ["label", "close"]
-    checklist_api.add_issue_label.assert_awaited_once_with(
-        "mitodl/my-app", 7, "ops:skip-checklist"
-    )
-    comment = checklist_api.close_release_issue.call_args.kwargs["comment"]
+    checklist_api.close_release_issue.assert_not_awaited()
+    repo, number, comment = checklist_api.override_and_close.call_args.args
+    assert (repo, number) == ("mitodl/my-app", 7)
     assert "<@U1>" in comment
-    assert "> prod is down" in comment
+    # In an indented code block, so the @mention notifies nobody on GitHub.
+    assert "\n\n    prod is down @mitodl/everyone\n" in comment
     assert "- [ ] **B** (#2) by bob@example.com" in comment
     assert "skipping the checklist" in slack.said
     # Run from another channel, so the app's channel hears about it too.
     post = checklist_api.slack_client.chat_postMessage.call_args.kwargs
     assert post["channel"] == "C123"
     assert "prod is down" in post["text"]
+
+
+async def test_promote_override_that_fails_announces_nothing(
+    repos, slack, checklist_api
+):
+    """A label that did not stick must not read as a release on its way."""
+    checklist_api.override_and_close.side_effect = RuntimeError("did not stick")
+    command = dict(_command("my-app override hotfix"), channel_id="CELSEWHERE")
+
+    await bot._cmd_promote(repos, slack.ack, slack.respond, command, _ctx())
+
+    assert "Failed to promote" in slack.said
+    assert "skipping the checklist" not in slack.said
+    checklist_api.slack_client.chat_postMessage.assert_not_awaited()
 
 
 async def test_promote_override_is_not_posted_twice_in_the_apps_channel(
@@ -5007,7 +5020,7 @@ async def test_promote_override_is_not_posted_twice_in_the_apps_channel(
 
     await bot._cmd_promote(repos, slack.ack, slack.respond, command, _ctx())
 
-    checklist_api.close_release_issue.assert_awaited_once()
+    checklist_api.override_and_close.assert_awaited_once()
     checklist_api.slack_client.chat_postMessage.assert_not_awaited()
 
 
@@ -5027,7 +5040,7 @@ async def test_promote_passes_an_issue_with_no_checklist(repos, slack, checklist
     await bot._cmd_promote(repos, slack.ack, slack.respond, _command("my-app"), _ctx())
 
     checklist_api.close_release_issue.assert_awaited_once()
-    checklist_api.add_issue_label.assert_not_awaited()
+    checklist_api.override_and_close.assert_not_awaited()
 
 
 async def test_promote_button_rechecks_the_checklist_on_click(repos, checklist_api):
