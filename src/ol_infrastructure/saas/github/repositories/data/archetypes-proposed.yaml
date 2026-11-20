@@ -242,7 +242,6 @@ fork:
 - ocw-zendesk-theme
 - ol-parliament
 - open-edx-proposals
-- open-learning-ai-tutor
 - openedx-events
 - openedx-ledger
 - opentelemetry-python-contrib
@@ -310,6 +309,7 @@ library:
 - oldevops-scratch
 - open-collaboration
 - open-edx-plugins
+- open-learning-ai-tutor
 - open-learnix
 - open-podcast-data
 - open-video-data
