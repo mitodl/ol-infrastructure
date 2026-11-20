@@ -1362,6 +1362,32 @@ def _checkout_release_task(main_repo: Resource, output: Identifier) -> TaskStep:
     )
 
 
+# Inlined like the scripts below; see its header for why it exists.
+_PREPARE_HOTFIX_SOURCE_SCRIPT = (
+    Path(__file__).parent / "scripts" / "prepare_hotfix_source.sh"
+).read_text()
+PREPARE_HOTFIX_SOURCE_TASK_NAME = "prepare-hotfix-source"
+
+
+def _prepare_hotfix_source_task(release_res: Resource, main_repo: Resource) -> TaskStep:
+    """Put a hotfix's tree in *main_repo* so bump-version bumps what is cut.
+
+    A no-op for a normal release. Goes right before bump_version_task in a
+    cut job; see prepare_hotfix_source.sh.
+    """
+    return TaskStep(
+        task=Identifier(PREPARE_HOTFIX_SOURCE_TASK_NAME),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=release_res.name), Input(name=main_repo.name)],
+            outputs=[Output(name=main_repo.name)],
+            params={"REPO": str(main_repo.name), "RELEASE": str(release_res.name)},
+            run=Command(path="sh", args=["-euc", _PREPARE_HOTFIX_SOURCE_SCRIPT]),
+        ),
+    )
+
+
 # Inlined into the Production job's check task, so the generated pipeline
 # carries the script itself rather than fetching it at run time. See the
 # script's docstring for why the check exists.
@@ -1844,6 +1870,7 @@ def _build_release_image_job(
             file=f"{release_res.name}/hotfix",
             reveal=True,
         ),
+        _prepare_hotfix_source_task(release_res, main_repo),
         bump_version_task(
             version_file=f"{release_res.name}/version",
             repository=str(main_repo.name),
@@ -2630,6 +2657,7 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
             LoadVarStep(
                 load_var="hotfix", file=f"{release_res.name}/hotfix", reveal=True
             ),
+            _prepare_hotfix_source_task(release_res, main_repo),
             bump_version_task(
                 version_file=f"{release_res.name}/version",
                 repository=str(main_repo.name),
