@@ -681,8 +681,8 @@ Proposed, enforced by the service rather than by each app:
   or the fence table: clear deletes the bank row, and `_raise_fence` prunes expired fence rows
   so a forgotten learner's id does not outlive the fence. Account deletion deletes the record
   with the bank, and reaches it even when there is no bank (§5.9), so no id outlives the
-  account; protecting a
-  forgotten learner from writes in flight is the fence's job, and from a restore the deletion
+  account. Protecting a forgotten learner from app writes in flight is the fence's job; from
+  service writes, which can outlast the fence (§5.7), and from a restore, it is the deletion
   ledger's (§5.13).
 - Off refuses writes from every app, service writers included, and stops apps' reads, so apps
   stop injecting notes a learner asked not to be used. Two reads stay allowed: the
@@ -733,6 +733,14 @@ there into every app's prompts.
   the service cannot tell.
 - The learner's memory record (§5.6) and the forget fence apply unchanged, so off and clear
   hold against service writes too.
+- Service writes fail closed for a deleted learner. An app write needs a token for the
+  learner, which a deleted account can no longer get, but a service client gets tokens
+  whatever the learner's state. A grading retry queued before an account deletion could land
+  after the one-hour fence expires and recreate the bank, and the memory record whose last-clear
+  time would have refused its old event went with the account. So the validator refuses a
+  service write, and the bank creation it would cause, for any learner in the deletion ledger
+  (§5.13), which the account-deletion signal (§5.9) writes before forget runs. The grant does
+  not ship before the ledger.
 - A per-client write rate limit kept in shared state (Postgres), so it does not multiply as
   the API scales out, and per-client counts on `/metrics`, so a runaway or leaked writer shows
   up.
@@ -848,7 +856,9 @@ ever had a memory bank. The deployed forget job finds deleted learners by listin
 clear already removed, and a consent record (§5.6) left without a bank. Deletion is driven
 instead by a durable account-deletion signal (Keycloak's deletion of the user, recorded where
 every store can act on it) that fans out to Hindsight, to the consent table, and to each app
-holding conversations; the bank listing stays as a reconciliation check. Whether `pydantic-ai-harness` provides
+holding conversations. Each store's completion is recorded against the signal, so a step that
+fails is retried from the signal rather than rediscovered from a bank that may already be
+gone; the bank listing stays as a reconciliation check. Whether `pydantic-ai-harness` provides
 history and compaction, and whether learn-ai keeps its checkpointer, stay open (§5.13).
 
 ### 5.10 Backend evaluation (2026-09-15 to 2026-10-29)
@@ -1344,7 +1354,8 @@ owner decides it. Each open item names where it is tracked.
     a learner forgotten after the backup, and an RDS snapshot restore would do the same. Forget
     needs a permanent deletion ledger replayed after any restore, which does not exist. No task
     yet. The ledger also has to cover the per-learner consent record (§5.6), which the forget
-    deletes with the bank.
+    deletes with the bank, and the validator checks it on every service write (§5.7), so the
+    session-less grant waits on it.
 14. Hindsight fixes the vector column to the model's dimension once a bank holds data, so
     changing the embedding model means re-embedding every bank through export and import,
     which is untested (`tk-test-hindsight-export-import-re-embedding-before-1f636a`).
