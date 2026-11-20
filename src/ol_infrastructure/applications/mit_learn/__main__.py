@@ -1392,6 +1392,8 @@ mitlearn_redirects_dictionary = fastly.ServiceDictionaryItems(
     items={
         "/dashboard/organization/mit": "/dashboard/organization/mit-universal-ai",
         "/universal-learning/ai": "/organizational-learning",
+        "/news/systems-thinking-examples-in-the-workplace-how-top-performers-solve-complex-problems": "/articles/systems-thinking-examples-in-the-workplace-how-top-performers-solve-complex-problems",
+        "/news/what-is-an-ai-governance-framework-a-leaders-guide": "/articles/what-is-an-ai-governance-framework-a-leaders-guide",
     },
     service_id=mitlearn_fastly_service.id,
     manage_items=True,
