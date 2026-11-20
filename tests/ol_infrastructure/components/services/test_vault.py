@@ -9,6 +9,7 @@ default differs from "field absent".
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import pulumi
 
@@ -19,8 +20,14 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 
+# Inputs of every mocked resource by name. The mock monitor keeps the secret
+# wrapper on an input that was passed as a secret, so a test can check secretness.
+REGISTERED_INPUTS: dict[str, dict[str, Any]] = {}
+
+
 class K8sMocks(pulumi.runtime.Mocks):
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
+        REGISTERED_INPUTS[args.name] = args.inputs
         return [args.name + "_id", args.inputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
@@ -30,12 +37,16 @@ class K8sMocks(pulumi.runtime.Mocks):
 pulumi.runtime.set_mocks(K8sMocks())
 
 import pytest  # noqa: E402
+from pulumi.runtime.rpc import is_rpc_secret, unwrap_rpc_secret  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
+from ol_infrastructure.components.services import vault  # noqa: E402
 from ol_infrastructure.components.services.vault import (  # noqa: E402
+    OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultPostgresDatabaseConfig,
 )
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -153,3 +164,42 @@ def test_static_secret_has_no_revoke_key():
         assert spec["refreshAfter"] == "1h"
 
     return _rendered_spec(cfg).apply(check)
+
+
+# ─── database backend credentials ──────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_database_backend_passes_admin_password_as_secret(monkeypatch):
+    """The admin password reaches the connection as a secret, unchanged.
+
+    The provider does not mark `data` sensitive, so an unwrapped password is
+    stored in plaintext in the stack checkpoint.
+    """
+
+    class _CABundle:
+        text = "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n"
+
+    # Mocks are process-global and other test modules install their own, so
+    # install the recording mocks here rather than relying on import order.
+    pulumi.runtime.set_mocks(K8sMocks())
+    monkeypatch.setattr(vault.httpx, "get", lambda _url: _CABundle())
+    password = "test-admin-password"  # pragma: allowlist secret  # noqa: S105
+    backend = OLVaultDatabaseBackend(
+        OLVaultPostgresDatabaseConfig(
+            db_name="secret-wrap-test",
+            mount_point="postgres-secret-wrap-test",
+            db_admin_username="admin",
+            db_admin_password=password,
+            db_host="db.example.com",
+        )
+    )
+
+    def check(_urn):
+        inputs = REGISTERED_INPUTS["secret-wrap-test-database-connection"]
+        # A secret anywhere in a property marks the whole property secret.
+        for block in (inputs["data"], inputs["postgresql"]):
+            assert is_rpc_secret(block)
+            assert unwrap_rpc_secret(block)["password"] == password
+
+    return backend.db_connection.urn.apply(check)
