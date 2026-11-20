@@ -409,7 +409,8 @@ APPS = [
         "name": "ol-analytics-api",
         "dir": "ol-analytics-api",
         "namespace": "ol-analytics-api",
-        "deploy_name": "ol-analytics-api",
+        # The Deployment the program renders, and the Tilt resource that applies it.
+        "deploy_name": "ol-analytics-api-app",
         "images": {"ol-analytics-api": "mitodl/ol-analytics-api-app"},
         "tiltfile": "./local-dev/apps/ol-analytics-api/Tiltfile",
     },

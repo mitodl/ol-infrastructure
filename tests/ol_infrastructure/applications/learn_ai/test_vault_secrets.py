@@ -6,11 +6,11 @@ import yaml
 
 from ol_infrastructure.applications.learn_ai.vault_secrets import (
     secret_env_names,
-    secret_named,
     undescribed_static_keys,
     vault_secrets,
 )
 from ol_infrastructure.lib.opik import OPIK_KEYCLOAK_SECRET_TEMPLATES
+from ol_infrastructure.lib.secret_env import secret_named
 
 SOPS_DIR = Path(__file__).parents[4] / "src/bridge/secrets/learn_ai"
 # The keys the deployed program adds beside the sops files' before writing Vault.

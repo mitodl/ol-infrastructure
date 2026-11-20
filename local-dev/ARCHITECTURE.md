@@ -52,7 +52,7 @@ This is the closest thing to Vagrant: Vagrant gave you a disposable VM that beha
 
 ### k8s manifests + apisix — the declarative "compose file"
 
-The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Secrets) and `apisix-routes.yaml`; the Deployments and routes of mitxonline and learn-ai (learn-ai's sandbox aside) are rendered by a Pulumi program instead. This is the big conceptual leap from compose; see [Compose → Kubernetes](#docker-compose--kubernetes-translated) below.
+The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Secrets) and `apisix-routes.yaml`; the Deployments and routes of mitxonline, learn-ai and ol-analytics-api (learn-ai's sandbox aside) are rendered by a Pulumi program instead. This is the big conceptual leap from compose; see [Compose → Kubernetes](#docker-compose--kubernetes-translated) below.
 
 ### Pulumi — the shared-services installer
 
@@ -130,7 +130,7 @@ flowchart TB
     browser["Browser<br/>https://learn.mit.test"] --> lb
     lb --> api
     tilt -->|kubectl apply| api
-    tilt -->|pulumi up (mitxonline, learn-ai)| api
+    tilt -->|pulumi up (mitxonline, learn-ai, ol-analytics-api)| api
     tilt -->|build| docker
     docker -->|push changed layers| reg
     reg -.->|pull on pod create| k0 & k1
@@ -202,7 +202,7 @@ The whole stack is roughly 2.9GB and can be switched off with `observability_ena
 
 ## Design decisions
 
-**Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra, and the mitxonline and learn-ai apps via their own programs) or Tilt (the other apps' manifests, learn-ai's sandbox, and the `ApisixTls` of mitxonline and learn-ai). This prevents drift and conflicts.
+**Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra, and the mitxonline, learn-ai and ol-analytics-api apps via their own programs) or Tilt (the other apps' manifests, learn-ai's sandbox, and the `ApisixTls` of those three). This prevents drift and conflicts.
 
 **APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs (the routes of mitxonline and learn-ai are rendered by their Pulumi programs and their `ApisixTls` is `apisix-tls.yaml`; the learn-ai sandbox's are in `sandbox.yaml`). APISIX's Helm values, the `apisix` `GatewayClass` and `Gateway`, and the `identity-header-strip` global rule come from the same code the deployed clusters use (`src/ol_infrastructure/infrastructure/aws/eks/apisix_definition.py`); `local-dev/infra/modules/ingress.py` only supplies the local inputs (one pod, NodePort, the mkcert trusted CA).
 
@@ -292,10 +292,10 @@ Then, for each enabled app (apps deploy independently of each other):
 └── kubectl apply apisix-routes.yaml
       APISIX picks up new routes → app reachable at its mit.test URL
 
-mitxonline and learn-ai instead:
+mitxonline, learn-ai and ol-analytics-api instead:
 ├── docker build (as above)
 └── pulumi up (local-dev/apps/<app>/pulumi, run by Tilt as a custom deploy)
-      pre-deploy Job: migrate, then createcachetable, then (mitxonline, local only) re-assert the
+      pre-deploy Job (not ol-analytics-api): migrate, then createcachetable, then (mitxonline, local only) re-assert the
         OAuth2 Application the composed Open edX signs in through
       Deployments, Service, ApisixPluginConfig, ApisixRoutes (and learn-ai's ApisixConsumer) from the deployed definition
       learn-ai only, local only: a model stub (Deployment, Service, ConfigMap) learn-ai calls until a model backend is chosen
@@ -318,4 +318,4 @@ Tilt collapses all of that into a file-watch + in-container sync, and shows the 
 - [README.md](README.md) — setup and day-to-day usage
 - [EXTENDING.md](EXTENDING.md) — adding a new app, modifying shared infrastructure
 - `local-dev/apps/*/Tiltfile` — per-app build + live_update config
-- `local-dev/apps/*/deployment.yaml` — per-app k8s manifests (those of mitxonline and learn-ai come from `local-dev/apps/<app>/pulumi/`)
+- `local-dev/apps/*/deployment.yaml` — per-app k8s manifests (those of mitxonline, learn-ai and ol-analytics-api come from `local-dev/apps/<app>/pulumi/`)

@@ -36,6 +36,12 @@ Key wiring decisions (see also ``k8s/README.md`` in the app repo):
   ``OL_ANALYTICS_API_VAULT_{ROLE,K8S_MOUNT,STARROCKS_MOUNT}`` env vars, which
   ``core/config.py`` reads.
 
+* **The workload and routes come from ``definition.py``.**  This program
+  binds them to the data cluster (stack references, the pod security group,
+  ``OLEKSAuthBinding``, the Vault mounts and VSO secrets) and calls the
+  definition, which local-dev renders with k3d bindings
+  (``local-dev/apps/ol-analytics-api/pulumi``).
+
 * **``OLApplicationK8s`` for the Deployment/Service.**  Using the shared
   component (rather than hand-rolling the manifests the app repo keeps for
   dry-run reference) means the ``/health/{startup,readiness,liveness}/`` probe
@@ -74,33 +80,27 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2
 
-from bridge.lib.constants import LearnSession
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.ol_analytics_api import definition
+from ol_infrastructure.applications.ol_analytics_api.vault_secrets import (
+    vault_keys,
+    vault_secrets,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.services.apisix import (
-    OLApisixOIDCConfig,
     OLApisixOIDCResources,
-    OLApisixOIDCRouteGroup,
-    OLApisixOIDCVaultCredentials,
-    OLApisixPluginConfig,
     OLApisixRoute,
-    OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
-    learn_session_oidc_config,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
-from ol_infrastructure.components.services.k8s import (
-    GranianConfig,
-    OLApplicationK8s,
-    OLApplicationK8sConfig,
-)
+from ol_infrastructure.components.services.k8s import OLApplicationK8s
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
@@ -121,18 +121,13 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     make_stack_reference,
-    merge_otel_resource_attributes,
     parse_stack,
 )
+from ol_infrastructure.lib.secret_env import secret_named
 from ol_infrastructure.lib.vault import setup_vault_provider
 
-# The container listens on this port. No nginx sidecar sits in front, so the
-# Service and the health probes target it directly. Keep this aligned with
-# granian_config.port below.
-APPLICATION_PORT = 8000
-
-APPLICATION_NAME = "ol-analytics-api"
-APPLICATION_NAMESPACE = "ol-analytics"
+APPLICATION_NAME = definition.APPLICATION_NAME
+APPLICATION_NAMESPACE = definition.NAMESPACE
 
 stack_info = parse_stack()
 setup_vault_provider(stack_info)
@@ -172,12 +167,7 @@ cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(APPLICATION_NAMESPACE, ns)
 )
 
-# StarRocks exists on the QA and Production data clusters only (setup_starrocks
-# skips CI), so this service is deployed to QA and Production only -- there is
-# no CI stack. The mount name itself is not environment-specific: QA and
-# Production each run their own, entirely separate Vault deployment, so that
-# server (not the mount path) is what scopes the environment.
-starrocks_vault_mount_path = "database-starrocks"
+starrocks_vault_mount_path = definition.STARROCKS_VAULT_MOUNT
 
 ########################################################################
 # IRSA + Vault Kubernetes auth via OLEKSAuthBinding
@@ -276,9 +266,21 @@ ol_analytics_api_app_auth_delegator_binding = kubernetes.rbac.v1.ClusterRoleBind
 # ol-infrastructure-sentry Pulumi stack (infrastructure/sentry/__main__.py),
 # which owns the actual Sentry project + client key -- Pulumi manages the real
 # value end-to-end, no manual Vault write required.
+#
+# Each Vault path below, and the variables it supplies, is described in
+# vault_secrets.py, which the local-dev program checks its Secret against.
+_vault_secrets = vault_secrets()
+_static_vault_secret = secret_named(_vault_secrets, "ol-analytics-api-static-secrets")
+_mitxonline_oauth_vault_secret = secret_named(
+    _vault_secrets, "ol-analytics-api-mitxonline-oauth"
+)
+_learner_records_vault_secret = secret_named(
+    _vault_secrets, "ol-analytics-api-learner-records-oidc"
+)
+
 ol_analytics_api_secrets_mount = vault.Mount(
     f"ol-analytics-api-secrets-mount-{stack_info.env_suffix}",
-    path="secret-ol-analytics-api",
+    path=_static_vault_secret.mount,
     type="kv-v2",
     options={"version": "2"},
     description="Static application secrets for ol-analytics-api (e.g. SENTRY_DSN).",
@@ -287,7 +289,9 @@ ol_analytics_api_secrets_mount = vault.Mount(
 
 ol_analytics_api_static_vault_secrets = vault.generic.Secret(
     f"ol-analytics-api-secrets-{stack_info.env_suffix}",
-    path=ol_analytics_api_secrets_mount.path.apply("{}/secrets".format),
+    path=ol_analytics_api_secrets_mount.path.apply(
+        lambda mount: f"{mount}/{_static_vault_secret.path}"
+    ),
     data_json=sentry_stack.require_output("ol_analytics_api_sentry_dsn").apply(
         lambda dsn: json.dumps({"SENTRY_DSN": dsn})
     ),
@@ -303,9 +307,9 @@ static_secrets = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=static_secrets_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-ol-analytics-api",
-        mount_type="kv-v2",
-        path="secrets",
+        mount=_static_vault_secret.mount,
+        mount_type=_static_vault_secret.mount_type,
+        path=_static_vault_secret.path,
         includes=["*"],
         excludes=[],
         exclude_raw=True,
@@ -342,7 +346,10 @@ if stack_info.env_suffix == "ci":
     mitxonline_oauth_depends_on.append(
         vault.generic.Secret(
             f"ol-analytics-api-mitxonline-oauth-vault-secret-{stack_info.env_suffix}",
-            path="secret-operations/ol-analytics-api/mitxonline-oauth",
+            path=(
+                f"{_mitxonline_oauth_vault_secret.mount}/"
+                f"{_mitxonline_oauth_vault_secret.path}"
+            ),
             data_json=Output.secret(
                 json.dumps(
                     {
@@ -365,21 +372,14 @@ mitxonline_oauth_secrets = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=mitxonline_oauth_secret_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="ol-analytics-api/mitxonline-oauth",
-        includes=["client_id", "client_secret"],
+        mount=_mitxonline_oauth_vault_secret.mount,
+        mount_type=_mitxonline_oauth_vault_secret.mount_type,
+        path=_mitxonline_oauth_vault_secret.path,
+        includes=vault_keys(_mitxonline_oauth_vault_secret),
         excludes=[".*"],
         exclude_raw=True,
         refresh_after="1h",
-        templates={
-            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID": (
-                '{{ get .Secrets "client_id" }}'
-            ),
-            "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET": (  # pragma: allowlist secret  # noqa: E501
-                '{{ get .Secrets "client_secret" }}'
-            ),
-        },
+        templates=_mitxonline_oauth_vault_secret.templates,
         vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -416,19 +416,14 @@ learner_records_oidc_secrets = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=learner_records_oidc_secret_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/ol-analytics-api",
-        includes=["url", "client_id"],
+        mount=_learner_records_vault_secret.mount,
+        mount_type=_learner_records_vault_secret.mount_type,
+        path=_learner_records_vault_secret.path,
+        includes=vault_keys(_learner_records_vault_secret),
         excludes=[".*"],
         exclude_raw=True,
         refresh_after="1h",
-        templates={
-            "OL_ANALYTICS_API_B2B_LEARNER_RECORDS_ISSUER": '{{ get .Secrets "url" }}',
-            "OL_ANALYTICS_API_B2B_LEARNER_RECORDS_AUDIENCE": (
-                '{{ get .Secrets "client_id" }}'
-            ),
-        },
+        templates=_learner_records_vault_secret.templates,
         vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -436,36 +431,6 @@ learner_records_oidc_secrets = OLVaultK8SSecret(
         parent=ol_analytics_api_auth_binding.vault_k8s_resources,
     ),
 )
-
-########################################################################
-# Application environment
-########################################################################
-# Non-sensitive config comes from the stack's `ol_analytics_api:env_vars`
-# object; the Vault-related values are injected here because they depend on
-# stack outputs / the env suffix.
-env_vars = dict(ol_analytics_api_config.require_object("env_vars") or {})
-env_vars["OL_ANALYTICS_API_VAULT_ADDR"] = vault_config.require("address")
-# The Vault k8s auth role name == the OLEKSAuthBinding application_name.
-env_vars["OL_ANALYTICS_API_VAULT_ROLE"] = APPLICATION_NAME
-env_vars["OL_ANALYTICS_API_VAULT_STARROCKS_MOUNT"] = starrocks_vault_mount_path
-# Vault itself (OL_ANALYTICS_API_VAULT_ADDR above) is the single shared
-# per-env-tier Vault server, same as every other app -- there is no separate
-# "data cluster Vault". What differs per cluster is which Kubernetes auth
-# *mount* on that shared server the pod logs into, since Vault's kubernetes
-# auth method needs each cluster's own API endpoint/CA/JWT issuer configured
-# per mount. The data cluster's mount is `k8s-data` (env_prefix based, NOT
-# `k8s-data-{env}`); read it from the cluster stack rather than hardcoding.
-# This corrects the placeholder in the app repo's k8s/deployment.yaml.
-env_vars["OL_ANALYTICS_API_VAULT_K8S_MOUNT"] = cluster_stack.require_output(
-    "vault_auth_endpoint"
-)
-
-# Append the org's standard k8s labels to OTEL_RESOURCE_ATTRIBUTES so every
-# telemetry signal carries organizational metadata.  (GIT_SHA is baked into the
-# image and surfaces as service.version via core/config.py; pod identity is not
-# injected here, so the stack's OTEL_RESOURCE_ATTRIBUTES base should not contain
-# unexpandable ${GIT_SHA}/${HOSTNAME} shell placeholders.)
-merge_otel_resource_attributes(env_vars, k8s_global_labels)
 
 ########################################################################
 # Pod security group
@@ -489,139 +454,59 @@ ol_analytics_api_application_security_group = ec2.SecurityGroup(
 ########################################################################
 # Deployment + Service via OLApplicationK8s
 ########################################################################
-# Health probes match the shared component's paths but are re-pointed at the
-# app's own port (8000) since there is no nginx sidecar in front of it.
-_probe_configs = {
-    "startup_probe": kubernetes.core.v1.ProbeArgs(
-        http_get=kubernetes.core.v1.HTTPGetActionArgs(
-            path="/health/startup/",
-            port=APPLICATION_PORT,
-        ),
-        initial_delay_seconds=10,
-        period_seconds=10,
-        failure_threshold=12,
-        success_threshold=1,
-        timeout_seconds=5,
+ol_analytics_api_domain = ol_analytics_api_config.require("domain")
+# The MIT Learn frontend consumes the service under a Learn-scoped host
+# (`analytics.learn.mit.edu`) beside the canonical `analytics.ol.mit.edu`. Each
+# host gets its own APISIX route with its OWN OIDC resource rather than being
+# folded into one route's host list, so HOST-based tenant routing or
+# host-specific plugins can be layered on later without restructuring; all
+# hosts share a single SAN certificate. A learn.mit.edu host only provisions
+# once `learn.mit.edu` is in the data cluster's `allowed_dns_zones` -- both the
+# external-dns domainFilter and the cert-manager DNS-01 solver selector read
+# that list (see infrastructure/aws/eks and substructure/aws/eks).
+ol_analytics_api_learn_domain = ol_analytics_api_config.get("learn_domain")
+
+bindings = definition.OlAnalyticsApiBindings(
+    env_suffix=stack_info.env_suffix,
+    hostnames=definition.OlAnalyticsApiHostnames(
+        canonical=ol_analytics_api_domain,
+        learn=ol_analytics_api_learn_domain,
     ),
-    "readiness_probe": kubernetes.core.v1.ProbeArgs(
-        http_get=kubernetes.core.v1.HTTPGetActionArgs(
-            path="/health/readiness/",
-            port=APPLICATION_PORT,
-        ),
-        initial_delay_seconds=15,
-        period_seconds=15,
-        # Matches default_probe_configs: readiness shares the Granian connection
-        # budget with user traffic and its failure is correlated across replicas,
-        # so a fast eviction empties the EndpointSlice instead of shedding load.
-        # Kept in step with the component default -- see
-        # components/services/k8s.py.
-        failure_threshold=6,
-        timeout_seconds=5,
+    # Non-sensitive config; the Vault login settings below depend on stack
+    # outputs.
+    environment_variables=dict(ol_analytics_api_config.require_object("env_vars")),
+    # Vault itself is the single shared per-env-tier server, same as every other
+    # app. What differs per cluster is which Kubernetes auth *mount* on it the
+    # pod logs into, since Vault's kubernetes auth method needs each cluster's
+    # own API endpoint/CA/JWT issuer. The data cluster's mount is `k8s-data`
+    # (env_prefix based, NOT `k8s-data-{env}`), read from the cluster stack
+    # rather than hardcoded.
+    starrocks_vault=definition.StarRocksVaultLogin(
+        address=vault_config.require("address"),
+        k8s_auth_mount=cluster_stack.require_output("vault_auth_endpoint"),
     ),
-    # TCP rather than HTTP so a saturated Granian worker pool cannot fail
-    # liveness and trigger a restart that removes capacity from an already
-    # overloaded service. Readiness stays on HTTP. See default_probe_configs in
-    # components/services/k8s.py.
-    "liveness_probe": kubernetes.core.v1.ProbeArgs(
-        tcp_socket=kubernetes.core.v1.TCPSocketActionArgs(port=APPLICATION_PORT),
-        initial_delay_seconds=30,
-        period_seconds=30,
-        failure_threshold=3,
-        timeout_seconds=3,
+    # Browser origins outside the canonical host that call it with credentials,
+    # named per stack.
+    cors_frontend_origins=ol_analytics_api_config.get_object("cors_frontend_origins")
+    or [],
+    k8s_labels=k8s_global_labels,
+    secret_names=[
+        static_secrets_name,
+        mitxonline_oauth_secret_name,
+        learner_records_oidc_secret_name,
+    ],
+    cluster=definition.ClusterCapabilities(
+        security_group_id=ol_analytics_api_application_security_group.id,
+        security_group_name=Output.from_input(APPLICATION_NAME),
+        vault_auth_name=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
     ),
-}
+    service_account_name=APPLICATION_NAME,
+    **docker_image_config_kwargs("OL_ANALYTICS_API"),
+    min_replicas=ol_analytics_api_config.get_int("min_replicas") or 2,
+)
 
 ol_analytics_api_k8s = OLApplicationK8s(
-    ol_app_k8s_config=OLApplicationK8sConfig(
-        project_root=Path(__file__).parent,
-        application_config=env_vars,
-        application_name=APPLICATION_NAME,
-        application_namespace=APPLICATION_NAMESPACE,
-        application_lb_service_name=APPLICATION_NAME,
-        application_lb_service_port_name="http",
-        k8s_global_labels=k8s_global_labels,
-        env_from_secret_names=[
-            static_secrets_name,
-            mitxonline_oauth_secret_name,
-            learner_records_oidc_secret_name,
-        ],
-        application_security_group_id=ol_analytics_api_application_security_group.id,
-        application_security_group_name=Output.from_input(APPLICATION_NAME),
-        application_service_account_name=APPLICATION_NAME,
-        vault_k8s_resource_auth_name=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
-        application_image_repository="mitodl/ol-analytics-api-app",
-        **docker_image_config_kwargs("OL_ANALYTICS_API"),
-        application_min_replicas=ol_analytics_api_config.get_int("min_replicas") or 2,
-        # Granian settings are declared here via the shared component so server
-        # config is visible and diffable in this stack (and picks up the
-        # component's metrics/PodMonitor wiring).
-        granian_config=GranianConfig(
-            # FastAPI is ASGI; Granian's own default interface is RSGI.
-            interface="asgi",
-            # Not DEFAULT_WSGI_PORT: there is no nginx sidecar here, so the
-            # Service and the health probes talk to Granian directly on
-            # APPLICATION_PORT (see import_nginx_config=False below).
-            port=APPLICATION_PORT,
-            # Scale horizontally on replicas rather than workers-per-pod --
-            # this pod is CPU-request-small (100m) and the workload is
-            # IO-bound on StarRocks, not CPU-bound.
-            workers=1,
-            runtime_threads=1,
-            # blocking_threads is deliberately unset: Granian forces it to 1
-            # on the asgi interface and the component rejects an explicit >1.
-            #
-            # No websockets anywhere in this service's surface.
-            no_ws=True,
-            # Matches the app's own LOG_LEVEL=INFO, so Granian's lifecycle
-            # lines land in Loki alongside the app's structured output rather
-            # than being suppressed at the component's "warning" default.
-            log_level="info",
-            application_module="ol_analytics_api.main:app",
-        ),
-        application_port=APPLICATION_PORT,
-        import_nginx_config=False,
-        # Not a Django app: no migrations, no collectstatic, no nginx.
-        init_migrations=False,
-        init_collectstatic=False,
-        probe_configs=_probe_configs,
-        resource_requests={"cpu": "100m", "memory": "256Mi"},
-        resource_limits={"memory": "512Mi"},
-        # Pod/container hardening. The app image already declares
-        # `USER appuser` (uid/gid 1000) and PYTHONDONTWRITEBYTECODE=1, so
-        # nothing writes to the image filesystem at runtime and a read-only
-        # root is free -- with the exception of tempfile's default directory,
-        # which the emptyDir below keeps writable.
-        pod_security_context=kubernetes.core.v1.PodSecurityContextArgs(
-            run_as_non_root=True,
-            run_as_user=1000,
-            run_as_group=1000,
-            # An emptyDir is created root-owned; without an fsGroup the app
-            # user cannot write into the /tmp mount below.
-            fs_group=1000,
-            seccomp_profile=kubernetes.core.v1.SeccompProfileArgs(
-                type="RuntimeDefault"
-            ),
-        ),
-        container_security_context=kubernetes.core.v1.SecurityContextArgs(
-            allow_privilege_escalation=False,
-            read_only_root_filesystem=True,
-            capabilities=kubernetes.core.v1.CapabilitiesArgs(drop=["ALL"]),
-        ),
-        extra_volumes=[
-            kubernetes.core.v1.VolumeArgs(
-                name="tmp",
-                empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(
-                    size_limit="64Mi"
-                ),
-            )
-        ],
-        extra_volume_mounts=[
-            kubernetes.core.v1.VolumeMountArgs(
-                name="tmp",
-                mount_path="/tmp",  # noqa: S108
-            )
-        ],
-    ),
+    ol_app_k8s_config=definition.application_config(bindings),
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[
@@ -641,36 +526,6 @@ ol_analytics_api_k8s = OLApplicationK8s(
 ########################################################################
 # APISIX ingress + Keycloak OIDC
 ########################################################################
-ol_analytics_api_domain = ol_analytics_api_config.require("domain")
-
-# Additional host(s) that also route to this service beyond the canonical
-# `domain`: the MIT Learn frontend consumes it under a Learn-scoped host
-# (`analytics.learn.mit.edu`) alongside the canonical `analytics.ol.mit.edu`.
-# Each host gets its own APISIX route with its OWN OIDC resource (see below)
-# rather than being folded into one route's host list, so HOST-based tenant
-# routing or host-specific plugins can be layered on later without
-# restructuring; all hosts share a single SAN certificate. A learn.mit.edu
-# host only provisions once `learn.mit.edu` is in the data cluster's
-# `allowed_dns_zones` -- both the external-dns domainFilter and the
-# cert-manager DNS-01 solver selector read that list (see
-# infrastructure/aws/eks and substructure/aws/eks).
-ol_analytics_api_learn_domain = ol_analytics_api_config.get("learn_domain")
-ol_analytics_api_hosts = [ol_analytics_api_domain]
-if ol_analytics_api_learn_domain:
-    ol_analytics_api_hosts.append(ol_analytics_api_learn_domain)
-
-# Origins allowed to read this API cross-origin, with credentials.  The
-# canonical host serves its own UI, so it needs nothing here for itself; the
-# Learn-scoped host exists precisely because the MIT Learn frontend calls it
-# with `fetch` from a different origin (see the second OIDC resource below), and
-# that call carries the shared session cookie, so it is a credentialed
-# cross-origin read and has to be named explicitly, per stack, in
-# cors_frontend_origins.
-ol_analytics_api_cors_allow_origins = [
-    f"https://{ol_analytics_api_domain}",
-    *(ol_analytics_api_config.get_object("cors_frontend_origins") or []),
-]
-
 # Shared plugins (redirect http->https, cors, prometheus, opentelemetry, ...).
 ol_analytics_api_shared_plugins = OLApisixSharedPlugins(
     f"ol-analytics-api-{stack_info.env_suffix}-ol-shared-plugins",
@@ -680,82 +535,29 @@ ol_analytics_api_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=APPLICATION_NAMESPACE,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
-        cors_allow_origins=ol_analytics_api_cors_allow_origins,
+        cors_allow_origins=definition.cors_allow_origins(bindings),
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
 
-# OIDC resources: sync the Keycloak client config from Vault and expose the
-# openid-connect plugin config.  The `organization:*` scope (the component
-# default) is required so the org membership claim reaches X-Userinfo, which the
-# b2b_dashboard tenant's auth checks depend on.  This resource, with its own
-# dedicated Keycloak client (`ol-analytics-api-client`, see olapps.py), is used
-# only for the canonical `analytics.ol.mit.edu` host below with a full
-# redirect-to-Keycloak flow.
+# The canonical host's OIDC resources, syncing its dedicated Keycloak client
+# (`ol-analytics-api-client`, see olapps.py) from Vault.
 ol_analytics_api_oidc_resources = OLApisixOIDCResources(
     f"ol-analytics-api-{stack_info.env_suffix}-oidc-resources",
-    oidc_config=OLApisixOIDCConfig(
-        application_name=APPLICATION_NAME,
-        k8s_labels=k8s_global_labels,
-        k8s_namespace=APPLICATION_NAMESPACE,
-        oidc_logout_path="/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{ol_analytics_api_domain}/",
-        oidc_use_session_secret=True,
-        credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/ol-analytics-api",
-            vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
-        ),
-    ),
+    oidc_config=definition.canonical_oidc_config(bindings),
     opts=ResourceOptions(
         delete_before_replace=True,
         parent=ol_analytics_api_auth_binding.vault_k8s_resources,
     ),
 )
 
-# A second, separate OIDC resource for the Learn-scoped host
-# (`analytics.learn.mit.edu` et al.): the MIT Learn frontend calls this API
-# with `fetch`, not a browser navigation, so a redirect-to-Keycloak response
-# (what the canonical host's "auth" flow above returns) would show up as a
-# CORS/opaque-redirect failure, not the JSON 401/403 the frontend expects.
-# Rather than minting its own session, this resource reuses mit-learn's own
-# Keycloak client (`sso/mitlearn`, same vault_path mit_learn's and learn_ai's
-# own OIDC resources read -- see mit_learn/__main__.py and
-# learn_ai/__main__.py) so the cookie set when a user logs into mit-learn is
-# recognized here too, mirroring how learn-ai's `/ai/*` route piggybacks on
-# mit-learn's session rather than the JWT-plugin approach that ask implied
-# (this repo has no jwt-auth-plugin route anywhere; the shared-session
-# pass-through IS the established pattern). Sharing the session requires the
-# shared client, `unauth_action="pass"` below (never redirects), and the cookie
-# name and parent domain mit-learn's login writes, all of which come from
-# LearnSession.
-#
-# The logout path is the plugin default on this host.  Its post-logout landing
-# is mit-learn's /logout/, as learn-ai's is: the session being ended is the
-# shared one, and Keycloak rejects https://analytics.<env>.learn.mit.edu/ for
-# ol-mitlearn-client with a 400 in CI, RC and Production.
+# A second, separate OIDC resource for the Learn-scoped host, sharing
+# mit-learn's session (see definition.learn_oidc_config for why).
 ol_analytics_api_learn_oidc_resources = None
 if ol_analytics_api_learn_domain:
-    ol_analytics_api_learn_session = LearnSession.for_host(
-        stack_info.env_suffix, ol_analytics_api_learn_domain
-    )
     ol_analytics_api_learn_oidc_resources = OLApisixOIDCResources(
         f"ol-analytics-api-{stack_info.env_suffix}-learn-oidc-resources",
-        oidc_config=learn_session_oidc_config(
-            ol_analytics_api_learn_session,
-            OLApisixOIDCRouteGroup(
-                hosts=[ol_analytics_api_learn_domain],
-                post_logout_redirect_uri=ol_analytics_api_learn_session.logout_landing_uri,
-            ),
-            application_name=f"{APPLICATION_NAME}-learn",
-            k8s_labels=k8s_global_labels,
-            k8s_namespace=APPLICATION_NAMESPACE,
-            credentials=OLApisixOIDCVaultCredentials(
-                path=LearnSession.vault_path,
-                vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
-            ),
-        ),
+        oidc_config=definition.learn_oidc_config(bindings),
         opts=ResourceOptions(
             delete_before_replace=True,
             parent=ol_analytics_api_auth_binding.vault_k8s_resources,
@@ -771,94 +573,21 @@ ol_analytics_api_cert = OLCertManagerCert(
         k8s_labels=k8s_global_labels,
         create_apisixtls_resource=True,
         dest_secret_name="ol-analytics-api-tls",  # noqa: S106  # pragma: allowlist secret
-        dns_names=ol_analytics_api_hosts,
+        dns_names=definition.hosts(bindings),
     ),
 )
 
-# The learner-records tenant has no browser users. Partners call it with a
-# client-credentials token from the per-contract clients in
-# substructure/keycloak/learner_records.py, so its prefix gets a bearer-only
-# rule that answers 401 instead of redirecting. It reuses the canonical host's
-# OIDC resource only for the discovery URL and the client_id the audience is
-# checked against.
-_learner_records_bearer_plugin = (
-    ol_analytics_api_oidc_resources.get_full_oidc_plugin_config(unauth_action="deny")
+_ol_analytics_api_route_configs = definition.canonical_route_configs(
+    bindings,
+    ol_analytics_api_oidc_resources,
+    shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
 )
-_learner_records_bearer_plugin["config"].update(
-    {
-        "bearer_only": True,
-        # Verify the JWT against Keycloak's JWKS. Introspection reports
-        # client-credentials tokens as active: false (same as Opik's SDK route).
-        "use_jwks": True,
-        "required_scopes": ["learner-records:read"],
-        # Every olapps token is signed by the same realm key. Requiring
-        # ol-analytics-api-client in `aud`, which the learner-records:read scope
-        # adds, keeps tokens minted for other olapps clients out.
-        "claim_validator": {
-            "audience": {"required": True, "match_with_client_id": True}
-        },
-        # bearer_token() falls back to X-Access-Token when a request has no
-        # Authorization header.  The plugin clears an inbound X-Access-Token
-        # and only puts the verified token back with this on.
-        "set_access_token_header": True,
-    }
-)
-
-# Route every path to the service behind the openid-connect plugin so APISIX
-# authenticates the Keycloak session and forwards X-Userinfo.  The canonical
-# host uses unauth_action "auth" (redirects unauthenticated browsers to
-# Keycloak); the Learn-scoped host uses "pass" against the shared mit-learn
-# session instead (see ol_analytics_api_learn_oidc_resources above for why).
-# The learner-records rule outranks both on every host, so a browser session
-# can't reach that tenant through either catch-all.
-_ol_analytics_api_route_configs = [
-    OLApisixRouteConfig(
-        route_name="ol-analytics-api-learner-records",
-        priority=20,
-        shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
-        plugins=[OLApisixPluginConfig(**_learner_records_bearer_plugin)],
-        hosts=ol_analytics_api_hosts,
-        paths=["/api/v1/learner-records", "/api/v1/learner-records/*"],
-        backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
-        backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
-        backend_resolve_granularity="service",
-    ),
-    OLApisixRouteConfig(
-        route_name="ol-analytics-api",
-        priority=10,
-        shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
-        plugins=[
-            OLApisixPluginConfig(
-                **ol_analytics_api_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                )
-            ),
-        ],
-        hosts=[ol_analytics_api_domain],
-        paths=["/*"],
-        backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
-        backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
-        backend_resolve_granularity="service",
-    ),
-]
 if ol_analytics_api_learn_oidc_resources is not None:
     _ol_analytics_api_route_configs.append(
-        OLApisixRouteConfig(
-            route_name="ol-analytics-api-learn",
-            priority=10,
+        definition.learn_route_config(
+            bindings,
+            ol_analytics_api_learn_oidc_resources,
             shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    **ol_analytics_api_learn_oidc_resources.get_full_oidc_plugin_config(
-                        unauth_action="pass"
-                    )
-                ),
-            ],
-            hosts=[ol_analytics_api_learn_domain],
-            paths=["/*"],
-            backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
-            backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
         )
     )
 
