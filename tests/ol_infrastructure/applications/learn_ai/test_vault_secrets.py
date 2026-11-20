@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml
 
 from ol_infrastructure.applications.learn_ai.vault_secrets import (
+    memory_exchange_secret,
     secret_env_names,
     secret_named,
     undescribed_static_keys,
@@ -71,3 +72,23 @@ def test_secret_env_names_is_database_url_then_static_then_opik():
         *secret_named(SECRETS, "learn-ai-secrets").env,
         *OPIK_KEYCLOAK_SECRET_TEMPLATES,
     ]
+
+
+def test_the_memory_exchange_secret_is_ol_learn_ai_client():
+    secret = memory_exchange_secret()
+    assert (secret.mount, secret.mount_type, secret.path) == (
+        "secret-operations",
+        "kv-v1",
+        "sso/learn-ai",
+    )
+    assert secret.templates == {
+        "OL_LLM_MEMORY_EXCHANGE_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+        "OL_LLM_MEMORY_EXCHANGE_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+        "OL_LLM_MEMORY_TOKEN_URL": (
+            '{{ get .Secrets "url" }}/protocol/openid-connect/token'
+        ),
+    }
+
+
+def test_local_dev_gets_no_memory_variables():
+    assert not any(name.startswith("OL_LLM_MEMORY") for name in secret_env_names())
