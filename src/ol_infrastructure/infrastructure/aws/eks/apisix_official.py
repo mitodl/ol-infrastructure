@@ -28,6 +28,7 @@ from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
     gateway_class_spec,
     gateway_error_pages,
     gateway_spec,
+    http2_safe_chart,
     identity_header_strip_rule_spec,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -98,7 +99,7 @@ def setup_apisix(
     apisix_domains = eks_config.get_object("apisix_domains") or []
 
     # APISIX chart uses a different chart version scheme
-    # Chart version 2.17.x contains APISIX 3.18.x
+    # Chart version 3.1.x contains APISIX 3.21.x
     apisix_chart_version = versions["APISIX_CHART"]
 
     # Get Fastly IP ranges for trusted proxy configuration
@@ -115,6 +116,9 @@ def setup_apisix(
         env_suffix=stack_info.env_suffix,
         admin_key=eks_config.require_secret("apisix_admin_key"),
         viewer_key=eks_config.require_secret("apisix_viewer_key"),
+        # setup_traefik installs the experimental bundle (see apisix_crds below).
+        install_gateway_api_crds=False,
+        http2_enabled=http2_safe_chart(apisix_chart_version),
         service=ApisixGatewayService(
             type="LoadBalancer",
             annotations={
@@ -189,14 +193,14 @@ def setup_apisix(
     # backendtrafficpolicies was 30 schema properties behind on all 12 clusters and
     # apisixupstreams 18 on most.
     #
-    # Only the apisix.apache.org group. The subchart also ships gwapi-crds.yaml,
-    # holding the Gateway API CRDs at channel "standard", bundle v1.6.0 -- the same
-    # cluster-scoped objects setup_traefik installs from the *experimental* bundle
-    # at GATEWAY_API_VERSION and owns. Adopting those here would force every
+    # Only the apisix.apache.org group. The subchart also ships the Gateway API
+    # CRDs at channel "standard" -- the same cluster-scoped objects
+    # setup_traefik installs from the *experimental* bundle at
+    # GATEWAY_API_VERSION and owns. Adopting those here would force every
     # gateway.networking.k8s.io CRD down from experimental to standard and leave
-    # two Pulumi resources overwriting each other on every up. skip_crds below
-    # keeps Helm from installing that copy on a fresh cluster too, which the
-    # release's existing depends_on gateway_api_crds already makes unnecessary.
+    # two Pulumi resources overwriting each other on every up. Since chart 3.0.0
+    # that copy is a template rather than crds/, so skip_crds below no longer
+    # stops it; install_gateway_api_crds=False does.
     apisix_crds = adopt_helm_chart_crds(
         f"{cluster_name}-apisix-crds",
         kubeconfig=cluster.kubeconfig,

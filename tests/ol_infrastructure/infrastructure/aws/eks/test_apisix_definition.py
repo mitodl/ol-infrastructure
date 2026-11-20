@@ -5,12 +5,14 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from bridge.lib.versions import APISIX_CHART_VERSION
 from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
     ApisixGatewayConfig,
     ApisixGatewayService,
     ApisixHighAvailability,
     ApisixTrustedCA,
     apisix_helm_values,
+    http2_safe_chart,
 )
 
 FLEET_ONLY_KEYS = {
@@ -37,6 +39,8 @@ def _single_pod(**overrides: Any) -> ApisixGatewayConfig:
             "otel_collector_address": None,
             "service_monitor_enabled": False,
             "admission_webhook_enabled": True,
+            "install_gateway_api_crds": True,
+            "http2_enabled": True,
             **overrides,
         },
     )
@@ -58,7 +62,26 @@ def _fleet() -> ApisixGatewayConfig:
         otel_collector_address="collector.example:4318",
         service_monitor_enabled=True,
         admission_webhook_enabled=True,
+        install_gateway_api_crds=False,
+        http2_enabled=True,
     )
+
+
+def test_gateway_proxy_admin_key_comes_from_apisix_credentials():
+    # Chart 3.0.0+ renders the GatewayProxy from apisix.admin.credentials;
+    # a second copy under gatewayProxy would make the controller chart
+    # render its own and fight the apisix chart's.
+    for config in (_single_pod(), _fleet()):
+        gateway_proxy = apisix_helm_values(config)["ingress-controller"]["gatewayProxy"]
+        assert "createDefault" not in gateway_proxy
+        assert "provider" not in gateway_proxy
+
+
+def test_gateway_api_crds_follow_config():
+    # The fleet's Gateway API CRDs are Traefik's experimental bundle.
+    for config, expected in ((_single_pod(), True), (_fleet(), False)):
+        crds = apisix_helm_values(config)["ingress-controller"]["crds"]
+        assert crds == {"gatewayAPI": {"enabled": expected}}
 
 
 def test_http_redirects_go_to_443_everywhere():
@@ -68,10 +91,20 @@ def test_http_redirects_go_to_443_everywhere():
         assert values["apisix"]["pluginAttrs"]["redirect"] == {"https_port": 443}
 
 
-def test_http2_is_off_everywhere():
-    # CVE-2026-123007 / CVE-2026-123633: the chart turns HTTP/2 on by default.
-    for config in (_single_pod(), _fleet()):
-        assert apisix_helm_values(config)["apisix"]["enableHTTP2"] is False
+def test_http2_follows_config():
+    for enabled in (True, False):
+        values = apisix_helm_values(_single_pod(http2_enabled=enabled))
+        assert values["apisix"]["enableHTTP2"] is enabled
+
+
+def test_http2_only_on_charts_past_the_nginx_rce():
+    # CVE-2026-123007 / CVE-2026-123633: a rollback through the APISIX_CHART
+    # override to a 3.20.x-or-older chart must turn HTTP/2 back off.
+    assert not http2_safe_chart("2.19.0")
+    assert not http2_safe_chart("3.0.0")
+    assert http2_safe_chart("3.1.0")
+    assert http2_safe_chart("3.2.0")
+    assert http2_safe_chart(APISIX_CHART_VERSION)
 
 
 def test_single_pod_has_no_fleet_settings():
@@ -192,4 +225,6 @@ def test_cluster_capabilities_must_be_stated():
         "otel_collector_address",
         "service_monitor_enabled",
         "admission_webhook_enabled",
+        "install_gateway_api_crds",
+        "http2_enabled",
     }

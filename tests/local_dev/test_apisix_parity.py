@@ -75,6 +75,8 @@ EXPECTED_DIFFERENCES = {
     "podAnnotations",
     # The admission webhook denies local's batch-applied routes; see ingress.py.
     "ingress-controller.webhook",
+    # Deployed clusters get the Gateway API CRDs from setup_traefik.
+    "ingress-controller.crds",
 }
 
 EKS_ENV_SUFFIX = "qa"
