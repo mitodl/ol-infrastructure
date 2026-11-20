@@ -1,6 +1,8 @@
 """Meilisearch Helm release installation and configuration for EDXApp."""
 
 import hashlib
+import hmac
+import json
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,159 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+
+# Meilisearch computes an API key as HMAC-SHA256(master key, uid)
+# (generate_key_as_hexa in crates/meilisearch-auth/src/store.rs), so a key
+# created with a fixed uid has the same value in every database that shares the
+# master key. edxapp used to carry a copy of the Default Admin API Key, whose
+# uid is random per database, and recreating the database silently invalidated
+# it (mitx CI, 2026-04-01 to 2026-10-01). The uid is not secret: anyone holding
+# a key can read it from GET /keys, and the value still needs the master key.
+EDXAPP_MEILISEARCH_KEY_UID = "be0444d7-0b85-4dde-a512-0fd3e205902a"
+
+# Same scope as the Default Admin API Key edxapp used before. edx-platform
+# manages indexes, writes documents, and signs tenant tokens with this key, and
+# it calls GET /keys/<key> to look up the uid it signs them with.
+EDXAPP_MEILISEARCH_KEY_REQUEST = {
+    "uid": EDXAPP_MEILISEARCH_KEY_UID,
+    "name": "edxapp",
+    "description": "Open edX Studio content search. Managed by ol-infrastructure.",
+    "actions": ["*"],
+    "indexes": ["*"],
+    "expiresAt": None,
+}
+
+EDXAPP_KEY_JOB_NAME = "meilisearch-edxapp-key"
+
+# How quickly a recreated database gets the edxapp key back.
+EDXAPP_KEY_RECONCILE_SCHEDULE = "*/15 * * * *"
+
+EDXAPP_KEY_JOB_TTL_SECONDS = 3600
+
+# Meilisearch answers 201 when it creates the key and 409 (api_key_already_exists)
+# when a key with this uid is already there, so the script is safe to repeat.
+# The master key goes to curl on stdin so it stays out of the process arguments.
+_ENSURE_EDXAPP_KEY_SCRIPT = """\
+code=$(printf 'Authorization: Bearer %s\\n' "$MEILI_MASTER_KEY" | curl -sS \\
+  -o /tmp/response -w '%{http_code}' -H @- -H 'Content-Type: application/json' \\
+  --data "$KEY_REQUEST" http://meilisearch:7700/keys)
+case "$code" in
+  201|409) echo "edxapp Meilisearch key present (HTTP $code)" ;;
+  *) echo "creating the edxapp Meilisearch key failed (HTTP $code)"
+     cat /tmp/response
+     exit 1 ;;
+esac
+"""
+
+
+def edxapp_meilisearch_api_key(master_key: str) -> str:
+    """Compute the value Meilisearch gives the edxapp key under ``master_key``.
+
+    :param master_key: the Meilisearch master key.
+    :returns: the API key edxapp authenticates with.
+    :rtype: str
+    """
+    return hmac.new(
+        master_key.encode(), EDXAPP_MEILISEARCH_KEY_UID.encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def _create_edxapp_key_jobs(
+    stack_info: StackInfo,
+    namespace: str,
+    k8s_global_labels: dict[str, str],
+    master_key_secret_name: str,
+    meilisearch_release: kubernetes.helm.v3.Release,
+) -> None:
+    """Create the edxapp API key in Meilisearch, and recreate it when it goes missing.
+
+    The Job creates the key as soon as the release is up, so a deploy that
+    switches edxapp to the derived key does not leave Studio with a key
+    Meilisearch has never seen. The CronJob covers a database recreated later
+    (a replaced PVC starts with only the default keys).
+    """
+    labels = {**k8s_global_labels, "app.kubernetes.io/name": EDXAPP_KEY_JOB_NAME}
+    job_spec = kubernetes.batch.v1.JobSpecArgs(
+        backoff_limit=2,
+        active_deadline_seconds=300,
+        ttl_seconds_after_finished=EDXAPP_KEY_JOB_TTL_SECONDS,
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=labels),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                restart_policy="Never",
+                automount_service_account_token=False,
+                security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                    run_as_non_root=True,
+                    run_as_user=1000,
+                    run_as_group=1000,
+                ),
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="ensure-edxapp-key",
+                        # The Meilisearch image ships curl, so this needs no
+                        # image of its own.
+                        image=f"getmeili/meilisearch:{MEILISEARCH_VERSION}",
+                        command=["/bin/sh", "-c", _ENSURE_EDXAPP_KEY_SCRIPT],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="MEILI_MASTER_KEY",
+                                value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                    secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
+                                        name=master_key_secret_name,
+                                        key="MEILI_MASTER_KEY",
+                                    ),
+                                ),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="KEY_REQUEST",
+                                value=json.dumps(EDXAPP_MEILISEARCH_KEY_REQUEST),
+                            ),
+                        ],
+                        security_context=kubernetes.core.v1.SecurityContextArgs(
+                            allow_privilege_escalation=False,
+                            capabilities=kubernetes.core.v1.CapabilitiesArgs(
+                                drop=["ALL"]
+                            ),
+                        ),
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "10m", "memory": "16Mi"},
+                            limits={"memory": "64Mi"},
+                        ),
+                    )
+                ],
+            ),
+        ),
+    )
+
+    kubernetes.batch.v1.Job(
+        f"ol-{stack_info.env_prefix}-edxapp-meilisearch-key-job-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            namespace=namespace,
+            labels=labels,
+        ),
+        spec=job_spec,
+        opts=ResourceOptions(depends_on=[meilisearch_release]),
+    )
+    kubernetes.batch.v1.CronJob(
+        f"ol-{stack_info.env_prefix}-edxapp-meilisearch-key-cronjob-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=EDXAPP_KEY_JOB_NAME,
+            namespace=namespace,
+            labels=labels,
+        ),
+        spec=kubernetes.batch.v1.CronJobSpecArgs(
+            schedule=EDXAPP_KEY_RECONCILE_SCHEDULE,
+            concurrency_policy="Forbid",
+            starting_deadline_seconds=300,
+            successful_jobs_history_limit=1,
+            failed_jobs_history_limit=3,
+            job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=labels),
+                spec=job_spec,
+            ),
+        ),
+        opts=ResourceOptions(depends_on=[meilisearch_release]),
+    )
 
 
 def create_meilisearch_resources(
@@ -208,6 +363,14 @@ def create_meilisearch_resources(
         opts=ResourceOptions(
             delete_before_replace=True, depends_on=[master_key_secret]
         ),
+    )
+
+    _create_edxapp_key_jobs(
+        stack_info,
+        namespace,
+        k8s_global_labels,
+        master_key_secret_name,
+        meilisearch_release,
     )
 
     # Raise the throughput of an already-provisioned volume. The storageclass sets
