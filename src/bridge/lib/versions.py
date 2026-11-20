@@ -32,6 +32,13 @@ AIRBYTE_CHART_VERSION = "2.5.0"
 SUPERSET_CHART_VERSION = "0.22.8"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
+# The image tag the chart above runs: its appVersion, which does not follow from
+# the chart version (chart 3.2.2 runs 3.2.2.0-full, chart 2.9.0 runs 2.9.0.0).
+# Deployed stacks get it from the chart. Local-dev runs the image in its own
+# Deployment and reads it here, so it starts without fetching the chart index.
+# Renovate cannot read a chart's appVersion, so this has no marker, and the tika
+# rule in renovate.json5 holds chart bumps until it is moved in the same PR.
+TIKA_IMAGE_TAG = "3.2.2.0-full"
 # The Stripe-written PayPal adapter, run unmodified from the vendor image
 # (docs/plans/paypal-adapter-eks-deployment.md, P4). The pod pulls by digest so
 # a re-pushed tag cannot change what runs in the payment path. The distinct

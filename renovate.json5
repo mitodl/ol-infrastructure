@@ -79,6 +79,22 @@
       allowedVersions: '/^7\\.2\\.\\d+-alpine$/',
     },
     {
+      // TIKA_IMAGE_TAG pins the appVersion of the chart at TIKA_CHART_VERSION,
+      // the image local-dev runs in its own Deployment. Renovate cannot read a
+      // chart's appVersion, so a chart bump that automerged would leave
+      // local-dev on the old image. Hold it for a person to move both.
+      matchDatasources: [
+        'helm',
+      ],
+      matchPackageNames: [
+        'tika',
+      ],
+      automerge: false,
+      prBodyNotes: [
+        'Before merging, set `TIKA_IMAGE_TAG` in `src/bridge/lib/versions.py` to the appVersion of the new chart: `helm show chart tika --repo https://apache.jfrog.io/artifactory/tika --version {{{newVersion}}} | grep appVersion`',
+      ],
+    },
+    {
       // Altinity Stable tags (e.g. 25.8.28.10001.altinitystable) have four
       // numeric parts and a dotted suffix, which docker versioning cannot parse,
       // so the dependency dashboard listed CLICKHOUSE_SERVER_VERSION with no

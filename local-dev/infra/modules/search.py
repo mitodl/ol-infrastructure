@@ -10,33 +10,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import pulumi_kubernetes as k8s
-import requests
-import yaml as pyyaml
 from pulumi import Alias, ResourceOptions, get_project, get_stack
 
 from bridge.lib.versions import (
     OPENSEARCH_CHART_VERSION,
     QDRANT_VERSION,
-    TIKA_CHART_VERSION,
+    TIKA_IMAGE_TAG,
 )
-
-TIKA_CHART_REPO = "https://apache.jfrog.io/artifactory/tika"
-
-
-def tika_image_tag() -> str:
-    """Return the image tag the deployed Tika chart version runs.
-
-    Deployed stacks install the chart at ``TIKA_CHART_VERSION``, whose
-    ``appVersion`` is the image tag (e.g. chart 3.2.2 runs ``3.2.2.0-full``).
-    Local-dev keeps its own Deployment, because swapping it for the chart on an
-    existing cluster collides with the Deployment and Service already named
-    ``tika``, so it reads the tag from the chart index instead of repeating it.
-    """
-    resp = requests.get(f"{TIKA_CHART_REPO}/index.yaml", timeout=30)
-    resp.raise_for_status()
-    entries = pyyaml.safe_load(resp.text)["entries"]["tika"]
-    (entry,) = (e for e in entries if e["version"] == TIKA_CHART_VERSION)
-    return entry["appVersion"]
 
 
 @dataclass
@@ -263,7 +243,17 @@ def create_search(
                     "containers": [
                         {
                             "name": "tika",
-                            "image": f"apache/tika:{tika_image_tag()}",
+                            # Deployed stacks install the Tika chart at
+                            # TIKA_CHART_VERSION. Local-dev keeps its own
+                            # Deployment, because swapping it for the chart on
+                            # an existing cluster collides with the Deployment
+                            # and Service already named tika. TIKA_IMAGE_TAG in
+                            # bridge.lib.versions pins that chart's appVersion
+                            # beside it, so this runs the deployed image without
+                            # downloading the chart index on every run. That
+                            # download failed the whole program on a stalled
+                            # link.
+                            "image": f"apache/tika:{TIKA_IMAGE_TAG}",
                             "ports": [{"containerPort": 9998}],
                             # The -full image the chart runs adds tesseract,
                             # which Tika calls for scanned PDF pages as a
