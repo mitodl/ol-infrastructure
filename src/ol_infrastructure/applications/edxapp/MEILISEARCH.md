@@ -153,6 +153,9 @@ kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- \
 
 The CMS reads the key at pod start, and the Meilisearch Secret is not part of
 the CMS config hash, so a changed key reaches Studio on the next CMS rollout.
+Rotating the master key changes the derived key too, so restart the CMS
+Deployments after the deploy that rotates it, or Studio search fails until
+they next roll.
 
 ## Reindex data
 

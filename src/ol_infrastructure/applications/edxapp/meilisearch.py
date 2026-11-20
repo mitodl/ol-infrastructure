@@ -154,6 +154,11 @@ def _create_edxapp_key_jobs(
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             namespace=namespace,
             labels=labels,
+            # Pulumi would otherwise await this Job, and keep awaiting a failed
+            # one on later updates, so a Meilisearch outage at deploy time would
+            # fail every edxapp deploy until someone deleted the Job. A failed
+            # run raises WorkloadJobFailed* instead, and the CronJob retries.
+            annotations={"pulumi.com/skipAwait": "true"},
         ),
         spec=job_spec,
         opts=ResourceOptions(depends_on=[meilisearch_release]),
