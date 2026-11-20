@@ -1,0 +1,30 @@
+---
+# Reference workflow asserting that no `uv.lock` falls to an older format than it is already on.
+#
+# Copy to .github/workflows/uv-lock-revision.yml and change only the lines marked ADAPT.
+# Contract: https://github.com/mitodl/ol-github-workflows/blob/main/docs/uv-lock-revision-contract.md
+# Source:   https://github.com/mitodl/ol-github-workflows/blob/main/workflow-templates/uv-lock-revision.yml
+#
+# The check itself lives in mitodl/ol-github-workflows/actions/uv-lock-revision, so a fix to it
+# lands once rather than in every repository that adopted a copy. It is a composite action rather
+# than a reusable workflow so that it runs as a step inside this job: a `uses:` at job level would
+# make the check context `<caller job> / <called job>`, renaming the required check everywhere.
+name: uv.lock revision
+on:
+  pull_request:
+  push:
+    branches: [main] # ADAPT: the repository's default branch
+permissions:
+  contents: read
+concurrency:
+  group: uv-lock-revision-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  uv-lock-revision:
+    name: uv.lock revision # the required-check context; keep it stable
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: mitodl/ol-github-workflows/actions/uv-lock-revision@14f8b56edf705df487fa85df6bb326dd9633d075   # v1.1.0
+      with:
+        expected-revision: "5"   # ADAPT: the lowest `revision` any uv.lock here may be on
