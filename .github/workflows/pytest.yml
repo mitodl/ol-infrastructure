@@ -50,12 +50,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Every APISIX release a cluster runs. Production is split while the
-        # chart upgrade rolls out: 3.18.0 on the applications and residential
-        # clusters, 3.19.0 on data and operations (2026-10-07). Drop a version
-        # once no cluster runs it. 3.20.0 ships with chart 2.19.0, 3.21.0 with
-        # chart 3.1.0.
-        apisix: ["3.18.0", "3.19.0", "3.20.0", "3.21.0"]
+        # Every APISIX release a cluster runs. While chart 3.1.0 rolls out,
+        # applications-ci runs 3.21.0 and every other cluster 3.20.0
+        # (2026-11-20). Drop a version once no cluster runs it.
+        apisix: ["3.20.0", "3.21.0"]
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
