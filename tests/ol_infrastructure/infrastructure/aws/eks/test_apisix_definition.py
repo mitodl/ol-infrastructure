@@ -87,10 +87,11 @@ def test_http_redirects_go_to_443_everywhere():
         assert values["apisix"]["pluginAttrs"]["redirect"] == {"https_port": 443}
 
 
-def test_http2_is_off_everywhere():
-    # CVE-2026-123007 / CVE-2026-123633: the chart turns HTTP/2 on by default.
+def test_http2_is_on_everywhere():
+    # Safe from CVE-2026-123007 / CVE-2026-123633 only on APISIX 3.21.0+
+    # (openresty 1.31.9.1); see the enableHTTP2 comment.
     for config in (_single_pod(), _fleet()):
-        assert apisix_helm_values(config)["apisix"]["enableHTTP2"] is False
+        assert apisix_helm_values(config)["apisix"]["enableHTTP2"] is True
 
 
 def test_single_pod_has_no_fleet_settings():

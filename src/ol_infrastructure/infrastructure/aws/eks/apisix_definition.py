@@ -926,12 +926,12 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
             # Chart default is true, which sends "Server: APISIX/<version>"
             # on every response (hq#14079).
             "enableServerTokens": False,
-            # Chart default is true. nginx's HTTP/2 code up to 1.31.8 has a
-            # remote code execution bug (CVE-2026-123007, CVE-2026-123633,
-            # "nginx2root"), and every APISIX runtime so far bundles an affected
-            # nginx. Turn it back on once APISIX ships a runtime on nginx 1.31.9+.
-            # Clients fall back to HTTP/1.1; no route serves gRPC.
-            "enableHTTP2": False,
+            # nginx's HTTP/2 code up to 1.31.8 has a remote code execution bug
+            # (CVE-2026-123007, CVE-2026-123633, "nginx2root"), so this was off
+            # until APISIX 3.21.0, whose image runs openresty/1.31.9.1. Pinning
+            # an older chart through the APISIX_CHART env override brings back
+            # an affected nginx; turn this off again for that.
+            "enableHTTP2": True,
             # Enable comprehensive per-phase request lifecycle tracing
             # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
             # Available since chart 2.16.0; without it OpenTelemetry only
