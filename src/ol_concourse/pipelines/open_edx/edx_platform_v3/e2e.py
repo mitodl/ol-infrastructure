@@ -55,8 +55,9 @@ class E2ETarget(BaseModel):
             superuser that has an LMS password, with ``username`` and
             ``password`` keys. Surfaced to the suite as ``ADMIN_USERNAME`` and
             ``ADMIN_PASSWORD``.
-        grep_invert: Tags to leave out, as ``--grep-invert`` takes them: surfaces
-            the stage does not deploy at all, rather than ones that fail.
+        grep_invert: What to leave out, as ``--grep-invert`` takes it (tags, spec
+            paths or titles): surfaces the stage does not deploy, or replaces
+            with its own, rather than ones that fail.
         workers: Playwright workers. The stage is shared, so kept low.
         retries: Retries per failing test, so a one-off flake does not turn the
             run red.
@@ -109,9 +110,12 @@ E2E_TARGETS: list[E2ETarget] = [
             # libraries_v1_enabled and libraries_v2_enabled). Creating a legacy
             # library is not: Studio home has no Legacy Libraries tab, so
             # content-libraries-v1-create stays undeclared.
+            # COURSES_INVITE_ONLY is on (config_builder.py), so a learner cannot
+            # enroll themselves: -self-enrollment has the admin enroll them.
             # Capabilities left undeclared make their specs skip, not fail.
             "CAPABILITIES": (
-                "-mfe-authn,studio,teams,notes,ora,cohorts,special-exams,"
+                "-mfe-authn,-self-enrollment,"
+                "studio,teams,notes,ora,cohorts,special-exams,"
                 "scorm,edx-sga,courseware-navigation-sidebar,"
                 "content-libraries,content-libraries-v1"
             ),
@@ -129,6 +133,9 @@ E2E_TARGETS: list[E2ETarget] = [
             "JWT_AUTH_COOKIE_HEADER_PAYLOAD": (
                 "mitxonline-qa-edx-jwt-cookie-header-payload"
             ),
+            # The suite's demo course, imported into RC once and kept. The specs
+            # that read it skip while COURSE_KEY is unset.
+            "COURSE_KEY": "course-v1:E2E+DemoX+DemoCourse",
         },
         # The Concourse credential's NAME, not a credential. Resolves from Vault
         # at secret-concourse/infrastructure/e2e_mitxonline_rc for pr-inf.
@@ -138,7 +145,23 @@ E2E_TARGETS: list[E2ETarget] = [
         # and profile (neither is in Pulumi.mitxonline.QA.yaml's enabled_mfes).
         # These are tags rather than capabilities, so CAPABILITIES cannot turn
         # them off.
-        grep_invert="@mfe-account|@mfe-learner-dashboard|@mfe-catalog|@mfe-profile",
+        # Specs whose RC failure is mitxonline's own front end, matched by file
+        # or title:
+        # - the catalog (discovery.spec.ts, which lacks @mfe-catalog) and
+        #   /dashboard redirect to the mitxonline app
+        # - the course header links the dashboard and account to the mitxonline
+        #   app, and the logo spec does not find RC's header
+        # - the course progress API answers 404 on RC, which the completion and
+        #   progress specs read
+        grep_invert=(
+            "@mfe-account|@mfe-learner-dashboard|@mfe-catalog|@mfe-profile"
+            r"|catalog/discovery\.spec\.ts|dashboard/dashboard\.spec\.ts"
+            r"|chrome/logo\.spec\.ts"
+            "|header links the dashboard and the account"
+            "|in-course header names the course and links the account"
+            r"|course-home/progress\.spec\.ts|course-home/unit-completion\.spec\.ts"
+            r"|course-home/course-completion\.spec\.ts"
+        ),
     ),
 ]
 
