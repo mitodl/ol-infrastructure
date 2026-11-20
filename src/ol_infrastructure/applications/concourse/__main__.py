@@ -639,7 +639,10 @@ ol_web_launch_config = OLLaunchTemplateConfig(
             tags=aws_config.merged_tags({"Name": concourse_web_tag}),
         ),
     ],
-    user_data=consul_datacenter.apply(
+    # The cloud-init below carries Grafana Cloud credentials. Applying over a
+    # secret makes the result secret, so the launch template's userData is
+    # stored encrypted in the stack state.
+    user_data=Output.secret(consul_datacenter).apply(
         lambda consul_dc: base64.b64encode(
             "#cloud-config\n{}".format(
                 yaml.dump(
@@ -983,7 +986,10 @@ for worker_def in concourse_config.get_object("workers") or []:
                 ),
             ),
         ],
-        user_data=consul_datacenter.apply(build_worker_user_data_partial),
+        # Secret for the same reason as the web launch template's userData.
+        user_data=Output.secret(consul_datacenter).apply(
+            build_worker_user_data_partial
+        ),
         use_spot_instances=use_spot_instances,
         spot_options=spot_options_config,
     )

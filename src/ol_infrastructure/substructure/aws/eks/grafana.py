@@ -364,6 +364,10 @@ def setup_grafana(
     grafana_vault_secrets = read_yaml_secrets(
         Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
     )
+    # Wrapped so the Release's values hold ciphertext in state, not the key.
+    grafana_cloud_api_key = Output.secret(
+        grafana_vault_secrets["k8s_monitoring_api_key"]
+    )
     # The self-hosted telemetry archive (ADR-0014). Logs and OTLP metrics are
     # dual-shipped to it over an OTLP destination of its own, scraped metrics
     # over a second remote write; environments without an archive ship to
@@ -458,7 +462,7 @@ def setup_grafana(
                             "username": grafana_vault_secrets[
                                 "k8s_monitoring_metrics_username"
                             ],
-                            "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                            "password": grafana_cloud_api_key,
                         },
                     },
                     "grafana-cloud-logs": {
@@ -469,7 +473,7 @@ def setup_grafana(
                             "username": grafana_vault_secrets[
                                 "k8s_monitoring_logs_username"
                             ],
-                            "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                            "password": grafana_cloud_api_key,
                         },
                     },
                     "gc-otlp-endpoint": {
@@ -481,7 +485,7 @@ def setup_grafana(
                             "username": grafana_vault_secrets[
                                 "k8s_monitoring_tracing_username"
                             ],
-                            "password": grafana_vault_secrets["k8s_monitoring_api_key"],
+                            "password": grafana_cloud_api_key,
                         },
                         "metrics": {
                             "enabled": True,
@@ -1207,9 +1211,7 @@ def setup_grafana(
                                 "username": grafana_vault_secrets[
                                     "k8s_monitoring_tracing_username"
                                 ],
-                                "password": grafana_vault_secrets[
-                                    "k8s_monitoring_api_key"
-                                ],
+                                "password": grafana_cloud_api_key,
                             },
                         },
                     },
@@ -1277,5 +1279,12 @@ def setup_grafana(
                 },
             },
         ),
-        opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
+        # values carries the Grafana Cloud key. Marking the output secret
+        # re-encrypts a plaintext copy already in state; preview still shows
+        # which keys change and their new values, masking only the old ones.
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            delete_before_replace=True,
+            additional_secret_outputs=["values"],
+        ),
     )

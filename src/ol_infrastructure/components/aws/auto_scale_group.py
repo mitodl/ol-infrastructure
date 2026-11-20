@@ -493,7 +493,12 @@ class OLAutoScaling(pulumi.ComponentResource):
                 http_put_response_hop_limit=5,
                 instance_metadata_tags="enabled",
             ),
-            "opts": resource_options,
+            # userData can carry credentials. Marking the output secret also
+            # re-encrypts a plaintext value already in state, which wrapping the
+            # input alone does not do while the template is unchanged.
+            "opts": resource_options.merge(
+                pulumi.ResourceOptions(additional_secret_outputs=["user_data"])
+            ),
         }
 
         # Configure spot instances if requested. Diversifying across instance

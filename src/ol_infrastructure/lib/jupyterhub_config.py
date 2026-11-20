@@ -8,6 +8,8 @@ monorepo.
 
 from typing import Any
 
+from pulumi import Output
+
 from ol_infrastructure.lib.ol_types import AlertTier, Component, K8sGlobalLabels
 
 
@@ -71,7 +73,11 @@ def get_authenticator_config(
     }
     if authenticator_type == "shared-password":
         auth_conf["SharedPasswordAuthenticator"] = {
-            "admin_password": jupyterhub_deployment_config.get("shared_password")
+            # Callers read this from config with require_object, which drops the
+            # secure marking, so it is wrapped again before reaching Helm values.
+            "admin_password": Output.secret(
+                jupyterhub_deployment_config.get("shared_password")
+            )
         }
         auth_conf["JupyterHub"] = {
             "authenticator_class": "shared-password",

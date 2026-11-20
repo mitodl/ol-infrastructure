@@ -14,7 +14,7 @@ def get_heroku_provider(heroku_user: str) -> pulumi.ResourceTransformationResult
     )["apiKey"]
     return pulumiverse_heroku.Provider(
         resource_name=f"ol-heroku-provider-{heroku_user}",
-        api_key=heroku_api_key,
+        api_key=pulumi.Output.secret(heroku_api_key),
     )
 
 

@@ -260,7 +260,9 @@ def get_fastly_provider(
     pulumi.Config("fastly")
     fastly_provider = fastly.Provider(
         "fastly-provider",
-        api_key=read_yaml_secrets(Path("fastly.yaml"))["admin_api_key"],
+        api_key=pulumi.Output.secret(
+            read_yaml_secrets(Path("fastly.yaml"))["admin_api_key"]
+        ),
         opts=pulumi.ResourceOptions(
             aliases=[
                 pulumi.Alias(name="default_5_0_0"),

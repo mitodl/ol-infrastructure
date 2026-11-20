@@ -18,10 +18,12 @@ def get_consul_provider(
         provider_name,
         address=consul_address or consul_config.get("address"),
         scheme="https",
-        http_auth="pulumi:{}".format(
-            read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
-                "basic_auth_password"
-            ]
+        http_auth=pulumi.Output.secret(
+            "pulumi:{}".format(
+                read_yaml_secrets(Path(f"pulumi/consul.{stack_info.env_suffix}.yaml"))[
+                    "basic_auth_password"
+                ]
+            )
         ),
     )
     if wrap_in_pulumi_options:
