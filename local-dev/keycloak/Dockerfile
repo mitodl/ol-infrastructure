@@ -12,12 +12,12 @@
 # when a jar in providers/ no longer matches the one it was built against, so
 # a new theme cannot be mounted or copied into a running pod: it has to be
 # baked in and `kc.sh build` rerun. BASE_IMAGE has no default on purpose: the
-# script reads the digest the core stack pins in
-# local-dev/infra/core/__main__.py and passes it in, so the two cannot drift.
+# script reads LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST, the digest the core stack also
+# runs (src/bridge/lib/versions.py, kept current by Renovate), and passes it in,
+# so the two cannot drift.
 ARG BASE_IMAGE
 
 # The jar is platform-independent, so build it on the host's own architecture.
-# Only the Keycloak stage below has to be linux/amd64 (the base is amd64-only).
 FROM --platform=$BUILDPLATFORM node:26-bookworm@sha256:a546d3f8acd2af4382668a7e6acd3bc4418e6a27478373e3246f8162f5181509 AS theme
 # keycloakify packages the theme with Maven; Debian's package brings a JDK.
 # Any Maven 3 works for that, so the exact Debian package version is not
@@ -65,4 +65,6 @@ RUN /opt/keycloak/bin/kc.sh build \
     --spi-login--provider=ol-freemarker \
     --tracing-enabled=true \
     --tracing-jdbc-enabled=true \
-    --features=update-email
+    --features=update-email \
+    --features-disabled=scim-api \
+    --spi-admin--audience-check-enabled=false

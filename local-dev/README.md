@@ -646,7 +646,7 @@ kubectl --context local-dev -n local-infra get pod keycloak-0 -o jsonpath='{.spe
 
 Emails land in [Mailpit](#inspect-emails-mailpit); the olapps realm enables the `UPDATE_EMAIL` required action, so changing an email from the [account console](https://sso.ol.mit.test/realms/olapps/account/) exercises the email-update confirmation template as well.
 
-Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's short commit plus a hash of its uncommitted changes (tracked edits and untracked files; gitignored files don't count) and of the Dockerfile, so each distinct input gets its own tag and the operator, which only rolls when the image string changes, rolls once per change. The registry keeps the ten most recent tags per repository, so if `keycloak-0` ever fails to pull an old tag after many builds, re-run the script. To return to the published image:
+Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's short commit plus a hash of its uncommitted changes (tracked edits and untracked files; gitignored files don't count), the Dockerfile, the base digest and the cluster's architecture, so each distinct input gets its own tag and the operator, which only rolls when the image string changes, rolls once per change. The registry keeps the ten most recent tags per repository, so if `keycloak-0` ever fails to pull an old tag after many builds, re-run the script. To return to the published image:
 
 ```bash
 ./local-dev/scripts/kc-theme-image.sh --reset   # sets keycloak_image back to ""
@@ -654,7 +654,7 @@ Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's sho
 
 The realm, clients, and seeded users live in Postgres and are untouched by the image swap. Under the hood, Tilt forwards `keycloak_image` to the core Pulumi stack as `LOCAL_DEV_KEYCLOAK_IMAGE`, so the same value works for a hand-run `pulumi up`.
 
-Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to (the script reads it from `local-dev/infra/core/__main__.py`) and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak); when bumping the digest, check those flags still match.
+Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to, `LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST` in `src/bridge/lib/versions.py`, and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak). Renovate moves that digest whenever the Keycloak pipeline pushes a new `mitodl/keycloak:latest`; its PR notes that the flags must still match. A theme image is built on the digest that was pinned when you ran the script, so after pulling a digest bump re-run the script (or `--reset`) to move onto the new base.
 
 ### S3 Storage (RustFS)
 

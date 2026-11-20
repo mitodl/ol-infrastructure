@@ -58,6 +58,7 @@ from bridge.lib.versions import (
     CNPG_CHART_VERSION,
     CNPG_POSTGRES_VERSION,
     KEYCLOAK_OPERATOR_CRD_VERSION,
+    LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST,
 )
 
 # ---------------------------------------------------------------------------
@@ -133,19 +134,16 @@ host_gateway = (
     config.get("host_gateway") or os.environ.get("LOCAL_DEV_HOST_GATEWAY") or ""
 )
 
-# Keycloak server image. The default is the published image the hosted
-# environments run, pinned by digest; local-dev/scripts/kc-theme-image.sh reads
-# that digest as the base for a locally built theme image and writes the result
-# into the gitignored tilt_config.json, which the Tiltfile forwards as
-# LOCAL_DEV_KEYCLOAK_IMAGE. Not pinned in Pulumi.local-dev.core.Dev.yaml for
-# the same reason as log_retention_period.
+# Keycloak server image. The default is the published image, pinned by the
+# Renovate-managed LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST in bridge.lib.versions;
+# local-dev/scripts/kc-theme-image.sh builds a theme image on the same digest and
+# writes the result into the gitignored tilt_config.json, which the Tiltfile
+# forwards as LOCAL_DEV_KEYCLOAK_IMAGE. Not pinned in
+# Pulumi.local-dev.core.Dev.yaml for the same reason as log_retention_period.
 keycloak_image = (
     config.get("keycloak_image")
     or os.environ.get("LOCAL_DEV_KEYCLOAK_IMAGE")
-    or (
-        "mitodl/keycloak"
-        "@sha256:bac56d272e02121668a3d339b55585820525db248ce83aa58618f5e4f89ec9e0"
-    )
+    or f"mitodl/keycloak@{LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST}"
 )
 
 _infra_dir = Path(__file__).parent.parent

@@ -42,6 +42,16 @@ TIKA_CHART_VERSION = "3.2.2"
 # renovate-digest: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters
 PAYPAL_ADAPTER_VERSION = "2.4.2"
 PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:89ef36f0a06aa83788c1a465f95ffabd9b5b1a1e9e8e99eef57e484d67c28ba8"  # pragma: allowlist secret
+# The Keycloak image local-dev runs by default (local-dev/infra/core) and the
+# base local-dev/scripts/kc-theme-image.sh builds a theme image on. It follows
+# the tag the Keycloak pipeline pushes on every build, so Renovate moves the
+# digest when a build lands, which can be ahead of Production (that deploys
+# through the CI, QA and Production gates). Hosted stacks take their digest from
+# Concourse, not from here. The two assignments must stay adjacent and in this
+# order for the renovate-digest manager.
+# renovate-digest: datasource=docker depName=mitodl-keycloak packageName=mitodl/keycloak
+LOCAL_DEV_KEYCLOAK_IMAGE_VERSION = "latest"
+LOCAL_DEV_KEYCLOAK_IMAGE_DIGEST = "sha256:dccce37b6550894f601967c544ada45536fd83dbf7a22cfc1d8fa1f2aa3a38fb"  # pragma: allowlist secret
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "3.1.0"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
