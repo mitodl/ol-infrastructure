@@ -16,8 +16,8 @@ from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 # validates every contract daily. A PUT of an unchanged contract changes
 # nothing but its updatedAt.
 #
-# The bot credentials are written to Vault by the open_metadata Pulumi stack
-# (secret-concourse/infrastructure/openmetadata_contracts_bot).
+# The bot credentials are written to Vault by the substructure/open_metadata
+# Pulumi stack (secret-concourse/infrastructure/openmetadata_contracts_bot).
 sync_pipeline = ol_dbt_openmetadata_sync_pipeline(
     watched_dir="contracts",
     job_name="sync-data-contracts-to-openmetadata",
