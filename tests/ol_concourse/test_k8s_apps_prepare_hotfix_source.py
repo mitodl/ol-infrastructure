@@ -122,7 +122,11 @@ def world(tmp_path) -> dict[str, Any]:
 
 
 def _run_task(
-    tmp_path: Path, world: dict[str, Any], hotfix: str, since: str = PROD
+    tmp_path: Path,
+    world: dict[str, Any],
+    hotfix: str,
+    since: str = PROD,
+    checkout: str | None = None,
 ) -> tuple[Path, subprocess.CompletedProcess[str]]:
     """Run the rendered task's script the way Concourse does, in a fresh build dir."""
     config = _task(_cut_job("learn-ai"), PREPARE_HOTFIX_SOURCE_TASK_NAME)["config"]
@@ -132,6 +136,8 @@ def _run_task(
     build.mkdir()
     main = build / config["params"]["REPO"]
     _git(tmp_path, "clone", "-q", "--branch", "main", str(world["origin"]), str(main))
+    if checkout:
+        _git(main, "reset", "-q", "--hard", checkout)
     release = build / config["params"]["RELEASE"]
     release.mkdir()
     (release / "hotfix").write_text(hotfix)
@@ -174,6 +180,19 @@ def test_a_hotfix_bumps_production_plus_its_commits(tmp_path, world):
     log = _git(main, "log", "--format=%B", f"{world['prod_sha']}..{head}")
     assert f"(cherry picked from commit {world['fix']})" in log
     assert not _git(main, "status", "--porcelain"), "bump-version starts clean"
+
+
+def test_a_checkout_older_than_the_merge_back_still_bumps_the_release_commit(
+    tmp_path, world
+):
+    """The get can predate production's merge-back; the resource fetches the branch."""
+    tag = _git(world["origin"], "rev-list", "-n1", PROD)
+
+    main, result = _run_task(tmp_path, world, hotfix=world["fix"], checkout=tag)
+
+    assert result.returncode == 0, result.stderr
+    assert _git(main, "rev-parse", "HEAD^") == world["prod_sha"]
+    assert not (main / "changelog.d" / "a.md").exists(), "PROD's fragment shipped"
 
 
 def test_a_hotfix_of_an_unfinished_release_starts_from_its_tag(tmp_path, world):

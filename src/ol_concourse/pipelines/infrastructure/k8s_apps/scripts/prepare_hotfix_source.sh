@@ -21,13 +21,18 @@
 #
 # The base is found the way the release resource finds it: the
 # `Release <since>` commit whose first parent is the <since> tag's commit,
-# on the ancestry path to main, else the tag itself. The commits are picked
-# in the order the resource's `hotfix` file lists them, which is its pick
-# order. The repositories are public, so fetches need no credentials.
+# on the ancestry path to the tracked branch, else the tag itself. Like the
+# resource, this searches the branch as just fetched, not the checkout: the
+# get can predate production's merge-back by a check interval, and the tag
+# would then be bumped in place of the commit the resource cuts from. The
+# commits are picked in the order the resource's `hotfix` file lists them,
+# which is its pick order. The repositories are public, so fetches need no
+# credentials.
 #
 # Environment:
 #     REPO:    the main checkout, which bump-version and the put read.
 #     RELEASE: the release resource's get, with `hotfix` and `since` files.
+#     BRANCH:  the tracked branch the release resource cuts from.
 
 hotfix=$(cat "$RELEASE/hotfix")
 if [ -z "$hotfix" ]; then
@@ -47,11 +52,13 @@ fall_back() {
 if [ -z "$since" ]; then
     fall_back "there is no release to hotfix"
 fi
-git fetch --quiet origin "+refs/tags/$since:refs/tags/$since" ||
-    fall_back "cannot fetch the $since tag"
+git fetch --quiet origin \
+    "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" \
+    "+refs/tags/$since:refs/tags/$since" ||
+    fall_back "cannot fetch $BRANCH and the $since tag"
 tag=$(git rev-list -n1 "$since") || fall_back "cannot read the $since tag"
 base=$(
-    git log --ancestry-path --format='%H %P%x09%s' "$tag..$main" |
+    git log --ancestry-path --format='%H %P%x09%s' "$tag..origin/$BRANCH" |
         awk -F '\t' -v tag="$tag" -v subject="Release $since" '
             { split($1, shas, " ") }
             shas[2] == tag && $2 == subject { found = shas[1] }

@@ -1382,7 +1382,11 @@ def _prepare_hotfix_source_task(release_res: Resource, main_repo: Resource) -> T
             image_resource=TASK_IMAGE,
             inputs=[Input(name=release_res.name), Input(name=main_repo.name)],
             outputs=[Output(name=main_repo.name)],
-            params={"REPO": str(main_repo.name), "RELEASE": str(release_res.name)},
+            params={
+                "REPO": str(main_repo.name),
+                "RELEASE": str(release_res.name),
+                "BRANCH": main_repo.source["branch"],
+            },
             run=Command(path="sh", args=["-euc", _PREPARE_HOTFIX_SOURCE_SCRIPT]),
         ),
     )
