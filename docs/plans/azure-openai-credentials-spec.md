@@ -263,8 +263,8 @@ mit-learn and learn-ai have no equivalent dependency and should ship first.
 ## 6. Local development
 
 **Default: developers authenticate as themselves.** One Entra security group holding the
-engineers who need it, granted `Cognitive Services OpenAI User` on the three **CI**
-Cognitive Services accounts only. Nothing on QA or Production. A developer runs `az login`
+engineers who need it (`ol-eng-developer`, see Q2), granted `Cognitive Services OpenAI User`
+on the four **CI** Cognitive Services accounts only. Nothing on QA or Production. A developer runs `az login`
 once; `DefaultAzureCredential` finds `AzureCliCredential` and the same application code that
 runs in the cluster works on the laptop.
 
@@ -421,9 +421,10 @@ allocate heavily to Production and minimally to CI and QA.
   Production stack now refuses to preview at all without an explicit
   `azure_openai:model_capacity`, so this cannot be deployed on a guessed number. Blocks
   deploying, not writing or reviewing the code.
-- **Q2. Entra security group for developers.** Which group, and who administers membership?
-  Creating one is permitted (`allowedToCreateSecurityGroups: true`), but an existing
-  IS&T-managed group with the right membership would be preferable to a new one nobody owns.
+- **Q2. Entra security group for developers.** Answered 2026-11-20: `ol-eng-developer`
+  (object id `cc71ef9e-2c4d-4cf6-a965-51bad3fe580e`), an existing security group synced from
+  MIT's on-prem directory, so no new group was created. Membership is administered by the
+  `owner-ol-eng-developer` list.
 - **Q3. Retry policy for `AADSTS70021`.** Each app repo needs token-request retry. Confirm
   whether the shared settings/util layer in mit-learn and learn-ai is the right home, or
   whether each call site handles it.
