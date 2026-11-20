@@ -2,7 +2,7 @@
 
 **Last Updated:** October 29, 2025 (17:28 UTC)
 **Configuration Files:** `apisix_official.py`, with the chart values in `apisix_definition.py` (shared with local-dev)
-**Chart Version:** 2.12.2 (APISIX 3.14.1)
+**Chart Version:** see `APISIX_CHART_VERSION` in `src/bridge/lib/versions.py` (chart 3.1.0 ships APISIX 3.21.0)
 **Deployment Status:** ✅ Fully Operational
 
 ## Overview
@@ -126,7 +126,7 @@ This configuration:
 
 Configuration tells the ingress controller:
 - **Admin API service:** `apache-apisix-admin` (port 9180)
-- **Authentication:** AdminKey (from Vault secret)
+- **Authentication:** AdminKey (the `eks:apisix_admin_key` Pulumi secret)
 - **Provider type:** ControlPlane
 
 This is a **cluster-scoped configuration resource** that does not affect routing. It only configures HOW the controller connects to APISIX.
@@ -742,11 +742,11 @@ kubectl logs -n operations -l app.kubernetes.io/name=ingress-controller | grep -
 kubectl get gatewayproxy apache-apisix-config -n operations -o yaml
 ```
 
-2. **Check endpoint configuration:**
+2. **Check the Admin API service reference:**
 ```bash
-kubectl get gatewayproxy apache-apisix-config -n operations -o jsonpath='{.spec.provider.controlPlane.endpoints}'
+kubectl get gatewayproxy apache-apisix-config -n operations -o jsonpath='{.spec.provider.controlPlane.service}'
 ```
-Should show: `["http://apache-apisix-admin.operations.svc.cluster.local:9180"]`
+Should show: `{"name":"apache-apisix-admin","port":9180}`. The apisix chart renders this; it never sets `endpoints`.
 
 3. **Verify RBAC permissions:**
 ```bash
@@ -760,13 +760,13 @@ kubectl get clusterrolebinding apache-apisix-apisix-ingress-manager-rolebinding
 
 **Common Causes & Solutions:**
 
-1. **Using service name without namespace:**
-   - ❌ Bad: `service: { name: "apache-apisix-admin" }`
-   - ✅ Good: `endpoints: ["http://apache-apisix-admin.operations.svc.cluster.local:9180"]`
-
-2. **Wrong namespace in FQDN:**
+1. **Admin API service missing or not ready:**
    - Verify service exists: `kubectl get svc apache-apisix-admin -n operations`
-   - Check FQDN format: `<service>.<namespace>.svc.cluster.local:<port>`
+   - The GatewayProxy and the service share the `operations` namespace, so the plain service name resolves. Don't add `endpoints`: the chart creates the GatewayProxy and refuses to render conflicting settings.
+   - `ECONNREFUSED` for a single pod IP during a rollout is a pod still starting; it clears on the next sync.
+
+2. **Wrong service name:**
+   - The chart points the GatewayProxy at `<fullname>-admin`; check it matches `kubectl get svc -n operations | grep admin`.
 
 3. **Authentication failure:**
    - Verify admin key matches: Compare secret value with APISIX config
@@ -877,7 +877,7 @@ Pulumi creates resources in order:
   2. Helm Release deploys:
      - APISIX gateway pods (mount ConfigMap, enable Admin API)
      - Ingress controller pods (with RBAC ServiceAccount)
-     - GatewayProxy CRD (with FQDN endpoint config)
+     - GatewayProxy CRD (Admin API service reference, created by the apisix chart)
      - IngressClass (references GatewayProxy)
 ```
 
@@ -950,7 +950,7 @@ External Request
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Helm Release** | ✅ Deployed | Version 2.12.2, Revision 7 |
+| **Helm Release** | ✅ Deployed | `helm -n operations history apache-apisix` |
 | **APISIX Pods** | ✅ Running | 3/3 ready, autoscaling 3-5 |
 | **Ingress Controller** | ✅ Running | 3/3 pods, watching CRDs |
 | **AWS NLB** | ✅ Provisioned | `applications-ci-apisix-<hash>.elb.us-east-1.amazonaws.com` |
@@ -991,7 +991,7 @@ Kubernetes CRDs → Ingress Controller → Admin API → APISIX Gateway → AWS 
 For issues specific to this deployment:
 1. Check ingress controller logs: `kubectl logs -n operations -l app.kubernetes.io/name=ingress-controller`
 2. Check APISIX logs: `kubectl logs -n operations -l app.kubernetes.io/name=apisix`
-3. Verify GatewayProxy configuration uses FQDN endpoint
+3. Verify the GatewayProxy references the `apache-apisix-admin` service
 4. Ensure RBAC resources exist and are bound correctly
 5. Verify admin key secret exists and matches between components
 
