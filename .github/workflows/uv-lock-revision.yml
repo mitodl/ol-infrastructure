@@ -1,5 +1,5 @@
 ---
-# Reference workflow asserting that `uv.lock` stays on the format revision the repository expects.
+# Reference workflow asserting that no `uv.lock` falls to an older format than it is already on.
 #
 # Copy to .github/workflows/uv-lock-revision.yml and change only the lines marked ADAPT.
 # Contract: https://github.com/mitodl/ol-github-workflows/blob/main/docs/uv-lock-revision-contract.md
