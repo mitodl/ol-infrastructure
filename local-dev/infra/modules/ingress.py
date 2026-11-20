@@ -26,6 +26,7 @@ from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
     gateway_class_spec,
     gateway_error_pages,
     gateway_spec,
+    http2_safe_chart,
     identity_header_strip_rule_spec,
 )
 
@@ -132,6 +133,7 @@ def create_ingress(  # noqa: PLR0913
         # below needs. The deployed clusters turn this off and install the
         # bundle at GATEWAY_API_VERSION themselves (setup_traefik).
         install_gateway_api_crds=True,
+        http2_enabled=http2_safe_chart(apisix_version),
     )
 
     # Helm installs the chart's apisix.apache.org CRDs on first install.

@@ -8,6 +8,7 @@ from typing import Any
 
 import pulumi
 
+from bridge.lib.versions import APISIX_CHART_VERSION
 from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
     gateway_class_spec,
     gateway_spec,
@@ -69,7 +70,7 @@ def _render(
             apisix_admin_key=pulumi.Output.secret("admin"),
             apisix_viewer_key=pulumi.Output.secret("viewer"),
             cert_manager_version="v1.0.0",
-            apisix_version="2.18.2",
+            apisix_version=APISIX_CHART_VERSION,
             trusted_ca_secret=trusted_ca,
             trusted_ca_checksum="abc",
         )

@@ -16,6 +16,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Literal
 
+from packaging.version import Version
 from pulumi import Output
 from pydantic import BaseModel, ConfigDict
 
@@ -39,6 +40,10 @@ GATEWAY_ERROR_PAGES_CONFIGMAP_NAME = "apache-apisix-error-pages"
 # Renaming the rule replaces it (delete_before_replace), leaving a window with
 # no strip at all, so it keeps this name although it now does more.
 IDENTITY_HEADER_STRIP_RULE_NAME = "identity-header-strip"
+# nginx's HTTP/2 code up to 1.31.8 has a remote code execution bug
+# (CVE-2026-123007, CVE-2026-123633, "nginx2root"). APISIX 3.21.0, the first
+# release shipped by this chart version, lists both as fixed.
+APISIX_HTTP2_MIN_CHART_VERSION = Version("3.1.0")
 DEFAULT_CPU_REQUEST = "100m"
 DEFAULT_MEMORY_REQUEST = "400Mi"
 
@@ -314,6 +319,9 @@ class ApisixGatewayConfig(BaseModel):
     # API CRDs. Since chart 3.0.0 they are templates, so skip_crds no longer
     # keeps them out; clusters that install the bundle themselves turn this off.
     install_gateway_api_crds: bool
+    # Use http2_safe_chart() for the chart being deployed: a rollback through
+    # the APISIX_CHART override must not turn HTTP/2 on over an affected nginx.
+    http2_enabled: bool
     trusted_ca: ApisixTrustedCA | None = None
     pod_annotations: dict[str, str] | None = None
 
@@ -325,6 +333,11 @@ class ApisixGatewayConfig(BaseModel):
     def effective_memory_limit(self) -> str:
         """Return memory_limit, or double memory_request when it is unset."""
         return self.memory_limit or _double_memory_quantity(self.memory_request)
+
+
+def http2_safe_chart(chart_version: str) -> bool:
+    """Return whether the chart's APISIX image is past the nginx HTTP/2 RCE."""
+    return Version(chart_version) >= APISIX_HTTP2_MIN_CHART_VERSION
 
 
 def gateway_error_pages() -> dict[str, str]:
@@ -926,12 +939,8 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
             # Chart default is true, which sends "Server: APISIX/<version>"
             # on every response (hq#14079).
             "enableServerTokens": False,
-            # nginx's HTTP/2 code up to 1.31.8 has a remote code execution bug
-            # (CVE-2026-123007, CVE-2026-123633, "nginx2root"), so this was off
-            # until APISIX 3.21.0, whose image runs openresty/1.31.9.1. Pinning
-            # an older chart through the APISIX_CHART env override brings back
-            # an affected nginx; turn this off again for that.
-            "enableHTTP2": True,
+            # See APISIX_HTTP2_MIN_CHART_VERSION. Clients fall back to HTTP/1.1.
+            "enableHTTP2": config.http2_enabled,
             # Enable comprehensive per-phase request lifecycle tracing
             # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
             # Available since chart 2.16.0; without it OpenTelemetry only

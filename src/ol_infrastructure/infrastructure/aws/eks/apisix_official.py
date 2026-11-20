@@ -28,6 +28,7 @@ from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
     gateway_class_spec,
     gateway_error_pages,
     gateway_spec,
+    http2_safe_chart,
     identity_header_strip_rule_spec,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -117,6 +118,7 @@ def setup_apisix(
         viewer_key=eks_config.require_secret("apisix_viewer_key"),
         # setup_traefik installs the experimental bundle (see apisix_crds below).
         install_gateway_api_crds=False,
+        http2_enabled=http2_safe_chart(apisix_chart_version),
         service=ApisixGatewayService(
             type="LoadBalancer",
             annotations={
