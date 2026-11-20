@@ -79,6 +79,17 @@ oidc_issuers = {
 
 location = azure_config.get("location") or "eastus"
 
+# Object id of the Entra group whose members call the accounts from a laptop after
+# az login. CI only: a developer's token reaching QA or Production data would make
+# every member's laptop a path into those environments.
+developer_group_object_id = azure_config.get("developer_group_object_id")
+if developer_group_object_id and stack_info.env_suffix != "ci":
+    msg = (
+        "azure_openai:developer_group_object_id is for the CI stack only; "
+        f"remove it from {stack_info.full_name}."
+    )
+    raise ValueError(msg)
+
 # Capacity is in thousands of tokens per minute. For the GlobalStandard deployments
 # below, quota is pooled per model *and version* across every region in the
 # subscription -- not one pool shared by all models, and not per region. So each
@@ -373,6 +384,21 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
         ),
         opts=azure_opts,
     )
+
+    if developer_group_object_id:
+        azure_native.authorization.RoleAssignment(
+            f"{account_name}-developer-openai-user",
+            scope=account.id,
+            principal_id=developer_group_object_id,
+            principal_type="Group",
+            role_definition_id=Output.concat(
+                "/subscriptions/",
+                azure_secrets["subscription_id"],
+                "/providers/Microsoft.Authorization/roleDefinitions/",
+                COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID,
+            ),
+            opts=azure_opts,
+        )
 
 export("resource_group_id", resource_group.id)
 export("resource_group_name", resource_group.name)
