@@ -525,7 +525,12 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             },
             skip_await=False,
         ),
+        # values carries the shared password. Marking the output secret
+        # re-encrypts a plaintext copy already in state; preview still shows
+        # which keys change and their new values, masking only the old ones.
         opts=ResourceOptions(
-            delete_before_replace=True, depends_on=[app_db_creds_dynamic_secret]
+            delete_before_replace=True,
+            depends_on=[app_db_creds_dynamic_secret],
+            additional_secret_outputs=["values"],
         ),
     )

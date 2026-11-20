@@ -1279,5 +1279,12 @@ def setup_grafana(
                 },
             },
         ),
-        opts=ResourceOptions(provider=k8s_provider, delete_before_replace=True),
+        # values carries the Grafana Cloud key. Marking the output secret
+        # re-encrypts a plaintext copy already in state; preview still shows
+        # which keys change and their new values, masking only the old ones.
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            delete_before_replace=True,
+            additional_secret_outputs=["values"],
+        ),
     )
