@@ -224,8 +224,10 @@ code change.
 
 ## Local development
 
-Developers authenticate as themselves. One Entra security group holding the engineers
-who need it is granted `Cognitive Services OpenAI User` on the three **CI** accounts
-only — nothing on QA or Production. After `az login`, `DefaultAzureCredential` resolves
+Developers authenticate as themselves. The `ol-eng-developer` Entra group (synced from
+MIT's on-prem directory, set as `azure_openai:developer_group_object_id` in
+`Pulumi.CI.yaml`) holds `Cognitive Services OpenAI User` on the four **CI** accounts
+only, nothing on QA or Production. The program refuses that key on any other stack. To
+be added, ask the owners of the `owner-ol-eng-developer` list. After `az login`, `DefaultAzureCredential` resolves
 `AzureCliCredential`, so the same application code that runs in the cluster (where it
 resolves `WorkloadIdentityCredential`) works on a laptop with no environment branch.
