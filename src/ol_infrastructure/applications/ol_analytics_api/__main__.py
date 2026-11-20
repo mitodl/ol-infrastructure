@@ -280,7 +280,7 @@ _learner_records_vault_secret = secret_named(
 
 ol_analytics_api_secrets_mount = vault.Mount(
     f"ol-analytics-api-secrets-mount-{stack_info.env_suffix}",
-    path="secret-ol-analytics-api",
+    path=_static_vault_secret.mount,
     type="kv-v2",
     options={"version": "2"},
     description="Static application secrets for ol-analytics-api (e.g. SENTRY_DSN).",
@@ -289,7 +289,9 @@ ol_analytics_api_secrets_mount = vault.Mount(
 
 ol_analytics_api_static_vault_secrets = vault.generic.Secret(
     f"ol-analytics-api-secrets-{stack_info.env_suffix}",
-    path=ol_analytics_api_secrets_mount.path.apply("{}/secrets".format),
+    path=ol_analytics_api_secrets_mount.path.apply(
+        lambda mount: f"{mount}/{_static_vault_secret.path}"
+    ),
     data_json=sentry_stack.require_output("ol_analytics_api_sentry_dsn").apply(
         lambda dsn: json.dumps({"SENTRY_DSN": dsn})
     ),
@@ -344,7 +346,10 @@ if stack_info.env_suffix == "ci":
     mitxonline_oauth_depends_on.append(
         vault.generic.Secret(
             f"ol-analytics-api-mitxonline-oauth-vault-secret-{stack_info.env_suffix}",
-            path="secret-operations/ol-analytics-api/mitxonline-oauth",
+            path=(
+                f"{_mitxonline_oauth_vault_secret.mount}/"
+                f"{_mitxonline_oauth_vault_secret.path}"
+            ),
             data_json=Output.secret(
                 json.dumps(
                     {
