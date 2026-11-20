@@ -25,6 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-    - uses: mitodl/ol-github-workflows/actions/uv-lock-revision@0419e18f327d39c86b7a2147093fcb6a0b75da0c   # v1.0.0
+    - uses: mitodl/ol-github-workflows/actions/uv-lock-revision@14f8b56edf705df487fa85df6bb326dd9633d075   # v1.1.0
       with:
-        expected-revision: "5"   # ADAPT: the `revision` every uv.lock in this repository is on
+        expected-revision: "5"   # ADAPT: the lowest `revision` any uv.lock here may be on
