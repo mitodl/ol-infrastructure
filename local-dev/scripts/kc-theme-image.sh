@@ -84,9 +84,18 @@ curl -sf "http://${PUSH_REGISTRY}/v2/" >/dev/null \
 BASE_DIGEST="$(grep -o 'sha256:[0-9a-f]\{64\}' "${CORE_STACK}" | head -1)"
 [[ -n "${BASE_DIGEST}" ]] || die "no mitodl/keycloak digest found in ${CORE_STACK}"
 
+# The base is published for amd64 and arm64. Build for the k3d nodes'
+# architecture, not the builder's default: a remote buildx builder would build
+# its own, and containerd runs a lone manifest for another arch under
+# emulation.
+node_arch="$(kubectl --context local-dev get nodes \
+  -o jsonpath='{.items[0].status.nodeInfo.architecture}')"
+[[ -n "${node_arch}" ]] || die "could not read the k3d node architecture"
+
 # Tag: short HEAD plus a hash of the tracked modifications, untracked files
-# (gitignored ones excluded), and the Dockerfile, so edits made without
-# committing still get a fresh tag and a fresh rollout.
+# (gitignored ones excluded), the Dockerfile, the base and the target
+# architecture, so edits made without committing still get a fresh tag and a
+# fresh rollout.
 head_sha="$(git -C "${CHECKOUT}" rev-parse --short HEAD)"
 input_hash="$(
   {
@@ -95,21 +104,16 @@ input_hash="$(
       | (cd "${CHECKOUT}" && xargs -0 cat 2>/dev/null)
     cat "${DOCKERFILE}"
     echo "${BASE_DIGEST}"
+    echo "linux/${node_arch}"
   } | shasum -a 256 | cut -c1-8
 )"
 TAG="${head_sha}-${input_hash}"
 PUSH_REF="${PUSH_REGISTRY}/${REPO}:${TAG}"
 PULL_REF="${PULL_REGISTRY}/${REPO}:${TAG}"
 
-echo "Building ${PUSH_REF} from ${CHECKOUT} ..."
-# The base is published for amd64 and arm64. Build for the k3d nodes'
-# architecture, not the builder's default: a remote buildx builder would build
-# its own, and containerd runs a lone manifest for another arch under
-# emulation. --provenance=false --sbom=false keeps the push a single image
-# manifest: BuildKit's default attestation turns it into an OCI index.
-node_arch="$(kubectl --context local-dev get nodes \
-  -o jsonpath='{.items[0].status.nodeInfo.architecture}')"
-[[ -n "${node_arch}" ]] || die "could not read the k3d node architecture"
+echo "Building ${PUSH_REF} for linux/${node_arch} from ${CHECKOUT} ..."
+# --provenance=false --sbom=false keeps the push a single image manifest:
+# BuildKit's default attestation turns it into an OCI index.
 "${DOCKER}" build \
   --platform "linux/${node_arch}" \
   --provenance=false --sbom=false \
