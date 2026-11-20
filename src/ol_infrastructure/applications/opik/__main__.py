@@ -299,9 +299,10 @@ opik_helm_release = kubernetes.helm.v3.Release(
             # Bitnami-based subcharts.
             "chartMigration": {"enabled": False},
             "caCerts": {"existingAdditionalCACertsRef": CLICKHOUSE_CA_CONFIGMAP_NAME},
-            # Polls system.parts (the opik user is granted SELECT on it in
-            # ol-application-clickhouse) every 5m for per-partition part counts
-            # and lightweight-delete masks on traces/spans; a distributed lock
+            # Polls system.parts and system.disks (the opik user is granted
+            # SELECT on both in ol-application-clickhouse) every 5m for
+            # per-partition part counts and lightweight-delete masks on
+            # traces/spans; a distributed lock
             # keeps it to one backend instance.
             #
             # clickhouse.sharding.enabled (which would also turn on the

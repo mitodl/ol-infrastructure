@@ -850,6 +850,8 @@ def _create_clickhouse_installation(  # noqa: PLR0913
             # ACCESS_DENIED SELECT(...) ON system.parts). Enumerating grants lets us
             # add that one system-table read without opening the whole ``system``
             # database (preserving cross-tenant isolation vs. e.g. system.query_log).
+            # The same metrics job also reads disk names/types from
+            # ``system.disks``; the column list keeps paths and sizes hidden.
             #
             # ``default`` is granted in addition to ``opik_db``: opik's Liquibase
             # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
@@ -871,6 +873,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 "GRANT ALL ON opik_db.*",
                 "GRANT ALL ON default.*",
                 "GRANT SELECT ON system.parts",
+                "GRANT SELECT(name, type) ON system.disks",
                 "GRANT CLUSTER ON *.*",
             ],
         }
