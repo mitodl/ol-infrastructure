@@ -161,8 +161,15 @@ class OLVaultDatabaseBackend(ComponentResource):
         db_option_dict.update(db_config.connection_options or {})
         self.db_connection = database.SecretBackendConnection(
             f"{db_config.db_name}-database-connection",
+            # additional_secret_outputs re-encrypts a password already stored in
+            # plaintext in `data` outputs, which the wrapped input alone does not
+            # do while the connection is unchanged.
             opts=resource_opts.merge(
-                ResourceOptions(parent=self.db_mount, depends_on=self.db_mount)
+                ResourceOptions(
+                    parent=self.db_mount,
+                    depends_on=self.db_mount,
+                    additional_secret_outputs=["data"],
+                )
             ),
             backend=self.db_mount.path,
             verify_connection=db_config.verify_connection,
