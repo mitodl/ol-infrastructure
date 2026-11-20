@@ -1401,6 +1401,7 @@ PULUMI_CONFIG_PASSPHRASE='' pulumi up --refresh --stack local-dev.apps-infra.Dev
 Common causes:
 - **kubeconfig not set:** The stacks target the `local-dev` context, so `kubectl config get-contexts local-dev` must succeed. If it does not, run `k3d kubeconfig merge local-dev --kubeconfig-merge-default`, then `kubectl config rename-context k3d-local-dev local-dev` (k3d names the context `k3d-local-dev`; `setup.sh` renames it). If your `~/.kube` directory is a symlink pointing to a Windows-side path (common in WSL2), see [WSL2: kubeconfig context not found](#wsl2-kubeconfig-context-not-found) below.
 - **Cert files missing:** Run `setup.sh --skip-hosts` to regenerate certs without touching `/etc/hosts`.
+- **`no resource plugin 'pulumi-resource-<name>' found in the workspace`:** Tilt runs the stacks with `PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION=true`, after `scripts/pulumi-plugins.py` installs the providers each stack lists, so a program that started using another provider needs it added to that list ([EXTENDING.md](EXTENDING.md#common-modifications)). The commands above leave the download on, so run by hand they first fetch every provider the repository depends on that isn't installed yet.
 
 ### `local-infra-apps` fails with `Missing required argument "client_id"`
 

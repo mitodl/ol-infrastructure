@@ -529,6 +529,15 @@ host_gateway = str(local(
 # Shared infrastructure (Pulumi stacks)
 # ---------------------------------------------------------------------------
 
+# Pulumi's Python host asks for a plugin for every pulumi-* package in the
+# repository's virtualenv, which holds the providers of every deployed stack.
+# Pulumi downloads the missing ones before the program runs, so each provider
+# Renovate bumped on main cost the next Tilt start its binary (AWS, Azure Native
+# and GCP alone are about 1.7 GB), although these programs only use Kubernetes
+# and Keycloak. The Pulumi stacks below run with automatic plugin acquisition
+# off, after pulumi-plugins.py installs the plugins each one does use.
+pulumi_plugins = "uv run --project {root} python {root}/local-dev/scripts/pulumi-plugins.py".format(root=config.main_dir)
+
 # Core stack (operators, foundational services, Keycloak instance)
 local_resource(
     "local-infra-core",
@@ -536,7 +545,7 @@ local_resource(
     # `uv export` and parses its stdout as TOML, and uv honours FORCE_COLOR
     # even when piped, so the ANSI escapes break the parse ("TOML files cannot
     # contain control characters: '0x1b'"). Unset it for the Pulumi run.
-    cmd="bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
+    cmd="bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; pulumi stack init local-dev.core.Dev 2>/dev/null; {plugins} local-dev.core.Dev pulumi_kubernetes && pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'".format(plugins=pulumi_plugins),
     # Passed as environment rather than interpolated into the command string:
     # log_retention_period is developer-supplied, and a value containing shell
     # metacharacters would otherwise be interpreted here instead of reaching
@@ -552,11 +561,13 @@ local_resource(
         "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
         "LOCAL_DEV_HOST_GATEWAY": host_gateway,
         "PULUMI_CONFIG_PASSPHRASE": "",
+        "PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION": "true",
     },
     dir="./local-dev/infra/core",
     deps=[
         "./local-dev/infra/modules",
         "./local-dev/infra/core/__main__.py",
+        "./local-dev/scripts/pulumi-plugins.py",
         # APISIX's values, Gateway and global rule come from the deployed
         # definition and the shared APISIX component it builds on.
         "./src/ol_infrastructure/infrastructure/aws/eks/apisix_definition.py",
@@ -606,12 +617,15 @@ local_resource(
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {plugins} local-dev.apps-infra.Dev pulumi_kubernetes pulumi_keycloak && {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, plugins=pulumi_plugins, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
-    env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
+    env={
+        "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
+        "PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION": "true",
+    },
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh", "./local-dev/scripts/pulumi-plugins.py"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
