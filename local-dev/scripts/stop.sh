@@ -58,8 +58,11 @@ log "Stopping Tilt development server..."
 if command -v tilt &>/dev/null; then
     # End any interactive `tilt up` session FIRST: a live Tilt is a
     # reconciler, so resources deleted by `tilt down` below would race it
-    # re-creating them. SIGTERM lets it shut down cleanly.
-    if pkill -f "tilt up" 2>/dev/null; then
+    # re-creating them. SIGTERM lets it shut down cleanly. -x matches the
+    # process name, not the command line: `pkill -f "tilt up"` also killed
+    # any shell or editor whose command line mentioned "tilt up", including
+    # the one running this script.
+    if pkill -x tilt 2>/dev/null; then
         sleep 2  # give it time to exit
         ok "Running tilt session stopped."
     fi
