@@ -240,9 +240,7 @@ fork:
 - mitxpro-zendesk-theme
 - mynumbers
 - ocw-zendesk-theme
-- ol-parliament
 - open-edx-proposals
-- open-learning-ai-tutor
 - openedx-events
 - openedx-ledger
 - opentelemetry-python-contrib
@@ -307,9 +305,11 @@ library:
 - ol-keycloak
 - ol-keycloakify
 - ol-notebook-extensions
+- ol-parliament
 - oldevops-scratch
 - open-collaboration
 - open-edx-plugins
+- open-learning-ai-tutor
 - open-learnix
 - open-podcast-data
 - open-video-data
