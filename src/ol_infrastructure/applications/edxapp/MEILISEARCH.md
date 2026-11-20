@@ -127,40 +127,49 @@ complementary rather than alternatives.
 ## SOPS secrets
 
 ```yaml
-meilisearch_master_key: <See below>
-meilisearch_api_key: <See below>
+meilisearch_master_key: <a random string of at least 16 bytes>
 ```
 
-For the `meilisearch_master_key` I just use a random string from a shell alias I have: `pwgen -s -B -1 64 4`. Anything will work as long as it is at least 16 bytes. More is better, of course.
+The master key is the only Meilisearch secret stored in SOPS. Generate it with
+something like `pwgen -s -B -1 64 1`.
 
-This is a pain but there isn't a way around it. For `meilisearch_api_key`, you first need to provision the meilisearch instance and have it up and running. Firstly, shell into the running meilisearch-0 pod:
+edxapp's API key is derived rather than stored. Meilisearch computes every API
+key as HMAC-SHA256(master key, uid), so `meilisearch.py` creates a key with the
+fixed uid `EDXAPP_MEILISEARCH_KEY_UID` and the Pulumi program computes the same
+value (`edxapp_meilisearch_api_key`) for the `meilisearch_api_key` field of the
+`secret-<deployment>/edxapp` Vault secret. edxapp used to carry a hand-copied
+"Default Admin API Key", whose uid is random per database, so recreating the
+database silently invalidated it (mitx CI, 2026-04-01 to 2026-10-01).
+
+Two workloads create the key, both idempotent (201 on create, 409 when it
+already exists): a `Job` that runs once the Helm release is up, and the
+`meilisearch-edxapp-key` CronJob, which runs every 15 minutes so a database
+recreated later gets the key back. Check it with:
+
 ```bash
-kubectl exec -it -n mitxonline-openedx meilisearch-0 -- sh
+kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- \
+  sh -c 'curl -s -H "Authorization: Bearer $MEILI_MASTER_KEY" localhost:7700/keys/be0444d7-0b85-4dde-a512-0fd3e205902a'
 ```
-Then you need to curl localhost using the `meilisearch_master_key` that you generated earlier, and pull down a short list of default keys that the meilisearch instance provisioned for itself on the first startup. The data is JSON.
+
+The CMS reads the key at pod start, and the Meilisearch Secret is not part of
+the CMS config hash, so a changed key reaches Studio on the next CMS rollout.
+Rotating the master key changes the derived key too (Meilisearch checks every
+key against the current master key, so the stored key needs no update), and
+CMS pods keep the old value until they restart. The VaultStaticSecret copies
+the new value into the `15-meilisearch-yaml` Secret up to an hour after the
+deploy, and a CMS pod restarted before then still starts with the old key. So
+wait until the Secret holds the new key, then restart the CMS Deployments:
+
+```bash
+kubectl get secret -n <namespace> 15-meilisearch-yaml \
+  -o jsonpath='{.data.15-meilisearch-secrets\.yaml}' | base64 -d \
+  | grep MEILISEARCH_API_KEY | cut -d' ' -f2 | sha256sum
+kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- \
+  sh -c 'curl -s -H "Authorization: Bearer $MEILI_MASTER_KEY" localhost:7700/keys/be0444d7-0b85-4dde-a512-0fd3e205902a' \
+  | jq -r .key | sha256sum
 ```
-curl -X GET http://localhost:7700/keys  -H "Authorization: Bearer <YOUR MASTER KEY>" -H "Content-Type: application/json"
-<A bunch of JSON>
-```
-Run that JSON through `jq` to make it readable and you should see an entry in the `results: []` list like this:
-```
-    {
-      "name": "Default Admin API Key",
-      "description": "Use it for anything that is not a search operation. Caution! Do not expose it on a public frontend",
-      "key": "<Big long hex number>",
-      "uid": "b96ad989-66cb-49ca-ae15-475fd7f9a676",
-      "actions": [
-        "search"
-      ],
-      "indexes": [
-        "*"
-      ],
-      "expiresAt": null,
-      "createdAt": "2026-01-27T14:50:39.011505326Z",
-      "updatedAt": "2026-01-27T14:50:39.011505326Z"
-    },
-```
-It is important that you use "Default Admin API Key" and not some other API key that is listed. This one has the right permissions. Copy the `key` and that is the value for `meilisearch_api_key` in the SOPS secrets.
+
+The two digests match once the Secret has the rotated key.
 
 ## Reindex data
 
@@ -182,8 +191,8 @@ it logs a warning and lets the migration succeed if Meilisearch is unreachable
 or the API key is wrong. `reindex_studio` does not apply index settings, and
 Meilisearch creates a missing index on the first document write, so populating
 before the handler has succeeded leaves an index that exists without its
-filterable, searchable and sortable attributes. On a new instance a deploy has
-to run after `meilisearch_api_key` is in place. Confirm both indexes exist
+filterable, searchable and sortable attributes. On a new instance, a deploy has
+to run after the edxapp key exists in Meilisearch. Confirm both indexes exist
 before populating them:
 
 ```bash
@@ -197,7 +206,7 @@ Shell into a CMS pod and confirm the environment points at Meilisearch:
 kubectl exec -it -n mitxonline-openedx <cms-pod-name> -- bash
 grep -iR MEILISEARCH ../config/
 ../config/cms.env.yml:MEILISEARCH_MASTER_KEY: <The master key you generated earlier>
-../config/cms.env.yml:MEILISEARCH_API_KEY: <The API key you pulled from the meilisearch instance>
+../config/cms.env.yml:MEILISEARCH_API_KEY: <HMAC-SHA256 of the edxapp key uid under the master key>
 ../config/cms.env.yml:MEILISEARCH_ENABLED: true
 ../config/cms.env.yml:MEILISEARCH_URL: http://meilisearch:7700
 ../config/cms.env.yml:MEILISEARCH_PUBLIC_URL: https://<your-meilisearch-domain>
