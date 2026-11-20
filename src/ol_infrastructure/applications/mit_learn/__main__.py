@@ -865,6 +865,18 @@ for k, v in mimetypes.types_map.items():
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
 fastly_shielding_enabled = mitlearn_config.get_bool("enable_fastly_shielding") or False
+fastly_image_optimization_enabled = (
+    mitlearn_config.get_bool("enable_fastly_image_optimization") or False
+)
+if fastly_image_optimization_enabled and not fastly_shielding_enabled:
+    # The Image Optimizer runs at the shield, and the Fastly provider wants one
+    # on every backend of a service that enables it.
+    msg = (
+        "mitlearn:enable_fastly_image_optimization requires "
+        "mitlearn:enable_fastly_shielding"
+    )
+    raise ValueError(msg)
+not_an_ocw_course_image_condition = "Not an OCW course image"
 bucket_backend_name = "MIT Learn S3 Media Storage"
 ocw_courses_bucket_backend_name = "OCW S3 Courses"
 ocw_courses_bucket_fqdn = ocw_site_buckets["buckets"]["live"].apply(
@@ -1110,12 +1122,28 @@ mitlearn_fastly_service = fastly.ServiceVcl(
     gzips=[
         fastly.ServiceVclGzipArgs(
             name="enable-gzip-compression",
+            # Where the Image Optimizer runs, OCW course images skip this policy
+            # so that they reach it uncompressed.
+            cache_condition=(
+                not_an_ocw_course_image_condition
+                if fastly_image_optimization_enabled
+                else None
+            ),
             extensions=sorted(gzip_settings["extensions"]),
             content_types=sorted(gzip_settings["content_types"]),
         )
     ],
+    image_optimizer_default_settings=(
+        # WebP for browsers that accept it when a URL names no format, as
+        # ocw_site serves the same images.
+        fastly.ServiceVclImageOptimizerDefaultSettingsArgs(name="", webp=True)
+        if fastly_image_optimization_enabled
+        else None
+    ),
     product_enablement=fastly.ServiceVclProductEnablementArgs(
         brotli_compression=True,
+        # None rather than False, so a stack without it sends what it always has
+        image_optimizer=fastly_image_optimization_enabled or None,
     ),
     cache_settings=[],
     conditions=[
@@ -1138,6 +1166,25 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="S3 response has a site id",
             statement="beresp.http.x-amz-meta-site-id",
             type="CACHE",
+        ),
+        # Goes on the gzip policy above, which also compresses these image
+        # formats. At a shield POP vcl_fetch runs on the bucket's response before
+        # the Image Optimizer reads it, and the optimizer rejects a
+        # Content-Encoding it does not support. By vcl_fetch, vcl_recv has
+        # rewritten /courses/o/ to /ocw-course-v3/.
+        *(
+            [
+                fastly.ServiceVclConditionArgs(
+                    name=not_an_ocw_course_image_condition,
+                    statement=(
+                        r'!(req.url.path ~ "^/ocw-course-v3/" && '
+                        r'req.url.ext ~ "(?i)^(?:gif|png|jpe?g)\z")'
+                    ),
+                    type="CACHE",
+                )
+            ]
+            if fastly_image_optimization_enabled
+            else []
         ),
     ],
     dictionaries=[
@@ -1196,6 +1243,8 @@ mitlearn_fastly_service = fastly.ServiceVcl(
                   set req.http.orig-req-url = req.url;
                 }}
                 unset req.http.Cookie;
+                # Only this service decides which requests use the image optimizer
+                unset req.http.X-Fastly-Imageopto-Api;
 
                 # If the request is for the old DNS name, redirect
                 if (req.http.host == "{mitlearn_config.require("legacy_frontend_domain")}") {{
@@ -1235,9 +1284,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             }
             if (req.url.path ~ "^/ocw-course-v3/") {
               set var.is_ocw_request = true;
-              set req.url = querystring.remove(req.url);
-              if (req.url !~ "\.[^/]+$") {
-                set req.url = regsub(req.url, "/?$", "/index.html");
+              # The image optimizer reads its parameters from the query string
+              if (!req.http.X-Fastly-Imageopto-Api) {
+                set req.url = querystring.remove(req.url);
+                if (req.url !~ "\.[^/]+$") {
+                  set req.url = regsub(req.url, "/?$", "/index.html");
+                }
               }
               unset req.http.Cookie;
             }"""
@@ -1362,6 +1414,29 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="Strip noindex header from NextJS backend",
             content="unset resp.http.X-Robots-Tag;",
             type="deliver",
+        ),
+        *(
+            [
+                vcl_snippet(
+                    name="Send OCW course images through the image optimizer",
+                    content=Path(__file__)
+                    .parent.joinpath("snippets/ocw_image_optimization.vcl")
+                    .read_text(),
+                    type="recv",
+                    # After "handle domain redirect" drops a client's copy of the
+                    # header, and before "Route OCW courses to S3" reads it.
+                    priority=150,
+                ),
+                vcl_snippet(
+                    name="Let browsers cache optimized OCW images",
+                    content=Path(__file__)
+                    .parent.joinpath("snippets/ocw_image_cache_control.vcl")
+                    .read_text(),
+                    type="deliver",
+                ),
+            ]
+            if fastly_image_optimization_enabled
+            else []
         ),
     ],
     **fastly_logging_args(
