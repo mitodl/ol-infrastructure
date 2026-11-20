@@ -98,6 +98,7 @@ k8s_custom_deploy(
         APPLY,
         os.path.join(config.main_dir, 'local-dev/scripts/pulumi-clear-stale-lock.sh'),
         os.path.join(config.main_dir, 'local-dev/scripts/pulumi-pending-objects.py'),
+        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-plugins.py'),
         os.path.join(config.main_dir, 'src/ol_infrastructure/applications/learn_ai'),
         os.path.join(config.main_dir, 'src/ol_infrastructure/components/services'),
         os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
