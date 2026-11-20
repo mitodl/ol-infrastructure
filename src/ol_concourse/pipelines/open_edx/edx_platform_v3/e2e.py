@@ -105,10 +105,15 @@ E2E_TARGETS: list[E2ETarget] = [
             # deployment (config_builder.py's ENABLE_SPECIAL_EXAMS). lehrer's
             # mitxonline image installs the SCORM and SGA XBlocks, and the
             # courseware navigation sidebar ships with edx-platform master.
+            # Content libraries v1 and v2 are both enabled (Studio home reports
+            # libraries_v1_enabled and libraries_v2_enabled). Creating a legacy
+            # library is not: Studio home has no Legacy Libraries tab, so
+            # content-libraries-v1-create stays undeclared.
             # Capabilities left undeclared make their specs skip, not fail.
             "CAPABILITIES": (
                 "-mfe-authn,studio,teams,notes,ora,cohorts,special-exams,"
-                "scorm,edx-sga,courseware-navigation-sidebar"
+                "scorm,edx-sga,courseware-navigation-sidebar,"
+                "content-libraries,content-libraries-v1"
             ),
             "LEARNING_MFE_URL": "https://courses.rc.learn.mit.edu/learn",
             "AUTHORING_MFE_URL": "https://studio.courses.rc.learn.mit.edu/authoring",
