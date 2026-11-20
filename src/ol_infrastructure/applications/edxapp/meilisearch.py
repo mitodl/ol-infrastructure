@@ -370,13 +370,16 @@ def create_meilisearch_resources(
         ),
     )
 
-    _create_edxapp_key_jobs(
-        stack_info,
-        namespace,
-        k8s_global_labels,
-        master_key_secret_name,
-        meilisearch_release,
-    )
+    # Same gate as the derived key in __main__.py: a deployment that runs
+    # Meilisearch without pointing edxapp at it (xpro Production) gets no key.
+    if meilisearch_config.get_bool("enabled"):
+        _create_edxapp_key_jobs(
+            stack_info,
+            namespace,
+            k8s_global_labels,
+            master_key_secret_name,
+            meilisearch_release,
+        )
 
     # Raise the throughput of an already-provisioned volume. The storageclass sets
     # gp3 throughput at provisioning time and cannot revise it afterwards, so a

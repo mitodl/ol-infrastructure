@@ -153,9 +153,23 @@ kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- \
 
 The CMS reads the key at pod start, and the Meilisearch Secret is not part of
 the CMS config hash, so a changed key reaches Studio on the next CMS rollout.
-Rotating the master key changes the derived key too, so restart the CMS
-Deployments after the deploy that rotates it, or Studio search fails until
-they next roll.
+Rotating the master key changes the derived key too (Meilisearch checks every
+key against the current master key, so the stored key needs no update), and
+CMS pods keep the old value until they restart. The VaultStaticSecret copies
+the new value into the `15-meilisearch-yaml` Secret up to an hour after the
+deploy, and a CMS pod restarted before then still starts with the old key. So
+wait until the Secret holds the new key, then restart the CMS Deployments:
+
+```bash
+kubectl get secret -n <namespace> 15-meilisearch-yaml \
+  -o jsonpath='{.data.15-meilisearch-secrets\.yaml}' | base64 -d \
+  | grep MEILISEARCH_API_KEY | cut -d' ' -f2 | sha256sum
+kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- \
+  sh -c 'curl -s -H "Authorization: Bearer $MEILI_MASTER_KEY" localhost:7700/keys/be0444d7-0b85-4dde-a512-0fd3e205902a' \
+  | jq -r .key | sha256sum
+```
+
+The two digests match once the Secret has the rotated key.
 
 ## Reindex data
 
