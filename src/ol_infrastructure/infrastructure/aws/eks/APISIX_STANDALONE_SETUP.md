@@ -266,39 +266,11 @@ This creates:
 
 **Without RBAC:** The controller cannot watch CRDs, read service information, or access secrets, resulting in no configuration being pushed to APISIX.
 
-### 2. Service Configuration for GatewayProxy (Required)
+### 2. GatewayProxy Service and AdminKey (chart-managed)
 
-The GatewayProxy must use the `service` reference format:
+Since chart 3.0.0 the apisix chart creates the `apache-apisix-config` GatewayProxy itself. It points it at this release's Admin API Service (`apache-apisix-admin:9180`) and authenticates with `apisix.admin.credentials.admin`, so the key is set once, under `apisix.admin.credentials`.
 
-```python
-"service": {
-    "name": "apache-apisix-admin",
-    "port": 9180,
-}
-```
-
-**Why this works:**
-- The GatewayProxy CRD is in the `operations` namespace
-- The Admin API service is also in `operations` namespace
-- Kubernetes DNS resolves same-namespace services automatically
-- Service name alone is sufficient for resolution
-
-**Updated 2025-10-29:** Previous documentation incorrectly required FQDN format with `endpoints` array. Testing confirmed that `service` reference works correctly when both resources are in the same namespace.
-
-### 3. AdminKey Authentication (Required)
-
-The Admin API requires authentication via AdminKey:
-
-```python
-"auth": {
-    "type": "AdminKey",
-    "adminKey": {
-        "value": "<admin-key-from-vault>",
-    },
-}
-```
-
-This must match the `admin` credential configured in the APISIX deployment.
+Do not set `ingress-controller.gatewayProxy.createDefault`, `provider.controlPlane.service` or `auth.adminKey`: the chart's upgrade notes say to remove them, and `test_gateway_proxy_admin_key_comes_from_apisix_credentials` fails if they come back. Only `publishService` and `pluginMetadata` belong under `ingress-controller.gatewayProxy`.
 
 ## Resource Naming Convention
 
@@ -654,30 +626,8 @@ Before deploying or when troubleshooting, verify these critical settings:
 }
 ```
 
-### ✅ GatewayProxy Service Reference (Corrected)
-```python
-"gatewayProxy": {
-    "provider": {
-        "controlPlane": {
-            "service": {
-                "name": "apache-apisix-admin",
-                "port": 9180,
-            },
-            # NOT endpoints array - that was incorrect
-        }
-    }
-}
-```
-
-### ✅ Admin API Authentication
-```python
-"auth": {
-    "type": "AdminKey",
-    "adminKey": {
-        "value": "<must-match-apisix-admin-credential>",
-    },
-}
-```
+### ✅ GatewayProxy and Admin API Authentication
+Created by the apisix chart (3.0.0+) from `apisix.admin.credentials`; set only `publishService` and `pluginMetadata` under `ingress-controller.gatewayProxy`.
 
 ### ✅ APISIX Configuration
 ```python
