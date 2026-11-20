@@ -63,8 +63,8 @@ OPENEDX_OAUTH_APP_STEP = manage_py_shell_step(OPENEDX_OAUTH_APP_SCRIPT)
 # ol-analytics-api's org-manager check authenticates to mitxonline with a
 # client-credentials Application (mitodl/mitxonline#3807), created by hand in
 # the Django admin when deployed. Locally the Job re-asserts it while
-# ol-analytics-api is enabled. local-dev/apps/ol-analytics-api/
-# secrets.yaml holds the same pair, and tests/local_dev keeps the two equal.
+# ol-analytics-api is enabled. ol-analytics-api's program
+# (local-dev/apps/ol-analytics-api/pulumi) reads the pair from here.
 ANALYTICS_API_CLIENT_ID = "ol-analytics-api-local"
 ANALYTICS_API_CLIENT_SECRET = "local-dev-ol-analytics-api-mitxonline-secret"  # noqa: S105  # pragma: allowlist secret
 ANALYTICS_API_OAUTH_APP_SCRIPT = f"""\

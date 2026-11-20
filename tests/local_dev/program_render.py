@@ -1,8 +1,8 @@
 """Render a local-dev app's Pulumi program under mocks.
 
 Shared by the per-app program tests (test_mitxonline_program.py,
-test_learn_ai_program.py): each pins what its program must match deployed, on
-the resources this harness records.
+test_learn_ai_program.py, test_ol_analytics_api_program.py): each pins what its
+program must match deployed, on the resources this harness records.
 """
 
 import asyncio
@@ -51,6 +51,13 @@ class ProgramMocks(pulumi.runtime.Mocks):
         return {}
 
 
+# Files a program reads from another app's directory, relative to local-dev/apps.
+SIBLING_FILES = {
+    # The MITx Online client pair mitxonline's pre-deploy Job registers.
+    "ol-analytics-api": ["mitxonline/pulumi/inputs.py"],
+}
+
+
 def _tree(app: str, tmp_path: Path, app_files: dict[str, str] | None) -> Path:
     """Copy the app dir with pulumi/ inside; the program takes its parent as APP_DIR."""
     root = tmp_path / "local-dev"
@@ -59,6 +66,10 @@ def _tree(app: str, tmp_path: Path, app_files: dict[str, str] | None) -> Path:
         root / "apps" / app,
         ignore=shutil.ignore_patterns("__pycache__"),
     )
+    for relpath in SIBLING_FILES.get(app, []):
+        target = root / "apps" / relpath
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(REPO / "local-dev/apps" / relpath, target)
     for relpath, text in (app_files or {}).items():
         target = root / "apps" / app / relpath
         target.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,34 @@
+# Per-developer configuration for the local ol-analytics-api stack.
+#
+# The real file, Pulumi.Dev.yaml, is gitignored and appears next to this one on
+# the first apply (it starts with just an encryptionsalt).
+# Add a config: block to it; Tilt re-applies the program when it changes and the
+# pod rolls. `env_vars` is the deployed stacks' key (compare
+# src/ol_infrastructure/applications/ol_analytics_api/Pulumi.Production.yaml);
+# the memory limit is a local key:
+#
+#   ol_analytics_api:env_vars          env merged over LOCAL_ENV_DEFAULTS into
+#                                      the container's env:, which beats the
+#                                      tracked Secret's envFrom. Values must be
+#                                      strings: quote "true".
+#   ol_analytics_api:web_memory_limit  the pod's memory limit (default 512Mi)
+#   ol-local-dev-ol-analytics-api:kubeconfig
+#                                      the kubeconfig holding the local-dev
+#                                      context (default ~/.kube/config; the
+#                                      KUBECONFIG variable is not read)
+#
+# Edit the file rather than `pulumi config set`, which quotes values a second
+# time. Secret values are fine here: the file never leaves your machine.
+config:
+  ol_analytics_api:web_memory_limit: 512Mi  # the default, written out as the key to raise
+  # Uncomment ol_analytics_api:env_vars and the keys you need under it:
+  # ol_analytics_api:env_vars:
+    # Colorized console logs instead of JSON.
+    # DEBUG: "true"
+
+    # Show learner outcomes on learner-progress for learners with no recorded
+    # consent decision. Deployed stacks opt in the same way.
+    # OL_ANALYTICS_API_B2B_DASHBOARD_CONSENT_FAIL_OPEN: "true"
+
+    # Read the StarRocks views from a different database.
+    # OL_ANALYTICS_API_B2B_DASHBOARD_STARROCKS_SCHEMA: "b2b_analytics"

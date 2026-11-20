@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
 
 REPO = Path(__file__).parents[2]
 MODULE = REPO / "local-dev/apps/mitxonline/pulumi/inputs.py"
@@ -78,19 +77,3 @@ def test_the_composed_pre_deploy_command_runs_each_script_in_one_shell(
     (shell_input,) = log.read_text().split("\0")[:-1]
     assert "OPENEDX_OAUTH_APP_CLIENT_ID" in shell_input
     assert (inputs.ANALYTICS_API_CLIENT_ID in shell_input) is enabled
-
-
-def test_the_analytics_app_presents_the_credentials_the_job_registers():
-    """secrets.yaml is the analytics app's copy of the pair; a drift between the
-    two fails every org-manager check with a 502.
-    """
-    secret = yaml.safe_load(
-        (REPO / "local-dev/apps/ol-analytics-api/secrets.yaml").read_text()
-    )
-
-    assert secret["stringData"][
-        "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID"
-    ] == (inputs.ANALYTICS_API_CLIENT_ID)
-    assert secret["stringData"][
-        "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET"
-    ] == (inputs.ANALYTICS_API_CLIENT_SECRET)

@@ -1,0 +1,17 @@
+---
+# Terminates TLS for analytics.learn.<root>. pulumi/__main__.py renders this
+# host's route and plugins; the deployed program gets its ApisixTls from an
+# OLCertManagerCert the local program does not render. It references the
+# local-dev-tls wildcard the core stack writes into this namespace.
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: ol-analytics-api-tls
+  namespace: ol-analytics-api
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - analytics.learn.mit.test
+  secret:
+    name: local-dev-tls
+    namespace: ol-analytics-api
