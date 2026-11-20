@@ -222,6 +222,13 @@ class _FakeIssue:
 
     def create_comment(self, body):
         self.comments.append(body)
+        issue = self
+
+        class _Comment:
+            def delete(self):
+                issue.comments.remove(body)
+
+        return _Comment()
 
     def edit(self, **kwargs):
         if "state" in kwargs:
@@ -458,10 +465,20 @@ def test_close_release_issue_comments_and_closes(fake_repo):
 class _LabelRepo(_FakeRepo):
     """A repo that tracks its labels and can be told to misbehave."""
 
-    def __init__(self, issue, labels=(), *, drop_label=False, fail_close=False):
+    def __init__(
+        self,
+        issue,
+        labels=(),
+        *,
+        drop_label=False,
+        fail_close=False,
+        fail_readback=False,
+    ):
         super().__init__(issues=[issue])
         self.repo_labels = set(labels)
         self.drop_label = drop_label
+        self.fail_readback = fail_readback
+        self._issue = issue
         if fail_close:
             issue.edit = MagicMock(side_effect=RuntimeError("GitHub is down"))
         if drop_label:
@@ -474,6 +491,14 @@ class _LabelRepo(_FakeRepo):
 
     def create_label(self, name, _color, _description):
         self.repo_labels.add(name)
+
+    def get_issue(self, number):
+        # The first lookup is the override's own; any later one is the read-back.
+        if self.fail_readback and getattr(self, "_looked_up", False):
+            msg = "read-back failed"
+            raise RuntimeError(msg)
+        self._looked_up = True
+        return super().get_issue(number)
 
 
 def _release_issue():
@@ -511,8 +536,40 @@ def test_override_takes_the_label_back_when_the_close_fails(fake_repo):
     with pytest.raises(RuntimeError, match="GitHub is down"):
         github._override_and_close_sync("mitodl/thing", 42, "Overridden.")
 
-    labels = [lbl.name for lbl in repo.get_issue(42).labels]
-    assert github.CHECKLIST_OVERRIDE_LABEL not in labels
+    issue = repo._issue
+    assert github.CHECKLIST_OVERRIDE_LABEL not in [lbl.name for lbl in issue.labels]
+    # The comment claimed a promotion that did not happen.
+    assert issue.comments == []
+
+
+def test_override_takes_the_label_back_when_the_read_back_fails(fake_repo):
+    """GitHub applied the label, but the request confirming it did not return."""
+    repo = fake_repo(
+        _LabelRepo(
+            _release_issue(), [github.CHECKLIST_OVERRIDE_LABEL], fail_readback=True
+        )
+    )
+    with pytest.raises(RuntimeError, match="read-back failed"):
+        github._override_and_close_sync("mitodl/thing", 42, "Overridden.")
+
+    issue = repo._issue
+    assert github.CHECKLIST_OVERRIDE_LABEL not in [lbl.name for lbl in issue.labels]
+    assert issue.state == "open"
+    assert issue.comments == []
+
+
+def test_override_leaves_a_label_someone_added_by_hand(fake_repo):
+    """Only the bot's own label is rolled back."""
+    issue = _FakeIssue(
+        42, "Release app", "- [ ] x", ["release", github.CHECKLIST_OVERRIDE_LABEL]
+    )
+    repo = fake_repo(
+        _LabelRepo(issue, [github.CHECKLIST_OVERRIDE_LABEL], fail_close=True)
+    )
+    with pytest.raises(RuntimeError, match="GitHub is down"):
+        github._override_and_close_sync("mitodl/thing", 42, "Overridden.")
+
+    assert github.CHECKLIST_OVERRIDE_LABEL in [lbl.name for lbl in repo._issue.labels]
 
 
 # ---------------------------------------------------------------------------

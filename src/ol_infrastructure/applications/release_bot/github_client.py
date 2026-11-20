@@ -569,27 +569,52 @@ def _override_and_close_sync(repo_slug: str, issue_number: int, comment: str) ->
     repo = _get_client().get_repo(repo_slug)
     issue = repo.get_issue(issue_number)
     _ensure_label(repo, CHECKLIST_OVERRIDE_LABEL)
-    issue.add_to_labels(CHECKLIST_OVERRIDE_LABEL)
-    labels = {label.name for label in repo.get_issue(issue_number).labels}
-    if CHECKLIST_OVERRIDE_LABEL not in labels:
-        msg = f"{CHECKLIST_OVERRIDE_LABEL} did not stick on {repo_slug}#{issue_number}"
-        raise RuntimeError(msg)
+    # Someone may have waived it by hand already; a failure here leaves that be.
+    had_label = any(label.name == CHECKLIST_OVERRIDE_LABEL for label in issue.labels)
+    posted = None
     try:
-        issue.create_comment(comment)
+        issue.add_to_labels(CHECKLIST_OVERRIDE_LABEL)
+        labels = {label.name for label in repo.get_issue(issue_number).labels}
+        if CHECKLIST_OVERRIDE_LABEL not in labels:
+            msg = (
+                f"{CHECKLIST_OVERRIDE_LABEL} did not stick on "
+                f"{repo_slug}#{issue_number}"
+            )
+            raise RuntimeError(msg)  # noqa: TRY301
+        posted = issue.create_comment(comment)
         issue.edit(state="closed")
     except Exception:
         # A waiver left on an open issue would let a later hand close skip
-        # the checklist, with no comment saying who waived it.
+        # the checklist, and a comment left behind would claim a promotion
+        # that never happened.
+        _undo_override(issue, repo_slug, remove_label=not had_label, comment=posted)
+        raise
+
+
+def _undo_override(
+    issue: Any, repo_slug: str, *, remove_label: bool, comment: Any
+) -> None:
+    """Best-effort rollback of a failed override; each step is logged, not raised."""
+    steps = []
+    if remove_label:
+        steps.append(
+            (
+                "remove the label",
+                lambda: issue.remove_from_labels(CHECKLIST_OVERRIDE_LABEL),
+            )
+        )
+    if comment is not None:
+        steps.append(("delete the comment", comment.delete))
+    for what, step in steps:
         try:
-            issue.remove_from_labels(CHECKLIST_OVERRIDE_LABEL)
+            step()
         except Exception:
             log.exception(
-                "Failed to remove %s from %s#%s after a failed close",
-                CHECKLIST_OVERRIDE_LABEL,
+                "Failed to %s on %s#%s after a failed override",
+                what,
                 repo_slug,
-                issue_number,
+                issue.number,
             )
-        raise
 
 
 async def override_and_close(repo_slug: str, issue_number: int, comment: str) -> None:
