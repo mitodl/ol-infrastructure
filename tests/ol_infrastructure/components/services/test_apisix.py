@@ -53,6 +53,7 @@ from bridge.lib.constants import (  # noqa: E402
     GATEWAY_IDENTITY_HEADERS,
     LearnSession,
     apisix_oidc_session_cookie_name,
+    gateway_session_secret,
     mit_learn_session_cookie_name,
     oidc_secret_data,
 )
@@ -379,6 +380,34 @@ def test_oidc_secret_data_derives_the_plugin_keys_from_vault_fields():
         "realm": "olapps",
         "discovery": "https://sso.example/realms/olapps/.well-known/openid-configuration",
     }
+
+
+def test_gateway_session_secrets_differ_per_vault_path():
+    """A namespace that reads one client's path must not hold the key that
+    encrypts another gateway's session cookie, and neither key is the master.
+    """
+    master = "master-session-secret"  # pragma: allowlist secret
+    learn = gateway_session_secret(master, "secret-operations/sso/mitlearn")
+    opik = gateway_session_secret(master, "secret-operations/sso/opik")
+
+    assert learn != opik
+    assert master not in (learn, opik)
+    # Long enough for the openid-connect schema's session.secret minLength 16.
+    assert len(learn) == 64
+
+
+def test_gateway_session_secret_is_stable_and_follows_the_master():
+    """Re-running the stack must not rotate anything; changing the master
+    must rotate every path.
+    """
+    path = "secret-operations/sso/mitlearn"
+
+    assert gateway_session_secret("a-master", path) == gateway_session_secret(
+        "a-master", path
+    )
+    assert gateway_session_secret("a-master", path) != gateway_session_secret(
+        "b-master", path
+    )
 
 
 def test_session_cookie_name_is_emitted_flat():
