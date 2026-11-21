@@ -231,4 +231,4 @@ GRAFANA_VERSION = "13.3.0"
 HINDSIGHT_VERSION = "1.2.1-slim"
 # The stock uv image the Hindsight forget job runs its locked script on.
 # renovate: datasource=docker depName=uv packageName=ghcr.io/astral-sh/uv
-UV_IMAGE_TAG = "0.12.24-python3.13-trixie-slim"
+UV_IMAGE_TAG = "0.13.9-python3.13-trixie-slim"
