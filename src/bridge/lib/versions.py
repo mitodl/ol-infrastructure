@@ -208,7 +208,7 @@ OPENSEARCH_CHART_VERSION = "3.9.0"
 # Held to 7.2, the ElastiCache engine_version of every app local-dev runs, by
 # the valkey/valkey packageRule in renovate.json5.
 # renovate: datasource=docker depName=valkey packageName=valkey/valkey
-VALKEY_VERSION = "7.2.15-alpine"
+VALKEY_VERSION = "7.2.16-alpine"
 # renovate: datasource=docker depName=mailpit packageName=axllent/mailpit
 MAILPIT_VERSION = "v1.33.1"
 # renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
