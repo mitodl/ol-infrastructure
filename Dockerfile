@@ -10,7 +10,7 @@ ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
 COPY --chown=app:app ./ /home/app/workspace/
 RUN uv build --all-packages
 
-FROM python:3.14-slim
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 COPY --from=build /home/app/workspace/dist/*.whl /tmp/
 COPY --from=build /home/app/workspace/pyproject.toml /opt/ol-infrastructure/
 COPY --from=build /home/app/workspace/uv.lock /opt/ol-infrastructure/
