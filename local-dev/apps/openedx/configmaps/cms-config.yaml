@@ -12,7 +12,6 @@ data:
   # and Studio share one broker, so both override files use 12. The allocation
   # is listed under Shared Valkey in local-dev/ARCHITECTURE.md.
   CELERY_BROKER_VHOST: "12"
-  ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
 
   LMS_BASE_URL: "https://lms.mit.test"
   CMS_BASE_URL: "https://studio.mit.test"
@@ -33,3 +32,8 @@ data:
   # Django setting only when its settings model declares the field; the
   # README's Open edX section has the check.
   COURSE_AUTHORING_MICROFRONTEND_URL: "https://studio.mit.test/authoring"
+
+  # Where the browser reaches Meilisearch for Studio content search (Libraries
+  # V2): apisix-routes.yaml's meilisearch-route. lehrer's default is its own
+  # localhost port-forward, which lehrer only sets up behind Traefik.
+  MEILISEARCH_PUBLIC_URL: "https://studio.mit.test/meilisearch"

@@ -7,9 +7,10 @@
 # pf-decision-lehrer-owns-build-definitions-ol-infras.
 #
 # What "composed" means concretely, versus `lehrer dev start`:
-#   - Valkey and OpenSearch come from the shared local-infra namespace
-#     (manage_infra=False), not a second copy in the openedx namespace.
-#   - MariaDB and MongoDB are still lehrer's, since this cluster has neither.
+#   - Valkey comes from the shared local-infra namespace (manage_infra=False),
+#     not a second copy in the openedx namespace.
+#   - MariaDB and MongoDB are still lehrer's, since this cluster has neither,
+#     and so are Typesense and Meilisearch.
 #   - Ingress is APISIX on the shared wildcard cert, not port-forwards.
 #   - Config deltas are layered via configmaps/, not a forked ConfigMap.
 #
@@ -183,13 +184,10 @@ else:
         "deploy_config":   os.path.join(lehrer_dir, "deployments/mit-ol"),
         "registry":        "localhost:5001",
         "registry_k8s":    "k3d-registry.localhost:5000",
-        # Shared with every other app in this cluster. The chart names the
-        # Service "opensearch-cluster-master", which is also what mit-learn's
-        # OPENSEARCH_URL points at.
-        "opensearch_host": "opensearch-cluster-master.local-infra.svc.cluster.local",
         "namespace":       "openedx",
-        # This cluster already runs Valkey and OpenSearch; it runs neither
-        # MariaDB nor MongoDB, so those two stay lehrer's.
+        # This cluster already runs Valkey; it runs neither MariaDB nor
+        # MongoDB, so those two stay lehrer's. lehrer runs its own Typesense
+        # and Meilisearch whatever this is set to.
         "manage_infra":    False,
         "mysql_managed":   True,
         "mongo_managed":   True,
@@ -226,13 +224,14 @@ else:
     })
 
     # manage_infra=False means lehrer's own infra_deps never includes "redis"
-    # or "opensearch" (lehrer-core.star only adds those when it owns them);
-    # nothing otherwise stops edxapp-migrate/notes-migrate — both
-    # backoffLimit: 0 Jobs — from racing this cluster's shared OpenSearch on a
-    # fresh `tilt up`. Every other resource here (LMS/CMS/workers/notes)
-    # already depends on one of these two Jobs, so gating just these two on
-    # "local-infra-apps" — the same resource every sibling app Tiltfile in
-    # this repo waits on — orders the whole stack behind it. Tilt merges
+    # (lehrer-core.star only adds it when it owns Valkey), so nothing on
+    # lehrer's side orders edxapp-migrate/notes-migrate — both backoffLimit: 0
+    # Jobs — after the local-infra-apps stack that creates the openedx
+    # namespace and the shared services this cluster lends it. Every other
+    # resource here (LMS/CMS/workers/notes) already depends on one of these
+    # two Jobs, so gating just these two on "local-infra-apps" — the same
+    # resource every sibling app Tiltfile in this repo waits on — orders the
+    # whole stack behind it. Tilt merges
     # resource_deps across repeated k8s_resource() calls rather than
     # replacing them, so this adds to lehrer's own resource_deps for these
     # Jobs instead of dropping them.

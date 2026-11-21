@@ -245,11 +245,13 @@ How the split works, and why it is not a fork of lehrer's manifests:
 |---|---|
 | Platform/notes/codejail images, all k8s manifests, MariaDB + MongoDB | Which shared services to reuse, ingress, hostnames |
 
-`local-dev/apps/openedx/Tiltfile` calls lehrer's `setup()` with this cluster's topology. Valkey and OpenSearch come from the shared `local-infra` namespace rather than a second copy in `openedx` (`manage_infra: False`); MariaDB and MongoDB stay lehrer's, since this cluster has neither. Ingress is APISIX on the shared wildcard cert.
+`local-dev/apps/openedx/Tiltfile` calls lehrer's `setup()` with this cluster's topology. Valkey comes from the shared `local-infra` namespace rather than a second copy in `openedx` (`manage_infra: False`); MariaDB and MongoDB stay lehrer's, since this cluster has neither. lehrer also runs Typesense (forum and courseware search) and Meilisearch (notes) in `openedx`, since `local-infra` has neither; Open edX does not use `local-infra`'s OpenSearch. Ingress is APISIX on the shared wildcard cert.
 
 Config differences live in `local-dev/apps/openedx/configmaps/` as `*-config-overrides` ConfigMaps, which lehrer's manifests layer **last** in `envFrom`. Only the keys that actually differ belong there — hosts and public URLs. Everything else is inherited, so a key added on lehrer's side arrives without an edit here. Overriding one more key means adding one line, not copying a ConfigMap, with one constraint: an override reaches Django only if lehrer's settings model declares that key. Check with `kubectl -n openedx exec deploy/lms -- python -c 'import django; django.setup(); from django.conf import settings; print(settings.KEY)'` before trusting a new override.
 
 Two MFEs that lehrer's local-dev does not build are built here through lehrer's dagger module and served under the platform hosts, as in production: the learning MFE at `https://lms.mit.test/learn` and the course-authoring MFE at `https://studio.mit.test/authoring`. Studio depends on the second one: on the master release its home page is a redirect into the authoring MFE and every Studio page links to it, so without it Studio has no working page. Each build is a `dagger call mfe build-legacy-configured` run of a minute or two. The MFE source is cloned inside dagger, so Tilt has nothing local to watch for it; trigger `mfe-learning` or `mfe-authoring` by hand in the Tilt UI to pick up a new upstream commit.
+
+Studio content search (the Libraries V2 pages in the authoring MFE) runs on the Meilisearch lehrer deploys in `openedx`. The browser reaches it at `https://studio.mit.test/meilisearch`, an APISIX route that strips the prefix (`meilisearch-route` in `local-dev/apps/openedx/apisix-routes.yaml`).
 
 To run Open edX on its own instead — no MIT Learn, no shared infra — use `lehrer dev setup` && `lehrer dev start` in the lehrer repo, which brings up a self-contained cluster.
 
