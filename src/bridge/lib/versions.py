@@ -219,7 +219,7 @@ LITELLM_VERSION = "v1.108.3"
 # renovate: datasource=docker depName=rustfs packageName=rustfs/rustfs
 RUSTFS_VERSION = "1.0.4"
 # renovate: datasource=docker depName=loki packageName=grafana/loki
-LOKI_VERSION = "3.7.9"
+LOKI_VERSION = "3.7.10"
 # renovate: datasource=docker depName=mimir packageName=grafana/mimir
 MIMIR_VERSION = "3.2.3"
 # renovate: datasource=docker depName=alloy packageName=grafana/alloy
