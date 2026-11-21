@@ -176,7 +176,7 @@ VPA_CHART_VERSION = "0.16.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
 TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.65.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
-TOOLHIVE_OPERATOR_CHART_VERSION = "0.65.0"
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.67.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
 MCP_GRAFANA_VERSION = "2.3.0"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
