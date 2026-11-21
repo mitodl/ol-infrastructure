@@ -2,7 +2,8 @@
 
 **Status:** Accepted
 **Date:** 2026-09-25
-**Amended:** 2026-11-20 (batch-cluster trigger in decision 3)
+**Amended:** 2026-11-20 (batch-cluster trigger in decision 3; status of the stale-read
+cost in decision 1; soft-isolation consequence)
 **Deciders:** tmacey, Data Platform team
 **Technical Story:** `wp-trino-starburst-galaxy-starrocks-migration-decom-62b677` /
 `tk-e1-architecture-decisions-and-adr-for-the-trino--6f3075`
@@ -85,7 +86,11 @@ We accept these costs, each tracked:
   until this is fixed (`tk-make-starrocks-iceberg-reads-see-their-own-write-802810`).
   That task closed on 2026-10-15 as not reproducible. Stale reads after another
   engine's commit moved to `tk-starrocks-reads-a-stale-iceberg-snapshot-for-30s-0cb47c`,
-  and the Glue catalogs now run with the Iceberg metadata cache off.
+  and the Glue catalogs now run with the Iceberg metadata cache off. The Gravitino
+  catalog (`ol_governed_lake_*`, enabled in QA and Production) does not set
+  `enable_iceberg_metadata_cache`, so a read through it can still see the previous
+  snapshot after another engine commits. With the cache on, QA's Glue catalog stayed
+  stale for 16.9-58.0s per FE.
 - `starrocks__drop_relation` omits `FORCE`, which orphans data files on every full
   refresh and incremental temp relation
   (`tk-override-starrocks-drop-relation-to-emit-drop-ta-46824b`).
@@ -140,17 +145,17 @@ We keep one cluster per environment and isolate with:
 Exclusive cores are capped at the smallest CN's core count minus one, so CN pods must
 stay uniformly sized.
 
-The trigger to revisit is measured, not assumed. Either of these reopens whether to
-add a second cluster for batch:
+The trigger to revisit is measured, not assumed. The response depends on which
+trigger fires:
 
-- The M2 production parallel run shows interactive latency regressing during the
+- If the M2 production parallel run shows interactive latency regressing during the
   nightly build (ol-analytics-api has a 30s query timeout), and resource-group tuning
-  cannot fix it. The scale spike
+  cannot fix it, we add a second cluster for batch. The scale spike
   (`tk-scale-spike-build-the-tracking-log-scale-staging-fe1438`) and the M2 run supply
   that data.
-- A batch query takes a production CN to its process memory limit. Part of the memory
-  that gets there is not charged to the query, so a per-query cap does not stop it
-  (see below).
+- If a batch query takes a production CN to its process memory limit, we revisit
+  whether to add a second cluster for batch. Part of the memory that gets there is
+  not charged to the query, so a per-query cap does not stop it (see below).
 
 #### A batch query can exhaust a CN's process memory (added 2026-11-20)
 
@@ -186,13 +191,14 @@ Two mechanisms, from the query profiles:
   query's charged memory, but that is unverified.
 - Join memory that grows with dop. The stale `user_fk` re-check built a `dim_user`
   hash table of about 1 GB per CN at dop 1 and 4.23 GB at dop 4, then ran cn-1 out of
-  process memory. That memory is charged to the query, so a query or group cap does
-  bound it.
+  process memory. That memory is charged to the query, so a query or group cap below
+  the process limit is expected to refuse it first. Neither was tested on this query.
 
 The 15:09 failure hit the query pool, not the process limit. The query pool counts
 charged memory, and a resource group's `mem_limit` is a fraction of that same pool,
-so a group cap would have refused that query earlier. That narrows the problem: the
-process-limit failures are the ones resource groups do not reach.
+so a group cap is expected to have refused that query earlier (also untested). That
+narrows the problem: the failures resource groups are not expected to reach are the
+process-limit ones driven by uncharged scan memory.
 
 ol-data-platform#3451 fixed this model with a literal date floor on the scans, a
 rewrite of the stale-key re-check, and `pipeline_dop` 2. Its incremental now finishes
@@ -200,8 +206,10 @@ in 83.5s on a 159.8M-row production copy. Nothing stops the next model with an
 unpushed filter from doing the same.
 
 The CN autoscaler cannot react either. It scales on CPU (80% of a 4-core request)
-only after a 300s scale-up window. cn-0 did reach 5.5-7.2 cores during the 2026-11-20
-runs, but each query failed within 90s. A new CN would also not take work off one
+with a 300s scale-up stabilization window, so it acts on the lowest replica
+recommendation of the last 300s and adds a CN only once CPU has stayed above target
+for that long. cn-0 did reach 5.5-7.2 cores during the 2026-11-20 runs, but each
+query failed within 90s. A new CN would also not take work off one
 already running a query's fragments, because StarRocks assigns fragments to CNs when
 it schedules the query.
 
@@ -240,9 +248,10 @@ grants listed above:
   Dagster's `STARROCKS_HOST_MAP`, with its own Vault role.
 
 This narrows two related tasks. The resource group definitions
-(`tk-define-starrocks-interactive-batch-resource-grou-d3112c`) can bound the charged
-memory (join and query-pool failures) but not unpruned scan memory, so tuning them
-answers part of this trigger. Workload-signal CN scaling
+(`tk-define-starrocks-interactive-batch-resource-grou-d3112c`) are expected to bound
+the charged memory (join and query-pool failures) but not unpruned scan memory, so
+tuning them answers part of this trigger. Testing a group cap against both is part of
+that task. Workload-signal CN scaling
 (`tk-scale-starrocks-cns-on-workload-signals-keda-bui-401b1d`) adds CNs but does not
 move a running query off a full one.
 
