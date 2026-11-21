@@ -5,7 +5,7 @@ CONCOURSE_VERSION = "8.3.3"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some 
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "2.1.0"
 # renovate: datasource=github-releases depName=dagger packageName=dagger/dagger
-DAGGER_VERSION = "v0.21.11"
+DAGGER_VERSION = "v0.21.12"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.8.1"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
