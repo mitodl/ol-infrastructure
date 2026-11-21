@@ -146,7 +146,7 @@ MARIMO_OPERATOR_VERSION = "v0.3.0"
 # renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 MARIMO_JUPYTERLAB_VERSION = "2026.11.18.286.1"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "4.6.0"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "4.6.1"
 # renovate: datasource=helm depName=loki packageName=loki registryUrl=https://grafana.github.io/helm-charts
 LOKI_CHART_VERSION = "7.6.0"
 # renovate: datasource=helm depName=mimir-distributed packageName=mimir-distributed registryUrl=https://grafana.github.io/helm-charts
