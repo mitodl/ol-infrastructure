@@ -95,6 +95,30 @@ The generated kubeconfig uses an `exec` plugin that calls back into
   Add `--include-readonly-contexts` if you also want paired `-readonly`
   contexts for automation.
 
+## Logging out
+
+```bash
+uv run python scripts/eks/eks.py logout
+```
+
+This revokes the cached Vault tokens in Vault, deletes the local token and AWS
+credential caches, and marks the cache logged out. Until you log in again with
+`setup --mode <mode>`, readonly and developer contexts fail instead of minting a
+token or opening a browser login, including in clients that are still running.
+kubectl prints the "Logged out" message; other clients may show only a generic
+credentials error. Admin contexts use your ambient AWS credentials, so logout
+does not affect them.
+
+- AWS credentials already issued stay valid until they expire (up to eight
+  hours); logout prints when. Logout cannot revoke them. An IAM admin can, by
+  revoking the shared role's active sessions, which ends every user's sessions.
+- A running client keeps its current EKS token (about 15 minutes), and open
+  port-forwards, exec sessions and log or watch streams stay connected until
+  you close them.
+- If Vault is unreachable, logout fails and keeps the tokens it could not
+  revoke. Nothing on this machine uses them before the next `setup`; rerun
+  logout once Vault is reachable to revoke them.
+
 ## Access modes
 
 - `readonly` — safe exploratory access everywhere using `AmazonEKSViewPolicy`
