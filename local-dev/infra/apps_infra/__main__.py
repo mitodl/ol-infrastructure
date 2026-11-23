@@ -24,6 +24,7 @@ from modules.keycloak import (
     create_olapps_dev_realm,
     live_realm_import_id,
 )
+from modules.keycloak_scim import create_scim_remote_providers
 from pulumi import Config, Output
 
 # ---------------------------------------------------------------------------
@@ -63,6 +64,32 @@ ocw_studio_client_secret = config.get_secret(
     "ocw_studio_client_secret"
 ) or Output.secret(
     "local-dev-ocw-studio-secret"  # pragma: allowlist secret
+)
+
+# Bearer tokens Keycloak sends on outbound SCIM pushes. Each must match a row
+# in the receiving app's own database, which local-dev/scripts/seed-scim-tokens.sh
+# writes from the same defaults. Plain config, not get_secret: the value is
+# embedded in a pydantic spec the SCIM plugin receives, which cannot resolve an
+# Output (the deployed stacks get plaintext here too, because Config.get_object
+# decrypts secure: values before the spec is built). These are local-only
+# credentials for a cluster that is not reachable off the machine.
+learn_scim_token = (
+    config.get("learn_scim_token")
+    or "local-dev-learn-scim-token"  # pragma: allowlist secret
+)
+mitxonline_scim_token = (
+    config.get("mitxonline_scim_token")
+    or "local-dev-mitxonline-scim-token"  # pragma: allowlist secret
+)
+# mitxonline's workload comes from its own Tiltfile rather than a manifest in
+# this repo, so its Service is not declared anywhere here. Read off a running
+# cluster; override if it moves:
+#   kubectl --context local-dev -n mitxonline get svc
+# Note the Service is mitxonline-webapp while the Deployment is mitxonline-app,
+# so this is not the name the seed script execs into.
+mitxonline_scim_base_url = (
+    config.get("mitxonline_scim_base_url")
+    or "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/scim/v2"
 )
 
 # Which apps are switched on, forwarded by the Tiltfile from tilt_config.json.
@@ -126,7 +153,7 @@ keycloak_provider = keycloak.Provider(
     client_timeout=60,
 )
 
-create_olapps_dev_realm(
+olapps_realm = create_olapps_dev_realm(
     realm_import_id=live_realm_import_id(
         keycloak_url, OLAPPS_REALM, KEYCLOAK_ADMIN_USERNAME, KEYCLOAK_ADMIN_PASSWORD
     ),
@@ -141,6 +168,21 @@ create_olapps_dev_realm(
     ocw_studio_client_secret=ocw_studio_client_secret,
     root_domain=root_domain,
     verify_email=verify_email,
+    enabled_apps=enabled_apps,
+)
+
+# ---------------------------------------------------------------------------
+# Outbound SCIM provisioning (Keycloak -> mit-learn, mitxonline)
+# ---------------------------------------------------------------------------
+
+create_scim_remote_providers(
+    keycloak_provider=keycloak_provider,
+    keycloak_url=keycloak_url,
+    realm=olapps_realm,
+    realm_name=OLAPPS_REALM,
+    learn_scim_token=learn_scim_token,
+    mitxonline_scim_token=mitxonline_scim_token,
+    mitxonline_scim_base_url=mitxonline_scim_base_url,
     enabled_apps=enabled_apps,
 )
 

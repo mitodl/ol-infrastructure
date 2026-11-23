@@ -190,6 +190,33 @@ def create_identity_core(  # noqa: PLR0913
                 {"name": "spi-email-smtp-auth", "value": "false"},
                 {"name": "spi-email-smtp-ssl", "value": "false"},
                 {"name": "spi-email-smtp-starttls", "value": "false"},
+                # scim-for-keycloak. The jar is baked into the image, but the
+                # plugin only serves its admin backend once these are set, and
+                # the apps-infra stack configures the outbound SCIM providers
+                # through that backend. Same values as the deployed stacks in
+                # applications/keycloak/__main__.py. No license key: the image
+                # carries the enterprise build, whose EnterpriseMetaInfoExtender
+                # makes the key a free-version-only requirement.
+                #
+                # The admin backend compares the request URL against the
+                # configured Keycloak URL; the host reaches it through APISIX on
+                # a different port than the CR advertises, so an exact match
+                # fails.
+                {
+                    "name": "spi-realm-restapi-extension-scim-admin-url-check",
+                    "value": "no-context-path",
+                },
+                # Lets admin-cli password-grant tokens reach the admin backend,
+                # so kc-admin.sh-style scripts can read the SCIM config without
+                # a browser session.
+                {
+                    "name": "spi-realm-restapi-extension-scim-accept-admin-cli-login",
+                    "value": "true",
+                },
+                # Serves the plugin's own admin console from the welcome page,
+                # which is where provisioning attempts and the replay queue are
+                # visible. The plugin logs a warning when this is not "scim".
+                {"name": "spi-theme-welcome-theme", "value": "scim"},
             ],
             "resources": {
                 "limits": {"memory": "2Gi"},
