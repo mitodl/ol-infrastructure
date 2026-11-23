@@ -6,7 +6,8 @@ client's service account, so the OpenMetadata dynamic providers
 (ol_infrastructure.providers.openmetadata) can get an admin token with
 client_credentials instead of a long-lived admin JWT made by hand.
 
-The client holds no Keycloak roles: its access comes from OpenMetadata alone.
+The client is granted no Keycloak roles beyond the realm's default roles, which
+every service account gets: its access comes from OpenMetadata alone.
 """
 
 import json
@@ -67,6 +68,20 @@ def create_openmetadata_provisioner_resources(
         add_to_access_token=True,
         add_to_id_token=False,
         add_to_userinfo=False,
+        opts=resource_options,
+    )
+
+    # The realm's default scopes include `email`, which gives a service account,
+    # having no email, `email_verified: false`. OpenMetadata 2.1 rejects any
+    # provider token carrying that (SecurityUtil.validateEmailVerifiedClaim),
+    # so every call the provisioner made returned 401. An absent claim passes.
+    # `roles` stays: its audience resolution is what puts ol-open_metadata-client
+    # in aud, which 2.1 also requires (ProviderTokenValidator).
+    keycloak.openid.ClientDefaultScopes(
+        "ol-data-platform-openmetadata-provisioner-default-scopes",
+        realm_id=realm.id,
+        client_id=provisioner_client.id,
+        default_scopes=["acr", "basic", "profile", "roles", "web-origins"],
         opts=resource_options,
     )
 
