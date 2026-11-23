@@ -20,6 +20,7 @@ ENV = {
     "OM_SESSION_EXPIRY_SECONDS": "604800",
     "OM_MAX_ACTIVE_SESSIONS_PER_USER": "5",
     "OM_CLIENT_TYPE": "confidential",
+    "OM_PROVIDER_NAME": "MIT Open Learning",
     "OM_USE_ROLES_FROM_PROVIDER": "true",
     "OM_ADMIN_PRINCIPALS": json.dumps(ADMINS),
 }
@@ -58,6 +59,35 @@ def om_auth_config(monkeypatch: pytest.MonkeyPatch) -> Iterator[types.ModuleType
     yield importlib.import_module(module_name)
     # Drop the copy imported against the fake psycopg2.
     sys.modules.pop(module_name, None)
+
+
+def test_desired_authentication_row_carries_the_provider_name(om_auth_config):
+    assert om_auth_config.DESIRED["authenticationConfiguration"] == {
+        "sessionExpiry": 604800,
+        "maxActiveSessionsPerUser": 5,
+        "clientType": "confidential",
+        "providerName": "MIT Open Learning",
+    }
+
+
+def test_an_empty_provider_name_is_filled_in(om_auth_config, capsys):
+    # The rows 2.0 seeded carry providerName "", which 2.1's login page rejects.
+    desired = om_auth_config.DESIRED["authenticationConfiguration"]
+    cursor = FakeCursor(
+        {
+            "authenticationConfiguration": {
+                **desired,
+                "providerName": "",
+                "provider": "custom-oidc",
+            }
+        }
+    )
+
+    om_auth_config._reconcile_row(cursor, "authenticationConfiguration", desired)
+
+    # jsonb || merges at the top level, so provider is kept.
+    assert cursor.updates == [("authenticationConfiguration", desired)]
+    assert "providerName: '' -> 'MIT Open Learning'" in capsys.readouterr().out
 
 
 def test_desired_authorizer_row_carries_the_admin_list(om_auth_config):
