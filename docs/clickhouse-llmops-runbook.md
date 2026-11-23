@@ -648,7 +648,8 @@ Keeper and it fetches the parts.
 Copy `opik_db` everywhere. Copy `default` (the Liquibase ledger) only where
 every replica holds it as `Replicated*`, which is QA. In Production only replica
 0 registers `default.DATABASECHANGELOG*`; replicas 1 and 2 hold plain
-`MergeTree` copies that Liquibase never reads, so leave `default` out there.
+`MergeTree` copies that Liquibase never reads, so leave `default` out of `DBS`
+there and recreate those two copies from the other of replicas 1 and 2 (below).
 The source is replica 0 unless replica 0 is the one being rebuilt; then use
 replica 1. In Production that leaves the ledger unrecoverable from a peer, since
 only replica 0 held it. Restoring it in place is untested (see
@@ -691,12 +692,27 @@ for t in $(k "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM
 done
 ```
 
+In Production, when rebuilding replica 1 or 2, also recreate the two plain
+`MergeTree` ledger copies from the other one. They hold no Keeper path, and
+without them the rebuilt replica stays two tables short, which keeps
+`ClickHouseReplicaMissingTables` firing:
+
+```bash
+PEER=chi-clickhouse-default-0-<the other of 1 and 2>-0
+for t in default.DATABASECHANGELOG default.DATABASECHANGELOGLOCK; do
+  k "$PEER" -- clickhouse-client -q "SHOW CREATE TABLE $t FORMAT TSVRaw" \
+    | sed -E 's/^CREATE TABLE/CREATE TABLE IF NOT EXISTS/' \
+    | k -i "$DST" -- clickhouse-client --multiquery
+done
+```
+
 Check first that `opik_db` holds nothing but `Replicated*` tables and
 materialized views (on 2026-11-23: 38 tables and one view), since this loop
 copies nothing else. The replica is caught up when its `system.replicas` lists
 the same number of tables as replica 0 (Production: the same `opik_db` count)
 with `absolute_delay = 0` and `queue_size = 0`, and `opik_db` has the same table
-count. Then put it back in the Service:
+count. `ClickHouseReplicaMissingTables` clears once its non-system table count
+matches its peers. Then put it back in the Service:
 
 ```bash
 kubectl -n clickhouse label --overwrite pod chi-clickhouse-default-0-<n>-0 clickhouse.altinity.com/ready=yes
