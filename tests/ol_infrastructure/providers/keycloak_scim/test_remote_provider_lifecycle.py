@@ -94,6 +94,11 @@ class FakeBackend:
         self.attributes[attribute["id"]] = attribute
         return FakeResponse(attribute, 201)
 
+    def delete(self, url: str, timeout: int = 0) -> FakeResponse:  # noqa: ARG002
+        self.calls.append(("DELETE", url, None))
+        self.attributes.pop(url.rsplit("/", 1)[1])
+        return FakeResponse(None, 204)
+
     def put(self, url: str, json: dict[str, Any], timeout: int = 0) -> FakeResponse:  # noqa: ARG002
         self.calls.append(("PUT", url, json))
         resource_id = url.rsplit("/", 1)[1]
@@ -268,6 +273,55 @@ def test_matching_attribute_is_left_alone_and_a_changed_one_corrected(
     assert [method for method, _, _ in writes] == ["PUT"]
     assert writes[0][2]["customAttributeName"] == "displayName"
     assert _default_loads(backend) == 0
+
+
+@pytest.mark.parametrize(
+    ("declared", "kept"),
+    [([], set()), ([FULL_NAME], {"fullName"})],
+)
+def test_undeclared_custom_attributes_are_deleted(
+    backend: FakeBackend, declared: list[ScimUserAttribute], kept: set[str]
+) -> None:
+    """The declared list is the whole set of custom mappings; RFC ones stay."""
+    existing = _existing_provider(backend)
+    schema_id = backend.schemas[0]["id"]
+    for name, kind in (("fullName", "string"), ("emailOptIn", "integer")):
+        backend.attributes[f"a-{name}"] = {
+            "id": f"a-{name}",
+            "schemaId": schema_id,
+            "name": name,
+            "type": kind,
+            "customAttributeName": name,
+        }
+
+    ScimRemoteProviderProvider().update(
+        existing["id"], {}, _props(user_attributes=declared)
+    )
+
+    names = {a["name"] for a in backend.attributes.values()}
+    assert names == {"title", *kept}
+    assert _default_loads(backend) == 0
+
+
+def test_undeclared_provider_keeps_its_custom_attributes(
+    backend: FakeBackend,
+) -> None:
+    """None leaves the schema alone, custom mappings included."""
+    existing = _existing_provider(backend)
+    backend.attributes["a-fullName"] = {
+        "id": "a-fullName",
+        "schemaId": backend.schemas[0]["id"],
+        "name": "fullName",
+        "type": "string",
+        "customAttributeName": "fullName",
+    }
+
+    ScimRemoteProviderProvider().update(
+        existing["id"], {}, _props(user_attributes=None)
+    )
+
+    assert "a-fullName" in backend.attributes
+    assert not _attribute_writes(backend)
 
 
 def test_live_command_keys_are_never_echoed_into_a_write(

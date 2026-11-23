@@ -130,8 +130,8 @@ class ScimRemoteProviderSpec(BaseModel):
     authentication_list: list[ScimAuthentication] | None = None
     # None leaves the provider's schema configuration unmanaged. A list (empty
     # included) has Pulumi configure it: the default resource types when it has
-    # none, then the listed attributes created or corrected. Attributes on the
-    # live schema that are not listed are left alone.
+    # none, then the listed attributes created or corrected, and any other
+    # custom-mapped attribute deleted. RFC schema attributes are left alone.
     user_attributes: list[ScimUserAttribute] | None = None
 
     @field_validator("base_url")
@@ -404,8 +404,7 @@ def _configure(
             "User schema; fix it in the SCIM admin console"
         )
         raise RuntimeError(msg)
-    if declared:
-        _ensure_user_attributes(session, props, user_schema, declared)
+    _ensure_user_attributes(session, props, user_schema, declared)
 
 
 def _ensure_user_attributes(
@@ -414,7 +413,13 @@ def _ensure_user_attributes(
     schema: dict[str, Any],
     declared: list[dict[str, Any]],
 ) -> None:
-    """Create or correct the declared attributes on the provider's User schema.
+    """Make the User schema's custom attributes exactly the declared ones.
+
+    Declared attributes are created or corrected. A live top-level attribute
+    with a customAttributeName that is not declared is deleted: those are the
+    mappings added in the admin console, so the declared list is the whole set
+    of custom mappings. Attributes from the RFC schema carry no
+    customAttributeName and are left alone.
 
     Observed on plugin 4.1.5: a PUT that changed an existing provider's schema
     configuration did not reach the running plugin until Keycloak restarted,
@@ -426,6 +431,15 @@ def _ensure_user_attributes(
         if attribute["schemaId"] == schema["id"]
         and not attribute.get("parentAttribute")
     }
+    declared_names = {attribute["name"] for attribute in declared}
+    for name, attribute in live.items():
+        if attribute.get("customAttributeName") and name not in declared_names:
+            response = session.delete(
+                f"{_backend(props, 'KeycloakResourceSchemaAttributes')}"
+                f"/{attribute['id']}",
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            raise_for_status_with_body(response)
     for attribute in declared:
         existing = live.get(attribute["name"])
         if existing is None:
