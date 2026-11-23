@@ -12,6 +12,19 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR cancels that PR's older pytest run. Without this, every
+# superseded commit kept its jobs in the queue: on 2026-11-23, 96 of 142 open
+# pytest runs were for commits their PR had already replaced, and PR jobs
+# waited a median of 22 minutes for a runner. Pushes to main group by run ID,
+# so each one gets its own group and nothing cancels or replaces a main run.
+# ci-gate keeps `if: always()`, so a cancelled run still reports a failing
+# ci-gate on its own commit and a manual cancel of a PR's head cannot pass as
+# skipped. The group is per PR, not per commit: re-running an older commit's
+# run cancels the head's run, which then needs re-running by hand.
+concurrency:
+  group: pytest-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
