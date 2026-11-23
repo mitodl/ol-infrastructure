@@ -461,11 +461,19 @@ application stack copies the values into Vault at
    `MIT Open Learning data platform`) and a team support email. The OCW
    channel is owned by `mitopencourseware@gmail.com` (see
    [OCW YouTube Analytics for HighSystems](#ocw-youtube-analytics-for-highsystems)),
-   so an _Internal_ audience refuses its consent: pick _External_. Then add
-   `https://www.googleapis.com/auth/youtube.force-ssl` under Data Access, and
-   on Audience _Publish app_, for the same 7-day refresh token reason as above.
-   The YouTube Data API is already enabled by this stack.
-2. Console > Clients > Web application, named for its use (e.g.
+   so an _Internal_ audience refuses its consent: pick _External_.
+2. Console > Google Auth Platform > Branding. _Publish app_ refuses until
+   Branding has the three App domain links and `mit.edu` under authorized
+   domains. The source reads more than OCW's channel, so use MIT Learn's:
+   home page `https://learn.mit.edu`, privacy policy
+   `https://learn.mit.edu/privacy`, terms of service
+   `https://learn.mit.edu/terms`. Add a team developer contact email. Leave
+   the logo empty, because a logo puts the app through brand verification.
+3. Console > Google Auth Platform > Data Access: add
+   `https://www.googleapis.com/auth/youtube.force-ssl`. Then Audience >
+   _Publish app_, for the same 7-day refresh token reason as above. The
+   YouTube Data API is already enabled by this stack.
+4. Console > Clients > Web application, named for its use (e.g.
    `ol-data-platform YouTube captions`), with the redirect URI
    `https://developers.google.com/oauthplayground`. The secret is shown once;
    capture it into `src/bridge/secrets/ol_data/youtube_captions.production.yaml`
@@ -478,7 +486,7 @@ application stack copies the values into Vault at
      ocw: <refresh token>
    ```
 
-3. For each channel, someone who can pick that channel in Google's account
+5. For each channel, someone who can pick that channel in Google's account
    chooser gets a refresh token: the
    [OAuth 2.0 Playground](https://developers.google.com/oauthplayground) with
    _Use your own OAuth credentials_ set to the client, scope
@@ -486,7 +494,7 @@ application stack copies the values into Vault at
    authorization code for tokens_. Add it under `captions_refresh_tokens` with
    a label naming the channel. The label only names the token in the source's
    logs; the source asks the API which channel each token is for.
-4. Deploy the dagster application stack's Production stack.
+6. Deploy the dagster application stack's Production stack.
 
 Who can consent as a channel is not settled. Two vendors' docs say YouTube
 Studio's Manager and Editor permissions do not carry to the API, while the
