@@ -6,9 +6,11 @@
   // The org config's :rebaseStalePrs rebases every open Renovate PR whenever
   // main moves. With ~40 open PRs and five workflows per push, each merge to main
   // queued roughly 200 runs; on 2026-11-23 that left PR jobs waiting a median
-  // of 22 minutes for a runner. main does not require branches to be up to date, so
-  // rebasing only on conflict does not block merging, and pytest still runs on
-  // every push to main. Add the `rebase` label to a PR to rebase it by hand.
+  // of 22 minutes for a runner. main does not require branches to be up to
+  // date, so rebasing only on conflict does not block merging. The cost: an
+  // automerged PR's checks may have run against an older main, so two updates
+  // that break only together show up in main's own pytest run after merging.
+  // Add the `rebase` label to a PR to rebase it by hand.
   rebaseWhen: 'conflicted',
   packageRules: [
     {
