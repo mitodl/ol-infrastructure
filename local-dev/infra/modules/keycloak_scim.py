@@ -143,18 +143,18 @@ def create_scim_remote_providers(  # noqa: PLR0913
                 # Match production's providers (see Pulumi.Production.yaml), so
                 # local-dev exercises the same request shapes. Without
                 # patch_supported the plugin sends PUTs where production sends
-                # PATCHes, and the whole block defaults off.
-                #
-                # bulk_max_payload_size is left out: production bounds it at
-                # 1 MiB against the public hostname, and a local target is not
-                # worth the extra knob. etag_supported and
-                # change_password_supported stay off, as they are in production.
+                # PATCHes. Every flag is declared, off ones included, because
+                # loading the default configuration resets undeclared ones to
+                # RFC defaults.
                 filter_supported=True,
                 filter_max_results=50,
                 sort_supported=True,
                 patch_supported=True,
                 bulk_supported=True,
                 bulk_max_operations=100,
+                bulk_max_payload_size=1048576,
+                etag_supported=False,
+                change_password_supported=False,
                 authentication_list=[
                     ScimAuthentication(
                         authentication_type="BEARER",

@@ -40,6 +40,9 @@ SCIM_SCHEMA_ATTRIBUTE_SCHEMA = (
     "urn:goldfish:params:scim:schemas:core:2.0:KeycloakResourceSchemaAttribute"
 )
 SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User"
+# Write-only commands on a provider PUT. Both replace the provider's schema
+# configuration, so they are never copied from a live resource into a write.
+CONFIGURATION_COMMANDS = ("useDefaultScimConfiguration", "reloadConfiguration")
 SCIM_CONTENT_TYPE = "application/scim+json"
 REQUEST_TIMEOUT_SECONDS = 30
 ADMIN_REALM = "master"
@@ -320,7 +323,11 @@ def _put(
     commands: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     body = _overlay(
-        {key: value for key, value in live.items() if key != "meta"},
+        {
+            key: value
+            for key, value in live.items()
+            if key not in ("meta", *CONFIGURATION_COMMANDS)
+        },
         _declared(props),
     )
     # Replace rather than merge: the plugin prefers realmId over realmName, so
@@ -336,52 +343,72 @@ def _put(
     return response.json()
 
 
-def _load_default_configuration(
-    session: requests.Session, props: dict[str, Any], created: dict[str, Any]
+def _provider_schemas(
+    session: requests.Session, props: dict[str, Any], provider_id: str
+) -> list[dict[str, Any]]:
+    return [
+        schema
+        for schema in _list(session, props, "KeycloakResourceSchemas")
+        if schema.get("scimRemoteProviderId") == provider_id
+    ]
+
+
+def _configure(
+    session: requests.Session, props: dict[str, Any], provider: dict[str, Any]
 ) -> None:
-    """Give a new provider the RFC 7643 User and Group resource types.
+    """Make a provider that declares user_attributes able to provision.
 
-    A provider created through the admin backend has no resource types, and
-    the plugin skips one without them ("no resource-assignments for this
-    provider"), so nothing is provisioned. The command is ignored on POST and
-    only acts on PUT. reloadConfiguration would import the target's own
-    ResourceTypes instead, but mitol-django-scim advertises their endpoints as
-    /scim/v2/Users, which the plugin appends to base_url a second time.
+    A provider created through the admin backend has no schemas or resource
+    types, and the plugin skips one without them ("no resource-assignments for
+    this provider"), so nothing is provisioned. PUTting
+    useDefaultScimConfiguration loads the RFC 7643 /Users and /Groups types
+    (the command is ignored on POST). reloadConfiguration would import the
+    target's own ResourceTypes instead, but mitol-django-scim advertises them
+    as /scim/v2/Users, which the plugin appends to base_url a second time.
 
-    Loading defaults deletes the provider's existing schema configuration and
-    resets the capability flags to RFC defaults, so it runs only on a provider
-    this resource just created, and the declared attributes are put back after.
+    Loading defaults deletes the provider's schema configuration and resets
+    its capability flags, so it runs only when the provider has no schemas at
+    all (nothing to lose), and the declared attributes are put back after.
+    That covers a provider this resource just created and one left behind by
+    a create that failed after its POST.
+
+    It also runs only for a provider that declares user_attributes. With the
+    default schema and no fullName mapping, mitol-django-scim targets store a
+    broken name, so an undeclared provider (the deployed stacks, configured in
+    the admin console) stays as inert as it was rather than half-configured.
     """
-    loaded = _put(session, props, created, {"useDefaultScimConfiguration": True})
-    _put(session, props, loaded)
+    declared = props.get("user_attributes")
+    if not declared:
+        return
+    schemas = _provider_schemas(session, props, provider["id"])
+    if not schemas:
+        loaded = _put(session, props, provider, {"useDefaultScimConfiguration": True})
+        _put(session, props, loaded)
+        schemas = _provider_schemas(session, props, provider["id"])
+    user_schema = next(
+        (schema for schema in schemas if schema["schemaId"] == SCIM_USER_SCHEMA),
+        None,
+    )
+    if user_schema is None:
+        msg = (
+            f"Remote SCIM provider {props['spec']['name']!r} has schemas but no "
+            "User schema; fix it in the SCIM admin console"
+        )
+        raise RuntimeError(msg)
+    _ensure_user_attributes(session, props, user_schema, declared)
 
 
 def _ensure_user_attributes(
-    session: requests.Session, props: dict[str, Any], provider_id: str
+    session: requests.Session,
+    props: dict[str, Any],
+    schema: dict[str, Any],
+    declared: list[dict[str, Any]],
 ) -> None:
     """Create or correct the declared attributes on the provider's User schema.
 
     Writing a schema attribute also makes the running plugin reload its cached
     provider configuration (observed on 4.1.5); a provider PUT alone does not.
     """
-    declared = props.get("user_attributes")
-    if not declared:
-        return
-    schema = next(
-        (
-            schema
-            for schema in _list(session, props, "KeycloakResourceSchemas")
-            if schema.get("scimRemoteProviderId") == provider_id
-            and schema["schemaId"] == SCIM_USER_SCHEMA
-        ),
-        None,
-    )
-    if schema is None:
-        msg = (
-            f"Remote SCIM provider {props['spec']['name']!r} has no User schema; "
-            "its SCIM configuration was never loaded"
-        )
-        raise RuntimeError(msg)
     live = {
         attribute["name"]: attribute
         for attribute in _list(session, props, "KeycloakResourceSchemaAttributes")
@@ -412,6 +439,7 @@ def _ensure_user_attributes(
                 f"/{existing['id']}",
                 json={
                     **{key: value for key, value in existing.items() if key != "meta"},
+                    "schemas": [SCIM_SCHEMA_ATTRIBUTE_SCHEMA],
                     **attribute,
                 },
                 timeout=REQUEST_TIMEOUT_SECONDS,
@@ -442,8 +470,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
             )
             raise_for_status_with_body(response)
             created = response.json()
-            _load_default_configuration(session, props, created)
-        _ensure_user_attributes(session, props, created["id"])
+        _configure(session, props, created)
         return dynamic.CreateResult(id_=created["id"], outs=props)
 
     def read(self, id_: str, props: dict[str, Any]) -> dynamic.ReadResult:
@@ -491,8 +518,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
         session = _session(_news)
         response = _get(session, _news, _id)
         raise_for_status_with_body(response)
-        _put(session, _news, response.json())
-        _ensure_user_attributes(session, _news, _id)
+        _configure(session, _news, _put(session, _news, response.json()))
         return dynamic.UpdateResult(outs=_news)
 
     def delete(self, _id: str, _props: dict[str, Any]) -> None:
