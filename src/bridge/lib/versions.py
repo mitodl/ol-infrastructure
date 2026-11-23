@@ -11,7 +11,7 @@ KEYCLOAK_VERSION = "26.8.1"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
 # renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
-MEILISEARCH_VERSION = "v1.56.2"
+MEILISEARCH_VERSION = "v1.57.0"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "2.1.0"
 # renovate: datasource=docker depName=openapi-generator-cli packageName=openapitools/openapi-generator-cli
