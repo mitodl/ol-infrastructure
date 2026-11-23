@@ -5,6 +5,7 @@ from .remote_provider import (
     ScimRemoteProvider,
     ScimRemoteProviderProvider,
     ScimRemoteProviderSpec,
+    ScimUserAttribute,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "ScimRemoteProvider",
     "ScimRemoteProviderProvider",
     "ScimRemoteProviderSpec",
+    "ScimUserAttribute",
 ]

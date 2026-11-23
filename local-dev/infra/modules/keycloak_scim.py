@@ -23,10 +23,20 @@ from ol_infrastructure.providers.keycloak_scim import (
     ScimAuthentication,
     ScimRemoteProvider,
     ScimRemoteProviderSpec,
+    ScimUserAttribute,
 )
 
 SCIM_ADMIN_ROLE = "scim-admin"
 MASTER_REALM = "master"
+# The olapps user-profile attributes both apps read from a SCIM User
+# (mitol-django-scim adapters): fullName becomes the user's name, emailOptIn
+# Learn's email opt-in, which the target declares as an integer.
+USER_ATTRIBUTES = [
+    ScimUserAttribute(name="fullName", type="string", custom_attribute_name="fullName"),
+    ScimUserAttribute(
+        name="emailOptIn", type="integer", custom_attribute_name="emailOptIn"
+    ),
+]
 
 
 def create_scim_remote_providers(  # noqa: PLR0913
@@ -151,6 +161,7 @@ def create_scim_remote_providers(  # noqa: PLR0913
                         authentication_token=token,
                     )
                 ],
+                user_attributes=USER_ATTRIBUTES,
             ),
             opts=ResourceOptions(depends_on=[*role_grants, realm]),
         )
