@@ -87,7 +87,7 @@ GRAVITINO_SCHEMA_VERSION = "1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.15.3"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
-KEDA_CHART_VERSION = "2.21.0"
+KEDA_CHART_VERSION = "2.21.1"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=label-studio packageName=label-studio registryUrl=https://charts.heartex.com
