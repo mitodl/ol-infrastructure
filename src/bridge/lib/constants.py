@@ -160,8 +160,9 @@ class LearnSession:
     env_suffix: str
     cookie_domain: str
 
-    # The Keycloak client (ol-mitlearn-client) every participant shares, and so
-    # the session.secret the cookie is encrypted with.
+    # The Keycloak client every participant shares, and the Vault path holding
+    # its credentials and so the session.secret the cookie is encrypted with.
+    client_id: ClassVar[str] = "ol-mitlearn-client"
     vault_path: ClassVar[str] = "sso/mitlearn"
     # 14 days, matching the Keycloak SSO session.  Idling and rolling are off so
     # the envelope lasts the full absolute timeout instead of lua-resty-session's
