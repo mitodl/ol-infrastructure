@@ -154,12 +154,16 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
-    # Custom User-schema mappings as read from the live provider (2026-11-23).
-    # Production's Learn provider also maps emailOptIn; this one does not.
+    # Custom User-schema mappings, the same as Production's Learn provider so RC
+    # provisions the way Production does. The live provider had fullName only
+    # (read 2026-11-23); emailOptIn is added on apply.
     user_attributes:
     - name: fullName
       type: string
       custom_attribute_name: fullName
+    - name: emailOptIn
+      type: integer
+      custom_attribute_name: emailOptIn
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
@@ -176,12 +180,10 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
-    # Custom User-schema mappings as read from the live provider (2026-11-23).
-    # Production's mitxonline provider maps no fullName; this one does.
-    user_attributes:
-    - name: fullName
-      type: string
-      custom_attribute_name: fullName
+    # No custom User-schema mappings, the same as Production's mitxonline
+    # provider. The live provider mapped fullName (read 2026-11-23); apply
+    # deletes it, so RC stops sending mitxonline names, as Production does.
+    user_attributes: []
     authentication_list:
     - authentication_type: BEARER
       authentication_token:

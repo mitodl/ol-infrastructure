@@ -139,7 +139,7 @@ config:
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
     # Custom User-schema mappings as read from the live provider (2026-11-23).
-    # CI maps none; QA and Production map fullName.
+    # CI maps none; QA and Production map fullName and emailOptIn.
     user_attributes: []
     authentication_list:
     - authentication_type: BEARER

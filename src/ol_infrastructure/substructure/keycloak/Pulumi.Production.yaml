@@ -179,7 +179,7 @@ config:
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
     # Custom User-schema mappings as read from the live provider (2026-11-23).
-    # None: this provider sends mitxonline no fullName, unlike QA's.
+    # None: this provider sends mitxonline no fullName.
     user_attributes: []
     authentication_list:
     - authentication_type: BEARER
