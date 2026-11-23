@@ -386,7 +386,11 @@ def setup_karpenter(  # noqa: PLR0913
                 lambda ids: [{"id": subnet_id} for subnet_id in ids]
             ),
             "securityGroupSelectorTerms": [
-                {"id": cluster_stack.require_output("node_group_security_group_id")},
+                {
+                    "id": cluster_stack.require_output("node_group_security_group_ids")[
+                        "worker-xlarge"
+                    ]
+                },
             ],
             "instanceProfile": cluster_stack.require_output("node_instance_profile"),
             # Dynamically select the EKS Optimized AL2023 AMI based on cluster version
