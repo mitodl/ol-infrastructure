@@ -454,13 +454,17 @@ the client is created by hand (see
 application stack copies the values into Vault at
 `secret-data/pipelines/youtube` for production.
 
-1. Console (`mitol01`) > Google Auth Platform > Audience. The OCW channel is
-   owned by `mitopencourseware@gmail.com` (see
+1. Console (`mitol01`) > Google Auth Platform > Get started. `mitol01` had no
+   auth platform configuration before this (Audience showed "unconfigured" on
+   2026-11-23), so no other OAuth client depends on what is set here. Give it
+   an app name that tells the consenting channel owner who is asking (e.g.
+   `MIT Open Learning data platform`) and a team support email. The OCW
+   channel is owned by `mitopencourseware@gmail.com` (see
    [OCW YouTube Analytics for HighSystems](#ocw-youtube-analytics-for-highsystems)),
-   so an _Internal_ audience refuses its consent. The audience has to be
-   _External_ and published, for the same 7-day refresh token reason as above.
-   It is one setting for every OAuth client in `mitol01`, so check what else
-   depends on it before changing it.
+   so an _Internal_ audience refuses its consent: pick _External_. Then add
+   `https://www.googleapis.com/auth/youtube.force-ssl` under Data Access, and
+   on Audience _Publish app_, for the same 7-day refresh token reason as above.
+   The YouTube Data API is already enabled by this stack.
 2. Console > Clients > Web application, named for its use (e.g.
    `ol-data-platform YouTube captions`), with the redirect URI
    `https://developers.google.com/oauthplayground`. The secret is shown once;
