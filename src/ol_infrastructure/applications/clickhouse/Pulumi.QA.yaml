@@ -38,9 +38,9 @@ config:
     secure: v1:aCDdZ/XQXLi1PjFu:JW3cgJ4QnmYADnRtbJyuUyC8o20RQzJmp9Zaxwyq2xTThaGiA9+iKi+DAvKgVWj59AihbaJYV+E=
   clickhouse:opik_password:
     secure: v1:welcw7aZeYvZE/P1:4a5YIKqFpx7DRcLqOf6HQEkSzj+Ur34KJHD3pZbrc6MePWPSkRSnRxjeFqm+bDXAJM8zBZMejbc=
-  # Set to "true" only after the apply that adds interserver_password has
-  # restarted every replica (see INTERSERVER_CREDENTIALS_XML in __main__.py).
-  clickhouse:interserver_credentials_enabled: "false"
+  # Second step of the interserver credentials rollout; every replica had the
+  # password env var on 2026-11-23 (see INTERSERVER_CREDENTIALS_XML).
+  clickhouse:interserver_credentials_enabled: "true"
   # Set to "true" only after Keeper is verified serving TLS on 9281 in this
   # environment; flipping it restarts every replica (see keeper_tls_enabled
   # in __main__.py).
