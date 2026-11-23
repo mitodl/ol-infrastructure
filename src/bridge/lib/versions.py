@@ -202,7 +202,7 @@ CNPG_CHART_VERSION = "0.29.2"
 # chart bump would give new clusters a different Postgres major from existing
 # ones and pg-backup.sh dumps would stop restoring between them.
 # renovate: datasource=docker depName=cnpg-postgresql packageName=ghcr.io/cloudnative-pg/postgresql
-CNPG_POSTGRES_VERSION = "18.7-system-trixie"
+CNPG_POSTGRES_VERSION = "19.0-system-trixie"
 # renovate: datasource=helm depName=opensearch packageName=opensearch registryUrl=https://opensearch-project.github.io/helm-charts
 OPENSEARCH_CHART_VERSION = "3.10.0"
 # Held to 7.2, the ElastiCache engine_version of every app local-dev runs, by
