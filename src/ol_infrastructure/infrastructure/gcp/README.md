@@ -441,6 +441,64 @@ client in its name. To cut access, rotate or delete the client secret
 in the console, and have the channel owner revoke HighSystems at
 <https://myaccount.google.com/permissions>.
 
+## YouTube captions for the data platform
+
+The data platform's YouTube dlt source (`src/ol_dlt/ol_dlt/sources/youtube` in
+ol-data-platform) reads caption tracks with the Data API's `captions.list` and
+`captions.download`. Both need an OAuth token with `youtube.force-ssl` from a
+user who can edit the video, and YouTube does not accept service accounts. A
+refresh token authorizes as the one channel picked at consent, so there is one
+OAuth client and a refresh token per channel. Nothing here is Pulumi-managed:
+the client is created by hand (see
+[What this does not manage](#what-this-does-not-manage)), and the dagster
+application stack copies the values into Vault at
+`secret-data/pipelines/youtube` for production.
+
+1. Console (`mitol01`) > Google Auth Platform > Audience. The OCW channel is
+   owned by `mitopencourseware@gmail.com` (see
+   [OCW YouTube Analytics for HighSystems](#ocw-youtube-analytics-for-highsystems)),
+   so an _Internal_ audience refuses its consent. The audience has to be
+   _External_ and published, for the same 7-day refresh token reason as above.
+   It is one setting for every OAuth client in `mitol01`, so check what else
+   depends on it before changing it.
+2. Console > Clients > Web application, named for its use (e.g.
+   `ol-data-platform YouTube captions`), with the redirect URI
+   `https://developers.google.com/oauthplayground`. The secret is shown once;
+   capture it into `src/bridge/secrets/ol_data/youtube_captions.production.yaml`
+   immediately:
+
+   ```yaml
+   captions_client_id: <client id>
+   captions_client_secret: <client secret>
+   captions_refresh_tokens:
+     ocw: <refresh token>
+   ```
+
+3. For each channel, someone who can pick that channel in Google's account
+   chooser gets a refresh token: the
+   [OAuth 2.0 Playground](https://developers.google.com/oauthplayground) with
+   _Use your own OAuth credentials_ set to the client, scope
+   `https://www.googleapis.com/auth/youtube.force-ssl`, then _Exchange
+   authorization code for tokens_. Add it under `captions_refresh_tokens` with
+   a label naming the channel. The label only names the token in the source's
+   logs; the source asks the API which channel each token is for.
+4. Deploy the dagster application stack's Production stack.
+
+Who can consent as a channel is not settled. Two vendors' docs say YouTube
+Studio's Manager and Editor permissions do not carry to the API, while the
+channel's owner, or an owner of its Brand Account, can. Google's own pages do
+not say either way. OCW holds 1,355 of the 1,793 videos the source reads, so
+its token comes first.
+
+Which project's quota an OAuth user token's calls count against is not in
+Google's docs; the client's project (`mitol01`, 10,000 units a day by default)
+is the likely one, and the source spends at most 9,000 a run. If the app is
+unverified, whoever consents clicks through an unverified-app warning once. A
+token stops working after six
+months unused, or when the channel's owner revokes it at
+<https://myaccount.google.com/permissions>; the source then logs that token as
+refused and goes on with the others.
+
 ## reCAPTCHA keys
 
 Every OL property that uses reCAPTCHA renders the v2 checkbox through the
