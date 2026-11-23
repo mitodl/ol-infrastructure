@@ -10,9 +10,11 @@ import asyncio
 import pulumi
 import pytest
 
-from ol_infrastructure.components.aws import database
-from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
-from ol_infrastructure.lib.aws import rds_helper
+from ol_infrastructure.components.aws.database import OLAmazonDB
+from tests.ol_infrastructure.components.aws.rds_test_helpers import (
+    postgres_db,
+    stub_rds_lookups,
+)
 
 ROLE_TYPE = "aws:iam/role:Role"
 
@@ -40,33 +42,19 @@ class RecordingMocks(pulumi.runtime.Mocks):
 @pytest.fixture
 def mocks(monkeypatch):
     """Stub the live RDS lookups and record what OLAmazonDB creates."""
-    # Both modules hold their own reference: the config validators use
-    # database's, max_minor_version uses rds_helper's.
-    for module in (database, rds_helper):
-        monkeypatch.setattr(module, "db_engines", lambda: {"postgres": ["16.15"]})
-    monkeypatch.setattr(database, "get_rds_instance", lambda _name: {})
-    monkeypatch.setattr(
-        database, "parameter_group_family", lambda _engine, _version: "postgres16"
-    )
+    stub_rds_lookups(monkeypatch)
     recorder = RecordingMocks()
     pulumi.runtime.set_mocks(recorder)
     return recorder
 
 
 def _db(name: str, **overrides) -> OLAmazonDB:
-    config = OLPostgresDBConfig(
-        instance_name=name,
-        password="not-a-real-password",  # pragma: allowlist secret
-        subnet_group_name="test-subnets",
-        security_groups=[],
-        tags={"OU": "operations", "Environment": "test"},
-        db_name="testdb",
-        engine_major_version="16",
+    return postgres_db(
+        name,
         enhanced_monitoring_interval=60,
         monitoring_profile_name="disabled",
         **overrides,
     )
-    return OLAmazonDB(config)
 
 
 def _monitoring_role(mocks: RecordingMocks, name: str):
