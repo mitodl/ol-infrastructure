@@ -24,7 +24,8 @@ TIKA_CHART_REPO = "https://apache.jfrog.io/artifactory/tika"
 # The appVersion of the chart at TIKA_CHART_VERSION when it was last checked.
 # Used only when the chart index cannot be read, so a slow or offline link
 # starts Tika on a known image instead of failing the whole core program.
-# Move it with TIKA_CHART_VERSION.
+# Move it with TIKA_CHART_VERSION. tests/local_dev/test_tika_image_tag.py fails
+# a chart bump that leaves it behind.
 TIKA_FALLBACK_IMAGE_TAG = "3.2.2.0-full"
 
 

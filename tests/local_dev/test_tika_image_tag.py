@@ -60,6 +60,18 @@ def _serve(
     return urls
 
 
+def test_fallback_follows_the_chart_version(search):
+    # Renovate bumps TIKA_CHART_VERSION alone, so this fails that PR until the
+    # fallback moves too. Since chart 2.7.0 every chart X.Y.Z has run an image
+    # tagged X.Y.Z.<n>, with or without -full.
+    assert search.TIKA_FALLBACK_IMAGE_TAG.startswith(f"{TIKA_CHART_VERSION}."), (
+        "Set TIKA_FALLBACK_IMAGE_TAG in local-dev/infra/modules/search.py to the "
+        f"appVersion of Tika chart {TIKA_CHART_VERSION}: helm show chart tika "
+        f"--repo {search.TIKA_CHART_REPO} --version {TIKA_CHART_VERSION} "
+        "| grep appVersion"
+    )
+
+
 def test_reads_the_tag_from_the_chart_index(search, monkeypatch):
     urls = _serve(monkeypatch, search, _Response(INDEX))
 
