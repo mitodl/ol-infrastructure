@@ -90,8 +90,6 @@ def vault_secrets(
                 "CKEDITOR_ENVIRONMENT_ID": ("ckeditor", "environment_id"),
                 "CKEDITOR_SECRET_KEY": ("ckeditor", "secret_key"),
                 "CKEDITOR_UPLOAD_URL": ("ckeditor", "upload_url"),
-                "EDX_API_CLIENT_ID": ("edx_api_client", "id"),
-                "EDX_API_CLIENT_SECRET": ("edx_api_client", "secret"),
                 "OLL_API_CLIENT_ID": ("open_learning_library_client", "client_id"),
                 "OLL_API_CLIENT_SECRET": (
                     "open_learning_library_client",

@@ -153,7 +153,6 @@ data:
   CSAIL_BASE_URL: "https://cap.csail.mit.edu/"
   MITPE_BASE_URL: "https://professional.mit.edu/"
   SEE_BASE_URL: "https://executive.mit.edu/"
-  EDX_API_URL: "https://api.edx.org/catalog/v1/catalogs/10/courses"
   YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/mitopen/youtube/channels.yaml"
 
   # ── Embedding config ───────────────────────────────────────────────────────
