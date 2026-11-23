@@ -626,6 +626,7 @@ k8s_provider = kubernetes.Provider(
 
 # Loop through the node group definitions and add them to the cluster
 node_groups = []
+node_group_security_group_ids: dict[str, Output[str]] = {}
 configured_node_groups = eks_config.require_object("nodegroups")
 if USE_IO_OPTIMIZED_STATEFUL_WORKLOAD_STORAGE and (
     "io-optimized" not in configured_node_groups
@@ -688,8 +689,7 @@ for ng_name, ng_config in configured_node_groups.items():
         vpc_id=target_vpc["id"],
         tags=aws_config.tags,
     )
-    # Even though this is in the loop, it will only export the first one (the 'core nodes')
-    export("node_group_security_group_id", node_group_sec_group.security_group.id)
+    node_group_security_group_ids[ng_name] = node_group_sec_group.security_group.id
 
     node_group = eks.NodeGroupV2(
         f"{cluster_name}-eks-nodegroup-{ng_name}",
@@ -763,6 +763,14 @@ for ng_name, ng_config in configured_node_groups.items():
         to_port=0,
         cidr_blocks=pod_ip_blocks,
     )
+
+export("node_group_security_group_ids", node_group_security_group_ids)
+# The single-SG output used to be exported inside the loop above, once per node
+# group, so the group it named depended on the loop rather than on intent
+# (worker-xlarge on every cluster as of 2026-11-23). It now names that group.
+# The Karpenter node class and the StarRocks FE NLB still read it through stack
+# references; drop it once they read node_group_security_group_ids instead.
+export("node_group_security_group_id", node_group_security_group_ids["worker-xlarge"])
 
 
 # Every cluster gets an 'operations' namespace.
