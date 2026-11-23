@@ -49,29 +49,30 @@ _DATA_ASSET_RESOURCES: list[str] = [
 ]
 
 POLICIES: list[OpenMetadataPolicySpec] = [
-    # A Slack destination's webhook URL is stored and returned unmasked
-    # (EventSubscriptionRepository only masks it on /testDestination), and the
-    # default policies give everyone ViewAll on every resource, so anyone who
-    # can log in could read the URL and post to the alert channel.  A deny rule
-    # wins over every allow and admins skip policy evaluation, so denying All
-    # leaves only admins able to read, edit or create alerts through
-    # /v1/events/subscriptions.  It also blocks the description edit the
-    # default DataConsumerPolicy allows, whose PATCH response carries the URL.
+    # The default policies give everyone ViewAll on every resource, and an
+    # alert's Slack webhook URL lets anyone who has it post to the alert
+    # channel.  A deny rule wins over every allow and admins skip policy
+    # evaluation, so denying All leaves only admins able to read, edit or
+    # create alerts through /v1/events/subscriptions.  It also blocks the
+    # description edit the default DataConsumerPolicy allows.
     #
-    # Two reads no policy can close, so this keeps the URL from casual reads,
-    # not from a determined user:
-    # - A PATCH is authorized only for the operations its patch touches
-    #   (JsonPatchUtils.getMetadataOperations), so an empty patch passes for any
-    #   user and returns the whole alert.
-    # - The change-event feed (GET /v1/events) is not permission-checked and
-    #   keeps each alert's create and update, URL included, for the
-    #   change-event retention period.
+    # Through 2.0.x the URL was returned unmasked (EventSubscriptionRepository
+    # only masked it on /testDestination), and two reads no policy can close
+    # exposed it: an empty PATCH, which is authorized only for the operations it
+    # touches (JsonPatchUtils.getMetadataOperations) and so passes for any user,
+    # returned the whole alert; and the change-event feed (GET /v1/events),
+    # which is not permission-checked, keeps each alert's create and update.
+    # 2.1 masks the URL in the subscription API's GET, create, update and PATCH
+    # responses (DestinationSecrets.mask), which closes the PATCH read.
+    # Whether it also masks the change-event feed is unverified, so the deny
+    # stays.
     OpenMetadataPolicySpec(
         name="HideAlertDestinationsPolicy",
         display_name="Hide Alert Destinations Policy",
         description=(
-            "Keeps alerts and notifications, whose Slack webhook URLs are "
-            "returned unmasked, out of the alerts API for every user but admins."
+            "Keeps alerts and notifications, whose Slack webhook URLs let "
+            "anyone post to the alert channel, out of the alerts API for every "
+            "user but admins."
         ),
         rules=[
             OpenMetadataPolicyRule(

@@ -1,9 +1,10 @@
 """The OpenMetadata alert (event subscription) dynamic provider.
 
-The fake server follows OpenMetadata 2.0.6 where the provider depends on it
+The fake server follows OpenMetadata 2.1.0 where the provider depends on it
 (EventSubscriptionResource): ``PUT /v1/events/subscriptions`` creates the alert
 or updates the one with the same name, keeping its id, and ``GET`` returns the
-``input``, ``destinations`` and ``enabled`` it holds.
+``input``, ``destinations`` and ``enabled`` it holds. Both responses mask each
+destination's endpoint (DestinationSecrets.mask).
 """
 
 import copy
@@ -25,6 +26,15 @@ from .fakes import FakeResponse
 SERVER = "https://om.example/api"
 TOKEN_URL = "https://keycloak.example/realms/ol/protocol/openid-connect/token"  # noqa: S105
 WEBHOOK = "https://hooks.slack.example/services/T/B/x"
+MASKED = "*********"
+
+
+def _masked(subscription: dict[str, Any]) -> dict[str, Any]:
+    masked = copy.deepcopy(subscription)
+    for destination in masked.get("destinations") or []:
+        if "endpoint" in (destination.get("config") or {}):
+            destination["config"]["endpoint"] = MASKED
+    return masked
 
 
 class FakeOpenMetadata:
@@ -46,13 +56,15 @@ class FakeOpenMetadata:
                 "filteringRules": {"resources": list(body["resources"])},
             }
             self.subscriptions[subscription["id"]] = subscription
-            return FakeResponse(method, url, 200, subscription)
+            return FakeResponse(method, url, 200, _masked(subscription))
         prefix = "events/subscriptions/"
         if path.startswith(prefix):
             subscription_id = path.removeprefix(prefix)
             if method == "GET":
                 found = self.subscriptions.get(subscription_id)
-                return FakeResponse(method, url, 200 if found else 404, found)
+                if found is None:
+                    return FakeResponse(method, url, 404, None)
+                return FakeResponse(method, url, 200, _masked(found))
             if method == "DELETE":
                 found = self.subscriptions.pop(subscription_id, None)
                 return FakeResponse(method, url, 200 if found else 404, found)
@@ -162,13 +174,21 @@ def test_read_is_in_sync_when_the_server_reorders_arguments(
     assert provider.read(created.id, created.outs).outs["in_sync"] is True
 
 
+@pytest.mark.usefixtures("server")
+def test_read_is_in_sync_although_the_server_masks_the_webhook() -> None:
+    provider = OpenMetadataEventSubscriptionProvider()
+    created = provider.create(_props())
+
+    assert provider.read(created.id, created.outs).outs["in_sync"] is True
+
+
 @pytest.mark.parametrize(
     "edit",
     [
         pytest.param(lambda s: s.update(enabled=False), id="disabled"),
         pytest.param(
-            lambda s: s["destinations"][0]["config"].update(endpoint="https://x"),
-            id="webhook",
+            lambda s: s["destinations"][0].update(type="MsTeams"),
+            id="destination-type",
         ),
         pytest.param(
             lambda s: s["input"]["actions"][0]["arguments"][0].update(input=["Failed"]),

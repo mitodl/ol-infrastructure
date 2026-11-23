@@ -689,12 +689,14 @@ open_metadata_glue_iam_policy = iam.Policy(
 )
 
 # Grants the server pod access to invoke the Bedrock embedding model used for
-# semantic search (see EMBEDDING_PROVIDER below). The DJL provider is unusable
-# on the official OpenMetadata image: DJL downloads a glibc-linked PyTorch
-# native runtime, but the image is Alpine/musl, so it fails every time with
-# `UnsatisfiedLinkError: ... initial-exec TLS resolves to dynamic definition`.
-# Unresolved upstream as of 1.13.1 -
-# https://github.com/open-metadata/OpenMetadata/issues/29576
+# semantic search (see EMBEDDING_PROVIDER below). Through 2.0.x the DJL
+# provider was unusable on the official OpenMetadata image: DJL downloads a
+# glibc-linked PyTorch native runtime, but the image was Alpine/musl, so it
+# failed every time with
+# `UnsatisfiedLinkError: ... initial-exec TLS resolves to dynamic definition`
+# (https://github.com/open-metadata/OpenMetadata/issues/29576). 2.1 moved the
+# server to a glibc distroless Debian base; staying on Bedrock keeps the
+# existing vector index, which Titan embeddings built.
 open_metadata_bedrock_policy_document = {
     "Version": IAM_POLICY_VERSION,
     "Statement": [
@@ -1068,12 +1070,10 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # name below remains except AWS_BEDROCK_REGION. llmConfiguration's own
             # `enabled` flag gates only the chat/completion client, not embeddings, so
             # semantic search needs no LLM_* vars.
-            # EMBEDDING_PROVIDER=bedrock (not djl): DJL is unusable on the official
-            # Alpine/musl-based server image - it fails to load its glibc-linked
-            # PyTorch native runtime every time. Unresolved upstream as of 1.13.1:
-            # https://github.com/open-metadata/OpenMetadata/issues/29576
+            # EMBEDDING_PROVIDER=bedrock (not djl): see
+            # open_metadata_bedrock_policy_document above for why.
             # Bedrock auth uses the pod's IRSA role (open_metadata_bedrock_iam_policy
-            # below) via the AWS default credential provider chain - no API key
+            # above) via the AWS default credential provider chain - no API key
             # needed, just the region and the IAM-auth flag below.
             # LOG_FORMAT=json enables JSON-structured Dropwizard server logs.
             "extraEnvs": [

@@ -1303,11 +1303,11 @@ if stack_info.env_suffix == "production":
 # supersedes a running one or the quality run cannot be triggered, neither of
 # which says the contract failed.
 #
-# OpenMetadata returns a Slack destination's endpoint unmasked to anyone who
-# can read the alert, so HideAlertDestinationsPolicy (access_control.py) keeps
-# alerts from every user and bot but admins and the system bots.  Any valid
-# token can still read the URL through an empty PATCH of the alert or the
-# change-event feed (GET /v1/events); see that policy's comment.
+# The webhook URL lets anyone who has it post to the channel, so
+# HideAlertDestinationsPolicy (access_control.py) keeps alerts from every user
+# and bot but admins and the system bots.  2.1 masks the URL in the alerts
+# API's responses; the change-event feed (GET /v1/events) may still carry it.
+# See that policy's comment.
 #
 # QA and Production hold the same webhook, so both environments' contract
 # failures post to one channel.
