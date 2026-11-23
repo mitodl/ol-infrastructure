@@ -24,6 +24,7 @@ from pulumi import (
 )
 from pulumi_aws import ec2, iam, s3
 
+from bridge.lib.constants import LearnSession
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
@@ -712,6 +713,10 @@ bindings = definition.MitxonlineBindings(
         **DEPLOYED_ENV_DEFAULTS,
         **mitxonline_config.require_object("vars"),
         "MIT_LEARN_API_BASE_URL": f"https://{learn_backend_domain}",
+        # Partner learners land in MIT Learn, so an IdP's kc_idp_hint login
+        # link is a login through Learn's gateway client and /login route.
+        "B2B_IDP_LOGIN_CLIENT_ID": LearnSession.client_id,
+        "B2B_IDP_LOGIN_REDIRECT_URI": f"https://{learn_backend_domain}/login",
         # The bucket is private here, so media URLs must go through Fastly's /media/ route.
         **(
             {"AWS_S3_CUSTOM_DOMAIN": f"{frontend_domain}/media"}
