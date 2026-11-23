@@ -17,7 +17,11 @@ bot-token Slack destination.
 
 ``read`` reports whether the server still holds the declared input, destination
 type and enabled flag, so an alert edited or disabled in the UI is put back on the
-next ``pulumi up --refresh``.
+next ``pulumi up --refresh``. The webhook URL is the exception: 2.1 masks it in
+every response, so ``read`` can't see a URL edited in the UI and only a change
+to the declared ``slack_webhook_url`` puts one back. HideAlertDestinationsPolicy
+(substructure/open_metadata/access_control.py) leaves only admins able to edit
+alerts.
 """
 
 from typing import Any, Literal
@@ -156,8 +160,9 @@ def _in_sync(subscription: dict[str, Any], props: dict[str, Any]) -> bool:
     held_input = subscription.get("input") or {}
     declared_input = _input(props)
     # 2.1 masks the endpoint in every subscription response
-    # (DestinationSecrets.mask), so it can't be compared. A changed webhook URL
-    # still updates through diff, which compares the declared props.
+    # (DestinationSecrets.mask), so it can't be compared, and a URL edited on
+    # the server goes undetected. Only a change to the declared
+    # slack_webhook_url updates it, through diff.
     destinations = [
         (d["category"], d["type"]) for d in subscription.get("destinations") or []
     ]

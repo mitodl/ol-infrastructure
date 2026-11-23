@@ -62,9 +62,9 @@ class FakeOpenMetadata:
             subscription_id = path.removeprefix(prefix)
             if method == "GET":
                 found = self.subscriptions.get(subscription_id)
-                return FakeResponse(
-                    method, url, 200 if found else 404, found and _masked(found)
-                )
+                if found is None:
+                    return FakeResponse(method, url, 404, None)
+                return FakeResponse(method, url, 200, _masked(found))
             if method == "DELETE":
                 found = self.subscriptions.pop(subscription_id, None)
                 return FakeResponse(method, url, 200 if found else 404, found)
