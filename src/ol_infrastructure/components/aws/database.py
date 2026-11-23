@@ -46,6 +46,9 @@ from ol_infrastructure.lib.aws.rds_helper import (
 from ol_infrastructure.lib.ol_types import AWSBase
 
 MAX_BACKUP_DAYS = 35
+ONE_GIBIBYTE_BYTES = 2**30
+MIN_FREE_STORAGE_ALARM_BYTES = 5 * ONE_GIBIBYTE_BYTES
+FREE_STORAGE_ALARM_FRACTION = 0.05
 
 
 class StorageType(StrEnum):
@@ -272,7 +275,7 @@ class OLMariaDBConfig(OLDBConfig):
 class OLAmazonDB(pulumi.ComponentResource):
     """Create an RDS instance with sane defaults and manage associated resources."""
 
-    def __init__(  # noqa: C901, PLR0915
+    def __init__(  # noqa: C901
         self, db_config: OLDBConfig, opts: pulumi.ResourceOptions | None = None
     ):
         """Create an RDS instance, parameter group, and optionally read replica.
@@ -585,21 +588,48 @@ class OLAmazonDB(pulumi.ComponentResource):
         self.register_outputs(component_outputs)
 
         if db_config.monitoring_profile_name:
-            monitoring_profile = self._get_default_monitoring_profile(
-                db_config.monitoring_profile_name
-            )
-            for alarm_name, alarm_args in monitoring_profile.items():
-                alarm_config = OLCloudWatchAlarmSimpleRDSConfig(
-                    database_identifier=db_config.instance_name,
-                    name=f"{db_config.instance_name}-{alarm_name}-OLCloudWatchAlarmSimpleRDSConfig",
-                    tags=db_config.tags,
-                    **alarm_args,
-                )
-                OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)
+            self._create_alarms(db_config)
 
-    def _get_default_monitoring_profile(self, profile_name: str):
+    def _create_alarms(self, db_config: OLDBConfig) -> None:
+        monitoring_profile = self._get_default_monitoring_profile(
+            db_config.monitoring_profile_name, db_config.storage
+        )
+        for alarm_name, alarm_args in monitoring_profile.items():
+            alarm_config = OLCloudWatchAlarmSimpleRDSConfig(
+                database_identifier=db_config.instance_name,
+                name=f"{db_config.instance_name}-{alarm_name}-OLCloudWatchAlarmSimpleRDSConfig",
+                tags=db_config.tags,
+                **alarm_args,
+            )
+            OLCloudWatchAlarmSimpleRDS(alarm_config=alarm_config)
+        # A replica has its own volume and max_allocated_storage, and replays every
+        # write the primary takes, so it can fill independently. Only the storage
+        # alarm applies: CPU and latency on a replica track whatever analytics reads
+        # are running, not the health of the application.
+        if db_config.read_replica and "FreeStorageSpace" in monitoring_profile:
+            replica_identifier = f"{db_config.instance_name}-replica"
+            OLCloudWatchAlarmSimpleRDS(
+                alarm_config=OLCloudWatchAlarmSimpleRDSConfig(
+                    database_identifier=replica_identifier,
+                    name=f"{replica_identifier}-FreeStorageSpace-OLCloudWatchAlarmSimpleRDSConfig",
+                    tags=db_config.tags,
+                    **monitoring_profile["FreeStorageSpace"],
+                )
+            )
+
+    def _get_default_monitoring_profile(self, profile_name: str, storage_gb: int):
         if profile_name == "disabled":
             return {}
+        # Allocated storage never drops below the configured size, and autoscaling
+        # grows the volume once free space falls to 10% of it. Free space under 5%
+        # of the configured size therefore means autoscaling can't keep up: it has
+        # hit max_storage, is waiting out its cooldown, or the volume is filling
+        # faster than it can grow. A flat 5 GiB alone fired 30 minutes after
+        # edxapp-db-mitx-production (1500 GiB) went storage-full on 2026-11-23.
+        free_storage_threshold_bytes = max(
+            MIN_FREE_STORAGE_ALARM_BYTES,
+            int(storage_gb * ONE_GIBIBYTE_BYTES * FREE_STORAGE_ALARM_FRACTION),
+        )
         global_profiles = {
             "CPUUtilization": {
                 "comparison_operator": "GreaterThanThreshold",
@@ -620,7 +650,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 "period": 300,  # 5 minutes
                 "evaluation_periods": 6,  # 30 minutes
                 "metric_name": "FreeStorageSpace",
-                "threshold": 5368709120,  # 5 gigabytes
+                "threshold": free_storage_threshold_bytes,
                 "unit": "Bytes",
             },
             "WriteLatency": {
