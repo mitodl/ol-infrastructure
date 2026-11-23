@@ -1187,6 +1187,13 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     # Pulumi state can be rehearsed somewhere other than production partner SSO.
     # Delete once the rehearsal runbook is written up.
     if stack_info.env_suffix == "qa":
+        # Handover step 1: retain the whole cluster (org, IdP, mappers) so that
+        # removing this block later drops it from state and leaves it in the
+        # realm. Must be deployed, and retainOnDelete visible in the stack
+        # export, before the block is removed.
+        rehearsal_resource_options = resource_options.merge(
+            ResourceOptions(retain_on_delete=True)
+        )
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="handover-rehearsal",
@@ -1195,7 +1202,7 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 keycloak_url=keycloak_url,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
-                resource_options=resource_options,
+                resource_options=rehearsal_resource_options,
             ),
             org=OrgConfig(
                 org_domains=["handover-rehearsal.mit.edu"],
@@ -1203,7 +1210,7 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 org_alias="handover-rehearsal",
                 learn_domain=mitlearn_domain,
                 realm_id=ol_apps_realm.id,
-                resource_options=resource_options,
+                resource_options=rehearsal_resource_options,
             ),
         )
 
