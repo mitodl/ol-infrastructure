@@ -145,6 +145,10 @@ open_metadata_use_roles_from_provider = True
 # and public means the implicit flow, which ol-open_metadata-client no longer
 # allows. The auth-config Job reconciles the row to this value.
 open_metadata_client_type = "confidential"
+# The label on the login page's sign-in button. 2.1's login page refuses a
+# Custom OIDC configuration without one, and our stored rows were seeded empty,
+# so the auth-config Job writes it into the row as well.
+open_metadata_provider_name = "MIT Open Learning"
 # The chart renders this into AUTHORIZER_ADMIN_PRINCIPALS in a Secret the server
 # reads through envFrom, with no checksum on the pods. It is an input to the
 # om-auth-config hash, whose pod annotation rolls the server when this changes:
@@ -840,6 +844,7 @@ _auth_config_hash = hashlib.sha256(
             str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
             str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
             open_metadata_client_type,
+            open_metadata_provider_name,
             json.dumps(open_metadata_use_roles_from_provider),
             json.dumps(open_metadata_initial_admins),
         ]
@@ -894,6 +899,10 @@ open_metadata_auth_config_job = kubernetes.batch.v1.Job(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="OM_CLIENT_TYPE",
                                 value=open_metadata_client_type,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_PROVIDER_NAME",
+                                value=open_metadata_provider_name,
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="OM_USE_ROLES_FROM_PROVIDER",
@@ -1164,6 +1173,14 @@ open_metadata_application = kubernetes.helm.v3.Release(
                 {
                     "name": "AUTHENTICATION_MAX_ACTIVE_SESSIONS_PER_USER",
                     "value": str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+                },
+                # conf/openmetadata.yaml reads providerName from this var and
+                # defaults it to "". The chart has no value for it. Like the two
+                # above, it only seeds a new install's row; om-auth-config writes
+                # it into existing ones.
+                {
+                    "name": "CUSTOM_OIDC_AUTHENTICATION_PROVIDER_NAME",
+                    "value": open_metadata_provider_name,
                 },
                 # Asset uploader, see open_metadata_assets_bucket above. Objects
                 # are keyed by asset id under the prefix. AES256 (SSE-S3) because

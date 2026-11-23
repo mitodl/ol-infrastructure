@@ -13,7 +13,10 @@ row 1.13.x wrote carries neither, which leaves them at their schema defaults:
 unset (falling through to the deprecated ``oidcConfiguration.sessionExpiry``)
 and 5.  ``useRolesFromProvider`` was false when our authorizer row was seeded,
 and CI's authentication row still carries ``clientType: public`` from before
-the switch to confidential.
+the switch to confidential.  ``providerName`` was seeded empty, which 2.0
+tolerated; 2.1's login page refuses a Custom OIDC configuration without one
+(``REQUIRED_FIELDS_BY_PROVIDER`` in the UI's AuthProvider.util.ts) and shows
+"Authentication configuration is missing required fields: providerName".
 
 ``adminPrincipals`` is the one key the YAML and the row both feed.
 ``UserRepository.initializeUsers`` makes every name in the YAML's list an admin
@@ -51,6 +54,7 @@ DESIRED: dict[str, dict[str, Any]] = {
         "sessionExpiry": int(os.environ["OM_SESSION_EXPIRY_SECONDS"]),
         "maxActiveSessionsPerUser": int(os.environ["OM_MAX_ACTIVE_SESSIONS_PER_USER"]),
         "clientType": os.environ["OM_CLIENT_TYPE"],
+        "providerName": os.environ["OM_PROVIDER_NAME"],
     },
     "authorizerConfiguration": {
         "useRolesFromProvider": json.loads(os.environ["OM_USE_ROLES_FROM_PROVIDER"]),
