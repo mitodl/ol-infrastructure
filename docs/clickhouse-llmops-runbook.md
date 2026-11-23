@@ -656,11 +656,13 @@ DBS="'opik_db', 'default'"   # Production: DBS="'opik_db'"
 If the replica existed before (its volume was lost or replaced, rather than
 never created), Keeper still holds its old registration and `CREATE TABLE`
 fails with `REPLICA_ALREADY_EXISTS`. Drop it from replica 0 first, which cannot
-drop its own. Run it once per database in `DBS`:
+drop its own. Run it for each database in `DBS`:
 
 ```bash
-k "$SRC" -- clickhouse-client -q \
-  "SYSTEM DROP REPLICA 'chi-clickhouse-default-0-<n>' FROM DATABASE opik_db"
+for db in opik_db default; do   # Production: opik_db only
+  k "$SRC" -- clickhouse-client -q \
+    "SYSTEM DROP REPLICA 'chi-clickhouse-default-0-<n>' FROM DATABASE $db"
+done
 ```
 
 Then copy the replicated tables, and the materialized views after them. Opik's
