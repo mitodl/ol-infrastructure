@@ -156,6 +156,12 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    # Custom User-schema mappings as read from the live provider (2026-11-23).
+    # Production's Learn provider also maps emailOptIn; this one does not.
+    user_attributes:
+    - name: fullName
+      type: string
+      custom_attribute_name: fullName
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
@@ -172,6 +178,12 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    # Custom User-schema mappings as read from the live provider (2026-11-23).
+    # Production's mitxonline provider maps no fullName; this one does.
+    user_attributes:
+    - name: fullName
+      type: string
+      custom_attribute_name: fullName
     authentication_list:
     - authentication_type: BEARER
       authentication_token:

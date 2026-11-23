@@ -203,7 +203,18 @@ def test_undeclared_provider_is_never_given_default_configuration(
     assert not _attribute_writes(backend)
 
 
-@pytest.mark.parametrize("user_attributes", [None, [FULL_NAME]])
+def test_empty_user_attributes_configure_the_provider_without_custom_ones(
+    backend: FakeBackend,
+) -> None:
+    """An empty list still opts in: resource types load, nothing custom is added."""
+    result = ScimRemoteProviderProvider().create(_props(user_attributes=[]))
+
+    assert _default_loads(backend) == 1
+    assert [s["scimRemoteProviderId"] for s in backend.schemas] == [result.id]
+    assert not _attribute_writes(backend)
+
+
+@pytest.mark.parametrize("user_attributes", [None, [], [FULL_NAME]])
 def test_configured_provider_is_never_reset(
     backend: FakeBackend, user_attributes: list[ScimUserAttribute] | None
 ) -> None:

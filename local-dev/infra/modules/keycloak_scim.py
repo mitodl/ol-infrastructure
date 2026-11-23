@@ -28,15 +28,18 @@ from ol_infrastructure.providers.keycloak_scim import (
 
 SCIM_ADMIN_ROLE = "scim-admin"
 MASTER_REALM = "master"
-# The olapps user-profile attributes both apps read from a SCIM User
-# (mitol-django-scim adapters): fullName becomes the user's name, emailOptIn
-# Learn's email opt-in, which the target declares as an integer.
-USER_ATTRIBUTES = [
+# Custom User-schema mappings, the same as each Production provider's
+# (substructure/keycloak/Pulumi.Production.yaml): Learn gets fullName (its
+# profile name) and emailOptIn (an integer on Learn's side); mitxonline gets
+# neither, so locally, as in Production, a Keycloak name change does not reach
+# mitxonline's name. To test mitxonline name sync, add fullName to its list.
+LEARN_USER_ATTRIBUTES = [
     ScimUserAttribute(name="fullName", type="string", custom_attribute_name="fullName"),
     ScimUserAttribute(
         name="emailOptIn", type="integer", custom_attribute_name="emailOptIn"
     ),
 ]
+MITXONLINE_USER_ATTRIBUTES: list[ScimUserAttribute] = []
 
 
 def create_scim_remote_providers(  # noqa: PLR0913
@@ -116,15 +119,17 @@ def create_scim_remote_providers(  # noqa: PLR0913
             "ol-learn-scim",
             "http://mitlearn-webapp.mit-learn.svc.cluster.local:8060/scim/v2",
             learn_scim_token,
+            LEARN_USER_ATTRIBUTES,
         ),
         "mitxonline": (
             "ol-mitxonline-scim",
             mitxonline_scim_base_url,
             mitxonline_scim_token,
+            MITXONLINE_USER_ATTRIBUTES,
         ),
     }
 
-    for app, (name, base_url, token) in targets.items():
+    for app, (name, base_url, token, user_attributes) in targets.items():
         if app not in set(enabled_apps):
             continue
         ScimRemoteProvider(
@@ -161,7 +166,7 @@ def create_scim_remote_providers(  # noqa: PLR0913
                         authentication_token=token,
                     )
                 ],
-                user_attributes=USER_ATTRIBUTES,
+                user_attributes=user_attributes,
             ),
             opts=ResourceOptions(depends_on=[*role_grants, realm]),
         )
