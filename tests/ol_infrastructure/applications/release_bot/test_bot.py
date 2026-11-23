@@ -1533,6 +1533,37 @@ async def test_rc_announcement_survives_a_failure_rendering_the_authors(
     assert "Still waiting on" not in text
 
 
+@pytest.mark.parametrize("label", ["ops:abandoned", "abandoned"])
+async def test_rc_announcement_of_an_abandoned_release_chases_nobody(
+    repos, slack_app, monkeypatch, label
+):
+    """The QA deploy can finish just after the abandon closed its issue.
+
+    Live on ol-analytics-api 2026-11-23: 2026.11.23.3 reached RC a minute
+    before its abandon, and the announcement asked its author to verify it.
+    """
+    issue = {**_issue(_MIXED_CHECKLIST), "labels": ["ops:release", label]}
+
+    text = await _announce_rc(repos, slack_app, monkeypatch, issue)
+
+    assert "2026.9.2.1 is deployed to RC, but the release was abandoned" in text
+    assert _RC_ISSUE_URL in text
+    assert "Still waiting on" not in text
+    assert "Check off" not in text
+    assert "<@" not in text
+
+
+async def test_rc_announcement_of_a_consumed_release_still_chases_authors(
+    repos, slack_app, monkeypatch
+):
+    """Only an abandoned label changes the announcement."""
+    issue = {**_issue(_MIXED_CHECKLIST), "labels": ["ops:release", "ops:consumed"]}
+
+    text = await _announce_rc(repos, slack_app, monkeypatch, issue)
+
+    assert "Still waiting on: <@UALICE>, <@UBOB>" in text
+
+
 async def test_production_announcement_does_not_chase_authors(
     repos, slack_app, monkeypatch
 ):
@@ -2696,6 +2727,44 @@ async def test_abandon_with_nothing_in_flight_only_cancels_requests(
     assert "nothing to abandon" in slack.said
 
 
+async def test_abandon_watches_its_build_for_the_requester(
+    repos, slack, monkeypatch, release_build_watch
+):
+    """A refused abandon leaves the release in flight; the watch says so."""
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.9.1", timedelta(days=1))),
+    )
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger([]))
+    )
+
+    await bot._cmd_abandon(
+        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "UDANA"}
+    )
+
+    release_build_watch.assert_called_once_with(
+        "my-app", repos["my-app"], "http://build/1", requester="UDANA", abandon=True
+    )
+
+
+async def test_abandon_with_nothing_in_flight_watches_nothing(
+    repos, slack, monkeypatch, release_build_watch
+):
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    await bot._cmd_abandon(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    release_build_watch.assert_not_called()
+
+
 async def test_abandon_triggers_the_job_for_an_in_flight_release(
     repos, slack, monkeypatch
 ):
@@ -2716,9 +2785,8 @@ async def test_abandon_triggers_the_job_for_an_in_flight_release(
 
     assert calls == [("trigger", "my-app-pipeline", "abandon-my-app-release")]
     said = slack.said
-    # Not "Abandoning <version>": the job deletes whatever version the
-    # release resource's last `check` recorded, which can diverge from what
-    # in_flight_release reads fresh from GitHub branches.
+    # Not "Abandoning <version>": the job abandons what its own check finds
+    # in flight, read later than in_flight_release here.
     assert "abandon triggered" in said
     assert "last seen in flight" in said
     assert "2026.9.9.1" in said
@@ -4795,7 +4863,7 @@ def _build_statuses(monkeypatch, *statuses):
     monkeypatch.setattr(bot.asyncio, "sleep", AsyncMock())
 
 
-async def _watch(repos, hotfix_shas=None):
+async def _watch(repos, hotfix_shas=None, *, abandon=False):
     app = MagicMock()
     app.client.chat_postMessage = AsyncMock()
     await bot._watch_release_build(
@@ -4806,8 +4874,47 @@ async def _watch(repos, hotfix_shas=None):
         "C123",
         requester="UDANA",
         hotfix_shas=hotfix_shas,
+        abandon=abandon,
     )
     return app.client.chat_postMessage
+
+
+async def test_a_failed_abandon_build_says_the_release_is_still_in_flight(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "started", "failed")
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_IN_FLIGHT)
+    )
+
+    text = (await _watch(repos, abandon=True)).call_args.kwargs["text"]
+
+    assert text.splitlines()[0] == (
+        f"❌ <@UDANA> `my-app` abandon build failed: {_BUILD_URL}"
+    )
+    assert "2026.8.3.1" in text
+    assert "still in flight" in text
+    assert "To try again: `/doof abandon my-app`" in text
+    assert "supersede" not in text
+
+
+async def test_a_failed_abandon_build_with_nothing_in_flight_says_so(
+    repos, monkeypatch
+):
+    _build_statuses(monkeypatch, "errored")
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    text = (await _watch(repos, abandon=True)).call_args.kwargs["text"]
+
+    assert "abandon build errored" in text
+    assert "Nothing is in flight now" in text
+    assert "/doof release" not in text
+
+
+async def test_a_successful_abandon_build_posts_nothing(repos, monkeypatch):
+    _build_statuses(monkeypatch, "pending", "succeeded")
+
+    (await _watch(repos, abandon=True)).assert_not_awaited()
 
 
 async def test_a_failed_release_build_says_how_to_supersede_what_it_cut(

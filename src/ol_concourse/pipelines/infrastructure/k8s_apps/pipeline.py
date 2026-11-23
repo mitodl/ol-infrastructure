@@ -1949,9 +1949,19 @@ def _build_abandon_release_job(
     only after the release put succeeds, so a refused abandon (a version that
     is not in flight) leaves its issue alone.
 
+    The release to cancel is read from the ``in_flight`` file, not
+    ``version``. A manually triggered build checks its inputs first, and once
+    the tracked branch has commits past the release in flight, that check's
+    newest version is the *next* release, with ``in_flight`` naming the real
+    one. Abandoning ``version`` then found nothing to delete and succeeded,
+    and the release and its gate issue survived (ol-analytics-api,
+    2026-11-23). An empty ``in_flight`` means nothing is in flight, and the
+    ``assert-release-in-flight`` task fails the build before either put runs.
+
     *serial_groups* puts the job in the release's serial group, as the
     tag-only pipeline does; see _build_tag_release_pipeline.
     """
+    in_flight_file = f"{release_res.name}/in_flight"
     return Job(
         name=Identifier(f"abandon-{app_name}-release"),
         build_log_retention={"builds": 10},
@@ -1959,9 +1969,30 @@ def _build_abandon_release_job(
         plan=[
             GetStep(get=release_res.name, trigger=False),
             GetStep(get=main_repo.name, trigger=False),
+            TaskStep(
+                task=Identifier("assert-release-in-flight"),
+                config=TaskConfig(
+                    platform=Platform.linux,
+                    image_resource=TASK_IMAGE,
+                    inputs=[Input(name=release_res.name)],
+                    params={"IN_FLIGHT_FILE": in_flight_file},
+                    run=Command(
+                        path="sh",
+                        args=[
+                            "-euc",
+                            'if [ -z "$(cat "$IN_FLIGHT_FILE")" ]; then\n'
+                            "    echo 'No release is in flight, so there is "
+                            "nothing to abandon.' >&2\n"
+                            "    exit 1\n"
+                            "fi\n"
+                            'echo "Abandoning $(cat "$IN_FLIGHT_FILE")"',
+                        ],
+                    ),
+                ),
+            ),
             LoadVarStep(
                 load_var="abandoned_version",
-                file=f"{release_res.name}/version",
+                file=in_flight_file,
                 reveal=True,
             ),
             PutStep(
@@ -1969,7 +2000,7 @@ def _build_abandon_release_job(
                 params={
                     "action": "abandon",
                     "repo_dir": str(main_repo.name),
-                    "version_file": f"{release_res.name}/version",
+                    "version_file": in_flight_file,
                 },
                 no_get=True,
             ),
