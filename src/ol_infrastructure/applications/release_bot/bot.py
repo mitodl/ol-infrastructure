@@ -909,7 +909,11 @@ async def _abandon(respond, app_name, cfg, requester: str | None = None):
     # trigger rather than a deletion. A build that does not succeed left the
     # release in flight, which the watch reports in the channel.
     _start_release_build_watch(
-        app_name, cfg, build_url, requester=requester, abandon=True
+        app_name,
+        cfg,
+        build_url,
+        requester=requester,
+        abandon_version=in_flight["version"],
     )
     lines.insert(
         0,
@@ -1451,11 +1455,12 @@ def _start_release_build_watch(  # noqa: PLR0913
     *,
     requester: str | None,
     hotfix_shas: list[str] | None = None,
-    abandon: bool = False,
+    abandon_version: str | None = None,
 ) -> None:
     """Report in the app's channel if the build at *build_url* does not succeed.
 
-    *abandon* marks the build as the abandon job's rather than a release cut.
+    *abandon_version* marks the build as the abandon job's rather than a
+    release cut, and names the release it was asked to cancel.
     """
     channel = _announce_channel(cfg)
     if _slack_app is None or not channel:
@@ -1474,7 +1479,7 @@ def _start_release_build_watch(  # noqa: PLR0913
             channel,
             requester=requester,
             hotfix_shas=hotfix_shas,
-            abandon=abandon,
+            abandon_version=abandon_version,
         )
     )
 
@@ -1488,7 +1493,7 @@ async def _watch_release_build(  # noqa: PLR0913
     *,
     requester: str | None,
     hotfix_shas: list[str] | None = None,
-    abandon: bool = False,
+    abandon_version: str | None = None,
 ) -> None:
     """Poll a release build and post the way forward if it does not succeed.
 
@@ -1510,9 +1515,9 @@ async def _watch_release_build(  # noqa: PLR0913
             continue
         if status == "succeeded":
             return
-        if abandon:
+        if abandon_version:
             text = await _abandon_failure_text(
-                app_name, cfg, build_url, status, requester
+                app_name, cfg, build_url, status, requester, abandon_version
             )
         else:
             text = await _build_failure_text(
@@ -1533,40 +1538,74 @@ async def _watch_release_build(  # noqa: PLR0913
     log.warning("Stopped watching %s for %s: still not finished", build_url, app_name)
 
 
-async def _abandon_failure_text(
-    app_name, cfg, build_url, status: str, requester: str | None
+async def _abandon_failure_text(  # noqa: PLR0913
+    app_name, cfg, build_url, status: str, requester: str | None, version: str
 ) -> str:
-    """Say an abandon build did not succeed, and whether the release survived.
+    """Say an abandon build did not succeed, and what is left to clean up.
 
     The job refuses rather than guesses (nothing in flight, a version that
     was never cut, a tag that could not be deleted), and a refused abandon
-    leaves the release and its open issue in place. Without this, the only
-    trace in Slack was "abandon triggered".
+    leaves the release in flight. It can also fail *after* deleting the
+    release, when retiring the issue fails or the build is aborted between
+    the two puts. The release is then gone but its issue is open and
+    unlabelled, and closing it starts a Production deploy of a release that
+    no longer exists, so that case names the issue and the fix. Without this,
+    the only trace in Slack was "abandon triggered".
     """
     mention = f"<@{requester}> " if requester else ""
     lines = [
-        f"❌ {mention}`{app_name}` abandon build "
+        f"❌ {mention}`{app_name}` abandon build of {version} "
         f"{_BUILD_STATUS_PHRASES[status]}: {build_url}"
     ]
+    retire = (
+        f"label it `{github.ABANDONED_LABELS[0]}` and close it. Closed without "
+        "that label, it starts a Production deploy of a release that no longer "
+        "exists."
+    )
     try:
         in_flight = await github.in_flight_release(cfg.repo)
     except Exception:
         log.exception("Failed to check in-flight release for %s", app_name)
         lines.append(
-            "Could not check what is in flight, so its release issue may still "
-            f"be open. To try again: `/doof abandon {app_name}`"
+            "Could not check what is in flight. To try again: "
+            f"`/doof abandon {app_name}`. If the release is gone and its "
+            f"release issue is still open, {retire}"
         )
         return "\n".join(lines)
     if in_flight:
         lines.append(
-            f"Release {_describe_in_flight(in_flight)} is still in flight and "
-            "its release issue is still open; closing that issue would ship "
-            f"it. To try again: `/doof abandon {app_name}`"
+            f"Release {_describe_in_flight(in_flight)} is still in flight, so "
+            "nothing was abandoned. Its release issue, if it has one, is "
+            "untouched, and closing it would ship the release. To try again: "
+            f"`/doof abandon {app_name}`"
+        )
+        return "\n".join(lines)
+    try:
+        issue = await github.release_issue_for_version(cfg.repo, version)
+    except Exception:
+        log.exception("Failed to find the release issue for %s %s", app_name, version)
+        lines.append(
+            f"Nothing is in flight now, but its release issue could not be "
+            f"checked. If it is still open, {retire}"
+        )
+        return "\n".join(lines)
+    abandoned = bool(issue) and (
+        github.release_state(issue.get("labels") or []) == "abandoned"
+    )
+    if issue and not abandoned and issue.get("state") == "open":
+        lines.append(
+            f"{version} is no longer in flight, but its release issue "
+            f"<{issue['url']}|#{issue['number']}> is still open: {retire}"
+        )
+    elif abandoned:
+        lines.append(
+            f"{version} was abandoned and its release issue retired, so there "
+            "is nothing left to do."
         )
     else:
         lines.append(
             "Nothing is in flight now, so the release was finished or "
-            "abandoned another way. Check the build log for what it refused."
+            "abandoned another way. The build log says what happened."
         )
     return "\n".join(lines)
 

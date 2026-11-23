@@ -1201,6 +1201,7 @@ def test_release_issue_for_version_finds_a_closed_issue(fake_repo):
     fake_repo(_FakeRepo(issues=[closed]))
     issue = github._release_issue_for_version_sync("mitodl/thing", "2026.9.2.1")
     assert issue["number"] == 9
+    assert issue["state"] == "closed"
 
 
 def test_release_issue_for_version_is_none_when_no_issue_matches(fake_repo):

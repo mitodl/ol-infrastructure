@@ -711,6 +711,7 @@ def _release_issue_for_version_sync(
                 "title": issue.title,
                 "body": issue.body or "",
                 "labels": [lbl.name for lbl in issue.labels],
+                "state": issue.state,
             }
     return None
 
