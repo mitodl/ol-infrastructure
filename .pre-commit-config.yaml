@@ -48,7 +48,7 @@ repos:
     entry: python bin/falco-vcl
     language: python
     additional_dependencies:
-    - cyclopts==5.4.0
+    - cyclopts==5.5.2
     files: |
       (?x)(
         \.vcl$|
