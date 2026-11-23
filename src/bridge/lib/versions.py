@@ -228,7 +228,7 @@ ALLOY_VERSION = "v1.21.3"
 GRAFANA_VERSION = "13.3.1"
 # The -slim variant: no bundled local models. Embeddings come from Bedrock.
 # renovate: datasource=docker depName=hindsight-api packageName=ghcr.io/vectorize-io/hindsight-api
-HINDSIGHT_VERSION = "1.2.1-slim"
+HINDSIGHT_VERSION = "1.2.3-slim"
 # The stock uv image the Hindsight forget job runs its locked script on.
 # renovate: datasource=docker depName=uv packageName=ghcr.io/astral-sh/uv
 UV_IMAGE_TAG = "0.12.24-python3.13-trixie-slim"
