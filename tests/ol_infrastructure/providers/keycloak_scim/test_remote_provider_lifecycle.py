@@ -15,6 +15,7 @@ from ol_infrastructure.providers.keycloak_scim.remote_provider import (
 KEYCLOAK_URL = "https://sso.example.test"
 BACKEND = f"{KEYCLOAK_URL}/realms/master/scim/admin/backend/scim/v2"
 PROVIDERS = f"{BACKEND}/RemoteScimProviderConfig"
+SCHEMAS = f"{BACKEND}/KeycloakResourceSchemas"
 ATTRIBUTES = f"{BACKEND}/KeycloakResourceSchemaAttributes"
 
 
@@ -44,7 +45,18 @@ class FakeBackend:
         return provider
 
     def load_defaults(self, provider_id: str) -> None:
-        schema_id = f"s-{provider_id}"
+        # Like the plugin: drop the provider's schema configuration, load the
+        # RFC schemas, and reset the capability flags.
+        old = {
+            s["id"] for s in self.schemas if s["scimRemoteProviderId"] == provider_id
+        }
+        self.schemas = [s for s in self.schemas if s["id"] not in old]
+        self.attributes = {
+            key: value
+            for key, value in self.attributes.items()
+            if value["schemaId"] not in old
+        }
+        schema_id = f"s-{provider_id}-{len(self.calls)}"
         self.schemas.append(
             {
                 "id": schema_id,
@@ -52,20 +64,19 @@ class FakeBackend:
                 "scimRemoteProviderId": provider_id,
             }
         )
-        self.attributes[f"a-{provider_id}-title"] = {
-            "id": f"a-{provider_id}-title",
+        self.attributes[f"a-{schema_id}-title"] = {
+            "id": f"a-{schema_id}-title",
             "schemaId": schema_id,
             "name": "title",
             "type": "string",
         }
-        # The plugin resets the capability flags to RFC defaults.
         self.providers[provider_id]["bulkSupported"] = False
 
     def get(self, url: str, params: Any = None, timeout: int = 0) -> FakeResponse:  # noqa: ARG002
         self.calls.append(("GET", url, None))
         listings = {
             PROVIDERS: list(self.providers.values()),
-            f"{BACKEND}/KeycloakResourceSchemas": self.schemas,
+            SCHEMAS: self.schemas,
             ATTRIBUTES: list(self.attributes.values()),
         }
         if url in listings:
@@ -107,6 +118,11 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> FakeBackend:
     return fake
 
 
+FULL_NAME = ScimUserAttribute(
+    name="fullName", type="string", custom_attribute_name="fullName"
+)
+
+
 def _props(*, user_attributes: list[ScimUserAttribute] | None) -> dict[str, Any]:
     spec = ScimRemoteProviderSpec(
         realm="olapps",
@@ -116,7 +132,7 @@ def _props(*, user_attributes: list[ScimUserAttribute] | None) -> dict[str, Any]
         bulk_supported=True,
         user_attributes=user_attributes,
     )
-    return {
+    props = {
         "keycloak_url": KEYCLOAK_URL,
         "realm": "olapps",
         "client_id": "scim-config-manager",
@@ -125,19 +141,40 @@ def _props(*, user_attributes: list[ScimUserAttribute] | None) -> dict[str, Any]
         "authentication": None,
         "user_attributes": spec.user_attributes_to_scim(),
     }
+    # The engine drops None-valued inputs, so undeclared attributes are absent.
+    if props["user_attributes"] is None:
+        del props["user_attributes"]
+    return props
 
 
-FULL_NAME = ScimUserAttribute(
-    name="fullName", type="string", custom_attribute_name="fullName"
-)
-
-
-def _commands(backend: FakeBackend) -> list[bool]:
-    return [
-        bool(body.get("useDefaultScimConfiguration"))
+def _default_loads(backend: FakeBackend) -> int:
+    return sum(
+        1
         for method, url, body in backend.calls
-        if method == "PUT" and url.startswith(PROVIDERS)
+        if method == "PUT"
+        and url.startswith(PROVIDERS)
+        and body.get("useDefaultScimConfiguration")
+    )
+
+
+def _attribute_writes(backend: FakeBackend) -> list[tuple[str, str, Any]]:
+    return [
+        call for call in backend.calls if call[0] != "GET" and ATTRIBUTES in call[1]
     ]
+
+
+def _existing_provider(backend: FakeBackend) -> dict[str, Any]:
+    """Add a provider configured by hand: schemas loaded, flags set."""
+    provider = backend.add_provider(
+        {
+            "name": "ol-mitxonline-scim",
+            "assignedRealm": {"realmName": "olapps"},
+            "bulkSupported": True,
+        }
+    )
+    backend.load_defaults(provider["id"])
+    backend.calls.clear()
+    return provider
 
 
 def test_new_provider_gets_default_resource_types_then_declared_flags(
@@ -145,33 +182,57 @@ def test_new_provider_gets_default_resource_types_then_declared_flags(
 ) -> None:
     result = ScimRemoteProviderProvider().create(_props(user_attributes=[FULL_NAME]))
 
-    # Defaults are loaded with a PUT (the POST ignores the command), then a
-    # plain PUT puts back the flags the defaults reset.
-    assert _commands(backend) == [True, False]
+    assert _default_loads(backend) == 1
+    # The defaults reset the flags; the plain PUT after puts the declared ones back.
     assert backend.providers[result.id]["bulkSupported"] is True
     added = [a for a in backend.attributes.values() if a["name"] == "fullName"]
     assert len(added) == 1
-    assert added[0]["schemaId"] == f"s-{result.id}"
     assert added[0]["type"] == "string"
     assert added[0]["customAttributeName"] == "fullName"
 
 
-def test_adopted_provider_keeps_its_configuration(backend: FakeBackend) -> None:
-    """A live provider is never reset to defaults, which deletes its schema setup."""
-    existing = backend.add_provider(
-        {
-            "name": "ol-mitxonline-scim",
-            "assignedRealm": {"realmName": "olapps"},
-            "bulkSupported": True,
-        }
+def test_undeclared_provider_is_never_given_default_configuration(
+    backend: FakeBackend,
+) -> None:
+    """Without the fullName mapping a default schema corrupts names, so stay inert."""
+    result = ScimRemoteProviderProvider().create(_props(user_attributes=None))
+    ScimRemoteProviderProvider().update(result.id, {}, _props(user_attributes=None))
+
+    assert _default_loads(backend) == 0
+    assert not backend.schemas
+    assert not _attribute_writes(backend)
+
+
+@pytest.mark.parametrize("user_attributes", [None, [FULL_NAME]])
+def test_configured_provider_is_never_reset(
+    backend: FakeBackend, user_attributes: list[ScimUserAttribute] | None
+) -> None:
+    """Adopting or updating a provider with schemas keeps its configuration."""
+    existing = _existing_provider(backend)
+    schemas_before = list(backend.schemas)
+
+    ScimRemoteProviderProvider().create(_props(user_attributes=user_attributes))
+    ScimRemoteProviderProvider().update(
+        existing["id"], {}, _props(user_attributes=user_attributes)
     )
-    backend.load_defaults(existing["id"])
-    backend.calls.clear()
 
-    ScimRemoteProviderProvider().create(_props(user_attributes=None))
+    assert _default_loads(backend) == 0
+    assert backend.schemas == schemas_before
+    assert any(a["name"] == "title" for a in backend.attributes.values())
 
-    assert _commands(backend) == [False]
-    assert not [url for _, url, _ in backend.calls if url.startswith(ATTRIBUTES)]
+
+def test_provider_left_without_schemas_is_repaired_on_adopt(
+    backend: FakeBackend,
+) -> None:
+    """A create that failed after its POST leaves a bare provider; next run fixes it."""
+    backend.add_provider(
+        {"name": "ol-mitxonline-scim", "assignedRealm": {"realmName": "olapps"}}
+    )
+
+    ScimRemoteProviderProvider().create(_props(user_attributes=[FULL_NAME]))
+
+    assert _default_loads(backend) == 1
+    assert any(a["name"] == "fullName" for a in backend.attributes.values())
 
 
 def test_matching_attribute_is_left_alone_and_a_changed_one_corrected(
@@ -184,7 +245,7 @@ def test_matching_attribute_is_left_alone_and_a_changed_one_corrected(
     ScimRemoteProviderProvider().update(
         created.id, olds, _props(user_attributes=[FULL_NAME])
     )
-    assert not [c for c in backend.calls if c[0] != "GET" and ATTRIBUTES in c[1]]
+    assert not _attribute_writes(backend)
 
     renamed = ScimUserAttribute(
         name="fullName", type="string", custom_attribute_name="displayName"
@@ -192,27 +253,31 @@ def test_matching_attribute_is_left_alone_and_a_changed_one_corrected(
     ScimRemoteProviderProvider().update(
         created.id, olds, _props(user_attributes=[renamed])
     )
-    writes = [c for c in backend.calls if c[0] != "GET" and ATTRIBUTES in c[1]]
+    writes = _attribute_writes(backend)
     assert [method for method, _, _ in writes] == ["PUT"]
     assert writes[0][2]["customAttributeName"] == "displayName"
+    assert _default_loads(backend) == 0
 
 
-def test_user_attributes_without_a_user_schema_fail_loudly(
+def test_live_command_keys_are_never_echoed_into_a_write(
     backend: FakeBackend,
 ) -> None:
-    existing = backend.add_provider(
-        {"name": "ol-mitxonline-scim", "assignedRealm": {"realmName": "olapps"}}
+    existing = _existing_provider(backend)
+    backend.providers[existing["id"]]["useDefaultScimConfiguration"] = True
+
+    ScimRemoteProviderProvider().update(
+        existing["id"], {}, _props(user_attributes=None)
     )
 
-    with pytest.raises(RuntimeError, match="no User schema"):
-        ScimRemoteProviderProvider().update(
-            existing["id"], {}, _props(user_attributes=[FULL_NAME])
-        )
+    assert _default_loads(backend) == 0
 
 
 def test_diff_sees_a_user_attribute_change() -> None:
-    olds = _props(user_attributes=[FULL_NAME])
-    news = _props(user_attributes=None)
+    declared = _props(user_attributes=[FULL_NAME])
+    undeclared = _props(user_attributes=None)
 
-    assert ScimRemoteProviderProvider().diff("p0", olds, news).changes is True
-    assert ScimRemoteProviderProvider().diff("p0", olds, olds).changes is False
+    assert ScimRemoteProviderProvider().diff("p0", declared, undeclared).changes
+    assert not ScimRemoteProviderProvider().diff("p0", declared, declared).changes
+    # Deployed state predates the input and the engine drops the None value.
+    assert "user_attributes" not in undeclared
+    assert not ScimRemoteProviderProvider().diff("p0", undeclared, undeclared).changes
