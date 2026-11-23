@@ -10,13 +10,55 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import pulumi_kubernetes as k8s
-from pulumi import Alias, ResourceOptions, get_project, get_stack
+import requests
+import yaml as pyyaml
+from pulumi import Alias, ResourceOptions, get_project, get_stack, log
 
 from bridge.lib.versions import (
     OPENSEARCH_CHART_VERSION,
     QDRANT_VERSION,
-    TIKA_IMAGE_TAG,
+    TIKA_CHART_VERSION,
 )
+
+TIKA_CHART_REPO = "https://apache.jfrog.io/artifactory/tika"
+# The appVersion of the chart at TIKA_CHART_VERSION when it was last checked.
+# Used only when the chart index cannot be read, so a slow or offline link
+# starts Tika on a known image instead of failing the whole core program.
+# Move it with TIKA_CHART_VERSION.
+TIKA_FALLBACK_IMAGE_TAG = "3.2.2.0-full"
+
+
+def tika_image_tag() -> str:
+    """Return the image tag the deployed Tika chart version runs.
+
+    Deployed stacks install the chart at ``TIKA_CHART_VERSION``, whose
+    ``appVersion`` is the image tag (e.g. chart 3.2.2 runs ``3.2.2.0-full``).
+    Local-dev keeps its own Deployment, because swapping it for the chart on an
+    existing cluster collides with the Deployment and Service already named
+    ``tika``, so it reads the tag from the chart index instead of repeating it.
+    If the index cannot be fetched or has no entry for that version, it warns
+    and returns ``TIKA_FALLBACK_IMAGE_TAG``.
+    """
+    index_url = f"{TIKA_CHART_REPO}/index.yaml"
+    try:
+        resp = requests.get(index_url, timeout=30)
+        resp.raise_for_status()
+        entries = pyyaml.safe_load(resp.text)["entries"]["tika"]
+        (entry,) = (e for e in entries if e["version"] == TIKA_CHART_VERSION)
+        tag = str(entry["appVersion"])
+    except (
+        requests.RequestException,
+        pyyaml.YAMLError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        log.warn(
+            f"Could not read the image tag of Tika chart {TIKA_CHART_VERSION} "
+            f"from {index_url} ({exc!r}). Using {TIKA_FALLBACK_IMAGE_TAG}."
+        )
+        return TIKA_FALLBACK_IMAGE_TAG
+    return tag
 
 
 @dataclass
@@ -243,17 +285,7 @@ def create_search(
                     "containers": [
                         {
                             "name": "tika",
-                            # Deployed stacks install the Tika chart at
-                            # TIKA_CHART_VERSION. Local-dev keeps its own
-                            # Deployment, because swapping it for the chart on
-                            # an existing cluster collides with the Deployment
-                            # and Service already named tika. TIKA_IMAGE_TAG in
-                            # bridge.lib.versions pins that chart's appVersion
-                            # beside it, so this runs the deployed image without
-                            # downloading the chart index on every run. That
-                            # download failed the whole program on a stalled
-                            # link.
-                            "image": f"apache/tika:{TIKA_IMAGE_TAG}",
+                            "image": f"apache/tika:{tika_image_tag()}",
                             "ports": [{"containerPort": 9998}],
                             # The -full image the chart runs adds tesseract,
                             # which Tika calls for scanned PDF pages as a
