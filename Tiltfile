@@ -619,17 +619,23 @@ local_resource(
 # Write the bearer tokens Keycloak authenticates its outbound SCIM pushes with
 # into each app's database. The apps-infra stack configures the same values on
 # the Keycloak side; the apps validate them as django-oauth-toolkit AccessToken
-# rows, which exist only once something creates them. Runs after kc-seed-users
-# because the token's owner is one of those seeded users.
+# rows, which exist only once something creates them. It execs into each app's
+# web Deployment, so it waits for those to be up; on a fresh `tilt up` it would
+# otherwise run before either exists and fail.
 #
 # Only the apps that receive SCIM need it, so it is skipped unless one is on.
-if "mit-learn" in enabled_apps or "mitxonline" in enabled_apps:
+scim_app_deploys = [
+    a["deploy_name"]
+    for a in APPS
+    if a["name"] in ("mit-learn", "mitxonline") and a["name"] in enabled_apps
+]
+if scim_app_deploys:
     local_resource(
         "seed-scim-tokens",
         cmd="{}/local-dev/scripts/seed-scim-tokens.sh".format(config.main_dir),
         deps=["./local-dev/scripts/seed-scim-tokens.sh"],
         labels=["infra"],
-        resource_deps=["kc-seed-users"],
+        resource_deps=["kc-seed-users"] + scim_app_deploys,
     )
 
 # Re-assert the realm's browser/first-broker-login flow bindings. The Keycloak
