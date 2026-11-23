@@ -540,15 +540,34 @@ local_resource(
 # create that times out on a fresh cluster still lands in Keycloak, and the
 # second run adopts it; without the retry the resource stays red, and
 # kc-seed-users and every app wait on it until someone retriggers it by hand.
+# The SCIM remote-provider resource talks to Keycloak over its mkcert-signed
+# hostname with plain requests, which has no way to be told about that CA
+# per-call, so the stack runs with REQUESTS_CA_BUNDLE pointed at the bundle
+# setup.sh writes: certifi's roots plus the mkcert root, concatenated because the
+# variable REPLACES the trust store rather than adding to it.
+#
+# Set only when the file is there. requests raises "Could not find a suitable TLS
+# CA certificate bundle, invalid path" on a missing one, which would break every
+# HTTPS call in the program, not just the SCIM resource — a checkout whose certs
+# predate this bundle would fail with an error naming a path instead of a cause.
+apps_infra_env = {
+    # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
+    # the core stack only creates on demand.
+    "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
+}
+_ca_bundle = "{}/local-dev/certs/combined-ca.pem".format(config.main_dir)
+if os.path.exists(_ca_bundle):
+    apps_infra_env["REQUESTS_CA_BUNDLE"] = _ca_bundle
+else:
+    print("[scim] no %s; the Keycloak SCIM resource will fail TLS. Re-run local-dev/scripts/setup.sh." % _ca_bundle)
+
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
-    # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
-    # the core stack only creates on demand.
-    env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
+    env=apps_infra_env,
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./src/ol_infrastructure/providers/keycloak_scim", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
@@ -596,6 +615,22 @@ local_resource(
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
+
+# Write the bearer tokens Keycloak authenticates its outbound SCIM pushes with
+# into each app's database. The apps-infra stack configures the same values on
+# the Keycloak side; the apps validate them as django-oauth-toolkit AccessToken
+# rows, which exist only once something creates them. Runs after kc-seed-users
+# because the token's owner is one of those seeded users.
+#
+# Only the apps that receive SCIM need it, so it is skipped unless one is on.
+if "mit-learn" in enabled_apps or "mitxonline" in enabled_apps:
+    local_resource(
+        "seed-scim-tokens",
+        cmd="{}/local-dev/scripts/seed-scim-tokens.sh".format(config.main_dir),
+        deps=["./local-dev/scripts/seed-scim-tokens.sh"],
+        labels=["infra"],
+        resource_deps=["kc-seed-users"],
+    )
 
 # Re-assert the realm's browser/first-broker-login flow bindings. The Keycloak
 # provider resets them to built-in defaults whenever the keycloak.Realm resource

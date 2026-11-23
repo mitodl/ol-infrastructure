@@ -99,7 +99,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     realm_import_id: str | None,
     verify_email: bool = True,
     enabled_apps: tuple[str, ...] = (),
-) -> None:
+) -> keycloak.Realm:
     """
     Create the olapps Keycloak realm for local development.
 
@@ -113,6 +113,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     ``realm_import_id`` is :func:`live_realm_import_id`'s result; when set, the
     realm resource adopts the live realm instead of creating it.
+
+    :returns: The realm resource, for callers that need to order work after it.
+    :rtype: keycloak.Realm
     """
     kc_opts = ResourceOptions(provider=keycloak_provider)
     k8s_opts = ResourceOptions(provider=k8s_provider)
@@ -967,3 +970,5 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             ),
             opts=ResourceOptions(provider=k8s_provider, parent=ocw_studio_client),
         )
+
+    return realm
