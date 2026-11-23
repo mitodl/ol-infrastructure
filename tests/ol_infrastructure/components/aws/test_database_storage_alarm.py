@@ -51,7 +51,7 @@ def _db(name: str, **overrides) -> OLAmazonDB:
     overrides.setdefault("monitoring_profile_name", "production")
     config = OLPostgresDBConfig(
         instance_name=name,
-        password="[REDACTED:API key param]",  # pragma: allowlist secret
+        password="not-a-real-password",  # pragma: allowlist secret
         subnet_group_name="test-subnets",
         security_groups=[],
         tags={"OU": "operations", "Environment": "test"},
