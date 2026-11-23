@@ -765,11 +765,10 @@ for ng_name, ng_config in configured_node_groups.items():
     )
 
 export("node_group_security_group_ids", node_group_security_group_ids)
-# The single-SG output used to be exported inside the loop above, once per node
-# group, so the group it named depended on the loop rather than on intent
-# (worker-xlarge on every cluster as of 2026-11-23). It now names that group.
-# The Karpenter node class and the StarRocks FE NLB still read it through stack
-# references; drop it once they read node_group_security_group_ids instead.
+# Nothing in this repo reads the single-SG output any more. It stays until every
+# Karpenter and StarRocks stack has deployed a revision that reads
+# node_group_security_group_ids, so a queued build or rollback of an older
+# revision can still resolve it; remove it after that.
 export("node_group_security_group_id", node_group_security_group_ids["worker-xlarge"])
 
 

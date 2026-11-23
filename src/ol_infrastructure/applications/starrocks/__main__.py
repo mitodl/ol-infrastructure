@@ -1471,8 +1471,8 @@ fe_mysql_nlb_security_group = ec2.SecurityGroup(
                 vault_stack.require_output("vault_server")["security_group"],
                 mit_learn_stack.require_output("mit_learn")["app_security_group_id"],
                 applications_cluster_stack.require_output(
-                    "node_group_security_group_id"
-                ),
+                    "node_group_security_group_ids"
+                )["worker-xlarge"],
                 concourse_stack.require_output("worker_security_group"),
             ],
             protocol="tcp",
