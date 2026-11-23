@@ -3462,8 +3462,11 @@ async def test_promote_never_claims_a_deploy_started(
     assert "approved" in said
     assert "triggered" not in said
     assert "deploy started" not in said
-    assert "within 5m" in said
+    assert "within 5" in said
     assert ("could not confirm that Concourse checked" in said) is check_fails
+    assert (
+        "Promotion to production will start automatically within 5 minutes." in said
+    ) is not check_fails
 
 
 async def test_promote_button_reports_success_when_the_gate_check_fails(

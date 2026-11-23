@@ -723,8 +723,8 @@ async def _nudge_release_gate(app_name: str, cfg) -> str:
             f"sooner: {url}"
         )
     return (
-        "Concourse was asked to check the release gate; Production starts when "
-        f"a check records the close (within 5m): {url}"
+        "Promotion to production will start automatically within 5 minutes. "
+        f"Production job: {url}"
     )
 
 
