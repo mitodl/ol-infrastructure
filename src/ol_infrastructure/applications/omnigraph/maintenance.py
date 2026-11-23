@@ -574,6 +574,7 @@ def create_maintenance_window(  # noqa: PLR0913
     cleanup_iso_weekdays: tuple[int, ...],
     depends_on: list[Resource],
     *,
+    maintenance_actor: str,
     cleanup_keep: int | None = None,
     suspend: bool = False,
 ) -> OmnigraphMaintenanceWindow:
@@ -595,6 +596,11 @@ def create_maintenance_window(  # noqa: PLR0913
         command gives up on a server that has not stopped within it plus
         ``SERVER_STOP_MARGIN_SECONDS``, so a server still draining writes is
         not taken for a stuck one.
+    :param maintenance_actor: the actor ``optimize`` and ``cleanup`` name with
+        ``--as``. From omnigraph 0.16 a direct maintenance command on a graph
+        with policy is judged by it (``maintain`` for optimize, ``reclaim`` for
+        cleanup) and one naming no actor is denied; the agent-kit bundles grant
+        both to the ``witan-admin`` group. Images before 0.16 ignore it.
     :param cleanup_keep: run ``cleanup --keep`` with this count instead of
         ``--older-than cleanup_older_than``. See the comment below
         ``DEFAULT_CLEANUP_OLDER_THAN``, including why it is one-way.
@@ -719,6 +725,10 @@ def create_maintenance_window(  # noqa: PLR0913
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="OMNIGRAPH_UNLOCK_LEASE",
                                             value=UNLOCK_LEASE_NAME,
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_MAINTENANCE_ACTOR",
+                                            value=maintenance_actor,
                                         ),
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="POD_NAME",
