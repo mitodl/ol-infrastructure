@@ -112,6 +112,30 @@ def _readonly_replica(clusters: str) -> str:
     )
 
 
+def _replica_missing_tables(clusters: str) -> str:
+    # Non-system tables per host (NumberOfTables less NumberOfTablesSystem),
+    # as a deficit against the fullest host in the same cluster. A replica
+    # recreated on an empty volume keeps only information_schema, so on QA on
+    # 2026-11-23 it read 41 short while it served Opik queries that all failed
+    # (runbook "Replica pod Pending on its data volume"). Every host held 81 in
+    # data-production, and no host was short in data-production or data-qa
+    # over the 7 days before, through the 26.3 roll and the Keeper and TLS
+    # restarts. CI has one replica, so it never has a host to compare against.
+    # A host the exporter cannot read drops out of both sides rather than
+    # firing; ClickHouseServerDown covers that. The baseline is the fullest
+    # host, so a stray table on one host (created without ON CLUSTER) makes
+    # every other host fire instead.
+    tables = (
+        f'chi_clickhouse_metric_NumberOfTables{{cluster=~"{clusters}"}}'
+        f' - chi_clickhouse_metric_NumberOfTablesSystem{{cluster=~"{clusters}"}}'
+    )
+    return (
+        f"max by (cluster, namespace) ({tables})\n"
+        "- on (cluster, namespace) group_right\n"
+        f"max by ({_BY_HOST}) ({tables}) > 0"
+    )
+
+
 def _rejected_inserts(clusters: str) -> str:
     selector = f'{{cluster=~"{clusters}"}}'
     return (
@@ -461,6 +485,14 @@ def create(
                 _backup_near_grace_period(),
                 "5m",
                 f"A clickhouse-backup Job in cluster {{{{ $labels.cluster }}}} ran for {{{{ $values.B.Value | humanizeDuration }}}}, past 80% of the server pods' {CLICKHOUSE_TERMINATION_GRACE_SECONDS}s grace period. A replica restarted during the backup would be killed before it finishes. Raise CLICKHOUSE_TERMINATION_GRACE_SECONDS in bridge/lib/magic_numbers.py.",
+                rd,
+            ),
+            # Appended: rules are matched by position (see above).
+            *_paired(
+                "ClickHouseReplicaMissingTables",
+                _replica_missing_tables,
+                "5m",
+                "ClickHouse host {{ $labels.hostname }} in cluster {{ $labels.cluster }} has {{ $values.B.Value }} fewer non-system tables than the fullest replica. A replica recreated on an empty volume serves Opik queries that fail until its schema exists: remove its clickhouse.altinity.com/ready label and follow the runbook section 'Replica pod Pending on its data volume' in docs/clickhouse-llmops-runbook.md. If every host but one fires, the odd one out has an extra table instead.",
                 rd,
             ),
         ],
