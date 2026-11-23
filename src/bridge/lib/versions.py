@@ -156,7 +156,7 @@ PDC_AGENT_VERSION = "0.0.68"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.9.0"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
-NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.20.1"
+NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.20.2"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
 PGBOUNCER_VERSION = "1.26.1"
 # Keep at >= v0.12.1: earlier releases report the reserve_pool metric incorrectly
