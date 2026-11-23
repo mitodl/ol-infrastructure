@@ -153,6 +153,14 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    # Custom User-schema mappings as read from the live provider (2026-11-23).
+    user_attributes:
+    - name: fullName
+      type: string
+      custom_attribute_name: fullName
+    - name: emailOptIn
+      type: integer
+      custom_attribute_name: emailOptIn
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
@@ -170,6 +178,9 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    # Custom User-schema mappings as read from the live provider (2026-11-23).
+    # None: this provider sends mitxonline no fullName, unlike QA's.
+    user_attributes: []
     authentication_list:
     - authentication_type: BEARER
       authentication_token:

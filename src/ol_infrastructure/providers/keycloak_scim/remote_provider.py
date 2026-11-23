@@ -128,8 +128,10 @@ class ScimRemoteProviderSpec(BaseModel):
     bulk_max_payload_size: int | None = None
     etag_supported: bool | None = None
     authentication_list: list[ScimAuthentication] | None = None
-    # Created or corrected when declared; undeclared attributes on the live
-    # schema are left alone, as with every other attribute here.
+    # None leaves the provider's schema configuration unmanaged. A list (empty
+    # included) has Pulumi configure it: the default resource types when it has
+    # none, then the listed attributes created or corrected. Attributes on the
+    # live schema that are not listed are left alone.
     user_attributes: list[ScimUserAttribute] | None = None
 
     @field_validator("base_url")
@@ -372,13 +374,13 @@ def _configure(
     That covers a provider this resource just created and one left behind by
     a create that failed after its POST.
 
-    It also runs only for a provider that declares user_attributes. With the
-    default schema and no fullName mapping, mitol-django-scim targets store a
-    broken name, so an undeclared provider (the deployed stacks, configured in
-    the admin console) stays as inert as it was rather than half-configured.
+    It also runs only for a provider that declares user_attributes (an empty
+    list counts). A provider whose schema was set up in the admin console and
+    is not declared here stays as inert as it was if Pulumi recreates it, rather
+    than getting a default schema that may not match what the target expects.
     """
     declared = props.get("user_attributes")
-    if not declared:
+    if declared is None:
         return
     schemas = _provider_schemas(session, props, provider["id"])
     if not schemas:
@@ -395,7 +397,8 @@ def _configure(
             "User schema; fix it in the SCIM admin console"
         )
         raise RuntimeError(msg)
-    _ensure_user_attributes(session, props, user_schema, declared)
+    if declared:
+        _ensure_user_attributes(session, props, user_schema, declared)
 
 
 def _ensure_user_attributes(
@@ -406,8 +409,9 @@ def _ensure_user_attributes(
 ) -> None:
     """Create or correct the declared attributes on the provider's User schema.
 
-    Writing a schema attribute also makes the running plugin reload its cached
-    provider configuration (observed on 4.1.5); a provider PUT alone does not.
+    Observed on plugin 4.1.5: a PUT that changed an existing provider's schema
+    configuration did not reach the running plugin until Keycloak restarted,
+    while a schema-attribute write, or creating the provider, did.
     """
     live = {
         attribute["name"]: attribute
