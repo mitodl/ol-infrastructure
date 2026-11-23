@@ -49,10 +49,14 @@ _DATA_ASSET_RESOURCES: list[str] = [
 ]
 
 POLICIES: list[OpenMetadataPolicySpec] = [
-    # A Slack destination's webhook URL is stored and returned unmasked
-    # (EventSubscriptionRepository only masks it on /testDestination), and the
-    # default policies give everyone ViewAll on every resource, so anyone who
-    # can log in could read the URL and post to the alert channel.  A deny rule
+    # Through 2.0.x a Slack destination's webhook URL was stored and returned
+    # unmasked (EventSubscriptionRepository only masked it on
+    # /testDestination), and the default policies give everyone ViewAll on
+    # every resource, so anyone who could log in could read the URL and post to
+    # the alert channel.  2.1 masks it in the subscription API's GET, create,
+    # update and PATCH responses (DestinationSecrets.mask), which closes the
+    # empty-PATCH read below; whether it also masks the change-event feed is
+    # unverified, so the deny stays.  A deny rule
     # wins over every allow and admins skip policy evaluation, so denying All
     # leaves only admins able to read, edit or create alerts through
     # /v1/events/subscriptions.  It also blocks the description edit the

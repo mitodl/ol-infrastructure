@@ -1070,10 +1070,10 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # name below remains except AWS_BEDROCK_REGION. llmConfiguration's own
             # `enabled` flag gates only the chat/completion client, not embeddings, so
             # semantic search needs no LLM_* vars.
-            # EMBEDDING_PROVIDER=bedrock (not djl): see open_metadata_bedrock_iam_policy
-            # above for why.
+            # EMBEDDING_PROVIDER=bedrock (not djl): see
+            # open_metadata_bedrock_policy_document above for why.
             # Bedrock auth uses the pod's IRSA role (open_metadata_bedrock_iam_policy
-            # below) via the AWS default credential provider chain - no API key
+            # above) via the AWS default credential provider chain - no API key
             # needed, just the region and the IAM-auth flag below.
             # LOG_FORMAT=json enables JSON-structured Dropwizard server logs.
             "extraEnvs": [

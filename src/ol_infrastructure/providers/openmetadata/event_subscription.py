@@ -16,7 +16,7 @@ Slack is delivered through an incoming webhook only; OpenMetadata 2.0.6 has no
 bot-token Slack destination.
 
 ``read`` reports whether the server still holds the declared input, destination
-and enabled flag, so an alert edited or disabled in the UI is put back on the
+type and enabled flag, so an alert edited or disabled in the UI is put back on the
 next ``pulumi up --refresh``.
 """
 
@@ -155,9 +155,11 @@ def _normalized_conditions(conditions: list[dict[str, Any]]) -> list[Any]:
 def _in_sync(subscription: dict[str, Any], props: dict[str, Any]) -> bool:
     held_input = subscription.get("input") or {}
     declared_input = _input(props)
+    # 2.1 masks the endpoint in every subscription response
+    # (DestinationSecrets.mask), so it can't be compared. A changed webhook URL
+    # still updates through diff, which compares the declared props.
     destinations = [
-        (d["category"], d["type"], (d.get("config") or {}).get("endpoint"))
-        for d in subscription.get("destinations") or []
+        (d["category"], d["type"]) for d in subscription.get("destinations") or []
     ]
     return (
         subscription.get("enabled") is True
@@ -166,7 +168,7 @@ def _in_sync(subscription: dict[str, Any], props: dict[str, Any]) -> bool:
         == [props["resource"]]
         and subscription.get("displayName") == props["display_name"]
         and subscription.get("description") == props["description"]
-        and destinations == [("External", "Slack", props["slack_webhook_url"])]
+        and destinations == [("External", "Slack")]
         and all(
             _normalized_conditions(held_input.get(key) or [])
             == _normalized_conditions(declared_input[key])
