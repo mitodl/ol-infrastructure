@@ -22,6 +22,7 @@ from bridge.settings.openedx.accessors import filter_deployments_by_release
 from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import (
+    OPENEDX_GH_ISSUES_REPOSITORY,
     PULUMI_CODE_PATH,
     PULUMI_WATCHED_PATHS,
 )
@@ -132,6 +133,9 @@ def build_notes_pipeline(
             topology="preview-gated",
             record_deployments=False,
             auto_deploy_stages=["CI"],
+            github_issue_repository=OPENEDX_GH_ISSUES_REPOSITORY[
+                deployment.deployment_name
+            ],
             stack_names=[
                 f"{deployment.deployment_name}.{stage}"
                 for stage in deployment.envs_by_release(release_name)

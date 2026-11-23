@@ -2,7 +2,19 @@ from pathlib import Path
 
 from ol_concourse.lib.models.pipeline import Duration
 
+from bridge.settings.openedx.types import OpenEdxDeploymentName
+
 GH_ISSUES_DEFAULT_REPOSITORY = "ol-platform-eng/concourse-workflow"
+
+# Open edX release gates move on their own cadence and need a different
+# reviewer than the rest of the pipeline issues, so each deployment posts to
+# its own repository instead of crowding GH_ISSUES_DEFAULT_REPOSITORY.
+OPENEDX_GH_ISSUES_REPOSITORY: dict[OpenEdxDeploymentName, str] = {
+    "mitx": "ol-platform-eng/mitx-openedx-workflow",
+    "mitx-staging": "ol-platform-eng/mitx-openedx-workflow",
+    "mitxonline": "ol-platform-eng/mitlearn-openedx-workflow",
+    "xpro": "ol-platform-eng/xpro-openedx-workflow",
+}
 
 # The github-issues resource defaults to polling the github.mit.edu enterprise
 # appliance (gh_host defaults to https://github.mit.edu/api/v3). That appliance
