@@ -1361,6 +1361,7 @@ def create_data_tier(  # noqa: PLR0913
                     schedule=maintenance_schedule,
                     cleanup_older_than=cleanup_older_than,
                     cleanup_iso_weekdays=cleanup_iso_weekdays,
+                    maintenance_actor=CLUSTER_APPLY_ACTOR,
                     cleanup_keep=cleanup_keep,
                     # Behind the Deployment: the window needs the Lease the
                     # Deployment already waits for, and a graph the first boot

@@ -59,6 +59,7 @@ def _window(
         cleanup_older_than="30d",
         cleanup_iso_weekdays=cleanup_iso_weekdays,
         depends_on=[],
+        maintenance_actor="svc-witan-admin",
         cleanup_keep=cleanup_keep,
         suspend=suspend,
     )
@@ -179,6 +180,9 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_CLUSTER_DIR": "/etc/omnigraph/cluster",
             "OMNIGRAPH_SERVER_DEPLOYMENT": "omnigraph-server",
             "OMNIGRAPH_UNLOCK_LEASE": "omnigraph-unlock",
+            # omnigraph 0.16 judges optimize/cleanup by policy and denies a
+            # command that names no actor.
+            "OMNIGRAPH_MAINTENANCE_ACTOR": "svc-witan-admin",
             "POD_NAME": None,
             "OMNIGRAPH_CLEANUP_OLDER_THAN": "30d",
             "OMNIGRAPH_CLEANUP_ISO_WEEKDAY": "1,3,7",
