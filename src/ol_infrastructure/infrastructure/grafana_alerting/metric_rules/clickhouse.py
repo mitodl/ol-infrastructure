@@ -492,7 +492,7 @@ def create(
                 "ClickHouseReplicaMissingTables",
                 _replica_missing_tables,
                 "5m",
-                "ClickHouse host {{ $labels.hostname }} in cluster {{ $labels.cluster }} has {{ $values.B.Value }} fewer non-system tables than the fullest replica. A replica recreated on an empty volume serves Opik queries that fail until its schema exists: remove its clickhouse.altinity.com/ready label and follow the runbook section 'Replica pod Pending on its data volume' in docs/clickhouse-llmops-runbook.md. The comparison is against the fullest replica, so a stray extra table on a peer looks the same: before recovering, compare SELECT database, name FROM system.tables WHERE database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema') across the replicas.",
+                "ClickHouse host {{ $labels.hostname }} in cluster {{ $labels.cluster }} has {{ $values.B.Value }} fewer non-system tables than the fullest replica. An extra table on a peer produces the same alert, so first compare SELECT database, name FROM system.tables WHERE database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema') across the replicas. If the alerted host is the one missing Opik tables, it is serving Opik queries that fail: remove its clickhouse.altinity.com/ready label and follow the runbook section 'Replica pod Pending on its data volume' in docs/clickhouse-llmops-runbook.md.",
                 rd,
             ),
         ],
