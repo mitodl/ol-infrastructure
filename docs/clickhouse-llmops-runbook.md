@@ -409,12 +409,15 @@ FROM Disk('backups', '<UTC timestamp>')
 SETTINGS allow_different_table_def = 1;
 ```
 
-`allow_different_table_def` is needed whenever the backup was taken on an older
+Set `allow_different_table_def` whenever the backup was taken on an older
 server version than the target. RESTORE compares the table it creates against
-the definition stored in the backup, and a newer server renders some DDL
+the definition stored in the backup, and a newer server can render some DDL
 differently: 25.8 writes `CODEC(Gorilla(8), ...)` where a 24.8 backup holds
 `CODEC(Gorilla, ...)`, so a restore without it fails with `CANNOT_RESTORE_TABLE`
-on `opik_db.experiment_aggregates`.
+on `opik_db.experiment_aggregates`. A 25.8 backup restored into 26.3 without
+it (2026-11-23), so not every hop needs it. It is harmless on a scratch
+restore, but it skips the definition check entirely, so it also hides a real
+schema mismatch.
 
 To recover individual rows into the live cluster, restore into the scratch
 cluster first, then copy across with `INSERT INTO opik_db.<table> SELECT ...
@@ -446,6 +449,8 @@ SELECT status, error, dateDiff('second', start_time, end_time) FROM system.backu
 ```
 
 On 2026-10-21 the 33.43 GiB production backup restored into 25.8.28 in 287 s.
+On 2026-11-23 the 53.92 GiB production backup `20261123T033007Z` (taken on
+25.8.33.10003) restored into 26.3.60.10002 in 480 s, all 40 tables.
 
 Compare `system.tables.total_rows` against replica 0. For the ReplacingMergeTree
 tables (`traces`, `spans`, `trace_threads`), compare counts with
@@ -500,7 +505,7 @@ upgrade goes to QA first.
      CHK reach `Completed`.
    - Keeper: `CLICKHOUSE_KEEPER_VERSION` in `bridge/lib/versions.py`, applied
      with the `applications/clickhouse` QA stack. It is a floating tag
-     (`26.8-alpine`) shared by every environment and bumped by Renovate, so a
+     (e.g. `26.9-alpine`) shared by every environment and bumped by Renovate, so a
      patch release reaches any Keeper pod that pulls the image without passing
      through QA. Pin it to a full version or digest before relying on the
      canary for Keeper.
