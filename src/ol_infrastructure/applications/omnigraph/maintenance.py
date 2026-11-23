@@ -596,6 +596,9 @@ def create_maintenance_window(  # noqa: PLR0913
         command gives up on a server that has not stopped within it plus
         ``SERVER_STOP_MARGIN_SECONDS``, so a server still draining writes is
         not taken for a stuck one.
+    :param cleanup_iso_weekdays: UTC days ``cleanup`` also runs on (1 is
+        Monday), rendered as the comma list the image parses. Empty means the
+        window only optimizes.
     :param maintenance_actor: the actor ``optimize`` and ``cleanup`` name with
         ``--as``. From omnigraph 0.16 a direct maintenance command on a graph
         with policy is judged by it (``maintain`` for optimize, ``reclaim`` for
@@ -604,9 +607,6 @@ def create_maintenance_window(  # noqa: PLR0913
     :param cleanup_keep: run ``cleanup --keep`` with this count instead of
         ``--older-than cleanup_older_than``. See the comment below
         ``DEFAULT_CLEANUP_OLDER_THAN``, including why it is one-way.
-    :param cleanup_iso_weekdays: UTC days ``cleanup`` also runs on (1 is
-        Monday), rendered as the comma list the image parses. Empty means the
-        window only optimizes.
     :param suspend: hold the window off while a storage-format migration is
         armed. The command also skips on the Deployment's migration-armed
         annotation, which covers a run that started before the suspend landed.
