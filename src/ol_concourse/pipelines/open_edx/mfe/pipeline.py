@@ -54,8 +54,8 @@ from bridge.settings.openedx.types import (
 )
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import (
-    GH_ISSUES_DEFAULT_REPOSITORY,
     GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
+    OPENEDX_GH_ISSUES_REPOSITORY,
 )
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
@@ -368,7 +368,7 @@ def mfe_job(
         name=Identifier(
             f"github-issues-{mfe_name}-{open_edx.environment_stage.lower()}-post"
         ),
-        repository=GH_ISSUES_DEFAULT_REPOSITORY,
+        repository=OPENEDX_GH_ISSUES_REPOSITORY[open_edx_deployment.deployment_name],
         issue_title_template=(
             f"[bot] MFE {mfe_name} deployed to {open_edx.environment_stage} "
             f"for {open_edx_deployment.deployment_name}"
@@ -464,7 +464,7 @@ def mfe_pipeline(
                     name=Identifier(
                         f"github-issues-{mfe_app_name}-{edx_var.environment_stage.lower()}-trigger"
                     ),
-                    repository=GH_ISSUES_DEFAULT_REPOSITORY,
+                    repository=OPENEDX_GH_ISSUES_REPOSITORY[deployment_name],
                     issue_title_template=issue_title,
                     issue_prefix=issue_title,
                     issue_state="closed",

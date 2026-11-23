@@ -47,9 +47,10 @@ from ol_concourse.lib.resource_types import github_issues_resource, rclone
 from ol_concourse.lib.resources import git_repo, github_issues
 
 from bridge.settings.github.team_members import DEVOPS_MIT
+from bridge.settings.openedx.types import OpenEdxDeploymentName
 from ol_concourse.pipelines.constants import (
-    GH_ISSUES_DEFAULT_REPOSITORY,
     GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
+    OPENEDX_GH_ISSUES_REPOSITORY,
 )
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
@@ -58,7 +59,7 @@ LEHRER_URI = "https://github.com/mitodl/lehrer"
 
 @dataclass
 class SiteProjectEnv:
-    deployment_name: str
+    deployment_name: OpenEdxDeploymentName
     environment: str  # e.g. "mitxonline-ci"
     environment_stage: str  # "CI", "QA", "Production"
     # lehrer frontend/ subdirectory to build from, when it differs from
@@ -73,7 +74,7 @@ class SiteProjectEnv:
 class SiteProjectConfig:
     """Configuration for one OEP-65 Site Project across its promotion chain."""
 
-    deployment_name: str
+    deployment_name: OpenEdxDeploymentName
     envs: list[SiteProjectEnv] = field(
         default_factory=list
     )  # ordered CI → QA → Production
@@ -139,13 +140,13 @@ def _lehrer_resource(deployment_name: str, config_source: str) -> Resource:
     )
 
 
-def _gh_issues_post(deployment_name: str, stage: str) -> Resource:
+def _gh_issues_post(deployment_name: OpenEdxDeploymentName, stage: str) -> Resource:
     stage_lower = stage.lower()
     title = f"[bot] Site Project {deployment_name} deployed to {stage}"
     return github_issues(
         auth_method="token",
         name=Identifier(f"gh-issues-site-{deployment_name}-{stage_lower}-post"),
-        repository=GH_ISSUES_DEFAULT_REPOSITORY,
+        repository=OPENEDX_GH_ISSUES_REPOSITORY[deployment_name],
         issue_title_template=title,
         issue_prefix=title,
         issue_state="open",
@@ -153,14 +154,14 @@ def _gh_issues_post(deployment_name: str, stage: str) -> Resource:
     )
 
 
-def _gh_issues_trigger(deployment_name: str, stage: str) -> Resource:
+def _gh_issues_trigger(deployment_name: OpenEdxDeploymentName, stage: str) -> Resource:
     """Closed-issue resource that gates promotion from ``stage`` to the next stage."""
     stage_lower = stage.lower()
     title = f"[bot] Site Project {deployment_name} deployed to {stage}"
     return github_issues(
         auth_method="token",
         name=Identifier(f"gh-issues-site-{deployment_name}-{stage_lower}-trigger"),
-        repository=GH_ISSUES_DEFAULT_REPOSITORY,
+        repository=OPENEDX_GH_ISSUES_REPOSITORY[deployment_name],
         issue_title_template=title,
         issue_prefix=title,
         issue_state="closed",
@@ -371,7 +372,7 @@ def site_pipeline(deployment_name: str) -> Pipeline:
 
     ci_fragment = site_build_job(ci_env)
 
-    ci_trigger = _gh_issues_trigger(deployment_name, ci_env.environment_stage)
+    ci_trigger = _gh_issues_trigger(project.deployment_name, ci_env.environment_stage)
     if ci_trigger.name is None:
         msg = f"ci_trigger resource has no name for {deployment_name}"
         raise RuntimeError(msg)
@@ -382,7 +383,7 @@ def site_pipeline(deployment_name: str) -> Pipeline:
         trigger_resource=ci_trigger.name,
     )
 
-    qa_trigger = _gh_issues_trigger(deployment_name, qa_env.environment_stage)
+    qa_trigger = _gh_issues_trigger(project.deployment_name, qa_env.environment_stage)
     if qa_trigger.name is None:
         msg = f"qa_trigger resource has no name for {deployment_name}"
         raise RuntimeError(msg)
