@@ -705,9 +705,15 @@ async def _nudge_release_gate(app_name: str, cfg) -> str:
     gate records the close, and the gate checks every five minutes on its
     own. Asking for a check now usually saves that wait, but a check that
     succeeds can still miss a close made a second earlier (mitxonline #4204 on
-    2026-10-29), so the reply never says a deploy started. Whether one did is
-    on the release issue (`ops:consumed`, or `ops:refused` if Production
-    refused it) and in the channel when the deploy lands.
+    2026-10-29), so the reply never says a deploy started.
+
+    The success reply's "within 5 minutes" is the normal case, not a
+    guarantee. Production shares a serial group with QA, so it waits behind a
+    running QA job, and Production refuses the release if an
+    ol-infrastructure merge reaches QA before a check records the close.
+    Whether a deploy started is on the release issue
+    (`ops:consumed`, or `ops:refused` if Production refused it) and in the
+    channel when the deploy lands.
     """
     url = _production_job_url(app_name, cfg)
     try:
@@ -723,8 +729,8 @@ async def _nudge_release_gate(app_name: str, cfg) -> str:
             f"sooner: {url}"
         )
     return (
-        "Concourse was asked to check the release gate; Production starts when "
-        f"a check records the close (within 5m): {url}"
+        "Promotion to production will start automatically within 5 minutes. "
+        f"Production job: {url}"
     )
 
 
