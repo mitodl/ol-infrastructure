@@ -998,6 +998,21 @@ def test_in_flight_release_is_none_without_a_release_branch(fake_repo):
     assert github._in_flight_release_sync("mitodl/thing") is None
 
 
+def test_release_branch_exists_asks_about_one_version(fake_repo):
+    """An older release can still be in flight behind the newest one."""
+    fake_repo(
+        _FakeRepo(
+            branches=[
+                _FakeBranch("main"),
+                _FakeBranch("releases/2026.8.3.1"),
+                _FakeBranch("releases/2026.8.4.1"),
+            ]
+        )
+    )
+    assert github._release_branch_exists_sync("mitodl/thing", "2026.8.3.1")
+    assert not github._release_branch_exists_sync("mitodl/thing", "2026.8.3.2")
+
+
 def test_in_flight_release_ignores_non_version_release_branches(fake_repo):
     fake_repo(
         _FakeRepo(

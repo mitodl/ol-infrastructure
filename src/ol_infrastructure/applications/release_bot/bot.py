@@ -1551,6 +1551,11 @@ async def _abandon_failure_text(  # noqa: PLR0913
     unlabelled, and closing it starts a Production deploy of a release that
     no longer exists, so that case names the issue and the fix. Without this,
     the only trace in Slack was "abandon triggered".
+
+    Everything is judged against *version*, the release the build was asked
+    to cancel, not whatever is newest in flight by the time the build ends:
+    a release cut in between is a different release, and `/doof abandon`
+    would cancel that one, so it is never suggested for it.
     """
     mention = f"<@{requester}> " if requester else ""
     lines = [
@@ -1563,39 +1568,62 @@ async def _abandon_failure_text(  # noqa: PLR0913
         "exists."
     )
     try:
+        target_in_flight = await github.release_branch_exists(cfg.repo, version)
         in_flight = await github.in_flight_release(cfg.repo)
     except Exception:
         log.exception("Failed to check in-flight release for %s", app_name)
         lines.append(
-            "Could not check what is in flight. To try again: "
-            f"`/doof abandon {app_name}`. If the release is gone and its "
+            f"Could not check whether {version} is still in flight. If it is, "
+            f"`/doof abandon {app_name}` tries again. If it is gone and its "
             f"release issue is still open, {retire}"
         )
         return "\n".join(lines)
-    if in_flight:
+    other = in_flight if in_flight and in_flight["version"] != version else None
+    if target_in_flight:
         lines.append(
-            f"Release {_describe_in_flight(in_flight)} is still in flight, so "
-            "nothing was abandoned. Its release issue, if it has one, is "
-            "untouched, and closing it would ship the release. To try again: "
-            f"`/doof abandon {app_name}`"
+            f"{version} is still in flight, so nothing was abandoned. Its "
+            "release issue, if it has one, is untouched, and closing it would "
+            "ship the release."
         )
+        if other:
+            # `/doof abandon` cancels the newest release in flight.
+            lines.append(
+                f"Release {_describe_in_flight(other)} is in flight too, so "
+                f"`/doof abandon {app_name}` would cancel that one, not "
+                f"{version}. Ask platform engineering to abandon {version}."
+            )
+        else:
+            lines.append(f"To try again: `/doof abandon {app_name}`")
         return "\n".join(lines)
+    if other:
+        lines.append(
+            f"Release {_describe_in_flight(other)} was cut since; it is a "
+            "different release and this build did not touch it."
+        )
     try:
         issue = await github.release_issue_for_version(cfg.repo, version)
     except Exception:
         log.exception("Failed to find the release issue for %s %s", app_name, version)
         lines.append(
-            f"Nothing is in flight now, but its release issue could not be "
-            f"checked. If it is still open, {retire}"
+            f"{version} is no longer in flight, but its release issue could "
+            f"not be checked. If it is still open, {retire}"
         )
         return "\n".join(lines)
     abandoned = bool(issue) and (
         github.release_state(issue.get("labels") or []) == "abandoned"
     )
-    if issue and not abandoned and issue.get("state") == "open":
+    is_open = bool(issue) and issue.get("state") == "open"
+    if issue and is_open and not abandoned:
         lines.append(
             f"{version} is no longer in flight, but its release issue "
             f"<{issue['url']}|#{issue['number']}> is still open: {retire}"
+        )
+    elif issue and is_open:
+        # Labelled, so Production skips it, but nobody will close it.
+        lines.append(
+            f"{version} was abandoned and its release issue "
+            f"<{issue['url']}|#{issue['number']}> is labelled "
+            f"`{github.ABANDONED_LABELS[0]}` but still open: close it."
         )
     elif abandoned:
         lines.append(
@@ -1604,7 +1632,7 @@ async def _abandon_failure_text(  # noqa: PLR0913
         )
     else:
         lines.append(
-            "Nothing is in flight now, so the release was finished or "
+            f"{version} is no longer in flight, so it was finished or "
             "abandoned another way. The build log says what happened."
         )
     return "\n".join(lines)

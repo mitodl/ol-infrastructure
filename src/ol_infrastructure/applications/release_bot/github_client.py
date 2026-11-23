@@ -362,6 +362,21 @@ def _in_flight_release_sync(repo_slug: str) -> dict[str, Any] | None:
     }
 
 
+def _release_branch_exists_sync(repo_slug: str, version: str) -> bool:
+    name = f"{_RELEASE_BRANCH_PREFIX}{version}"
+    repo = _get_client().get_repo(repo_slug)
+    return any(branch.name == name for branch in repo.get_branches())
+
+
+async def release_branch_exists(repo_slug: str, version: str) -> bool:
+    """Return whether ``releases/<version>`` exists, i.e. *version* is in flight.
+
+    Unlike :func:`in_flight_release`, which names only the newest release in
+    flight, this asks about one version.
+    """
+    return await asyncio.to_thread(_release_branch_exists_sync, repo_slug, version)
+
+
 def _branch_commit_date(branch: Any) -> datetime | None:
     """Return the branch tip's authored date, or None if unavailable.
 
