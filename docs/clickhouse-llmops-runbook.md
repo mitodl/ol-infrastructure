@@ -614,31 +614,93 @@ kubectl -n clickhouse delete pvc clickhouse-data-chi-clickhouse-default-0-<n>-0 
 kubectl -n clickhouse delete pod chi-clickhouse-default-0-<n>-0
 ```
 
-The pod comes back with an empty data volume. The operator does not create the
-schema on it, because it already counted that host as part of the CHI (on QA on
-2026-10-20 the recreated replica started with only the `default` database and
-an empty `system.replicas`). Compare the two counts from step 3 of the
-[Upgrade Canary](#upgrade-canary-qa) on both replicas. If the new one is short,
-copy each replicated table's DDL from replica 0. The engine arguments use the
-`{shard}`/`{replica}` macros, so the same statement registers the new replica in
-Keeper and it fetches the parts:
+The pod comes back with an empty data volume, and it starts taking Opik
+queries as soon as it is Ready. Operator 0.27.4 writes the
+`clickhouse.altinity.com/ready=yes` label, which the `clickhouse` Service
+selects on, into the StatefulSet's pod template, so a pod the StatefulSet
+recreates has it from the start. Every query routed there fails with
+`Database opik_db does not exist` (QA, 2026-11-23). Take it out of the Service
+as soon as the pod exists; queries routed to it between Ready and the label
+removal still fail:
 
 ```bash
-K="kubectl -n clickhouse exec"
+kubectl -n clickhouse label pod chi-clickhouse-default-0-<n>-0 clickhouse.altinity.com/ready-
+```
+
+The removal lasts only as long as that pod and until the operator's next
+reconcile of the CHI. If the pod is recreated again (eviction, node replacement)
+before the copy below finishes, it comes back with the label, so remove it
+again. Hold clickhouse stack applies until the copy is done, since a reconcile
+puts the label back; if one can't wait, scale `kube-system/clickhouse-operator`
+to 0 for the duration (the abort procedure in the comment above
+`keeper_tls_enabled` in `applications/clickhouse/__main__.py` does the same).
+
+The operator does not create the schema on that replica either. In 0.27.4,
+`shouldMigrateTables` (`pkg/controller/chi/worker-migrator.go`) skips a host the
+CHI status already lists as having its tables. Don't force a reconcile to fix
+it: on QA a new `spec.taskID` completed in 30 s, created no tables, and put the
+label back. Compare the two counts from step 3 of the
+[Upgrade Canary](#upgrade-canary-qa) on both replicas. If the new one is short,
+copy the DDL from a healthy replica. The engine arguments use the
+`{shard}`/`{replica}` macros, so the same statement registers the new replica in
+Keeper and it fetches the parts.
+
+Copy `opik_db` everywhere. Copy `default` (the Liquibase ledger) only where
+every replica holds it as `Replicated*`, which is QA. In Production only replica
+0 registers `default.DATABASECHANGELOG*`; replicas 1 and 2 hold plain
+`MergeTree` copies that Liquibase never reads, so leave `default` out there.
+The source is replica 0 unless replica 0 is the one being rebuilt; then use
+replica 1. In Production that leaves the ledger unrecoverable from a peer, since
+only replica 0 held it. Restoring it in place is untested (see
+[Restore](#restore) for why restoring into a live cluster is risky), so plan it
+before opik-backend restarts and reruns its migrations. The commands below are
+for bash; set `SRC`, `DST` and `DBS` per case:
+
+```bash
+k() { kubectl -n clickhouse exec "$@"; }
 SRC=chi-clickhouse-default-0-0-0; DST=chi-clickhouse-default-0-<n>-0
-$K "$DST" -- clickhouse-client -q "CREATE DATABASE IF NOT EXISTS opik_db ENGINE = Atomic"
-for t in $($K "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM system.tables
-    WHERE database IN ('opik_db', 'default') AND engine LIKE 'Replicated%'"); do
-  $K "$SRC" -- clickhouse-client -q "SHOW CREATE TABLE $t FORMAT TSVRaw" \
-    | sed 's/^CREATE TABLE/CREATE TABLE IF NOT EXISTS/' \
-    | $K -i "$DST" -- clickhouse-client --multiquery
+DBS="'opik_db', 'default'"   # Production: DBS="'opik_db'"
+```
+
+If the replica existed before (its volume was lost or replaced, rather than
+never created), Keeper still holds its old registration and `CREATE TABLE`
+fails with `REPLICA_ALREADY_EXISTS`. Drop it from the source replica first (a
+replica cannot drop its own registration), for each database in `DBS`:
+
+```bash
+for db in ${DBS//[\',]/}; do
+  k "$SRC" -- clickhouse-client -q \
+    "SYSTEM DROP REPLICA '${DST%-0}' FROM DATABASE $db"
 done
 ```
 
-Check first that `opik_db` holds only `Replicated*` tables (no views or
-dictionaries), since this loop copies nothing else. The replica is caught up
-when its `system.replicas` lists the same number of tables as replica 0 with
-`absolute_delay = 0` and `queue_size = 0`.
+Then copy the replicated tables, and the materialized views after them. Opik's
+one view (`span_weeks_mv`) writes to a table named with `TO`; a view with an
+inner `.inner_id.*` table would need its own handling, so the first query skips
+those:
+
+```bash
+k "$DST" -- clickhouse-client -q "CREATE DATABASE IF NOT EXISTS opik_db ENGINE = Atomic"
+for t in $(k "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM system.tables
+    WHERE database IN ($DBS) AND engine LIKE 'Replicated%' AND name NOT LIKE '.inner%'") \
+    $(k "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM system.tables
+    WHERE database = 'opik_db' AND engine = 'MaterializedView'"); do
+  k "$SRC" -- clickhouse-client -q "SHOW CREATE TABLE $t FORMAT TSVRaw" \
+    | sed -E 's/^CREATE (TABLE|MATERIALIZED VIEW)/CREATE \1 IF NOT EXISTS/' \
+    | k -i "$DST" -- clickhouse-client --multiquery
+done
+```
+
+Check first that `opik_db` holds nothing but `Replicated*` tables and
+materialized views (on 2026-11-23: 38 tables and one view), since this loop
+copies nothing else. The replica is caught up when its `system.replicas` lists
+the same number of tables as replica 0 (Production: the same `opik_db` count)
+with `absolute_delay = 0` and `queue_size = 0`, and `opik_db` has the same table
+count. Then put it back in the Service:
+
+```bash
+kubectl -n clickhouse label --overwrite pod chi-clickhouse-default-0-<n>-0 clickhouse.altinity.com/ready=yes
+```
 
 ### VSO not syncing users.xml
 
