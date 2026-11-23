@@ -11,12 +11,11 @@ import pulumi
 import pytest
 
 from ol_infrastructure.components.aws import database
-from ol_infrastructure.components.aws.database import (
-    OLAmazonDB,
-    OLPostgresDBConfig,
-    OLReplicaDBConfig,
+from ol_infrastructure.components.aws.database import OLAmazonDB, OLReplicaDBConfig
+from tests.ol_infrastructure.components.aws.rds_test_helpers import (
+    postgres_db,
+    stub_rds_lookups,
 )
-from ol_infrastructure.lib.aws import rds_helper
 from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 ONE_GIBIBYTE_BYTES = 2**30
@@ -31,12 +30,7 @@ except RuntimeError:
 @pytest.fixture
 def alarm_configs(monkeypatch) -> list[database.OLCloudWatchAlarmSimpleRDSConfig]:
     """Stub the live RDS lookups and capture every alarm config OLAmazonDB builds."""
-    for module in (database, rds_helper):
-        monkeypatch.setattr(module, "db_engines", lambda: {"postgres": ["16.15"]})
-    monkeypatch.setattr(database, "get_rds_instance", lambda _name: {})
-    monkeypatch.setattr(
-        database, "parameter_group_family", lambda _engine, _version: "postgres16"
-    )
+    stub_rds_lookups(monkeypatch)
     captured: list[database.OLCloudWatchAlarmSimpleRDSConfig] = []
 
     def capture(alarm_config: database.OLCloudWatchAlarmSimpleRDSConfig) -> None:
@@ -49,17 +43,7 @@ def alarm_configs(monkeypatch) -> list[database.OLCloudWatchAlarmSimpleRDSConfig
 
 def _db(name: str, **overrides) -> OLAmazonDB:
     overrides.setdefault("monitoring_profile_name", "production")
-    config = OLPostgresDBConfig(
-        instance_name=name,
-        password="not-a-real-password",  # pragma: allowlist secret
-        subnet_group_name="test-subnets",
-        security_groups=[],
-        tags={"OU": "operations", "Environment": "test"},
-        db_name="testdb",
-        engine_major_version="16",
-        **overrides,
-    )
-    return OLAmazonDB(config)
+    return postgres_db(name, **overrides)
 
 
 def _free_storage_alarms(alarm_configs, identifier: str):
