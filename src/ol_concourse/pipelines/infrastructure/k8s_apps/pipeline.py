@@ -2488,6 +2488,11 @@ def _build_release_resource_app_pipeline(
 
 _PROMOTE_TAG_SCRIPT = (Path(__file__).parent / "scripts" / "promote_tag.py").read_text()
 PROMOTE_TAG_TASK_NAME = "promote-tag"
+# How long the RC job's deployment `start` waits for the release tag's checks.
+# A tag-only RC job starts as soon as the cut pushes the tag, so it waits out
+# the tag's whole CI run; ocw-hugo-themes' test-e2e alone takes 25-40 minutes,
+# past the resource's 1800s default (2026.11.23.1 timed out at 30 minutes).
+TAG_RC_CHECKS_TIMEOUT = 3600
 CHECK_PROMOTE_TAG_TASK_NAME = "check-promote-tag"
 
 
@@ -2688,7 +2693,11 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
             # to the finish put; see _build_release_resource_app_pipeline.
             PutStep(
                 put=deployment_rc.name,
-                params={"action": "start", "ref": "((.:version))"},
+                params={
+                    "action": "start",
+                    "ref": "((.:version))",
+                    "checks_timeout": TAG_RC_CHECKS_TIMEOUT,
+                },
             ),
             # What Production runs has to be current; see _cache_bust_task and
             # the release_current get in _build_release_resource_app_pipeline.
