@@ -12,7 +12,6 @@ from typing import Any
 
 import pytest
 
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
 from ol_concourse.pipelines.open_edx.edx_platform_v3.e2e import (
     E2E_SUITE_REF,
     E2E_TARGETS,
@@ -21,6 +20,7 @@ from ol_concourse.pipelines.open_edx.edx_platform_v3.e2e import (
 from ol_concourse.pipelines.open_edx.edx_platform_v3.pipeline import (
     build_edx_pipeline,
 )
+from tests.ol_concourse._build_manifest import RELEASES, TOPOLOGY, write_manifest
 from tests.ol_concourse._plan import walk
 
 # Every e2e job: each target's post-deploy job and its nightly one.
@@ -33,8 +33,9 @@ E2E_JOB_NAMES = [param.values[1] for param in E2E_JOBS]
 
 
 @pytest.fixture(scope="module")
-def pipeline() -> dict[str, Any]:
-    rendered = build_edx_pipeline([release.name for release in OpenEdxSupportedRelease])
+def pipeline(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    manifest = write_manifest(tmp_path_factory.mktemp("lehrer"), TOPOLOGY)
+    rendered = build_edx_pipeline(RELEASES, manifest)
     return json.loads(rendered.model_dump_json(by_alias=True, exclude_none=True))
 
 
