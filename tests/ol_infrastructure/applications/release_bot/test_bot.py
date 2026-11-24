@@ -5035,6 +5035,27 @@ async def test_a_failed_abandon_of_a_release_gone_another_way_says_so(
     assert "/doof release" not in text
 
 
+async def test_a_failed_abandon_that_cannot_check_in_flight_never_suggests_a_retry(
+    repos, monkeypatch
+):
+    """`/doof abandon` cancels the newest release, which may not be the target."""
+    _build_statuses(monkeypatch, "failed")
+    monkeypatch.setattr(
+        bot.github,
+        "release_branch_exists",
+        AsyncMock(side_effect=RuntimeError("api down")),
+    )
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    post = await _watch(repos, abandon_version="2026.8.3.1")
+    text = post.call_args.kwargs["text"]
+
+    assert "abandon build of 2026.8.3.1 failed" in text
+    assert "`/doof release-status my-app`" in text
+    assert "`/doof abandon my-app`" not in text
+    assert "label it `ops:abandoned` and close it" in text
+
+
 async def test_a_failed_abandon_whose_issue_cannot_be_read_says_to_check_it(
     repos, monkeypatch
 ):

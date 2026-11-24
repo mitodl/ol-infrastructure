@@ -1013,6 +1013,12 @@ def test_release_branch_exists_asks_about_one_version(fake_repo):
     assert not github._release_branch_exists_sync("mitodl/thing", "2026.8.3.2")
 
 
+def test_release_branch_exists_ignores_non_version_branches(fake_repo):
+    """Same filter as in_flight_release: `releases/foo` is not a release."""
+    fake_repo(_FakeRepo(branches=[_FakeBranch("releases/foo")]))
+    assert not github._release_branch_exists_sync("mitodl/thing", "foo")
+
+
 def test_in_flight_release_ignores_non_version_release_branches(fake_repo):
     fake_repo(
         _FakeRepo(

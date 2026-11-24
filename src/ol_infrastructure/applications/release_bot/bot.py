@@ -1556,6 +1556,12 @@ async def _abandon_failure_text(  # noqa: PLR0913
     to cancel, not whatever is newest in flight by the time the build ends:
     a release cut in between is a different release, and `/doof abandon`
     would cancel that one, so it is never suggested for it.
+
+    *version* is what `/doof abandon` saw before triggering, and the job
+    re-reads what is in flight when it runs. A release cut in the seconds
+    between is the one the build cancels, and this text then names the wrong
+    release. Binding the build to *version* closes that gap; until then this
+    is the same race the job already has.
     """
     mention = f"<@{requester}> " if requester else ""
     lines = [
@@ -1572,10 +1578,13 @@ async def _abandon_failure_text(  # noqa: PLR0913
         in_flight = await github.in_flight_release(cfg.repo)
     except Exception:
         log.exception("Failed to check in-flight release for %s", app_name)
+        # `/doof abandon` cancels the newest release in flight, and with the
+        # lookup down nothing says that is still *version*, so no retry here.
         lines.append(
-            f"Could not check whether {version} is still in flight. If it is, "
-            f"`/doof abandon {app_name}` tries again. If it is gone and its "
-            f"release issue is still open, {retire}"
+            f"Could not verify that {version} is the newest release in "
+            f"flight. Check `/doof release-status {app_name}`, and do not "
+            f"retry unless {version} is the newest. If {version} is gone and "
+            f"its release issue is still open, {retire}"
         )
         return "\n".join(lines)
     other = in_flight if in_flight and in_flight["version"] != version else None

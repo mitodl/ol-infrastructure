@@ -363,6 +363,9 @@ def _in_flight_release_sync(repo_slug: str) -> dict[str, Any] | None:
 
 
 def _release_branch_exists_sync(repo_slug: str, version: str) -> bool:
+    # Same filter as _in_flight_release_sync: only a version names a release.
+    if not _RELEASE_TAG_RE.match(version):
+        return False
     name = f"{_RELEASE_BRANCH_PREFIX}{version}"
     repo = _get_client().get_repo(repo_slug)
     return any(branch.name == name for branch in repo.get_branches())
