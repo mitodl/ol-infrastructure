@@ -10,6 +10,23 @@ from typing import ClassVar
 # every data cluster; the operator watches only this namespace.
 CLICKHOUSE_NAMESPACE = "clickhouse"
 
+
+def not_spot_node_match_expression() -> dict[str, str | list[str]]:
+    """Return a node affinity match expression that keeps a pod off Spot capacity.
+
+    NotIn also matches nodes without the label, so it admits the on-demand core
+    node groups and steers Karpenter to on-demand when it provisions for the pod.
+
+    :returns: A ``nodeSelectorTerms[].matchExpressions`` entry.
+    :rtype: dict[str, str | list[str]]
+    """
+    return {
+        "key": "karpenter.sh/capacity-type",
+        "operator": "NotIn",
+        "values": ["spot"],
+    }
+
+
 FASTLY_CNAME_TLS_1_2 = "d.sni.global.fastly.net"
 FASTLY_CNAME_TLS_1_3 = "j.sni.global.fastly.net"
 FASTLY_A_TLS_1_2 = [

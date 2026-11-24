@@ -28,7 +28,10 @@ import pulumi_tls as tls
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
-from bridge.lib.constants import CLICKHOUSE_NAMESPACE
+from bridge.lib.constants import (
+    CLICKHOUSE_NAMESPACE,
+    not_spot_node_match_expression,
+)
 from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
 from bridge.lib.versions import (
     CLICKHOUSE_KEEPER_VERSION,
@@ -270,6 +273,29 @@ IO_OPTIMIZED_TOLERATION = kubernetes.core.v1.TolerationArgs(
     value="true",
     effect="NoSchedule",
 )
+
+
+def _stateful_node_affinity(*, use_io_optimized: bool) -> dict[str, Any]:
+    """Keep ClickHouse and Keeper pods off Spot, and on io-optimized nodes if used.
+
+    A Spot interruption evicts the pod with two minutes' notice and the PDB
+    allows it, since only one replica goes. Production replica 0 was recreated
+    that way on 2026-11-23 23:46Z and 2026-11-24 16:25Z (Karpenter and
+    aws-node-termination-handler evictions in the EKS audit log, then an EC2
+    BidEvictedEvent for each node), dropping Opik's Liquibase target each time.
+    """
+    match_expressions: list[dict[str, Any]] = [not_spot_node_match_expression()]
+    if use_io_optimized:
+        match_expressions.append(
+            {"key": "ol.mit.edu/io_optimized", "operator": "In", "values": ["true"]}
+        )
+    return {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [{"matchExpressions": match_expressions}]
+        }
+    }
+
+
 IO_OPTIMIZED_NODE_AFFINITY = kubernetes.core.v1.AffinityArgs(
     node_affinity=kubernetes.core.v1.NodeAffinityArgs(
         required_during_scheduling_ignored_during_execution=kubernetes.core.v1.NodeSelectorArgs(
@@ -460,22 +486,9 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                 }
             ]
         }
-    if use_io_optimized:
-        affinity["nodeAffinity"] = {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                    {
-                        "matchExpressions": [
-                            {
-                                "key": "ol.mit.edu/io_optimized",
-                                "operator": "In",
-                                "values": ["true"],
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
+    affinity["nodeAffinity"] = _stateful_node_affinity(
+        use_io_optimized=use_io_optimized
+    )
 
     return ebs_storageclass_output.apply(
         lambda sc: kubernetes.apiextensions.CustomResource(
@@ -548,7 +561,7 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                             "spec": {
                                 "securityContext": {"fsGroup": 101},
                                 **io_scheduling,
-                                **({"affinity": affinity} if affinity else {}),
+                                "affinity": affinity,
                                 **(
                                     {
                                         "topologySpreadConstraints": _zone_spread(
@@ -666,63 +679,20 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         else []
     )
     ch_node_selector = IO_OPTIMIZED_NODE_SELECTOR if use_io_optimized else {}
-    ch_affinity = (
-        {
-            "podAntiAffinity": {
-                "requiredDuringSchedulingIgnoredDuringExecution": [
-                    {
-                        "labelSelector": {
-                            "matchLabels": {"clickhouse.altinity.com/chi": "clickhouse"}
-                        },
-                        "topologyKey": "kubernetes.io/hostname",
-                    }
-                ]
-            },
-            **(
+    ch_affinity: dict[str, Any] = {
+        "nodeAffinity": _stateful_node_affinity(use_io_optimized=use_io_optimized)
+    }
+    if ch_replicas > 1:
+        ch_affinity["podAntiAffinity"] = {
+            "requiredDuringSchedulingIgnoredDuringExecution": [
                 {
-                    "nodeAffinity": {
-                        "requiredDuringSchedulingIgnoredDuringExecution": {
-                            "nodeSelectorTerms": [
-                                {
-                                    "matchExpressions": [
-                                        {
-                                            "key": "ol.mit.edu/io_optimized",
-                                            "operator": "In",
-                                            "values": ["true"],
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
+                    "labelSelector": {
+                        "matchLabels": {"clickhouse.altinity.com/chi": "clickhouse"}
+                    },
+                    "topologyKey": "kubernetes.io/hostname",
                 }
-                if use_io_optimized
-                else {}
-            ),
+            ]
         }
-        if ch_replicas > 1
-        else (
-            {
-                "nodeAffinity": {
-                    "requiredDuringSchedulingIgnoredDuringExecution": {
-                        "nodeSelectorTerms": [
-                            {
-                                "matchExpressions": [
-                                    {
-                                        "key": "ol.mit.edu/io_optimized",
-                                        "operator": "In",
-                                        "values": ["true"],
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                }
-            }
-            if use_io_optimized
-            else {}
-        )
-    )
 
     # hot_storage_size is a Kubernetes quantity in Gi, e.g. "1500Gi"; anything
     # else fails the int() conversion.
