@@ -1424,9 +1424,8 @@ if oidc_enabled:
     #   username    - the starrocks_username claim value (local part of the Keycloak
     #                 preferred_username, without @domain); whitespace is stripped,
     #                 empty strings are rejected
-    #   keycloak_role - one of the governance role names in _GOVERNANCE_ROLES
-    #                   (ol_platform_admin / ol_data_engineer / ol_data_analyst /
-    #                    ol_researcher / ol_instructor / ol_business_analyst)
+    #   keycloak_role - one of the governance role names in _GOVERNANCE_ROLES,
+    #                   which comes from GOVERNANCE_ROLES in data_lake_access
     # The keycloak_role value matches the StarRocks role name exactly (1:1 mapping).
     # One Pulumi resource is created per user so that removing an entry from config
     # during `pulumi up` triggers the DROP USER for that specific account.

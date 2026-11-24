@@ -6,9 +6,12 @@ intersect: a user needs both, and when they differ the narrower one wins with
 nothing to say which layer refused. See
 docs/plans/gravitino-authorization-spec.md, decisions A2-A5.
 
-The table is derived from the ``+grants`` blocks of ``src/ol_dbt/dbt_project.yml``
-in ol-data-platform. Consumers render their own syntax from it; nothing here
-knows about Gravitino privileges or StarRocks SQL.
+The layer table is derived from the ``+grants`` blocks of
+``src/ol_dbt/dbt_project.yml`` in ol-data-platform. The single-table grants have
+no dbt counterpart; Superset's copy of them is each role's ``allowed_datasets``
+in applications/superset/ol_governance_roles.json, which a test holds equal to
+``GOVERNANCE_TABLE_ACCESS``. Consumers render their own syntax from it; nothing
+here knows about Gravitino privileges or StarRocks SQL.
 """
 
 import re
