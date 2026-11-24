@@ -20,7 +20,10 @@ from packaging.version import Version
 from pulumi import Output
 from pydantic import BaseModel, ConfigDict
 
-from bridge.lib.constants import mit_learn_session_cookie_name
+from bridge.lib.constants import (
+    mit_learn_session_cookie_name,
+    not_spot_node_match_expression,
+)
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT
 from ol_infrastructure.components.services.apisix import (
     OIDC_RECOVERY_SHARED_DICT,
@@ -468,21 +471,11 @@ def _high_availability_values(ha: ApisixHighAvailability) -> dict[str, Any]:
     # gateway pod is already disrupted. The node termination handler logged
     # rejected evictions for 37 gateway pods in Production over the 14 days
     # to 2026-11-16. A pod that is never evicted dies with its node and
-    # resets the client connections it holds. NotIn matches nodes
-    # without the label too, so this admits the on-demand core node groups
-    # and steers Karpenter to on-demand capacity when it provisions.
+    # resets the client connections it holds.
     placement["affinity"]["nodeAffinity"] = {
         "requiredDuringSchedulingIgnoredDuringExecution": {
             "nodeSelectorTerms": [
-                {
-                    "matchExpressions": [
-                        {
-                            "key": "karpenter.sh/capacity-type",
-                            "operator": "NotIn",
-                            "values": ["spot"],
-                        }
-                    ]
-                }
+                {"matchExpressions": [not_spot_node_match_expression()]}
             ]
         }
     }
