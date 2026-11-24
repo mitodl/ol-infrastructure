@@ -365,6 +365,14 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
 # inline policy granting full read/write on the dedicated shared-data bucket so
 # FE and CN pods can write tablet data, metadata snapshots, and compaction
 # output without relying on the broader data-lake policy.
+#
+# Versioning is what makes the cluster snapshot restorable to more than one point
+# in time. StarRocks keeps a single automated cluster snapshot and purges the
+# previous one as soon as the next is taken (substructure/starrocks), so a mistake
+# that is snapshotted over is unrecoverable from the cluster's own view. The
+# purged meta image and the tablet files only it referenced survive here as
+# noncurrent versions for this window. See docs/starrocks-restore-runbook.md.
+SHARED_DATA_NONCURRENT_VERSION_DAYS = 14
 aws_region = starrocks_config.get("aws_region") or "us-east-1"
 shared_data_bucket: OLBucket | None = None
 shared_data_bucket_name: str | None = None
@@ -380,6 +388,8 @@ if starrocks_config.get_bool("use_cn"):
             server_side_encryption_enabled=True,
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
+            versioning_enabled=True,
+            noncurrent_version_expiration_days=SHARED_DATA_NONCURRENT_VERSION_DAYS,
         ),
         opts=ResourceOptions(parent=starrocks_auth_binding),
     )
