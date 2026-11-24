@@ -996,6 +996,12 @@ for _resource_group in resource_groups:
 # snapshots are on and ALTER/OFF fail while they are off. So create and update try
 # ALTER first and fall back to ON, whose error is the informative one if both fail.
 # Every lakehouse stack runs shared-data (starrocks:use_cn), which ON requires.
+#
+# There is deliberately no delete. OFF deletes the snapshot from S3
+# (ClusterSnapshotMgr.clearFinishedAutomatedClusterSnapshot), so a rename, a
+# replace or a stack destroy would throw away the restore point, and OFF also
+# fails when snapshots are already off. Turning snapshots off is a manual
+# `ADMIN SET AUTOMATED CLUSTER SNAPSHOT OFF`.
 CLUSTER_SNAPSHOT_INTERVAL_HOURS = 1
 _cluster_snapshot_on_sql = (
     "ADMIN SET AUTOMATED CLUSTER SNAPSHOT ON"
@@ -1015,17 +1021,12 @@ cluster_snapshot_cmd = command.local.Command(
     f"starrocks-{stack_info.env_suffix}-automated-cluster-snapshot",
     create=_exec_alter_or_on_sql,
     update=_exec_alter_or_on_sql,
-    delete=_exec_delete_sql,
     environment={
         **_mysql_env,
         "STARROCKS_SQL": _cluster_snapshot_on_sql,
         "STARROCKS_ALTER_SQL": _cluster_snapshot_alter_sql,
-        "STARROCKS_DELETE_SQL": "ADMIN SET AUTOMATED CLUSTER SNAPSHOT OFF;",
     },
-    opts=ResourceOptions(
-        delete_before_replace=True,
-        depends_on=[starrocks_db_connection],
-    ),
+    opts=ResourceOptions(depends_on=[starrocks_db_connection]),
 )
 
 # --- OIDC / OAuth2 authentication via Keycloak ------------------------------
