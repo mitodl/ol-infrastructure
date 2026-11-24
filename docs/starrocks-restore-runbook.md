@@ -47,40 +47,80 @@ FROM information_schema.cluster_snapshot_jobs
 ORDER BY created_time DESC LIMIT 5;
 ```
 
-The FE also exports `cluster_snapshot_consecutive_failures` and
-`cluster_snapshot_last_finished_time` (epoch ms). A failure count above zero
-means the FE cannot write to the bucket, so check the IRSA role's shared-data
-bucket policy first.
+The FE also exports `starrocks_fe_cluster_snapshot_consecutive_failures` and
+`starrocks_fe_cluster_snapshot_last_finished_time` (epoch ms, 0 until the first
+snapshot finishes). `StarRocksClusterSnapshotFailing` in
+`grafana_alerting/metric_rules/starrocks.py` warns when the failure count is
+above zero, which usually means the FE cannot write to the bucket, so check the
+IRSA role's shared-data bucket policy first.
+
+## Stopping the cluster
+
+Both paths start from a cluster with nothing running. Pausing Dagster is not
+enough: a running FE keeps taking snapshots, vacuuming and compacting the same
+service-id prefix, and the operator recreates any pod or StatefulSet you delete.
+All commands are in namespace `starrocks`, on the environment's data cluster.
+
+1. Pause the `lakehouse` dbt schedules and sensors in Dagster.
+2. Stop the operator, so nothing reconciles while you work:
+   `kubectl -n starrocks scale deploy/starrocks-operator-operator --replicas=0`.
+3. Scale both StatefulSets to zero and wait for every pod to go:
+   `kubectl -n starrocks scale sts/lakehouse-starrocks-fe sts/lakehouse-starrocks-cn --replicas=0`,
+   then `kubectl -n starrocks get pods` until no FE or CN pod is left. The CN
+   HPA scales the `StarRocksCluster` resource, not the StatefulSet, so with the
+   operator stopped it cannot bring the CNs back.
+
+The cluster comes back when you scale the operator to 1 again. It re-renders both
+StatefulSets from the `StarRocksCluster` resource.
+
+## Setting root's password on an empty FE
+
+The FE and CN containers log in as root with `MYSQL_PWD`, from Secret
+`lakehouse-starrocks-root-password`. That covers follower joins and CN
+registration in the entrypoints, and the substructure stack reads the same
+password. A FE that starts with empty metadata has a root with no password, and
+the chart's `initPassword` job ran only at install. So as soon as FE 0 is up on
+empty metadata, before any follower or CN starts, set it:
+
+```bash
+kubectl -n starrocks exec lakehouse-starrocks-fe-0 -c fe -- \
+  sh -c 'pw="$MYSQL_PWD"; env -u MYSQL_PWD mysql -h127.0.0.1 -P9030 -uroot \
+    -e "SET PASSWORD FOR root = PASSWORD(\"$pw\")"'
+```
+
+A snapshot restore brings back root's password as of the snapshot. Run the same
+command if the Secret has changed since.
 
 ## Path 1: rebuild
 
 Use this when the FE metadata is gone or untrustworthy and nothing hand-made in
 `default_catalog` needs to survive. Nothing in Iceberg is touched.
 
-1. Stop writers: pause the `lakehouse` dbt schedules and sensors in Dagster.
-2. Give the FE empty metadata. Set `starrocks:fe_config.replicas` to 1 in the
-   applications stack config and `pulumi up`, then delete pod
-   `lakehouse-starrocks-fe-0` together with its PVCs
-   `lakehouse-fe-storage-meta-lakehouse-starrocks-fe-0` and
-   `lakehouse-fe-storage-log-lakehouse-starrocks-fe-0` in namespace `starrocks`.
-   The StatefulSet recreates the pod on new volumes and the FE starts with no
-   meta. Delete the other FE PVCs left behind by the scale-down: a follower that
-   finds its old meta skips the entrypoint's `--helper` join and comes back with
-   the old cluster's state (`fe_entrypoint.sh`, `start_fe_with_meta`). CI runs a
-   single FE, so there is nothing to scale down there.
-   Do not `pulumi destroy` the applications stack: it owns the shared-data bucket.
-3. A new FE writes under a new service id in the same bucket, as QA's bucket
+1. [Stop the cluster](#stopping-the-cluster).
+2. Delete every FE PVC (`lakehouse-fe-storage-meta-*` and
+   `lakehouse-fe-storage-log-*`) and wait until `kubectl get pvc` no longer lists
+   them. A follower that keeps its old meta skips the entrypoint's `--helper`
+   join and comes back with the old cluster's state (`fe_entrypoint.sh`,
+   `start_fe_with_meta`). Do not `pulumi destroy` the applications stack: it
+   owns the shared-data bucket.
+3. Set `starrocks:fe_config.replicas` to 1 in the applications stack config,
+   `pulumi up` on `applications/starrocks`, then start the operator again
+   (`--replicas=1`). FE 0 starts on new, empty volumes.
+4. [Set root's password](#setting-roots-password-on-an-empty-fe).
+5. Delete the CN pods. A CN registers with the FE only when its container
+   starts (`cn_entrypoint.sh`), and the ones that started before step 4 could
+   not log in. `SHOW COMPUTE NODES` should list them all as alive.
+6. A new FE writes under a new service id in the same bucket, as QA's bucket
    already shows (two prefixes). Leave the old prefix until the rebuild is
    verified, then delete it.
-4. Recreate the CN pods. A CN registers itself with the FE only when its
-   container starts (`cn_entrypoint.sh`), so the new FE has no compute nodes
-   until they restart. `SHOW COMPUTE NODES` should list them all as alive.
-5. Set the FE replicas back to the stack's configured count and `pulumi up` on
-   `applications/starrocks`. Then `pulumi up` on `substructure/starrocks`. Its
-   Command resources are already "created" in state and their triggers (where
-   they have any) hash SQL that has not changed, so they will not run against
-   the empty FE on their own. Remove them from state first, so the next `up`
-   creates them: `pulumi state delete --target-dependents <urn>` on each
+7. Set the FE replicas back to the stack's configured count (CI runs one) and
+   `pulumi up` on `applications/starrocks`. The followers start on empty volumes
+   and join through `--helper`.
+8. `pulumi up` on `substructure/starrocks`. Its Command resources are already
+   "created" in state and their triggers (where they have any) hash SQL that has
+   not changed, so they will not run against the empty FE on their own. Remove
+   them from state first, so the next `up` creates them:
+   `pulumi state delete --target-dependents <urn>` on each
    `command:local:Command` that is still in state, starting with
    `starrocks-<env>-roles-setup`, which the grant and resource-group Commands
    depend on. Check `pulumi stack --show-urns` afterwards for any left over.
@@ -90,44 +130,47 @@ Use this when the FE metadata is gone or untrustworthy and nothing hand-made in
    running in the cluster. If the next `up` fails on them with AlreadyExists,
    delete those objects in namespace `starrocks` and run `up` again; it
    recreates them.
-6. Revoke and reissue the VaultDynamicSecrets in the consumers' namespaces
+9. Revoke and reissue the VaultDynamicSecrets in the consumers' namespaces
    (Superset, ol-analytics-api, OpenMetadata, mit-learn) so they get users that
    exist in the new FE.
-7. Materialize the `b2b_analytics` and `b2b_learner_records` assets in the
-   `lakehouse` code location, then the `starrocks_mv_refresh` asset.
-8. Unpause the schedules. Confirm Superset's StarRocks database connects and the
-   B2B dashboards in MIT Learn load.
+10. Materialize the `b2b_analytics` and `b2b_learner_records` assets in the
+    `lakehouse` code location, then the `starrocks_mv_refresh` asset.
+11. Unpause the schedules. Confirm Superset's StarRocks database connects and
+    the B2B dashboards in MIT Learn load.
 
 ## Path 2: restore from the cluster snapshot
 
 Use this when hand-made native objects or the exact FE state must come back. It
 restores the cluster as of the last snapshot, at most one hour old.
 
-1. Find the service id: `SELECT storage_path FROM
-   information_schema.cluster_snapshots` on a running FE, or the newest
-   `<service_id>/meta/image/automated_cluster_snapshot_<ms>/` in
-   `s3://ol-starrocks-lakehouse-<env>/` when the FE is gone and more than one
-   prefix exists.
-2. If the snapshot you need was already purged (the mistake was snapshotted
+1. Find the service id while an FE is still up:
+   `SELECT storage_path FROM information_schema.cluster_snapshots`. If none is
+   up, take the prefix in `s3://ol-starrocks-lakehouse-<env>/` holding the
+   newest `<service_id>/meta/image/automated_cluster_snapshot_<ms>/`.
+2. [Stop the cluster](#stopping-the-cluster). Nothing may touch the bucket
+   between here and step 6.
+3. If the snapshot you need was already purged (the mistake was snapshotted
    over), list `aws s3api list-object-versions --prefix <service_id>/` and
    restore as current versions the older image directory and every tablet file
    deleted after that image's timestamp. The FE picks the newest image directory
    that has a `snapshot_meta.json`, so remove newer image directories too.
-3. Stop writers as in Path 1, set the FE replicas to 1, and delete the meta and
-   log PVCs of every FE except `lakehouse-starrocks-fe-0`. The restored FE 0
-   resets its BDB election group, and the surviving members of the old group
-   could otherwise elect their own leader from the old metadata and vacuum the
-   same service-id prefix. FE 0's own meta PVC can stay: the restore deletes its
-   local image and BDB directories before it downloads the snapshot.
-4. Write `cluster_snapshot.yaml`. Without its `cluster_snapshot` section the FE
+4. Delete the meta and log PVCs of every FE except `lakehouse-starrocks-fe-0`
+   and wait until they are gone. FE 0's can stay: the restore deletes its local
+   image and BDB directories before it downloads the snapshot.
+5. Write `cluster_snapshot.yaml`. Without its `cluster_snapshot` section the FE
    restores from its own local image, which is no use when the meta PVC is lost.
    A path ending in `/meta` makes the FE take the newest complete snapshot under
-   it. The volume name has to match the snapshot's.
+   it. The volume name has to match the snapshot's. `frontends: []` drops the
+   snapshot's follower records (`RestoreClusterSnapshotMgr.updateFrontends`
+   leaves them when the key is absent), so FE 0 comes up as a group of one.
+   `compute_nodes` is left out: the CN pods keep their host names, so the
+   snapshot's CN records still match them.
 
    ```yaml
    cluster_snapshot:
      cluster_snapshot_path: s3://ol-starrocks-lakehouse-<env>/<service_id>/meta
      storage_volume_name: builtin_storage_volume
+   frontends: []
    storage_volumes:
      - name: builtin_storage_volume
        type: S3
@@ -139,7 +182,7 @@ restores the cluster as of the last snapshot, at most one hour old.
            value: "true"
    ```
 
-5. Start FE 0 in restore mode. The FE reads
+6. Start FE 0 in restore mode. The FE reads
    `/opt/starrocks/fe/conf/cluster_snapshot.yaml` and restores when started with
    `--cluster_snapshot` or with `RESTORE_CLUSTER_SNAPSHOT=true` in its
    environment. `fe_entrypoint.sh` passes neither and links into `conf/` only the
@@ -147,18 +190,29 @@ restores the cluster as of the last snapshot, at most one hour old.
    ConfigMap added to `starrocksFESpec.configMaps` and extend the FE entrypoint
    script (the Gravitino block in `applications/starrocks` shows the shape) to
    copy it into `/opt/starrocks/fe/conf/` and export
-   `RESTORE_CLUSTER_SNAPSHOT=true` before it execs `fe_entrypoint.sh`. The FE
-   deletes its local image and BDB directories itself before downloading.
-6. When FE 0 is up and `SHOW FRONTENDS` lists only it, remove the script change
-   and the ConfigMap. Left in place, every restart restores again.
-7. Recreate the CN pods so their local caches start empty, then set the FE
+   `RESTORE_CLUSTER_SNAPSHOT=true` before it execs `fe_entrypoint.sh`. Set
+   `starrocks:fe_config.replicas` to 1 with it, `pulumi up` on
+   `applications/starrocks`, then start the operator again.
+7. When FE 0 is up and `SHOW FRONTENDS` lists only it, remove the script change
+   and the ConfigMap and `pulumi up` again. Left in place, every restart restores
+   again. Set root's password if the Secret changed after the snapshot.
+8. Bring authorization back to now before anyone queries. The restored FE has
+   the users, grants, catalogs and settings of the snapshot, and Pulumi state
+   was not rewound with it, so a plain `pulumi up` changes nothing. Run Path 1
+   step 8 (Command state reset, then `pulumi up` on `substructure/starrocks`).
+   Then drop every restored Vault user (`SHOW USERS`, names from the
+   `database-starrocks` roles' username template) with no live lease under
+   `vault list sys/leases/lookup/database-starrocks/creds/<role>`, and do Path 1
+   step 9. Consumers can reach FE 0 from step 6 on, and queries run once the CNs
+   register, so do this step straight away. Writers stay paused until step 10.
+9. Delete the CN pods so their local caches start empty, then set the FE
    replicas back to the stack's configured count. The new followers start with
-   empty PVCs (step 3), so they join through the entrypoint's `--helper` path.
-8. Check `SHOW DATABASES`, the b2b MVs' row counts and `SHOW RESOURCE GROUPS`,
-   then `pulumi up` on `substructure/starrocks` to bring the FE back to what the
-   code says. Restoring into a different bucket or cluster needs every file under
-   the old storage path copied first, plus the `frontends` and `compute_nodes`
-   sections of StarRocks' `conf/cluster_snapshot.yaml` template.
+   empty PVCs (step 4), so they join through the entrypoint's `--helper` path.
+10. Check `SHOW DATABASES`, the b2b MVs' row counts and `SHOW RESOURCE GROUPS`,
+    then unpause the schedules. Restoring into a different bucket or cluster
+    needs every file under the old storage path copied first, plus a
+    `compute_nodes` section from StarRocks' `conf/cluster_snapshot.yaml`
+    template.
 
 ## Limitations
 

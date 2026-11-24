@@ -1233,6 +1233,7 @@ STARROCKS_FE_KEEP_METRICS = [
     "starrocks_fe_(tablet_num|total_data_size_bytes)",
     "starrocks_fe_thrift_server_rejected_connections_total",
     "starrocks_fe_mv_global_refresh_(failed_jobs_total|jobs_total)",
+    "starrocks_fe_cluster_snapshot_(consecutive_failures|last_finished_time)",
 ]
 STARROCKS_CN_KEEP_METRICS = [
     "starrocks_be_(process|query|load|compaction|metadata)_mem_bytes",
