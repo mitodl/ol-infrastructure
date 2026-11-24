@@ -84,6 +84,12 @@ Use this when the FE metadata is gone or untrustworthy and nothing hand-made in
    `command:local:Command` that is still in state, starting with
    `starrocks-<env>-roles-setup`, which the grant and resource-group Commands
    depend on. Check `pulumi stack --show-urns` afterwards for any left over.
+   `--target-dependents` also drops non-Command resources downstream of them
+   from state: the keycloak group sync's `OLVaultK8SSecret` and CronJob
+   (`group_sync_job.py`), which depend on the group-provider Command. They keep
+   running in the cluster. If the next `up` fails on them with AlreadyExists,
+   delete those objects in namespace `starrocks` and run `up` again; it
+   recreates them.
 6. Revoke and reissue the VaultDynamicSecrets in the consumers' namespaces
    (Superset, ol-analytics-api, OpenMetadata, mit-learn) so they get users that
    exist in the new FE.
