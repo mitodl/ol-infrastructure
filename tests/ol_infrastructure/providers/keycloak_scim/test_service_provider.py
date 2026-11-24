@@ -12,6 +12,7 @@ from ol_infrastructure.providers.keycloak_scim.service_provider import (
     ScimServiceProviderConfigProvider,
     ScimServiceProviderSpec,
 )
+from tests.ol_infrastructure.providers.keycloak_scim.fakes import FakeResponse
 
 KEYCLOAK_URL = "https://sso.example.test"
 CONFIGS = (
@@ -38,17 +39,6 @@ def _default_config(realm: str) -> dict[str, Any]:
         },
         "meta": {"resourceType": "ServiceProviderBackendConfig"},
     }
-
-
-class FakeResponse:
-    def __init__(self, payload: Any, status_code: int = 200) -> None:
-        self.payload = payload
-        self.status_code = status_code
-        self.ok = status_code < 400
-        self.text = str(payload)
-
-    def json(self) -> Any:
-        return self.payload
 
 
 class FakeBackend:
