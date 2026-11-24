@@ -7,6 +7,8 @@ the abandon refused to cancel.
 """
 
 import json
+import subprocess
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -16,15 +18,19 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
 )
 
 APP = "ol-analytics-api"
+# A k8s app and a tag-only app: the two pipelines share the abandon job.
+APPS = [APP, "ocw-hugo-themes"]
 
 
 def _pipeline(app_name: str) -> dict[str, Any]:
     return json.loads(build_app_pipeline(app_name).model_dump_json())
 
 
-def _abandon_plan() -> list[dict[str, Any]]:
+def _abandon_plan(app_name: str = APP) -> list[dict[str, Any]]:
     (job,) = [
-        j for j in _pipeline(APP)["jobs"] if j["name"] == f"abandon-{APP}-release"
+        j
+        for j in _pipeline(app_name)["jobs"]
+        if j["name"] == f"abandon-{app_name}-release"
     ]
     return job["plan"]
 
@@ -77,6 +83,64 @@ def test_label_matches_the_one_the_gate_skips():
     assert set(put["params"]["close_with_labels"]) <= set(
         gate["source"]["skip_if_labeled"]
     )
+
+
+@pytest.mark.parametrize("app_name", APPS)
+def test_abandon_cancels_the_release_in_flight_not_the_newest_version(app_name):
+    """The newest version can be the next release; in_flight names the real one.
+
+    Live on ol-analytics-api 2026-11-23: the build's own check made the next
+    version newest, the put abandoned that, deleted nothing and succeeded.
+    """
+    plan = _abandon_plan(app_name)
+    abandon = plan[_index(plan, "put", f"{app_name}-release")]
+    load = plan[_index(plan, "load_var", "abandoned_version")]
+
+    assert abandon["params"]["version_file"] == f"{app_name}-release/in_flight"
+    assert load["file"] == f"{app_name}-release/in_flight"
+
+
+@pytest.mark.parametrize("app_name", APPS)
+def test_nothing_in_flight_fails_before_anything_is_changed(app_name):
+    plan = _abandon_plan(app_name)
+    guard = _index(plan, "task", "assert-release-in-flight")
+
+    assert guard < _index(plan, "load_var", "abandoned_version")
+    assert guard < _index(plan, "put", f"{app_name}-release")
+    assert guard < _index(plan, "put", f"{app_name}-release-issue")
+
+
+def _run_guard(tmp_path: Path, in_flight: str) -> subprocess.CompletedProcess[str]:
+    plan = _abandon_plan()
+    config = plan[_index(plan, "task", "assert-release-in-flight")]["config"]
+    in_flight_file = tmp_path / config["params"]["IN_FLIGHT_FILE"]
+    in_flight_file.parent.mkdir(parents=True)
+    in_flight_file.write_text(in_flight)
+    return subprocess.run(  # noqa: S603
+        [config["run"]["path"], *config["run"]["args"]],
+        cwd=tmp_path,
+        env={
+            "IN_FLIGHT_FILE": config["params"]["IN_FLIGHT_FILE"],
+            "PATH": "/bin:/usr/bin",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_guard_fails_when_nothing_is_in_flight(tmp_path):
+    result = _run_guard(tmp_path, "")
+
+    assert result.returncode != 0
+    assert "nothing to abandon" in result.stderr
+
+
+def test_guard_passes_a_release_in_flight(tmp_path):
+    result = _run_guard(tmp_path, "2026.11.23.2")
+
+    assert result.returncode == 0
+    assert "Abandoning 2026.11.23.2" in result.stdout
 
 
 def test_load_var_runs_before_the_abandon_deletes_anything():

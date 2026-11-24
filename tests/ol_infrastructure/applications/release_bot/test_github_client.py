@@ -998,6 +998,27 @@ def test_in_flight_release_is_none_without_a_release_branch(fake_repo):
     assert github._in_flight_release_sync("mitodl/thing") is None
 
 
+def test_release_branch_exists_asks_about_one_version(fake_repo):
+    """An older release can still be in flight behind the newest one."""
+    fake_repo(
+        _FakeRepo(
+            branches=[
+                _FakeBranch("main"),
+                _FakeBranch("releases/2026.8.3.1"),
+                _FakeBranch("releases/2026.8.4.1"),
+            ]
+        )
+    )
+    assert github._release_branch_exists_sync("mitodl/thing", "2026.8.3.1")
+    assert not github._release_branch_exists_sync("mitodl/thing", "2026.8.3.2")
+
+
+def test_release_branch_exists_ignores_non_version_branches(fake_repo):
+    """Same filter as in_flight_release: `releases/foo` is not a release."""
+    fake_repo(_FakeRepo(branches=[_FakeBranch("releases/foo")]))
+    assert not github._release_branch_exists_sync("mitodl/thing", "foo")
+
+
 def test_in_flight_release_ignores_non_version_release_branches(fake_repo):
     fake_repo(
         _FakeRepo(
@@ -1201,6 +1222,7 @@ def test_release_issue_for_version_finds_a_closed_issue(fake_repo):
     fake_repo(_FakeRepo(issues=[closed]))
     issue = github._release_issue_for_version_sync("mitodl/thing", "2026.9.2.1")
     assert issue["number"] == 9
+    assert issue["state"] == "closed"
 
 
 def test_release_issue_for_version_is_none_when_no_issue_matches(fake_repo):

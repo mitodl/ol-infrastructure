@@ -857,7 +857,7 @@ async def _cmd_publish(repos, ack, respond, command, _context):
     )
 
 
-async def _cmd_abandon(repos, ack, respond, command, _context):
+async def _cmd_abandon(repos, ack, respond, command, context):
     await ack()
     app_name = command["text"].strip()
     cfg, error = _resolve_app(repos, app_name, "abandon")
@@ -865,10 +865,10 @@ async def _cmd_abandon(repos, ack, respond, command, _context):
         await _refuse(respond, error)
         return
     async with _app_lock(app_name):
-        await _abandon(respond, app_name, cfg)
+        await _abandon(respond, app_name, cfg, (context or {}).get("user_id"))
 
 
-async def _abandon(respond, app_name, cfg):
+async def _abandon(respond, app_name, cfg, requester: str | None = None):
     # Read before mutating: a lookup that failed after the cancel would report
     # "nothing abandoned" with the requests already deleted.
     try:
@@ -891,10 +891,8 @@ async def _abandon(respond, app_name, cfg):
         return
     lines = [f"Cancelled the pending hotfix of `{sha[:7]}`." for sha in cancelled]
     if not in_flight:
-        # The abandon job deletes the branch and tag of whatever version the
-        # release resource last reported. With nothing in flight and no new
-        # commits, that is the release production is running, and its tag is
-        # the only record of what it runs.
+        # The abandon job would only fail: it refuses an empty in_flight.
+        # Answering here says so without a red build in the channel.
         lines.append(f"No release is in flight for `{app_name}`; nothing to abandon.")
         await respond("\n".join(lines))
         return
@@ -912,11 +910,17 @@ async def _abandon(respond, app_name, cfg):
         await respond("\n".join(lines))
         return
     _release_requesters.pop(app_name, None)
-    # The job deletes whatever version the release resource's last `check`
-    # recorded, which can diverge from `in_flight` (read fresh from GitHub
-    # branches here) if a `check` ran without a cut in between. Report the
-    # trigger, not a specific deletion, and let the build's own output say
-    # what it removed.
+    # The job abandons the release its own check finds in flight, read from
+    # the same release branches as `in_flight` here but later, so report the
+    # trigger rather than a deletion. A build that does not succeed left the
+    # release in flight, which the watch reports in the channel.
+    _start_release_build_watch(
+        app_name,
+        cfg,
+        build_url,
+        requester=requester,
+        abandon_version=in_flight["version"],
+    )
     lines.insert(
         0,
         f"🗑️ Release abandon triggered for `{app_name}` (last seen in flight: "
@@ -1450,15 +1454,20 @@ _BUILD_STATUS_PHRASES = {
 }
 
 
-def _start_release_build_watch(
+def _start_release_build_watch(  # noqa: PLR0913
     app_name,
     cfg,
     build_url,
     *,
     requester: str | None,
     hotfix_shas: list[str] | None = None,
+    abandon_version: str | None = None,
 ) -> None:
-    """Report in the app's channel if the build at *build_url* does not succeed."""
+    """Report in the app's channel if the build at *build_url* does not succeed.
+
+    *abandon_version* marks the build as the abandon job's rather than a
+    release cut, and names the release it was asked to cancel.
+    """
     channel = _announce_channel(cfg)
     if _slack_app is None or not channel:
         log.warning(
@@ -1476,6 +1485,7 @@ def _start_release_build_watch(
             channel,
             requester=requester,
             hotfix_shas=hotfix_shas,
+            abandon_version=abandon_version,
         )
     )
 
@@ -1489,6 +1499,7 @@ async def _watch_release_build(  # noqa: PLR0913
     *,
     requester: str | None,
     hotfix_shas: list[str] | None = None,
+    abandon_version: str | None = None,
 ) -> None:
     """Poll a release build and post the way forward if it does not succeed.
 
@@ -1510,9 +1521,14 @@ async def _watch_release_build(  # noqa: PLR0913
             continue
         if status == "succeeded":
             return
-        text = await _build_failure_text(
-            app_name, cfg, build_url, status, requester, hotfix_shas
-        )
+        if abandon_version:
+            text = await _abandon_failure_text(
+                app_name, cfg, build_url, status, requester, abandon_version
+            )
+        else:
+            text = await _build_failure_text(
+                app_name, cfg, build_url, status, requester, hotfix_shas
+            )
         try:
             await app.client.chat_postMessage(
                 channel=await slack_channels.resolve(app.client, channel), text=text
@@ -1526,6 +1542,115 @@ async def _watch_release_build(  # noqa: PLR0913
             continue
         return
     log.warning("Stopped watching %s for %s: still not finished", build_url, app_name)
+
+
+async def _abandon_failure_text(  # noqa: PLR0913
+    app_name, cfg, build_url, status: str, requester: str | None, version: str
+) -> str:
+    """Say an abandon build did not succeed, and what is left to clean up.
+
+    The job refuses rather than guesses (nothing in flight, a version that
+    was never cut, a tag that could not be deleted), and a refused abandon
+    leaves the release in flight. It can also fail *after* deleting the
+    release, when retiring the issue fails or the build is aborted between
+    the two puts. The release is then gone but its issue is open and
+    unlabelled, and closing it starts a Production deploy of a release that
+    no longer exists, so that case names the issue and the fix. Without this,
+    the only trace in Slack was "abandon triggered".
+
+    Everything is judged against *version*, the release the build was asked
+    to cancel, not whatever is newest in flight by the time the build ends:
+    a release cut in between is a different release, and `/doof abandon`
+    would cancel that one, so it is never suggested for it.
+
+    *version* is what `/doof abandon` saw before triggering, and the job
+    re-reads what is in flight when it runs. A release cut in the seconds
+    between is the one the build cancels, and this text then names the wrong
+    release. Binding the build to *version* closes that gap; until then this
+    is the same race the job already has.
+    """
+    mention = f"<@{requester}> " if requester else ""
+    lines = [
+        f"❌ {mention}`{app_name}` abandon build of {version} "
+        f"{_BUILD_STATUS_PHRASES[status]}: {build_url}"
+    ]
+    retire = (
+        f"label it `{github.ABANDONED_LABELS[0]}` and close it. Closed without "
+        "that label, it starts a Production deploy of a release that no longer "
+        "exists."
+    )
+    try:
+        target_in_flight = await github.release_branch_exists(cfg.repo, version)
+        in_flight = await github.in_flight_release(cfg.repo)
+    except Exception:
+        log.exception("Failed to check in-flight release for %s", app_name)
+        # `/doof abandon` cancels the newest release in flight, and with the
+        # lookup down nothing says that is still *version*, so no retry here.
+        lines.append(
+            f"Could not verify that {version} is the newest release in "
+            f"flight. Check `/doof release-status {app_name}`, and do not "
+            f"retry unless {version} is the newest. If {version} is gone and "
+            f"its release issue is still open, {retire}"
+        )
+        return "\n".join(lines)
+    other = in_flight if in_flight and in_flight["version"] != version else None
+    if target_in_flight:
+        lines.append(
+            f"{version} is still in flight, so nothing was abandoned. Its "
+            "release issue, if it has one, is untouched, and closing it would "
+            "ship the release."
+        )
+        if other:
+            # `/doof abandon` cancels the newest release in flight.
+            lines.append(
+                f"Release {_describe_in_flight(other)} is in flight too, so "
+                f"`/doof abandon {app_name}` would cancel that one, not "
+                f"{version}. Ask platform engineering to abandon {version}."
+            )
+        else:
+            lines.append(f"To try again: `/doof abandon {app_name}`")
+        return "\n".join(lines)
+    if other:
+        lines.append(
+            f"Release {_describe_in_flight(other)} was cut since; it is a "
+            "different release and this build did not touch it."
+        )
+    try:
+        issue = await github.release_issue_for_version(cfg.repo, version)
+    except Exception:
+        log.exception("Failed to find the release issue for %s %s", app_name, version)
+        lines.append(
+            f"{version} is no longer in flight, but its release issue could "
+            f"not be checked. If it is still open, {retire}"
+        )
+        return "\n".join(lines)
+    abandoned = bool(issue) and (
+        github.release_state(issue.get("labels") or []) == "abandoned"
+    )
+    is_open = bool(issue) and issue.get("state") == "open"
+    if issue and is_open and not abandoned:
+        lines.append(
+            f"{version} is no longer in flight, but its release issue "
+            f"<{issue['url']}|#{issue['number']}> is still open: {retire}"
+        )
+    elif issue and is_open:
+        # Labelled, so Production skips it, but nobody will close it.
+        lines.append(
+            f"{version} was abandoned and its release issue "
+            f"<{issue['url']}|#{issue['number']}> is labelled "
+            f"`{github.ABANDONED_LABELS[0]}` but still open: close it."
+        )
+    elif abandoned:
+        lines.append(
+            f"{version} was abandoned and its release issue retired, so there "
+            "is nothing left to do."
+        )
+    else:
+        lines.append(
+            f"{version} is no longer in flight, so it was finished or "
+            "abandoned another way. The build log says what happened."
+        )
+    return "\n".join(lines)
 
 
 async def _build_failure_text(  # noqa: PLR0913
@@ -2190,6 +2315,14 @@ async def _milestone_text(app_name, cfg, environment, deployment, client) -> str
     link = f" <{issue['url']}|Release issue>" if issue else ""
     if environment == github.PRODUCTION_ENVIRONMENT:
         return f"🎉 `{app_name}` {version} is live in production.{link}"
+    if issue and github.release_state(issue.get("labels") or []) == "abandoned":
+        # The deploy finished after the release was abandoned (the QA job and
+        # the abandon job race), so RC runs it, but nobody should verify it.
+        return (
+            f"🚢 `{app_name}` {version} is deployed to RC, but the release was "
+            f"abandoned.{link} Nothing to verify; RC runs it until the next "
+            "release."
+        )
     text = (
         f"🚢 `{app_name}` {version} is deployed to RC.{link}"
         " Check off your items once you have verified them."
