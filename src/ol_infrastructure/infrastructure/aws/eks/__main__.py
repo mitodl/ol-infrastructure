@@ -765,11 +765,6 @@ for ng_name, ng_config in configured_node_groups.items():
     )
 
 export("node_group_security_group_ids", node_group_security_group_ids)
-# Nothing in this repo reads the single-SG output any more. It stays until every
-# Karpenter and StarRocks stack has deployed a revision that reads
-# node_group_security_group_ids, so a queued build or rollback of an older
-# revision can still resolve it; remove it after that.
-export("node_group_security_group_id", node_group_security_group_ids["worker-xlarge"])
 
 
 # Every cluster gets an 'operations' namespace.
