@@ -68,14 +68,19 @@ class FakeBackend:
         self.calls.append(("POST", url, json))
         assert url == CONFIGS
         realm = json["realm"]["name"]
-        self.configs[realm] = {**json, "id": f"{realm}-config"}
+        self.configs[realm] = self._stored(realm, json, f"{realm}-config")
         return FakeResponse(self.configs[realm], 201)
+
+    def _stored(self, realm: str, body: dict[str, Any], id_: str) -> dict[str, Any]:
+        # Like the plugin, which lists the realm's clients and roles with
+        # every config whatever was written.
+        return {**body, "id": id_, REALM_INFOS: self.configs[realm][REALM_INFOS]}
 
     def put(self, url: str, json: dict[str, Any], timeout: int = 0) -> FakeResponse:  # noqa: ARG002
         self.calls.append(("PUT", url, json))
         realm = json["realm"]["name"]
         assert url == f"{CONFIGS}/{self.configs[realm]['id']}"
-        self.configs[realm] = {**json, "id": self.configs[realm]["id"]}
+        self.configs[realm] = self._stored(realm, json, self.configs[realm]["id"])
         return FakeResponse(self.configs[realm])
 
     def delete(self, url: str, timeout: int = 0) -> FakeResponse:  # noqa: ARG002
@@ -103,7 +108,12 @@ def _props(
         "client_id": "scim-config-manager",
         "client_secret": "s",  # pragma: allowlist secret
         "spec": spec.to_scim(),
-        "authorized_clients": authorized_clients,
+        # Pulumi drops None inputs, so an undeclared list arrives as no key.
+        **(
+            {}
+            if authorized_clients is None
+            else {"authorized_clients": authorized_clients}
+        ),
     }
 
 
@@ -144,7 +154,20 @@ def test_undeclared_authorized_clients_are_left_alone(backend):
     provider.create(_props())
 
     assert backend.configs["olapps"]["authorizedClients"] == live
-    assert provider.read("olapps-config", _props()).outs["authorized_clients"] is None
+    assert "authorized_clients" not in provider.read("olapps-config", _props()).outs
+
+
+def test_an_entry_for_a_recreated_client_reads_as_drift(backend):
+    declared = _props(authorized_clients=["ol-mitxonline-client"])
+    provider = ScimServiceProviderConfigProvider()
+    provider.create(declared)
+    # The client was deleted and recreated: same clientId, new internal id.
+    backend.configs["olapps"][REALM_INFOS]["availableClients"][1]["id"] = "new-uuid"
+
+    outs = provider.read("olapps-config", declared).outs
+
+    assert outs["authorized_clients"] == []
+    assert provider.diff("olapps-config", outs, declared).changes
 
 
 @pytest.mark.usefixtures("backend")
@@ -194,7 +217,9 @@ def test_create_updates_a_saved_config_by_put(backend):
     result = ScimServiceProviderConfigProvider().create(_props())
 
     assert result.id == "olapps-config"
+    [put] = [call for call in backend.calls if call[0] == "PUT"]
     assert [call[0] for call in backend.calls] == ["GET", "PUT"]
+    assert not set(READ_ONLY_ATTRIBUTES) & set(put[2])
     assert backend.configs["olapps"]["active"] is True
     assert backend.configs["olapps"]["limitClientAccess"] is True
 

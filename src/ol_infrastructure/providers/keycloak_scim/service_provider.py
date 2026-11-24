@@ -56,7 +56,7 @@ READ_ONLY_ATTRIBUTES = ("meta", REALM_INFOS_SCHEMA)
 class ScimServiceProviderSpec(BaseModel):
     """Declared attributes of a realm's inbound SCIM server.
 
-    Attributes left as ``None`` are not managed and keep their live value.
+    Only these attributes are managed; every other one keeps its live value.
     """
 
     model_config = ConfigDict(
@@ -148,8 +148,18 @@ class ScimServiceProviderConfigProvider(dynamic.ResourceProvider):
             return dynamic.ReadResult(id_="", outs={})
         outs = {**props, "spec": _project(live, props["spec"])}
         if props.get("authorized_clients") is not None:
+            # An entry whose client was deleted and recreated keeps the old
+            # internal id; dropping it here makes that show as drift.
+            current = {
+                client["clientId"]: client["id"]
+                for client in live.get(REALM_INFOS_SCHEMA, {}).get(
+                    "availableClients", []
+                )
+            }
             outs["authorized_clients"] = [
-                client["clientId"] for client in live.get("authorizedClients", [])
+                client["clientId"]
+                for client in live.get("authorizedClients", [])
+                if current.get(client["clientId"]) == client["id"]
             ]
         return dynamic.ReadResult(id_=live["id"], outs=outs)
 
