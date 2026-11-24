@@ -43,8 +43,9 @@ config:
   # password env var on 2026-11-23 (see INTERSERVER_CREDENTIALS_XML).
   clickhouse:interserver_credentials_enabled: "true"
   # Set to "true" only after Keeper is verified serving TLS on 9281 in this
-  # environment; flipping it restarts every replica (see keeper_tls_enabled
-  # in __main__.py).
+  # environment. With the operator's zookeeper/* restart rule at "no" the
+  # servers reload the new Keeper port without a restart; check that rule in
+  # the live operator config first (see keeper_tls_enabled in __main__.py).
   clickhouse:keeper_tls_enabled: "false"
   # Every chi-* pod had /etc/clickhouse-server/tls mounted when checked on
   # 2026-11-24 (see tls_listeners_enabled in __main__.py). Apply opik only
