@@ -53,6 +53,16 @@ SUPERSET_WEBSERVER_PROTOCOL = os.environ.get("SUPERSET_WEBSERVER_PROTOCOL", "htt
 SUPERSET_WEBSERVER_ADDRESS = os.environ.get("SUPERSET_WEBSERVER_ADDRESS", "0.0.0.0")  # noqa: S104
 SUPERSET_WEBSERVER_PORT = os.environ.get("SUPERSET_WEBSERVER_PORT", "8088")
 ENABLE_PROXY_FIX = os.environ.get("ENABLE_PROXY_FIX", "True").lower() == "true"
+# Celery workers fetch a report's CSV from the web app over HTTP. Superset
+# 6.1.0 defaults this to http://0.0.0.0:8080/, where nothing listens in the
+# worker pod, so every report failed with "Connection refused". The web
+# Service's URL comes from __main__.py, which names the Service.
+# Screenshots (PNG/PDF reports, and CSV reports on a chart with no saved
+# query_context) also need a browser, which the image does not ship.
+WEBDRIVER_BASEURL = os.environ["SUPERSET_INTERNAL_URL"]
+# Links in report emails and Slack messages, which would otherwise point at
+# the in-cluster Service.
+WEBDRIVER_BASEURL_USER_FRIENDLY = os.environ["SUPERSET_PUBLIC_URL"]
 # -------------------------------
 # White Labeling Configurations #
 # --------------------------------

@@ -83,6 +83,11 @@ superset_vault_kv_path = vault_mount_stack.require_output("superset_kv")["path"]
 aws_config = AWSBase(tags={"OU": "data", "Environment": superset_env})
 
 SUPERSET_TAG = os.environ.get("SUPERSET_IMAGE_TAG", "latest")
+# The release's fullnameOverride, which names the web Service and prefixes
+# the chart's other resources (superset-worker, superset-mcp), and the web
+# Service's port. Report workers and the gateway route use both.
+SUPERSET_SERVICE_NAME = "superset"
+SUPERSET_SERVICE_PORT = 8088
 
 # Kubernetes provider setup
 # mypy/pylance: Output[str] is acceptable at runtime
@@ -647,7 +652,7 @@ superset_chart = kubernetes.helm.v3.Release(
             repo="https://apache.github.io/superset",
         ),
         values={
-            "fullnameOverride": "superset",
+            "fullnameOverride": SUPERSET_SERVICE_NAME,
             "image": {
                 # Use our custom image that bundles config and deps
                 "repository": ecr_image_uri("mitodl/superset"),
@@ -658,10 +663,17 @@ superset_chart = kubernetes.helm.v3.Release(
             "redis": {"enabled": False},
             # Do not let the chart create its own env secret; use Vault-synced ones
             "secretEnv": {"create": False},
+            "service": {"port": SUPERSET_SERVICE_PORT},
             "extraEnv": {
                 "REDIS_PROTO": "rediss",
                 # Public URL for MCP-generated links (chart previews, etc.)
                 "SUPERSET_MCP_PUBLIC_URL": f"https://{superset_domain}",
+                # Report workers fetch from SUPERSET_INTERNAL_URL and link to
+                # SUPERSET_PUBLIC_URL in emails (superset_config.py).
+                "SUPERSET_INTERNAL_URL": (
+                    f"http://{SUPERSET_SERVICE_NAME}:{SUPERSET_SERVICE_PORT}/"
+                ),
+                "SUPERSET_PUBLIC_URL": f"https://{superset_domain}/",
             },
             "configOverrides": {
                 "config": Path(__file__)
@@ -851,7 +863,7 @@ celery_keda_scaling = kubernetes.apiextensions.CustomResource(
         lambda cache: {
             "scaleTargetRef": {
                 "kind": "Deployment",
-                "name": "superset-worker",
+                "name": f"{SUPERSET_SERVICE_NAME}-worker",
             },
             "pollingInterval": 3,
             "cooldownPeriod": 10,
@@ -900,7 +912,7 @@ gateway_config = OLEKSGatewayConfig(
         # list order does not affect matching.  Gateway API selects the most
         # specific matching route by prefix length, so /mcp always wins over /.
         OLEKSGatewayRouteConfig(
-            backend_service_name="superset-mcp",
+            backend_service_name=f"{SUPERSET_SERVICE_NAME}-mcp",
             backend_service_namespace=superset_namespace,
             backend_service_port=5008,
             name="superset-mcp-https",
@@ -910,9 +922,9 @@ gateway_config = OLEKSGatewayConfig(
             matches=[{"path": {"type": "PathPrefix", "value": "/mcp"}}],
         ),
         OLEKSGatewayRouteConfig(
-            backend_service_name="superset",
+            backend_service_name=SUPERSET_SERVICE_NAME,
             backend_service_namespace=superset_namespace,
-            backend_service_port=8088,
+            backend_service_port=SUPERSET_SERVICE_PORT,
             name="superset-https-root",
             listener_name="https-web",
             hostnames=[superset_domain],
@@ -938,7 +950,7 @@ make_vpa(
     name="superset-worker-vpa",
     namespace=superset_namespace,
     target_kind="Deployment",
-    target_name="superset-worker",
+    target_name=f"{SUPERSET_SERVICE_NAME}-worker",
     controlled_resources=["cpu", "memory"],
     container_name="superset",
     min_allowed={"cpu": "25m", "memory": "128Mi"},
@@ -949,7 +961,7 @@ make_vpa(
 export(
     "superset",
     {
-        "deployment": "superset",
+        "deployment": SUPERSET_SERVICE_NAME,
         "redis": superset_redis_cache.address,
         # The provider output, not the raw redis_auth_token string. pulumi_aws
         # wraps ReplicationGroup.auth_token in Output.secret(), so this is masked
