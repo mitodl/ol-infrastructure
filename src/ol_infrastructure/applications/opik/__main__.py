@@ -9,8 +9,10 @@ user ``opik``).
 Backing services:
 - ClickHouse  — EXTERNAL. The bundled ClickHouse, the Altinity operator, and
   ZooKeeper that the chart would otherwise deploy are disabled; the chart's
-  backend talks to ``clickhouse.clickhouse.svc.cluster.local`` over HTTPS
-  instead, trusting the CA the ClickHouse stack exports.
+  backend talks to ``clickhouse.clickhouse.svc.cluster.local`` instead, over
+  HTTPS once that stack's TLS listeners are on (unless
+  opik:clickhouse_force_http is set), trusting the CA the ClickHouse stack
+  exports.
 - MySQL (state DB), Redis, and MinIO (object storage) — kept as the chart's
   bundled, namespace-local instances. These are internal-only (ClusterIP) and
   use the chart's default credentials, which is acceptable for the CI stack.
@@ -127,7 +129,15 @@ CLICKHOUSE_HTTPS_PORT = 8443
 # The clickhouse stack serves 8443 only once its clickhouse:tls_listeners_enabled
 # rollout step is done; until then 8443 refuses connections and Opik stays on
 # plaintext 8123.
-clickhouse_tls = require_stack_output_value(clickhouse_stack, "tls_listeners_enabled")
+#
+# opik:clickhouse_force_http keeps Opik on 8123 while the listeners are on, which
+# stays open. It is the first step of a TLS rollback: set it and apply this stack
+# before turning tls_listeners_enabled off, or Opik keeps pointing at 8443 from
+# the clickhouse apply until this stack's next apply. It can only move Opik off
+# TLS, never onto a listener that isn't there.
+clickhouse_tls = require_stack_output_value(
+    clickhouse_stack, "tls_listeners_enabled"
+) and not opik_config.get_bool("clickhouse_force_http")
 clickhouse_port = CLICKHOUSE_HTTPS_PORT if clickhouse_tls else CLICKHOUSE_HTTP_PORT
 CLICKHOUSE_DATABASE = "opik_db"
 CLICKHOUSE_USER = "opik"
