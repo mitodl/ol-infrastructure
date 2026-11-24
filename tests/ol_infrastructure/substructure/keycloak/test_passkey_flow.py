@@ -62,6 +62,9 @@ def test_passkey_registration_action_is_enabled(resources):
     action = resources[f"{PREFIX}-webauthn-register-passwordless"].inputs
     assert action["alias"] == "webauthn-register-passwordless"
     assert action["enabled"] is True
+    assert action["defaultAction"] is True
+    # Without an explicit name, Pulumi's auto-name becomes the display name.
+    assert action["name"] == "Webauthn Register Passwordless"
 
 
 def test_every_top_level_step_is_alternative(resources):

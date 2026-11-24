@@ -23,6 +23,9 @@ def create_passkey_browser_flow(
     present the organization authenticator shows its own username form ahead of the
     passkey form.
 
+    It also declares the realm's ``webauthn-register-passwordless`` required action,
+    since the passkey step cannot enroll a user who has no passkey.
+
     :param realm_id: The realm the flow belongs to.
     :param name_prefix: Prefix for the resource names and flow aliases, e.g.
         ``ol-browser-data-platform``. The realm's flow binding points at the alias, so
