@@ -403,38 +403,6 @@ def setup_grafana(
     # Cost and energy telemetry. A gap in it is a reporting problem.
     cost_exporter_labels = _labels(Component.exporter, AlertTier.ticket)
 
-    alloy_extra_env_vars = [
-        {
-            "name": "GCLOUD_RW_API_KEY",
-            "valueFrom": {
-                "secretKeyRef": {
-                    "name": "alloy-metrics-remote-cfg-grafana-k8s-monitoring",
-                    "key": "password",
-                }
-            },
-        },
-        {
-            "name": "CLUSTER_NAME",
-            "value": cluster_name,
-        },
-        {
-            "name": "NAMESPACE",
-            "valueFrom": {
-                "fieldRef": {"fieldPath": "metadata.namespace"},
-            },
-        },
-        {
-            "name": "POD_NAME",
-            "valueFrom": {
-                "fieldRef": {"fieldPath": "metadata.name"},
-            },
-        },
-        {
-            "name": "GCLOUD_FM_COLLECTOR_ID",
-            "value": "grafana-k8s-monitoring-$(CLUSTER_NAME)-$(NAMESPACE)-$(POD_NAME)",
-        },
-    ]
-
     kubernetes.helm.v3.Release(
         f"{cluster_name}-grafana-k8s-monitoring-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -1182,8 +1150,7 @@ def setup_grafana(
                         },
                     },
                 },
-                # v4: shared extraEnv goes under collectorCommon.alloy; named
-                #     alloy instances replaced by collectors map with presets.
+                # v4: named alloy instances replaced by collectors map with presets.
                 # No remoteConfig: we define no Fleet Management pipelines, and
                 # the Grafana-managed self_monitoring ones re-scraped every
                 # Alloy self-metric without a cluster label or our drop_metrics
@@ -1198,7 +1165,6 @@ def setup_grafana(
                             "extraLabels": collector_labels,
                             "podLabels": collector_labels,
                         },
-                        "extraEnv": alloy_extra_env_vars,
                     },
                 },
                 "collectors": {

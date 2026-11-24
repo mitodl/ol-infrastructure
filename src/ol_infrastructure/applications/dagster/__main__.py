@@ -2400,8 +2400,7 @@ sql_exporter_deployment = kubernetes.apps.v1.Deployment(
                             ),
                             # $(VAR) is expanded by Kubernetes from the two secret
                             # vars declared above it, so the credential never lands
-                            # in the ConfigMap or in this repo. Same mechanism as
-                            # GCLOUD_FM_COLLECTOR_ID in substructure/aws/eks/grafana.
+                            # in the ConfigMap or in this repo.
                             #
                             # This is a URL, so the password has to be URL-safe.
                             # Vault's default database password generator emits
