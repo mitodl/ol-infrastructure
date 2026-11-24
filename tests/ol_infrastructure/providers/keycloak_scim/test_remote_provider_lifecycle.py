@@ -235,6 +235,77 @@ def test_configured_provider_is_never_reset(
     assert _default_loads(backend) == 0
     assert backend.schemas == schemas_before
     assert any(a["name"] == "title" for a in backend.attributes.values())
+    # A declared attribute is added to the configured schema without a reset.
+    has_full_name = any(a["name"] == "fullName" for a in backend.attributes.values())
+    assert has_full_name == bool(user_attributes)
+
+
+def test_read_reports_live_mappings_so_refresh_sees_drift(
+    backend: FakeBackend,
+) -> None:
+    """A mapping removed in the admin console shows as a diff after refresh."""
+    props = _props(user_attributes=[FULL_NAME])
+    created = ScimRemoteProviderProvider().create(props)
+
+    unchanged = ScimRemoteProviderProvider().read(created.id, props).outs
+    assert unchanged["user_attributes"] == props["user_attributes"]
+    assert not ScimRemoteProviderProvider().diff(created.id, unchanged, props).changes
+
+    full_name = next(
+        k for k, a in backend.attributes.items() if a["name"] == "fullName"
+    )
+    del backend.attributes[full_name]
+    drifted = ScimRemoteProviderProvider().read(created.id, props).outs
+
+    assert drifted["user_attributes"] == []
+    assert ScimRemoteProviderProvider().diff(created.id, drifted, props).changes
+
+
+def test_read_reports_a_missing_user_schema(backend: FakeBackend) -> None:
+    """A provider without schemas never reads as a valid empty mapping list."""
+    bare = backend.add_provider(
+        {"name": "ol-mitxonline-scim", "assignedRealm": {"realmName": "olapps"}}
+    )
+    props = _props(user_attributes=[])
+
+    outs = ScimRemoteProviderProvider().read(bare["id"], props).outs
+
+    assert outs["user_attributes"] == remote_provider.NO_USER_SCHEMA
+    assert ScimRemoteProviderProvider().diff(bare["id"], outs, props).changes
+
+
+def test_read_leaves_an_undeclared_schema_unmanaged(backend: FakeBackend) -> None:
+    existing = _existing_provider(backend)
+
+    outs = (
+        ScimRemoteProviderProvider()
+        .read(existing["id"], _props(user_attributes=None))
+        .outs
+    )
+
+    assert "user_attributes" not in outs
+    assert not [c for c in backend.calls if SCHEMAS in c[1] or ATTRIBUTES in c[1]]
+
+
+def test_repairing_an_existing_bare_provider_warns_to_restart_keycloak(
+    backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The plugin keeps skipping a provider it already loaded until it reloads."""
+    warnings: list[str] = []
+    monkeypatch.setattr(remote_provider.pulumi.log, "warn", warnings.append)
+
+    ScimRemoteProviderProvider().create(_props(user_attributes=[]))
+    assert not warnings
+
+    backend.add_provider(
+        {"name": "ol-learn-scim", "assignedRealm": {"realmName": "olapps"}}
+    )
+    learn = _props(user_attributes=[])
+    learn["spec"] = {**learn["spec"], "name": "ol-learn-scim"}
+    ScimRemoteProviderProvider().create(learn)
+
+    assert len(warnings) == 1
+    assert "Restart Keycloak" in warnings[0]
 
 
 def test_provider_left_without_schemas_is_repaired_on_adopt(
