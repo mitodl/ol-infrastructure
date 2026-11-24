@@ -119,7 +119,7 @@ def create_scim_remote_providers(  # noqa: PLR0913
 
     # The realm's inbound SCIM server, which mitxonline's scim_sync calls as
     # ol-mitxonline-client. On a new realm it is inactive and admits no client
-    # until saved; the deployed realms' configs were set in the admin console.
+    # until saved. No deployed stack manages the deployed realms' configs.
     # Unlike the providers below, not gated on enabled_apps: it targets nothing.
     ScimServiceProviderConfig(
         f"{realm_name}-scim-service-provider-config",
