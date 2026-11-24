@@ -1,6 +1,7 @@
 """Keycloak realm definition for OL Platform Engineering."""
 
 import json
+from collections.abc import Callable
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
@@ -28,7 +29,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     mit_email_password: str,
     mit_email_username: str,
     mit_email_host: str,
-    session_secret: str,
+    session_secret_for: Callable[[str], str],
     fetch_realm_public_key_partial,
 ):
     """Create the OL Platform Engineering realm and all of its resources."""
@@ -181,10 +182,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_airbyte_client.client_id,
             client_secret=ol_platform_engineering_airbyte_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
+            secret=session_secret_for("secret-operations/sso/airbyte"),
             realm_id=ol_platform_engineering_airbyte_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_airbyte_client.realm_id.apply(
@@ -229,9 +227,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_opik_client.client_id,
             client_secret=ol_platform_engineering_opik_client.client_secret,
-            # Independent random value required by the APISIX openid-connect
-            # plugin for session signing; not part of the OAuth credentials.
-            secret=session_secret,
+            secret=session_secret_for("secret-operations/sso/opik"),
             realm_id=ol_platform_engineering_opik_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_opik_client.realm_id.apply(
@@ -716,10 +712,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_jupyterhub_client.client_id,
             client_secret=ol_platform_engineering_jupyterhub_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=ol_platform_engineering_jupyterhub_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_jupyterhub_client.realm_id.apply(
@@ -757,10 +749,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_dagster_client.client_id,
             client_secret=ol_platform_engineering_dagster_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
+            secret=session_secret_for("secret-operations/sso/dagster"),
             realm_id=ol_platform_engineering_dagster_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_dagster_client.realm_id.apply(
@@ -798,10 +787,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_concourse_client.client_id,
             client_secret=ol_platform_engineering_concourse_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=ol_platform_engineering_concourse_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_concourse_client.realm_id.apply(
@@ -853,10 +838,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_leek_client.client_id,
             client_secret=ol_platform_engineering_leek_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
+            secret=session_secret_for("secret-operations/sso/leek"),
             realm_id=ol_platform_engineering_leek_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_leek_client.realm_id.apply(
@@ -949,10 +931,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
                 ),
                 client_id=ol_platform_engineering_gwarek_client.client_id,
                 client_secret=ol_platform_engineering_gwarek_client.client_secret,
-                # This is included for the case where we are using
-                # traefik-forward-auth. It requires a random secret value to be
-                # present which is independent of the OAuth credentials.
-                secret=session_secret,
+                secret=session_secret_for("secret-operations/sso/gwarek"),
                 realm_id=ol_platform_engineering_gwarek_client.realm_id,
                 realm_name="ol-platform-engineering",
                 realm_public_key=ol_platform_engineering_gwarek_client.realm_id.apply(
@@ -990,10 +969,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_vault_client.client_id,
             client_secret=ol_platform_engineering_vault_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=ol_platform_engineering_vault_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_vault_client.realm_id.apply(
@@ -1113,10 +1088,6 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             ),
             client_id=ol_platform_engineering_grafana_client.client_id,
             client_secret=ol_platform_engineering_grafana_client.client_secret,
-            # This is included for the case where we are using traefik-forward-auth.
-            # It requires a random secret value to be present which is independent
-            # of the OAuth credentials.
-            secret=session_secret,
             realm_id=ol_platform_engineering_grafana_client.realm_id,
             realm_name="ol-platform-engineering",
             realm_public_key=ol_platform_engineering_grafana_client.realm_id.apply(
