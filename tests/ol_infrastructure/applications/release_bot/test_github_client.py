@@ -3,6 +3,7 @@ selection, and PyGithub-backed API wrappers.
 """
 
 from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
 
 import github_client as github
 import pytest
@@ -968,6 +969,86 @@ def test_hotfix_tags_not_named_for_a_full_sha_are_not_requests(fake_repo):
     assert github._pending_hotfix_requests_sync("mitodl/thing") == []
     assert github._cancel_hotfix_requests_sync("mitodl/thing") == []
     assert len(repo.refs) == 2
+
+
+# ---------------------------------------------------------------------------
+# Abandon requests
+# ---------------------------------------------------------------------------
+
+_BRANCH_SHA = "c" * 40
+
+
+class _AbandonRefsRepo(_RefsRepo):
+    """Refs plus the release branches an abandon request is pushed at."""
+
+    def __init__(self, *names, branches=()):
+        super().__init__(*names)
+        self.branches = set(branches)
+        self.created: list[tuple[str, str]] = []
+
+    def get_branch(self, name):
+        if name not in self.branches:
+            raise LookupError(name)
+        return SimpleNamespace(commit=SimpleNamespace(sha=_BRANCH_SHA))
+
+    def create_git_ref(self, ref, sha):
+        self.created.append((ref, sha))
+        self.refs.append(_FakeRef(self, ref))
+
+
+def test_request_abandon_tags_the_head_of_the_release_branch(fake_repo):
+    """The release resource looks for exactly this name."""
+    repo = fake_repo(_AbandonRefsRepo(branches={"releases/2026.9.9.1"}))
+
+    github._request_abandon_sync("mitodl/thing", "2026.9.9.1")
+
+    assert repo.created == [("refs/tags/abandon-request/2026.9.9.1", _BRANCH_SHA)]
+
+
+def test_request_abandon_drops_requests_for_other_releases_only(fake_repo):
+    """Nothing else deletes a request the job never consumed."""
+    repo = fake_repo(
+        _AbandonRefsRepo(
+            "refs/tags/abandon-request/2026.9.8.1",
+            f"refs/tags/hotfix/{_HOTFIX_SHA}",
+            "refs/tags/abandoned/2026.9.8.1",
+            "refs/tags/2026.9.7.1",
+            branches={"releases/2026.9.9.1"},
+        )
+    )
+
+    github._request_abandon_sync("mitodl/thing", "2026.9.9.1")
+
+    assert [r.ref for r in repo.refs] == [
+        f"refs/tags/hotfix/{_HOTFIX_SHA}",
+        "refs/tags/abandoned/2026.9.8.1",
+        "refs/tags/2026.9.7.1",
+        "refs/tags/abandon-request/2026.9.9.1",
+    ]
+
+
+def test_request_abandon_reuses_a_request_left_for_the_same_release(fake_repo):
+    """Re-running `/doof abandon` after a failed trigger must not fail on it."""
+    repo = fake_repo(
+        _AbandonRefsRepo(
+            "refs/tags/abandon-request/2026.9.9.1",
+            branches={"releases/2026.9.9.1"},
+        )
+    )
+
+    github._request_abandon_sync("mitodl/thing", "2026.9.9.1")
+
+    assert repo.created == []
+    assert [r.ref for r in repo.refs] == ["refs/tags/abandon-request/2026.9.9.1"]
+
+
+def test_request_abandon_refuses_a_release_no_longer_in_flight(fake_repo):
+    repo = fake_repo(_AbandonRefsRepo())
+
+    with pytest.raises(LookupError):
+        github._request_abandon_sync("mitodl/thing", "2026.9.9.1")
+
+    assert repo.created == []
 
 
 # ---------------------------------------------------------------------------

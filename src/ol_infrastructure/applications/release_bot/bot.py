@@ -896,6 +896,20 @@ async def _abandon(respond, app_name, cfg, requester: str | None = None):
         lines.append(f"No release is in flight for `{app_name}`; nothing to abandon.")
         await respond("\n".join(lines))
         return
+    # The job takes no parameters and reads what is in flight when it runs.
+    # The request names the release seen here, and the release resource
+    # refuses any other, such as one a supersede cut in the meantime.
+    try:
+        await github.request_abandon(cfg.repo, in_flight["version"])
+    except Exception:
+        log.exception("Failed to request abandon of %s", app_name)
+        lines.append(
+            f"❌ Could not request the abandon of `{app_name}` "
+            f"{in_flight['version']}; nothing abandoned. Check "
+            f"`/doof release-status {app_name}` before trying again."
+        )
+        await respond("\n".join(lines))
+        return
     try:
         build_url = await concourse.trigger_job(
             cfg.pipeline, config.job_name(app_name, cfg, "abandon_job")
@@ -910,10 +924,10 @@ async def _abandon(respond, app_name, cfg, requester: str | None = None):
         await respond("\n".join(lines))
         return
     _release_requesters.pop(app_name, None)
-    # The job abandons the release its own check finds in flight, read from
-    # the same release branches as `in_flight` here but later, so report the
-    # trigger rather than a deletion. A build that does not succeed left the
-    # release in flight, which the watch reports in the channel.
+    # Report the trigger rather than a deletion: the build can still refuse,
+    # e.g. when a release cut since is what its own check finds in flight. A
+    # build that does not succeed left the release in flight, which the watch
+    # reports in the channel.
     _start_release_build_watch(
         app_name,
         cfg,

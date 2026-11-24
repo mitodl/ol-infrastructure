@@ -96,6 +96,14 @@ def release_build_watch(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def abandon_request(monkeypatch):
+    """Record abandon requests instead of pushing tags to GitHub."""
+    request = AsyncMock()
+    monkeypatch.setattr(bot.github, "request_abandon", request)
+    return request
+
+
+@pytest.fixture(autouse=True)
 def _no_pending_hotfix(monkeypatch):
     """Default to no pending hotfix, since one changes what /doof release does."""
     monkeypatch.setattr(
@@ -2794,6 +2802,65 @@ async def test_abandon_triggers_the_job_for_an_in_flight_release(
     assert "abandon triggered" in said
     assert "last seen in flight" in said
     assert "2026.9.9.1" in said
+
+
+async def test_abandon_requests_the_release_it_saw_before_triggering(
+    repos, slack, monkeypatch, abandon_request
+):
+    """The job re-reads what is in flight; the request pins it to this release.
+
+    Without it, a supersede cut between this command and the build's check
+    is the release the build cancels.
+    """
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.9.1", timedelta(days=1))),
+    )
+    abandon_request.side_effect = lambda repo, version: calls.append(
+        ("request", repo, version)
+    )
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger(calls))
+    )
+
+    await bot._cmd_abandon(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    assert calls == [
+        ("request", repos["my-app"].repo, "2026.9.9.1"),
+        ("trigger", "my-app-pipeline", "abandon-my-app-release"),
+    ]
+
+
+async def test_abandon_triggers_nothing_when_the_request_fails(
+    repos, slack, monkeypatch, abandon_request, release_build_watch
+):
+    """Without a request the job would refuse; say so here instead."""
+    trigger = AsyncMock()
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(return_value=[_SHA])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.9.1", timedelta(days=1))),
+    )
+    abandon_request.side_effect = RuntimeError("branch gone")
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_abandon(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    trigger.assert_not_called()
+    release_build_watch.assert_not_called()
+    said = slack.said
+    assert "Could not request the abandon of `my-app` 2026.9.9.1" in said
+    assert "nothing abandoned" in said
+    # The hotfix requests are gone already; the reply must not hide that.
+    assert "Cancelled the pending hotfix of `aaaaaaa`" in said
 
 
 async def test_abandon_reports_cancelled_hotfixes_when_the_trigger_fails(

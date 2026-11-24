@@ -816,3 +816,42 @@ async def cancel_hotfix_requests(
     how a request that failed part way is taken back without touching others.
     """
     return await asyncio.to_thread(_cancel_hotfix_requests_sync, repo_slug, only)
+
+
+# An abandon is requested with an `abandon-request/<version>` tag. The abandon
+# job reads the release in flight when it runs, and the release resource's
+# `require_request` refuses that version unless a request names it, so a
+# release cut after `/doof abandon` looked is never the one cancelled. The
+# resource deletes the request once the version is abandoned.
+ABANDON_REQUEST_TAG_PREFIX = "abandon-request/"
+
+
+def _request_abandon_sync(repo_slug: str, version: str) -> None:
+    repo = _get_client().get_repo(repo_slug)
+    wanted = f"refs/tags/{ABANDON_REQUEST_TAG_PREFIX}{version}"
+    present = False
+    for ref in repo.get_git_matching_refs(f"tags/{ABANDON_REQUEST_TAG_PREFIX}"):
+        if ref.ref == wanted:
+            # Left by an abandon of this release that failed or was never
+            # triggered; it already says what this one would.
+            present = True
+        else:
+            # For a release no longer in flight, or an older one, which the
+            # job never abandons. Nothing else would ever delete it.
+            ref.delete()
+    if present:
+        return
+    # At the head of the release branch, so a release that stopped being in
+    # flight since the caller looked fails here rather than being requested.
+    sha = repo.get_branch(f"{_RELEASE_BRANCH_PREFIX}{version}").commit.sha
+    repo.create_git_ref(wanted, sha)
+
+
+async def request_abandon(repo_slug: str, version: str) -> None:
+    """Ask the abandon job to cancel *version*, and only *version*.
+
+    Pushes ``abandon-request/<version>`` at the head of ``releases/<version>``
+    and deletes requests for any other version. Raises if *version* has no
+    release branch.
+    """
+    await asyncio.to_thread(_request_abandon_sync, repo_slug, version)
