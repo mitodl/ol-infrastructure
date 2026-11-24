@@ -199,6 +199,7 @@ raw_env_vars = {
     "NEXT_PUBLIC_FEATURE_enrollment_dashboard": "false",  # pragma: allowlist secret
     "NEXT_PUBLIC_FEATURE_lr_drawer_chatbot": "true",
     "NEXT_PUBLIC_FEATURE_home_page_recommendation_bot": "true",  # pragma: allowlist secret  # noqa: E501
+    "NEXT_PUBLIC_FEATURE_support_page": "false",
     # OpenTelemetry — server-side only (no NEXT_PUBLIC_ prefix).
     # OTEL_EXPORTER_OTLP_ENDPOINT is the base URL; the Node.js SDK appends /v1/traces.
     # OTEL_RESOURCE_ATTRIBUTES is read by Sentry's OTEL provider for span metadata.
