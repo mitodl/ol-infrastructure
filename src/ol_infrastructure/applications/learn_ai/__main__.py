@@ -30,6 +30,7 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.learn_ai import definition
 from ol_infrastructure.applications.learn_ai.vault_secrets import (
+    memory_exchange_secret,
     undescribed_static_keys,
     vault_secrets,
 )
@@ -837,6 +838,53 @@ opik_keycloak_secret = OLVaultK8SSecret(
 
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 
+# Learner memory through ol-llm's memory interface (ol_llm.memory.MemoryConfig).
+# learn-ai exchanges the learner's forwarded session token as ol-learn-ai-client,
+# whose id and secret (and the olapps token endpoint) arrive as OL_LLM_MEMORY_*
+# from the VSO secret below. A config switch, because the Hindsight stack exists
+# only in some environments and a StackReference to a missing stack fails the
+# preview. The CHAT_MEMORY feature flag still decides per learner. Turn it on only
+# where the keycloak substructure sets keycloak_realm:olapps-ol-memory-enabled:
+# that is what lets ol-learn-ai-client exchange tokens and puts its audience on
+# mit-learn's tokens, so without it every exchange fails and learn-ai runs with
+# no memory.
+memory_enabled = learn_ai_config.get_bool("enable_memory") or False
+memory_secret_names: list[str] = []
+memory_secret_resources: list[OLVaultK8SSecret] = []
+if memory_enabled:
+    hindsight_stack = make_stack_reference(projects.HINDSIGHT, stack_info.name)
+    env_vars.update(
+        {
+            "OL_LLM_MEMORY_BACKEND": "hindsight",
+            "OL_LLM_MEMORY_APP": "learn-ai",
+            "OL_LLM_MEMORY_URL": hindsight_stack.require_output("hindsight")["url"],
+        }
+    )
+    memory_secret = memory_exchange_secret()
+    memory_secret_names.append(memory_secret.name)
+    memory_secret_resources.append(
+        OLVaultK8SSecret(
+            name=f"learn-ai-{stack_info.env_suffix}-memory-exchange-secret",
+            resource_config=OLVaultK8SStaticSecretConfig(
+                name=memory_secret.name,
+                namespace=learn_ai_namespace,
+                labels=k8s_global_labels,
+                dest_secret_name=memory_secret.name,
+                dest_secret_labels=k8s_global_labels,
+                mount=memory_secret.mount,
+                mount_type=memory_secret.mount_type,
+                path=memory_secret.path,
+                restart_targets=env_secret_restart_targets,
+                templates=memory_secret.templates,
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
+            opts=ResourceOptions(
+                delete_before_replace=True,
+                parent=vault_k8s_resources,
+            ),
+        )
+    )
+
 # Azure OpenAI, additive alongside the existing OPENAI_API_KEY wiring, which is not
 # touched. Nothing here is secret: the managed identity is reached by exchanging the
 # projected ServiceAccount token mounted below, so the client id is an identifier
@@ -934,10 +982,15 @@ bindings = definition.LearnAiBindings(
     environment_variables=env_vars,
     cors_frontend_origins=learn_ai_config.require_object("cors_frontend_origins"),
     k8s_labels=k8s_global_labels,
+    # The memory exchange secret is required where memory is on: the rest of
+    # the memory settings are plain env, and ol-llm accepts them with no
+    # exchange pair, so a pod that started before VSO's first sync would hand
+    # raw session tokens to Hindsight and get 401 on every call.
     secret_names=[
         db_creds_secret_name,
         redis_creds_secret_name,
         static_secrets_name,
+        *memory_secret_names,
     ],
     # Optional so pods start before the Production keycloak stack writes it.
     optional_secret_names=[opik_keycloak_secret_name],
@@ -972,6 +1025,7 @@ learn_ai_app_k8s = OLApplicationK8s(
             redis_creds,
             static_secrets,
             opik_keycloak_secret,
+            *memory_secret_resources,
             vault_k8s_resources,
             learn_ai_application_security_group,
             # The ScaledObject references the trigger authentication by name.
