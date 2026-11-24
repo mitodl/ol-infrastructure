@@ -718,6 +718,33 @@ matches its peers. Then put it back in the Service:
 kubectl -n clickhouse label --overwrite pod chi-clickhouse-default-0-<n>-0 clickhouse.altinity.com/ready=yes
 ```
 
+### Opik failing over TLS (moving Opik back to 8123)
+
+With `clickhouse:tls_listeners_enabled` on, Opik reads that stack output and
+connects on 8443. The plaintext 8123 listener stays open, so the first move
+when Opik's TLS connection breaks (handshake or certificate errors in
+opik-backend, failed `backend-migrations`) is to put Opik back on 8123 without
+touching ClickHouse:
+
+1. Set `opik:clickhouse_force_http: "true"` in that environment's
+   `applications/opik/Pulumi.<Stack>.yaml` and apply the opik stack. No
+   ClickHouse replica restarts.
+2. Check that opik-backend's pods restarted with `ANALYTICS_DB_PROTOCOL=HTTP`,
+   and that the `opik` user's queries now arrive in plaintext:
+   ```sql
+   SELECT is_secure, count() FROM system.query_log
+   WHERE user = 'opik' AND event_time > now() - INTERVAL 5 MINUTE
+   GROUP BY is_secure
+   ```
+3. Only if the listeners themselves have to go, set
+   `clickhouse:tls_listeners_enabled: "false"` and apply the clickhouse stack,
+   which restarts every replica. Don't do this first: it closes 8443 while
+   Opik still points at it, and Opik has no database until its next apply. To
+   stop a listener roll in progress, follow the abort procedure in the
+   comment above `keeper_tls_enabled` in `applications/clickhouse/__main__.py`.
+
+Remove `opik:clickhouse_force_http` and apply opik again to move back to TLS.
+
 ### VSO not syncing users.xml
 
 ```bash
