@@ -159,7 +159,7 @@ class ScimServiceProviderConfigProvider(dynamic.ResourceProvider):
             outs["authorized_clients"] = [
                 client["clientId"]
                 for client in live.get("authorizedClients", [])
-                if current.get(client["clientId"]) == client["id"]
+                if current.get(client["clientId"]) == client.get("id")
             ]
         return dynamic.ReadResult(id_=live["id"], outs=outs)
 
