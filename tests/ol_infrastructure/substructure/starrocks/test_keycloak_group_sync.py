@@ -15,6 +15,7 @@ from typing import Any, Self
 
 import pytest
 
+from ol_infrastructure.lib.data_lake_access import GOVERNANCE_ROLES
 from ol_infrastructure.substructure.starrocks import keycloak_group_sync
 
 User = dict[str, Any]
@@ -88,6 +89,11 @@ def test_members_are_saml_uids_of_effective_holders(
     assert members["ol_researcher"] == {"alice"}
     assert members["ol_data_engineer"] == {"bob"}
     assert set(members) == set(keycloak_group_sync._GOVERNANCE_ROLES)
+
+
+def test_group_roles_are_the_governance_roles() -> None:
+    """The script runs from a ConfigMap, so it keeps its own copy of the roles."""
+    assert set(keycloak_group_sync._GOVERNANCE_ROLES) == set(GOVERNANCE_ROLES)
 
 
 def test_disabled_users_are_left_out(

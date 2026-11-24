@@ -118,6 +118,7 @@ AUTH_ROLES_MAPPING = {
     "ol_researcher": ["ol_researcher"],
     "ol_instructor": ["ol_instructor"],
     "ol_business_analyst": ["ol_business_analyst"],
+    "ol_commerce_operations": ["ol_commerce_operations"],
 }
 
 # if we should replace ALL the user's roles each login, or only on registration

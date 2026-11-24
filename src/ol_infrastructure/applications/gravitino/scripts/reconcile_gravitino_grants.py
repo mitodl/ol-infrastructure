@@ -351,6 +351,18 @@ class Gravitino:
             is not None
         )
 
+    def table_exists(self, catalog: str, schema: str, table: str) -> bool:
+        """Load a table, which also imports a backend table Gravitino has not seen."""
+        return (
+            self._call(
+                "GET",
+                f"{self._base}/catalogs/{_segment(catalog)}/schemas/{_segment(schema)}"
+                f"/tables/{_segment(table)}",
+                missing_ok=True,
+            )
+            is not None
+        )
+
     def ensure_group(self, group: str) -> None:
         """Create a group unless it exists."""
         if self._call("POST", f"{self._base}/groups", {"name": group}, exists_ok=True):
@@ -432,23 +444,30 @@ def reconcile_roles(
 ) -> None:
     """Make every managed role hold exactly its desired privileges.
 
-    A desired schema that does not exist yet (a layer dbt has not created) is
-    skipped with a warning: Gravitino rejects a grant on a missing object, and a
-    later run picks the schema up once it appears.
+    A desired schema or table that does not exist yet (a layer or model dbt has
+    not created) is skipped with a warning: Gravitino rejects a grant on a
+    missing object, and a later run picks it up once it appears.
     """
-    desired_schemas = {
-        full_name
+    desired_objects = {
+        key
         for securable_objects in roles.values()
-        for (object_type, full_name) in normalize_objects(securable_objects)
-        if object_type == "schema"
+        for key in normalize_objects(securable_objects)
+        if key[0] in {"schema", "table"}
     }
-    missing = {
-        full_name
-        for full_name in sorted(desired_schemas)
-        if not gravitino.schema_exists(*full_name.split(".", 1))
-    }
+    missing: set[str] = set()
+    for object_type, full_name in sorted(desired_objects):
+        if object_type == "schema" and not gravitino.schema_exists(
+            *full_name.split(".", 1)
+        ):
+            missing.add(full_name)
+    for object_type, full_name in sorted(desired_objects):
+        if object_type == "table" and (
+            full_name.rsplit(".", 1)[0] in missing
+            or not gravitino.table_exists(*full_name.split(".", 2))
+        ):
+            missing.add(full_name)
     for full_name in sorted(missing):
-        warn(f"Schema {full_name} does not exist; its grants are skipped this run")
+        warn(f"{full_name} does not exist; its grants are skipped this run")
 
     for role, securable_objects in roles.items():
         gravitino.ensure_group(role)

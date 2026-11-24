@@ -4435,5 +4435,304 @@
       "ol_warehouse_production_reporting",
       "public"
     ]
+  },
+  {
+    "name": "ol_commerce_operations",
+    "permissions": [
+      {
+        "permission": {
+          "name": "can_available_domains"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_csrf_token"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_dashboard"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_dashboard_permalink"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_drill"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_explore_json"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "Datasource"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get"
+        },
+        "view_menu": {
+          "name": "MenuApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_drill_info"
+        },
+        "view_menu": {
+          "name": "Dataset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_get_value"
+        },
+        "view_menu": {
+          "name": "KV"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_language_pack"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_list"
+        },
+        "view_menu": {
+          "name": "AsyncEventsRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_log"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_query"
+        },
+        "view_menu": {
+          "name": "Api"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_query_form_data"
+        },
+        "view_menu": {
+          "name": "Api"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "AvailableDomains"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Chart"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "DashboardFilterStateRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "DashboardPermalinkRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Dataset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Profile"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_read"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_recent_activity"
+        },
+        "view_menu": {
+          "name": "Log"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_recent_activity"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_slice"
+        },
+        "view_menu": {
+          "name": "Superset"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_time_range"
+        },
+        "view_menu": {
+          "name": "Api"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserDBModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserInfoEditView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserOAuthModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_userinfo"
+        },
+        "view_menu": {
+          "name": "UserOIDModelView"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_view_chart_as_table"
+        },
+        "view_menu": {
+          "name": "Dashboard"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "DashboardFilterStateRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "can_write"
+        },
+        "view_menu": {
+          "name": "DashboardPermalinkRestApi"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Dashboards"
+        }
+      },
+      {
+        "permission": {
+          "name": "menu_access"
+        },
+        "view_menu": {
+          "name": "Home"
+        }
+      }
+    ],
+    "allowed_schemas": [],
+    "allowed_datasets": [
+      "ol_warehouse_production_mart.marts__combined__orders",
+      "ol_warehouse_production_mart.marts__combined_discounts",
+      "ol_warehouse_production_reporting.orders_with_product_report"
+    ]
   }
 ]

@@ -590,6 +590,9 @@ CREATE ROLE IF NOT EXISTS ol_data_analyst;
 CREATE ROLE IF NOT EXISTS ol_researcher;
 CREATE ROLE IF NOT EXISTS ol_instructor;
 CREATE ROLE IF NOT EXISTS ol_business_analyst;
+-- ol_commerce_operations reads single lake tables (orders) and nothing in
+-- default_catalog, so it has no grant below.
+CREATE ROLE IF NOT EXISTS ol_commerce_operations;
 
 GRANT USAGE ON CATALOG default_catalog TO ROLE readonly;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE readonly;
@@ -652,16 +655,7 @@ _role_deps: list[pulumi.Resource] = [starrocks_db_connection, *catalog_setups]
 
 # Valid Keycloak ol-starrocks-client role names.  These match StarRocks role
 # names 1:1 so no translation is needed when creating OIDC user accounts.
-_GOVERNANCE_ROLES: frozenset[str] = frozenset(
-    {
-        "ol_platform_admin",
-        "ol_data_engineer",
-        "ol_data_analyst",
-        "ol_researcher",
-        "ol_instructor",
-        "ol_business_analyst",
-    }
-)
+_GOVERNANCE_ROLES: frozenset[str] = frozenset(GOVERNANCE_ROLES)
 
 # Allowlist for OIDC usernames before they are interpolated into SQL string
 # literals.  Keycloak preferred_username values are emails or short login ids;
@@ -1430,7 +1424,7 @@ if oidc_enabled:
     #   username    - the starrocks_username claim value (local part of the Keycloak
     #                 preferred_username, without @domain); whitespace is stripped,
     #                 empty strings are rejected
-    #   keycloak_role - one of the six governance role names in _GOVERNANCE_ROLES
+    #   keycloak_role - one of the governance role names in _GOVERNANCE_ROLES
     #                   (ol_platform_admin / ol_data_engineer / ol_data_analyst /
     #                    ol_researcher / ol_instructor / ol_business_analyst)
     # The keycloak_role value matches the StarRocks role name exactly (1:1 mapping).

@@ -11,6 +11,7 @@ in ol-data-platform. Consumers render their own syntax from it; nothing here
 knows about Gravitino privileges or StarRocks SQL.
 """
 
+import re
 from enum import StrEnum
 
 from ol_infrastructure.lib.aws.iam_helper import DATA_LAKE_STAGES
@@ -32,6 +33,7 @@ GOVERNANCE_ROLES: tuple[str, ...] = (
     "ol_business_analyst",
     "ol_researcher",
     "ol_instructor",
+    "ol_commerce_operations",
 )
 
 # Roles taken out of GOVERNANCE_ROLES. The Gravitino reconciler only converges
@@ -73,6 +75,23 @@ GOVERNANCE_LAYER_ACCESS: dict[str, dict[str, LakeAccess]] = {
     },
     "ol_researcher": {},
     "ol_instructor": {},
+    "ol_commerce_operations": {},
+}
+
+# dbt model names. Table names are interpolated into StarRocks SQL unquoted.
+TABLE_NAME_PATTERN = re.compile(r"[a-z0-9_]+")
+
+# Single tables a layer-scoped role may read in a layer it is not given whole,
+# for a role whose job needs a few tables and none of the learner-level rest of
+# the layer. Always read-only. A table here grants nothing else in its layer.
+# ol_commerce_operations is customer service and finance looking up orders and
+# payments: these tables carry payer name, email, IP address, authorization
+# code and card last-4, which the roles that read mart whole should not need.
+GOVERNANCE_TABLE_ACCESS: dict[str, dict[str, tuple[str, ...]]] = {
+    "ol_commerce_operations": {
+        "mart": ("marts__combined__orders", "marts__combined_discounts"),
+        "reporting": ("orders_with_product_report",),
+    },
 }
 
 
@@ -113,6 +132,27 @@ def validate_governance_access() -> None:
         if unknown:
             msg = f"{role} is granted unknown layers {sorted(unknown)}"
             raise ValueError(msg)
+    _validate_table_access()
+
+
+def _validate_table_access() -> None:
+    for role, table_layers in GOVERNANCE_TABLE_ACCESS.items():
+        if role not in GOVERNANCE_LAYER_ACCESS:
+            msg = f"{role} is granted single tables but is not a layer-scoped role"
+            raise ValueError(msg)
+        unknown = table_layers.keys() - set(DATA_LAKE_LAYERS)
+        if unknown:
+            msg = f"{role} is granted tables in unknown layers {sorted(unknown)}"
+            raise ValueError(msg)
+        whole = table_layers.keys() & GOVERNANCE_LAYER_ACCESS[role].keys()
+        if whole:
+            msg = f"{role} reads {sorted(whole)} whole; drop its single tables there"
+            raise ValueError(msg)
+        for layer, tables in table_layers.items():
+            invalid = [t for t in tables if not TABLE_NAME_PATTERN.fullmatch(t)]
+            if not tables or invalid:
+                msg = f"{role} has an empty or invalid table list in {layer}: {invalid}"
+                raise ValueError(msg)
 
 
 validate_governance_access()

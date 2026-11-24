@@ -21,6 +21,7 @@ from ol_infrastructure.lib.data_lake_access import (
     CATALOG_WIDE_WRITE_ROLES,
     DATA_LAKE_LAYERS,
     GOVERNANCE_LAYER_ACCESS,
+    GOVERNANCE_TABLE_ACCESS,
     layer_database,
 )
 
@@ -35,12 +36,16 @@ def _in_catalog(catalog: str, statements: list[str]) -> list[str]:
 
 
 def layer_scoped_grants_sql(catalog: str, env_suffix: str) -> str:
-    """Render SELECT on each layer a layer-scoped governance role may read.
+    """Render SELECT on each layer and single table a governance role may read.
 
     SELECT only, whatever ``data_lake_access`` says: no layer-scoped role is
     given ``write`` today, and a write through the Gravitino catalog would
     commit as its bootstrap credential rather than the user. A role the mapping
-    gives no layer gets no USAGE either.
+    gives no layer and no table gets no USAGE either.
+
+    A table grant on an external catalog stores the table's name without
+    resolving it (StarRocks ``TablePEntryObject.getTableUUID``), so it survives
+    dbt re-creating the table and can name one that does not exist yet.
 
     :param catalog: The StarRocks catalog name.
     :param env_suffix: The environment suffix of the lake the catalog reads,
@@ -51,16 +56,25 @@ def layer_scoped_grants_sql(catalog: str, env_suffix: str) -> str:
     """
     statements: list[str] = []
     for role, layers in GOVERNANCE_LAYER_ACCESS.items():
-        if not layers:
+        table_layers = GOVERNANCE_TABLE_ACCESS.get(role, {})
+        if not layers and not table_layers:
             continue
         statements.append(f"GRANT USAGE ON CATALOG {catalog} TO ROLE {role};")
         statements.extend(
             _in_catalog(
                 catalog,
                 [
-                    "GRANT SELECT ON ALL TABLES IN DATABASE "
-                    f"{layer_database(env_suffix, layer)} TO ROLE {role};"
-                    for layer in layers
+                    *(
+                        "GRANT SELECT ON ALL TABLES IN DATABASE "
+                        f"{layer_database(env_suffix, layer)} TO ROLE {role};"
+                        for layer in layers
+                    ),
+                    *(
+                        "GRANT SELECT ON TABLE "
+                        f"{layer_database(env_suffix, layer)}.{table} TO ROLE {role};"
+                        for layer, tables in table_layers.items()
+                        for table in tables
+                    ),
                 ],
             )
         )
@@ -113,11 +127,14 @@ def layer_scoped_revokes_sql(catalog: str, env_suffix: str) -> str:
     That is SELECT on all databases, which the Glue catalogs granted every
     governance role before they were scoped and which also covers every
     developer's dbt schemas; SELECT on each layer the mapping does not give the
-    role; and USAGE on the catalog for a role given no layer. Most of these
-    name a grant the role does not hold, so run them with ``revoke_step``.
+    role; and USAGE on the catalog for a role given no layer and no table. Most
+    of these name a grant the role does not hold, so run them with
+    ``revoke_step``. A REVOKE on a whole layer leaves a single-table grant in it
+    alone, since StarRocks revokes only the exact object named.
 
     Only roles and layers in today's mapping are covered. A role taken out of
-    ``GOVERNANCE_LAYER_ACCESS``, a layer taken out of ``DATA_LAKE_LAYERS``, or a
+    ``GOVERNANCE_LAYER_ACCESS``, a table taken out of ``GOVERNANCE_TABLE_ACCESS``,
+    a layer taken out of ``DATA_LAKE_LAYERS``, or a
     role moved there from ``CATALOG_WIDE_WRITE_ROLES`` (which also holds ALL and
     db_admin) keeps what it held and needs a manual REVOKE.
 
@@ -146,7 +163,7 @@ def layer_scoped_revokes_sql(catalog: str, env_suffix: str) -> str:
                 ],
             )
         )
-        if not layers:
+        if not layers and role not in GOVERNANCE_TABLE_ACCESS:
             statements.append(f"REVOKE USAGE ON CATALOG {catalog} FROM ROLE {role};")
     return "\n".join(statements)
 

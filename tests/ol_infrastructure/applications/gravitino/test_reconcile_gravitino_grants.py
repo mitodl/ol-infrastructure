@@ -62,8 +62,12 @@ def _error(status: int, code: int, kind: str) -> tuple[int, dict[str, Any]]:
 class FakeGravitino:
     """An in-memory stand-in for the management API."""
 
-    def __init__(self, backend_schemas: list[str]) -> None:
+    def __init__(
+        self, backend_schemas: list[str], backend_tables: tuple[str, ...] = ()
+    ) -> None:
         self.backend_schemas = set(backend_schemas)
+        # "<schema>.<table>"
+        self.backend_tables = set(backend_tables)
         self.metalake_exists = False
         self.catalog: dict[str, Any] | None = None
         self.groups: dict[str, set[str]] = {}
@@ -75,8 +79,10 @@ class FakeGravitino:
     def _object_exists(self, securable_object: dict[str, Any]) -> bool:
         if securable_object["type"].lower() == "catalog":
             return securable_object["fullName"] == CATALOG
-        _, _, schema = securable_object["fullName"].partition(".")
-        return schema in self.backend_schemas
+        _, _, name = securable_object["fullName"].partition(".")
+        if securable_object["type"].lower() == "table":
+            return name in self.backend_tables
+        return name in self.backend_schemas
 
     def __call__(  # noqa: C901, PLR0911, PLR0912, PLR0915
         self, method: str, path: str, body: dict[str, Any] | None
@@ -120,6 +126,12 @@ class FakeGravitino:
                     for schema in self.backend_schemas
                 ],
             }
+        if match := re.fullmatch(
+            rf"/catalogs/{CATALOG}/schemas/([^/]+)/tables/([^/]+)", rest
+        ):
+            if f"{match[1]}.{match[2]}" not in self.backend_tables:
+                return _error(404, 1003, "NoSuchTableException")
+            return 200, {"code": 0, "table": {"name": match[2]}}
         if match := re.fullmatch(rf"/catalogs/{CATALOG}/schemas/(.+)", rest):
             if match[1] not in self.backend_schemas:
                 return _error(404, 1003, "NoSuchSchemaException")
@@ -251,7 +263,14 @@ def _run(
 
 @pytest.fixture
 def server() -> FakeGravitino:
-    return FakeGravitino([*LAYER_SCHEMAS, "ol_warehouse_qa_tmacey_mart", "other_db"])
+    return FakeGravitino(
+        [*LAYER_SCHEMAS, "ol_warehouse_qa_tmacey_mart", "other_db"],
+        (
+            "ol_warehouse_qa_mart.marts__combined__orders",
+            "ol_warehouse_qa_mart.marts__combined_discounts",
+            "ol_warehouse_qa_mart.marts__combined_course_enrollment_detail",
+        ),
+    )
 
 
 def test_first_run_builds_everything(server):
@@ -327,6 +346,39 @@ def test_missing_schema_is_skipped_then_granted_once_it_exists(server, capsys):
         "USE_SCHEMA",
         "SELECT_TABLE",
     }
+
+
+def test_single_table_role_reads_only_its_tables(server):
+    _run(server)
+    orders = f"{MART}.marts__combined__orders"
+
+    assert server.privileges("ol_commerce_operations", CATALOG) == {"USE_CATALOG"}
+    # USE_SCHEMA alone: SELECT_TABLE on the schema would cover every mart table.
+    assert server.privileges("ol_commerce_operations", MART) == {"USE_SCHEMA"}
+    assert server.privileges("ol_commerce_operations", orders) == {"SELECT_TABLE"}
+    assert (
+        server.privileges(
+            "ol_commerce_operations",
+            f"{MART}.marts__combined_course_enrollment_detail",
+        )
+        == set()
+    )
+
+
+def test_missing_table_is_skipped_then_granted_once_it_exists(server, capsys):
+    _run(server)
+    report = f"{CATALOG}.ol_warehouse_qa_reporting.orders_with_product_report"
+
+    assert server.privileges("ol_commerce_operations", report) == set()
+    assert f"{report} does not exist" in capsys.readouterr().err
+    assert server.privileges(
+        "ol_commerce_operations", f"{MART}.marts__combined__orders"
+    ) == {"SELECT_TABLE"}
+
+    server.backend_tables.add("ol_warehouse_qa_reporting.orders_with_product_report")
+    _run(server)
+
+    assert server.privileges("ol_commerce_operations", report) == {"SELECT_TABLE"}
 
 
 def test_roles_reach_principals_only_through_their_own_group(server):
