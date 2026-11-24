@@ -32,6 +32,7 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     CLASSIFY_TASK_NAME,
     PROMOTE_TAG_TASK_NAME,
     SUPERSEDE_TASK_NAME,
+    TAG_RC_CHECKS_TIMEOUT,
     build_app_pipeline,
 )
 
@@ -123,6 +124,15 @@ def test_rc_posts_the_checklist_issue_without_a_preview():
     assert issue["params"]["skip_if_file"] == "promotion/skip"
     assert issue["params"]["skip_if_tag_missing"] == "((.:release_tag))"
     assert plan[-1]["task"] == SUPERSEDE_TASK_NAME
+
+
+def test_rc_waits_out_the_release_tags_ci():
+    """The RC start waits longer than the slowest observed tag CI run (~40 min)."""
+    plan = _job(f"deploy-{APP}-rc")["plan"]
+    start = plan[_index(plan, "put", f"{APP}-deployment-rc")]
+    assert start["params"]["action"] == "start"
+    assert start["params"]["checks_timeout"] == TAG_RC_CHECKS_TIMEOUT
+    assert TAG_RC_CHECKS_TIMEOUT >= 3600
 
 
 def test_production_checks_the_gate_before_it_promotes():
