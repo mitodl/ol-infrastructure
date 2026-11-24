@@ -6,11 +6,15 @@ intersect: a user needs both, and when they differ the narrower one wins with
 nothing to say which layer refused. See
 docs/plans/gravitino-authorization-spec.md, decisions A2-A5.
 
-The table is derived from the ``+grants`` blocks of ``src/ol_dbt/dbt_project.yml``
-in ol-data-platform. Consumers render their own syntax from it; nothing here
-knows about Gravitino privileges or StarRocks SQL.
+The layer table is derived from the ``+grants`` blocks of
+``src/ol_dbt/dbt_project.yml`` in ol-data-platform. The single-table grants have
+no dbt counterpart; Superset's copy of them is each role's ``allowed_datasets``
+in applications/superset/ol_governance_roles.json, which a test holds equal to
+``GOVERNANCE_TABLE_ACCESS``. Consumers render their own syntax from it; nothing
+here knows about Gravitino privileges or StarRocks SQL.
 """
 
+import re
 from enum import StrEnum
 
 from ol_infrastructure.lib.aws.iam_helper import DATA_LAKE_STAGES
@@ -32,6 +36,7 @@ GOVERNANCE_ROLES: tuple[str, ...] = (
     "ol_business_analyst",
     "ol_researcher",
     "ol_instructor",
+    "ol_commerce_operations",
 )
 
 # Roles taken out of GOVERNANCE_ROLES. The Gravitino reconciler only converges
@@ -73,7 +78,32 @@ GOVERNANCE_LAYER_ACCESS: dict[str, dict[str, LakeAccess]] = {
     },
     "ol_researcher": {},
     "ol_instructor": {},
+    "ol_commerce_operations": {},
 }
+
+# dbt model names. Table names are interpolated into StarRocks SQL unquoted.
+TABLE_NAME_PATTERN = re.compile(r"[a-z0-9_]+")
+
+# Single tables a layer-scoped role may read in a layer it is not given whole,
+# for a role whose job needs a few tables and none of the learner-level rest of
+# the layer. Always read-only. A table here grants nothing else in its layer.
+# ol_commerce_operations is customer service and finance looking up orders and
+# payments: these tables carry payer name, email, IP address, authorization
+# code and card last-4, which the roles that read mart whole should not need.
+GOVERNANCE_TABLE_ACCESS: dict[str, dict[str, tuple[str, ...]]] = {
+    "ol_commerce_operations": {
+        "mart": ("marts__combined__orders", "marts__combined_discounts"),
+        "reporting": ("orders_with_product_report",),
+    },
+}
+
+# Single tables taken out of GOVERNANCE_TABLE_ACCESS. StarRocks GRANTs are
+# additive and a table cannot be enumerated from the mapping once it is gone,
+# so deleting an entry above leaves its SELECT ON TABLE in place on every lake
+# catalog, including the Glue catalogs that Gravitino does not guard. Move a
+# removed table here instead, and StarRocks revokes it. Gravitino and Superset
+# converge on their own. Remove it once every environment has converged.
+RETIRED_TABLE_ACCESS: dict[str, dict[str, tuple[str, ...]]] = {}
 
 
 def layer_database(env_suffix: str, layer: str) -> str:
@@ -112,6 +142,51 @@ def validate_governance_access() -> None:
         unknown = layers.keys() - set(DATA_LAKE_LAYERS)
         if unknown:
             msg = f"{role} is granted unknown layers {sorted(unknown)}"
+            raise ValueError(msg)
+    _validate_table_access()
+
+
+def _validate_tables(
+    role: str, table_layers: dict[str, tuple[str, ...]], kind: str
+) -> None:
+    unknown = table_layers.keys() - set(DATA_LAKE_LAYERS)
+    if unknown:
+        msg = f"{role} has {kind} tables in unknown layers {sorted(unknown)}"
+        raise ValueError(msg)
+    for layer, tables in table_layers.items():
+        invalid = [t for t in tables if not TABLE_NAME_PATTERN.fullmatch(t)]
+        if not tables or invalid:
+            msg = (
+                f"{role} has an empty or invalid {kind} table list in {layer}: "
+                f"{invalid}"
+            )
+            raise ValueError(msg)
+
+
+def _validate_table_access() -> None:
+    for role, table_layers in GOVERNANCE_TABLE_ACCESS.items():
+        if role not in GOVERNANCE_LAYER_ACCESS:
+            msg = f"{role} is granted single tables but is not a layer-scoped role"
+            raise ValueError(msg)
+        _validate_tables(role, table_layers, "granted")
+        whole = table_layers.keys() & GOVERNANCE_LAYER_ACCESS[role].keys()
+        if whole:
+            msg = f"{role} reads {sorted(whole)} whole; drop its single tables there"
+            raise ValueError(msg)
+    for role, table_layers in RETIRED_TABLE_ACCESS.items():
+        # StarRocks renders the revokes per layer-scoped role.
+        if role not in GOVERNANCE_LAYER_ACCESS:
+            msg = f"{role} has retired tables but is not a layer-scoped role"
+            raise ValueError(msg)
+        _validate_tables(role, table_layers, "retired")
+        granted = GOVERNANCE_TABLE_ACCESS.get(role, {})
+        both = sorted(
+            f"{layer}.{table}"
+            for layer, tables in table_layers.items()
+            for table in set(tables) & set(granted.get(layer, ()))
+        )
+        if both:
+            msg = f"{role} has tables both granted and retired: {both}"
             raise ValueError(msg)
 
 

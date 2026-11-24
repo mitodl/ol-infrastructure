@@ -29,6 +29,7 @@ from ol_infrastructure.lib.data_lake_access import (
     CATALOG_WIDE_WRITE_ROLES,
     GOVERNANCE_LAYER_ACCESS,
     GOVERNANCE_ROLES,
+    GOVERNANCE_TABLE_ACCESS,
     RETIRED_ROLES,
     LakeAccess,
     layer_database,
@@ -65,6 +66,8 @@ SCHEMA_PRIVILEGES: dict[LakeAccess, tuple[str, ...]] = {
     LakeAccess.read: ("USE_SCHEMA", "SELECT_TABLE"),
     LakeAccess.write: ("USE_SCHEMA", "SELECT_TABLE", "MODIFY_TABLE", "CREATE_TABLE"),
 }
+TABLE_SCHEMA_PRIVILEGES = ("USE_SCHEMA",)
+SINGLE_TABLE_PRIVILEGES = ("SELECT_TABLE",)
 CATALOG_WIDE_WRITE_PRIVILEGES = (
     "USE_CATALOG",
     "USE_SCHEMA",
@@ -107,6 +110,7 @@ def render_role_grants(
             ]
             continue
         layers = GOVERNANCE_LAYER_ACCESS[role]
+        table_layers = GOVERNANCE_TABLE_ACCESS.get(role, {})
         grants[role] = [
             _securable_object(
                 "schema",
@@ -115,7 +119,18 @@ def render_role_grants(
             )
             for layer, access in sorted(layers.items())
         ]
-        if layers:
+        # A single table needs USE_SCHEMA on its schema and SELECT_TABLE on
+        # itself; SELECT_TABLE on the schema would cover the whole layer.
+        for layer, tables in sorted(table_layers.items()):
+            schema = f"{catalog}.{layer_database(env_suffix, layer)}"
+            grants[role].append(
+                _securable_object("schema", schema, TABLE_SCHEMA_PRIVILEGES)
+            )
+            grants[role].extend(
+                _securable_object("table", f"{schema}.{table}", SINGLE_TABLE_PRIVILEGES)
+                for table in sorted(tables)
+            )
+        if layers or table_layers:
             grants[role].insert(
                 0, _securable_object("catalog", catalog, CATALOG_USE_PRIVILEGES)
             )

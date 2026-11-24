@@ -82,6 +82,7 @@ config:
   - "ol_researcher"
   - "ol_instructor"
   - "ol_business_analyst"
+  - "ol_commerce_operations"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://open-metadata-qa.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-label-studio-redirect-uris: ["https://label-studio-qa.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-starrocks-redirect-uris:
@@ -94,6 +95,7 @@ config:
   - "ol_researcher"
   - "ol_instructor"
   - "ol_business_analyst"
+  - "ol_commerce_operations"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   keycloak_realm:olapps-learn-ai-client-secret:

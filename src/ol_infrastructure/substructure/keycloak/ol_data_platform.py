@@ -41,6 +41,7 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
         "ol_data_engineer",
         "ol_data_analyst",
         "ol_business_analyst",
+        "ol_commerce_operations",
     }
 )
 # The OpenMetadata role each realm role grants. Each value is a client role on
@@ -648,6 +649,13 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "ol_business_analyst",
             "Business analyst role similar to existing business_intelligence "
             "and finance roles",
+        ),
+        (
+            "ol-commerce-operations",
+            "ol-commerce-operations",
+            "ol_commerce_operations",
+            "Customer service and finance: order and payment lookups. Reads the "
+            "orders tables only; held alongside a general role for anything else",
         ),
     ):
         keycloak.Role(

@@ -16,8 +16,10 @@ from ol_infrastructure.lib.data_lake_access import (
     CATALOG_WIDE_WRITE_ROLES,
     DATA_LAKE_LAYERS,
     GOVERNANCE_LAYER_ACCESS,
+    GOVERNANCE_TABLE_ACCESS,
     layer_database,
 )
+from ol_infrastructure.substructure.starrocks import lake_grants
 from ol_infrastructure.substructure.starrocks.lake_grants import (
     NO_SUCH_GRANT_ERROR,
     governance_grants_sql,
@@ -98,7 +100,43 @@ def test_revokes_cover_everything_a_layer_scoped_role_may_not_hold(role: str) ->
             role,
         )
         assert (target in revoked) == (layer not in layers), layer
-    assert ((f"USAGE ON CATALOG {CATALOG}", role) in revoked) == (not layers)
+    assert ((f"USAGE ON CATALOG {CATALOG}", role) in revoked) == (
+        not layers and role not in GOVERNANCE_TABLE_ACCESS
+    )
+
+
+def test_retired_tables_are_revoked(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        lake_grants,
+        "RETIRED_TABLE_ACCESS",
+        {"ol_commerce_operations": {"mart": ("marts__old_orders",)}},
+    )
+    granted = _privileges(governance_grants_sql(CATALOG, "qa"), "GRANT")
+    revoked = _privileges(layer_scoped_revokes_sql(CATALOG, "qa"), "REVOKE")
+
+    assert (
+        "SELECT ON TABLE ol_warehouse_qa_mart.marts__old_orders",
+        "ol_commerce_operations",
+    ) in revoked
+    assert granted.isdisjoint(revoked)
+
+
+def test_single_table_role_gets_its_tables_and_nothing_else() -> None:
+    sql = governance_grants_sql(CATALOG, "qa")
+    granted = _privileges(sql, "GRANT")
+    role = "ol_commerce_operations"
+
+    assert (f"USAGE ON CATALOG {CATALOG}", role) in granted
+    tables = {
+        f"SELECT ON TABLE {layer_database('qa', layer)}.{table}"
+        for layer, layer_tables in GOVERNANCE_TABLE_ACCESS[role].items()
+        for table in layer_tables
+    }
+    assert {privilege for privilege, holder in granted if holder == role} == {
+        f"USAGE ON CATALOG {CATALOG}",
+        *tables,
+    }
+    assert "SELECT ON TABLE ol_warehouse_qa_mart.marts__combined__orders" in tables
 
 
 def test_revokes_never_touch_catalog_wide_roles() -> None:

@@ -46,6 +46,7 @@ from typing import Any
 
 _GOVERNANCE_ROLES: tuple[str, ...] = (
     "ol_business_analyst",
+    "ol_commerce_operations",
     "ol_data_analyst",
     "ol_data_engineer",
     "ol_instructor",
