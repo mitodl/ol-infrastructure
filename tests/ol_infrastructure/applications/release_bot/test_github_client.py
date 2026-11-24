@@ -1042,6 +1042,23 @@ def test_request_abandon_reuses_a_request_left_for_the_same_release(fake_repo):
     assert [r.ref for r in repo.refs] == ["refs/tags/abandon-request/2026.9.9.1"]
 
 
+def test_withdraw_abandon_request_deletes_only_that_release_s_request(fake_repo):
+    repo = fake_repo(
+        _AbandonRefsRepo(
+            "refs/tags/abandon-request/2026.9.9.1",
+            "refs/tags/abandon-request/2026.9.9.10",
+            "refs/tags/2026.9.9.1",
+        )
+    )
+
+    github._withdraw_abandon_request_sync("mitodl/thing", "2026.9.9.1")
+
+    assert [r.ref for r in repo.refs] == [
+        "refs/tags/abandon-request/2026.9.9.10",
+        "refs/tags/2026.9.9.1",
+    ]
+
+
 def test_request_abandon_refuses_a_release_no_longer_in_flight(fake_repo):
     repo = fake_repo(_AbandonRefsRepo())
 

@@ -855,3 +855,20 @@ async def request_abandon(repo_slug: str, version: str) -> None:
     release branch.
     """
     await asyncio.to_thread(_request_abandon_sync, repo_slug, version)
+
+
+def _withdraw_abandon_request_sync(repo_slug: str, version: str) -> None:
+    repo = _get_client().get_repo(repo_slug)
+    wanted = f"refs/tags/{ABANDON_REQUEST_TAG_PREFIX}{version}"
+    for ref in repo.get_git_matching_refs(f"tags/{ABANDON_REQUEST_TAG_PREFIX}"):
+        if ref.ref == wanted:
+            ref.delete()
+
+
+async def withdraw_abandon_request(repo_slug: str, version: str) -> None:
+    """Delete the ``abandon-request/<version>`` tag, if there is one.
+
+    For a request whose abandon was never triggered: left in place, it would
+    let a later manual trigger of the abandon job cancel *version*.
+    """
+    await asyncio.to_thread(_withdraw_abandon_request_sync, repo_slug, version)

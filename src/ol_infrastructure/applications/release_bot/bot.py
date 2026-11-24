@@ -921,6 +921,16 @@ async def _abandon(respond, app_name, cfg, requester: str | None = None):
         # the user nothing was abandoned when their hotfix requests are
         # already gone.
         lines.append(f"❌ Failed to trigger release abandon for `{app_name}`.")
+        # Left behind, the request would let a later manual trigger of the
+        # job cancel this release with nobody in Slack asking for it.
+        try:
+            await github.withdraw_abandon_request(cfg.repo, in_flight["version"])
+        except Exception:
+            log.exception("Failed to withdraw abandon request for %s", app_name)
+            lines.append(
+                f"The abandon request for {in_flight['version']} is still "
+                "pending, so a manual run of the abandon job would cancel it."
+            )
         await respond("\n".join(lines))
         return
     _release_requesters.pop(app_name, None)
