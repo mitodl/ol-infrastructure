@@ -128,9 +128,6 @@ def build_dagster_docker_pipeline() -> Pipeline:
         repo = code_location_repos[build_name]
         image = code_location_images[build_name]
 
-        # Determine if this location needs DBT secrets (lakehouse requires it)
-        needs_dbt_secrets = build_name == "lakehouse"
-
         # dagster-k8s uses a different Dockerfile path
         if build_name == "k8s":
             dockerfile_path = f"{repo.name}/dg_deployments/Dockerfile.dagster-k8s"
@@ -141,14 +138,6 @@ def build_dagster_docker_pipeline() -> Pipeline:
             "CONTEXT": repo.name,
             "DOCKERFILE": dockerfile_path,
         }
-
-        if needs_dbt_secrets:
-            build_params.update(
-                {
-                    "BUILDKIT_SECRETTEXT_dbt_trino_username": "((dbt.trino_username))",
-                    "BUILDKIT_SECRETTEXT_dbt_trino_password": "((dbt.trino_password))",
-                }
-            )
 
         docker_build_job = Job(
             name=f"build-dagster-{build_name}-image",
