@@ -22,6 +22,7 @@ from ol_infrastructure.lib.data_lake_access import (
     DATA_LAKE_LAYERS,
     GOVERNANCE_LAYER_ACCESS,
     GOVERNANCE_TABLE_ACCESS,
+    RETIRED_TABLE_ACCESS,
     layer_database,
 )
 
@@ -127,16 +128,18 @@ def layer_scoped_revokes_sql(catalog: str, env_suffix: str) -> str:
     That is SELECT on all databases, which the Glue catalogs granted every
     governance role before they were scoped and which also covers every
     developer's dbt schemas; SELECT on each layer the mapping does not give the
-    role; and USAGE on the catalog for a role given no layer and no table. Most
-    of these name a grant the role does not hold, so run them with
-    ``revoke_step``. A REVOKE on a whole layer leaves a single-table grant in it
-    alone, since StarRocks revokes only the exact object named.
+    role; SELECT on each table in ``RETIRED_TABLE_ACCESS``; and USAGE on the
+    catalog for a role given no layer and no table. Most of these name a grant
+    the role does not hold, so run them with ``revoke_step``. A REVOKE on a
+    whole layer leaves a single-table grant in it alone, since StarRocks
+    revokes only the exact object named.
 
     Only roles and layers in today's mapping are covered. A role taken out of
-    ``GOVERNANCE_LAYER_ACCESS``, a table taken out of ``GOVERNANCE_TABLE_ACCESS``,
-    a layer taken out of ``DATA_LAKE_LAYERS``, or a
-    role moved there from ``CATALOG_WIDE_WRITE_ROLES`` (which also holds ALL and
-    db_admin) keeps what it held and needs a manual REVOKE.
+    ``GOVERNANCE_LAYER_ACCESS``, a table deleted from ``GOVERNANCE_TABLE_ACCESS``
+    rather than moved to ``RETIRED_TABLE_ACCESS``, a layer taken out of
+    ``DATA_LAKE_LAYERS``, or a role moved there from
+    ``CATALOG_WIDE_WRITE_ROLES`` (which also holds ALL and db_admin) keeps what
+    it held and needs a manual REVOKE.
 
     :param catalog: The StarRocks catalog name.
     :param env_suffix: The environment suffix of the lake the catalog reads,
@@ -159,6 +162,13 @@ def layer_scoped_revokes_sql(catalog: str, env_suffix: str) -> str:
                         f"{layer_database(env_suffix, layer)} FROM ROLE {role};"
                         for layer in DATA_LAKE_LAYERS
                         if layer not in layers
+                    ),
+                    *(
+                        "REVOKE SELECT ON TABLE "  # noqa: S608
+                        f"{layer_database(env_suffix, layer)}.{table}"
+                        f" FROM ROLE {role};"
+                        for layer, tables in RETIRED_TABLE_ACCESS.get(role, {}).items()
+                        for table in tables
                     ),
                 ],
             )

@@ -65,3 +65,25 @@ def test_invalid_table_access_is_refused(
     monkeypatch.setattr(data_lake_access, "GOVERNANCE_TABLE_ACCESS", table_access)
     with pytest.raises(ValueError, match=message):
         validate_governance_access()
+
+
+@pytest.mark.parametrize(
+    ("retired", "message"),
+    [
+        (
+            {"ol_commerce_operations": {"mart": ("marts__combined__orders",)}},
+            "both granted and retired",
+        ),
+        ({"ol_platform_admin": {"mart": ("t",)}}, "not a layer-scoped role"),
+        ({"ol_commerce_operations": {"gold": ("t",)}}, "unknown layers"),
+        ({"ol_commerce_operations": {"mart": ("t; DROP",)}}, "empty or invalid"),
+    ],
+)
+def test_invalid_retired_tables_are_refused(
+    monkeypatch: pytest.MonkeyPatch,
+    retired: dict[str, dict[str, tuple[str, ...]]],
+    message: str,
+) -> None:
+    monkeypatch.setattr(data_lake_access, "RETIRED_TABLE_ACCESS", retired)
+    with pytest.raises(ValueError, match=message):
+        validate_governance_access()
