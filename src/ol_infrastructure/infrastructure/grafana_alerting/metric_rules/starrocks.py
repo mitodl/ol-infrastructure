@@ -305,6 +305,18 @@ def create(
                 rd,
             ),
             _warning(
+                "StarRocksClusterSnapshotFailing",
+                # Hourly automated cluster snapshots (substructure/starrocks).
+                # StarRocks keeps only the last good one, so a run of failures
+                # leaves restores on an ever older image until the bucket's
+                # 14-day noncurrent window runs out (docs/starrocks-restore-runbook.md).
+                f"max by ({_BY_CLUSTER}) "
+                f"(starrocks_fe_cluster_snapshot_consecutive_failures{{{_FE}}}) > 0",
+                "5m",
+                "StarRocks in cluster {{ $labels.cluster }} has failed its last {{ $values.B.Value }} automated cluster snapshot(s), so the newest restore point is getting older. information_schema.cluster_snapshot_jobs has the error; a write failure usually means the IRSA role's shared-data bucket policy.",
+                rd,
+            ),
+            _warning(
                 "StarRocksFEReplayLag",
                 f"max by ({_BY_POD}) (starrocks_fe_meta_replay_lag_second{{{_FE}}}) > 300",
                 "10m",

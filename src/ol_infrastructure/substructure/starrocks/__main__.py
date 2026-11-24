@@ -982,6 +982,53 @@ for _resource_group in resource_groups:
         ),
     )
 
+# --- Automated cluster snapshot --------------------------------------------
+# FE metadata (databases, native tables, MVs, users, grants, catalogs, resource
+# groups) lives on the FE PVs, not in the shared-data bucket. An automated cluster
+# snapshot checkpoints it into builtin_storage_volume (the shared-data bucket, at
+# <service_id>/meta/image/automated_cluster_snapshot_<ms>) and keeps every tablet
+# file it references out of vacuum, so the bucket alone can restore the cluster.
+# StarRocks keeps one snapshot and purges the last when the next finishes; the
+# bucket's versioning (applications/starrocks) is what keeps older ones for its
+# noncurrent window. Restore: docs/starrocks-restore-runbook.md.
+#
+# Neither statement is idempotent on 4.1 (ClusterSnapshotAnalyzer): ON fails once
+# snapshots are on and ALTER/OFF fail while they are off. So create and update try
+# ALTER first and fall back to ON, whose error is the informative one if both fail.
+# Every lakehouse stack runs shared-data (starrocks:use_cn), which ON requires.
+#
+# There is deliberately no delete. OFF deletes the snapshot from S3
+# (ClusterSnapshotMgr.clearFinishedAutomatedClusterSnapshot), so a rename, a
+# replace or a stack destroy would throw away the restore point, and OFF also
+# fails when snapshots are already off. Turning snapshots off is a manual
+# `ADMIN SET AUTOMATED CLUSTER SNAPSHOT OFF`.
+CLUSTER_SNAPSHOT_INTERVAL_HOURS = 1
+_cluster_snapshot_on_sql = (
+    "ADMIN SET AUTOMATED CLUSTER SNAPSHOT ON"
+    f" INTERVAL {CLUSTER_SNAPSHOT_INTERVAL_HOURS} HOUR;"
+)
+_cluster_snapshot_alter_sql = (
+    "ADMIN ALTER AUTOMATED CLUSTER SNAPSHOT SET INTERVAL"
+    f" {CLUSTER_SNAPSHOT_INTERVAL_HOURS} HOUR;"
+)
+_exec_alter_or_on_sql = (
+    f"{_mysql_opts_setup}"
+    f" && {{ printf '%s' \"$STARROCKS_ALTER_SQL\" | {_mysql_client} 2>/dev/null"
+    f" || printf '%s' \"$STARROCKS_SQL\" | {_mysql_client}; }}"
+    f"; {_mysql_opts_cleanup}"
+)
+cluster_snapshot_cmd = command.local.Command(
+    f"starrocks-{stack_info.env_suffix}-automated-cluster-snapshot",
+    create=_exec_alter_or_on_sql,
+    update=_exec_alter_or_on_sql,
+    environment={
+        **_mysql_env,
+        "STARROCKS_SQL": _cluster_snapshot_on_sql,
+        "STARROCKS_ALTER_SQL": _cluster_snapshot_alter_sql,
+    },
+    opts=ResourceOptions(depends_on=[starrocks_db_connection]),
+)
+
 # --- OIDC / OAuth2 authentication via Keycloak ------------------------------
 # StarRocks v3.5+ uses a "security integration" (SQL object) to hold OAuth2
 # provider settings rather than fe.conf env vars.  The integration name goes
