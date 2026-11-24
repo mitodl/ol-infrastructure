@@ -351,6 +351,22 @@ def test_the_root_domain_flows_into_hosts_and_env(tmp_path, monkeypatch):
     assert not [v for v in [*env.values(), *secret.values()] if "mit.test" in v]
 
 
+def test_scim_sync_targets_the_realm_production_does(tmp_path, monkeypatch):
+    """The same olapps realm URL as Production, on the local Keycloak host."""
+    production = yaml.safe_load(
+        (
+            REPO
+            / "src/ol_infrastructure/applications/mitxonline/Pulumi.Production.yaml"
+        ).read_text()
+    )["config"]["mitxonline:vars"]["MITOL_SCIM_KEYCLOAK_BASE_URL"]
+    mocks = _render(tmp_path, monkeypatch)
+    env = _env(_one(mocks, DEPLOYMENT, "mitxonline-app"))
+
+    assert env["MITOL_SCIM_KEYCLOAK_BASE_URL"] == production.replace(
+        "sso.ol.mit.edu", "sso.ol.mit.test"
+    )
+
+
 def _webapp_container(mocks):
     return _one(mocks, DEPLOYMENT, "mitxonline-app")["spec"]["template"]["spec"][
         "containers"

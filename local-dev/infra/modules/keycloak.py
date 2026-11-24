@@ -15,6 +15,7 @@ automatically (the "kc-seed-users" resource) after this realm is applied.
 
 import json
 from http import HTTPStatus
+from typing import NamedTuple
 
 import httpx
 import pulumi_keycloak as keycloak
@@ -35,6 +36,15 @@ LOCAL_OIDC_SESSION_SECRET = "local-dev-oidc-session-secret-32chars!"  # noqa: S1
 
 OLAPPS_REALM = "olapps"
 ADMIN_API_TIMEOUT_SECONDS = 30
+
+
+class OlappsRealm(NamedTuple):
+    """The olapps realm and the clients other modules need to reference."""
+
+    realm: keycloak.Realm
+    # scim_sync's client, which keycloak_scim.py authorizes on the realm's
+    # inbound SCIM server.
+    mitxonline_client: keycloak.openid.Client
 
 
 def live_realm_import_id(
@@ -85,7 +95,7 @@ def live_realm_import_id(
     return realm
 
 
-def create_olapps_dev_realm(  # noqa: PLR0913
+def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     k8s_provider: k8s.Provider,
@@ -100,7 +110,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     realm_import_id: str | None,
     verify_email: bool = True,
     enabled_apps: tuple[str, ...] = (),
-) -> keycloak.Realm:
+) -> OlappsRealm:
     """
     Create the olapps Keycloak realm for local development.
 
@@ -115,8 +125,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     ``realm_import_id`` is :func:`live_realm_import_id`'s result; when set, the
     realm resource adopts the live realm instead of creating it.
 
-    :returns: The realm resource, for callers that need to order work after it.
-    :rtype: keycloak.Realm
+    :returns: The realm resource, for callers that need to order work after it,
+        and the clients other modules configure access for.
+    :rtype: OlappsRealm
     """
     kc_opts = ResourceOptions(provider=keycloak_provider)
     k8s_opts = ResourceOptions(provider=k8s_provider)
@@ -615,6 +626,23 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         default_scopes=DEFAULT_SCOPES,
         opts=kc_opts,
     )
+    # scim_sync's credentials, under the names the deployed keycloak-scim entry
+    # in applications/mitxonline/vault_secrets.py writes. The deployed stacks
+    # use this same client (substructure/keycloak/olapps.py, MITXONLINE SCIM).
+    k8s.core.v1.Secret(
+        "mitxonline-keycloak-scim",
+        metadata={"name": "mitxonline-keycloak-scim", "namespace": "mitxonline"},
+        string_data=Output.all(
+            client_id=mitxonline_client.client_id,
+            client_secret=mitxonline_client.client_secret,
+        ).apply(
+            lambda args: {
+                "MITOL_SCIM_KEYCLOAK_CLIENT_ID": args["client_id"],
+                "MITOL_SCIM_KEYCLOAK_CLIENT_SECRET": args["client_secret"],
+            }
+        ),
+        opts=k8s_opts,
+    )
 
     # --- ODL Video Service ---
     # OVS does OIDC inside Django (social-auth) rather than at APISIX, so its
@@ -984,4 +1012,4 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             opts=ResourceOptions(provider=k8s_provider, parent=ocw_studio_client),
         )
 
-    return realm
+    return OlappsRealm(realm=realm, mitxonline_client=mitxonline_client)

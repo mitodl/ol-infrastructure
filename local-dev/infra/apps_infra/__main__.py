@@ -142,7 +142,7 @@ keycloak_provider = keycloak.Provider(
     client_timeout=60,
 )
 
-olapps_realm = create_olapps_dev_realm(
+olapps = create_olapps_dev_realm(
     realm_import_id=live_realm_import_id(
         keycloak_url, OLAPPS_REALM, KEYCLOAK_ADMIN_USERNAME, KEYCLOAK_ADMIN_PASSWORD
     ),
@@ -167,7 +167,8 @@ olapps_realm = create_olapps_dev_realm(
 create_scim_remote_providers(
     keycloak_provider=keycloak_provider,
     keycloak_url=keycloak_url,
-    realm=olapps_realm,
+    realm=olapps.realm,
+    mitxonline_client=olapps.mitxonline_client,
     realm_name=OLAPPS_REALM,
     learn_scim_token=learn_scim_token,
     mitxonline_scim_token=mitxonline_scim_token,

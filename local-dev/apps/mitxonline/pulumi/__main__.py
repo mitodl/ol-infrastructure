@@ -122,6 +122,9 @@ LOCAL_ENV_DEFAULTS = {
     # no secret.
     "KEYCLOAK_CLIENT_ID": "ol-mitxonline-client",
     "KEYCLOAK_CLIENT_SECRET": "local-dev-mitxonline-secret",  # pragma: allowlist secret
+    # scim_sync's target, as each deployed stack's vars set it. The client pair
+    # comes from mitxonline-keycloak-scim (supplied_by in secrets.yaml).
+    "MITOL_SCIM_KEYCLOAK_BASE_URL": f"https://sso.ol.{root_domain}/realms/olapps/",
     # Required for Django's CSRF origin check on POSTs behind HTTPS (e.g. the
     # admin login form); defaults to empty, which rejects them with DEBUG=False.
     "CSRF_TRUSTED_ORIGINS": (
@@ -209,10 +212,10 @@ opts = ResourceOptions(providers=[provider])
 # Deployed stacks get these variables from Vault through VSO. Here one plain
 # Secret carries the same names, with the values secrets.yaml gives them.
 local_secrets = manifest(APP_DIR / "secrets.yaml", root_domain)
-# The admin and membership client pairs, which apps-infra writes into this
-# namespace (the deployed stacks read them from keycloak-admin-b2b and
-# keycloak-admin-b2b-membership in Vault).
-MOUNTED_SECRETS = [SECRET_NAME, "mitxonline-keycloak-admin"]
+# The admin and membership client pairs and the SCIM client pair, which
+# apps-infra writes into this namespace (the deployed stacks read them from
+# keycloak-admin-b2b, keycloak-admin-b2b-membership and keycloak-scim in Vault).
+MOUNTED_SECRETS = [SECRET_NAME, "mitxonline-keycloak-admin", "mitxonline-keycloak-scim"]
 unmounted = sorted(set(local_secrets["supplied_by"].values()) - set(MOUNTED_SECRETS))
 if unmounted:
     msg = f"secrets.yaml supplied_by names Secrets no workload mounts: {unmounted}"
