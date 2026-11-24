@@ -26,7 +26,7 @@ from typing import Any
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Config, InvokeOptions, Output, ResourceOptions
+from pulumi import Config, InvokeOptions, Output, Resource, ResourceOptions
 from pydantic import ValidationError
 
 from ol_infrastructure.providers.keycloak_scim import (
@@ -51,17 +51,27 @@ def _parse_remote_provider(entry: dict[str, Any]) -> ScimRemoteProviderSpec:
         raise ValueError(msg) from None
 
 
-def create_scim_resources(
+def create_scim_config_manager(
     keycloak_provider: keycloak.Provider,
-    keycloak_url: str,
-) -> None:
-    """Create the SCIM admin service account and the declared remote providers."""
-    resource_options = ResourceOptions(provider=keycloak_provider)
+    realms: list[str],
+    depends_on: list[Resource] | None = None,
+) -> tuple[keycloak.openid.Client, list[keycloak.openid.ClientServiceAccountRole]]:
+    """Create the master-realm service account the SCIM admin backend accepts.
+
+    Shared by the deployed stacks and local-dev's apps-infra stack.
+
+    :param keycloak_provider: Provider authenticated against the master realm.
+    :param realms: Realms whose remote providers the account manages; each gets
+        a ``<realm>-realm`` ``scim-admin`` grant.
+    :param depends_on: Resources the account waits for, e.g. a realm created in
+        the same program, whose admin client the grant needs.
+    :returns: The client and its role grants, which remote providers depend on.
+    :rtype: tuple
+    """
+    resource_options = ResourceOptions(
+        provider=keycloak_provider, depends_on=depends_on
+    )
     invoke_options = InvokeOptions(provider=keycloak_provider)
-    remote_providers = [
-        _parse_remote_provider(entry)
-        for entry in Config("keycloak_scim").get_object("remote_providers") or []
-    ]
 
     scim_client = keycloak.openid.Client(
         "master-scim-config-manager-client",
@@ -81,13 +91,10 @@ def create_scim_resources(
     # The plugin only accepts a service account token when it holds scim-admin
     # on the master realm's own admin client. The per-realm grants scope the
     # backend's realm authorization to the realms we actually configure.
-    scim_realms = sorted(
-        DEFAULT_SCIM_REALMS | {provider.realm for provider in remote_providers}
-    )
     role_grants = []
     # A provider in the master realm would repeat master-realm.
     admin_client_ids = dict.fromkeys(
-        ["master-realm", *(f"{realm}-realm" for realm in scim_realms)]
+        ["master-realm", *(f"{realm}-realm" for realm in realms)]
     )
     for admin_client_id in admin_client_ids:
         admin_client = keycloak.openid.get_client(
@@ -103,6 +110,22 @@ def create_scim_resources(
                 opts=resource_options,
             )
         )
+    return scim_client, role_grants
+
+
+def create_scim_resources(
+    keycloak_provider: keycloak.Provider,
+    keycloak_url: str,
+) -> None:
+    """Create the SCIM admin service account and the declared remote providers."""
+    remote_providers = [
+        _parse_remote_provider(entry)
+        for entry in Config("keycloak_scim").get_object("remote_providers") or []
+    ]
+    scim_client, role_grants = create_scim_config_manager(
+        keycloak_provider,
+        sorted(DEFAULT_SCIM_REALMS | {provider.realm for provider in remote_providers}),
+    )
 
     vault.generic.Secret(
         "master-scim-config-manager-vault-credentials",

@@ -173,15 +173,16 @@ config:
     enabled: true
     replay_on_failure: true
     retry_interval_in_seconds: 3600
+    # Capability flags and custom User-schema mappings as read from the live
+    # provider (2026-11-24). Unlike Learn's, this provider sends no bulk
+    # requests or sort parameters, and maps no fullName.
     filter_supported: true
     filter_max_results: 50
-    sort_supported: true
+    sort_supported: false
     patch_supported: true
-    bulk_supported: true
-    bulk_max_operations: 100
-    bulk_max_payload_size: 1048576
-    # Custom User-schema mappings as read from the live provider (2026-11-23).
-    # None: this provider sends mitxonline no fullName.
+    bulk_supported: false
+    bulk_max_operations: 250
+    bulk_max_payload_size: 1000000
     user_attributes: []
     authentication_list:
     - authentication_type: BEARER

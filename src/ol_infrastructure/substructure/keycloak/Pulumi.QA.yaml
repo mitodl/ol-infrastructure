@@ -175,16 +175,18 @@ config:
     base_url: https://rc.mitxonline.mit.edu/scim/v2
     enabled: true
     replay_on_failure: false
+    # The same capability flags and custom User-schema mappings as
+    # Production's mitxonline provider: no bulk requests, no sort parameters,
+    # no custom mappings. The live provider mapped fullName (read 2026-11-23);
+    # apply deletes it, so RC stops sending mitxonline names, as Production
+    # does. Its live flags were not read.
     filter_supported: true
     filter_max_results: 50
-    sort_supported: true
+    sort_supported: false
     patch_supported: true
-    bulk_supported: true
-    bulk_max_operations: 100
-    bulk_max_payload_size: 1048576
-    # No custom User-schema mappings, the same as Production's mitxonline
-    # provider. The live provider mapped fullName (read 2026-11-23); apply
-    # deletes it, so RC stops sending mitxonline names, as Production does.
+    bulk_supported: false
+    bulk_max_operations: 250
+    bulk_max_payload_size: 1000000
     user_attributes: []
     authentication_list:
     - authentication_type: BEARER
