@@ -11,23 +11,13 @@ from ol_infrastructure.providers.keycloak_scim.remote_provider import (
     ScimRemoteProviderSpec,
     ScimUserAttribute,
 )
+from tests.ol_infrastructure.providers.keycloak_scim.fakes import FakeResponse
 
 KEYCLOAK_URL = "https://sso.example.test"
 BACKEND = f"{KEYCLOAK_URL}/realms/master/scim/admin/backend/scim/v2"
 PROVIDERS = f"{BACKEND}/RemoteScimProviderConfig"
 SCHEMAS = f"{BACKEND}/KeycloakResourceSchemas"
 ATTRIBUTES = f"{BACKEND}/KeycloakResourceSchemaAttributes"
-
-
-class FakeResponse:
-    def __init__(self, payload: Any, status_code: int = 200) -> None:
-        self.payload = payload
-        self.status_code = status_code
-        self.ok = status_code < 400
-        self.text = str(payload)
-
-    def json(self) -> Any:
-        return self.payload
 
 
 class FakeBackend:

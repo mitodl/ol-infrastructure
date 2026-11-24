@@ -7,11 +7,19 @@ from .remote_provider import (
     ScimRemoteProviderSpec,
     ScimUserAttribute,
 )
+from .service_provider import (
+    ScimServiceProviderConfig,
+    ScimServiceProviderConfigProvider,
+    ScimServiceProviderSpec,
+)
 
 __all__ = [
     "ScimAuthentication",
     "ScimRemoteProvider",
     "ScimRemoteProviderProvider",
     "ScimRemoteProviderSpec",
+    "ScimServiceProviderConfig",
+    "ScimServiceProviderConfigProvider",
+    "ScimServiceProviderSpec",
     "ScimUserAttribute",
 ]

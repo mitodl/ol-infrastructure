@@ -27,6 +27,8 @@ from ol_infrastructure.providers.keycloak_scim import (
     ScimAuthentication,
     ScimRemoteProvider,
     ScimRemoteProviderSpec,
+    ScimServiceProviderConfig,
+    ScimServiceProviderSpec,
     ScimUserAttribute,
 )
 from ol_infrastructure.substructure.keycloak.scim import create_scim_config_manager
@@ -70,6 +72,12 @@ LEARN_PROVIDER: dict[str, Any] = {
         ),
     ],
 }
+# Operations mitol.scim puts in one /Users/Bulk request: its
+# MITOL_SCIM_KEYCLOAK_BULK_OPERATIONS_COUNT default, which no deployed stack
+# overrides. The inbound server has to accept that many, or scim_sync of more
+# than the plugin's default 15 users gets a 500.
+MITOL_SCIM_BULK_OPERATIONS = 250
+
 MITXONLINE_PROVIDER: dict[str, Any] = {
     **COMMON_CAPABILITIES,
     "sort_supported": False,
@@ -84,6 +92,7 @@ def create_scim_remote_providers(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     realm: keycloak.Realm,
+    mitxonline_client: keycloak.openid.Client,
     learn_scim_token: str,
     mitxonline_scim_token: str,
     *,
@@ -98,6 +107,8 @@ def create_scim_remote_providers(  # noqa: PLR0913
         admin-url-check to no-context-path.
     :param realm: The olapps realm, depended on so the per-realm scim-admin
         role exists before it is granted.
+    :param mitxonline_client: ol-mitxonline-client, which mitxonline's
+        scim_sync authenticates to the realm's SCIM server as.
     :param learn_scim_token: Bearer token mit-learn will accept. Must match the
         AccessToken row seeded in mit-learn's database.
     :param mitxonline_scim_token: Bearer token mitxonline will accept.
@@ -110,6 +121,24 @@ def create_scim_remote_providers(  # noqa: PLR0913
     """
     scim_client, role_grants = create_scim_config_manager(
         keycloak_provider, [realm_name], depends_on=[realm]
+    )
+
+    # The realm's inbound SCIM server, which mitxonline's scim_sync calls as
+    # ol-mitxonline-client. On a new realm it is inactive and admits no client
+    # until saved. No deployed stack manages the deployed realms' configs.
+    # Unlike the providers below, not gated on enabled_apps: it targets nothing.
+    ScimServiceProviderConfig(
+        f"{realm_name}-scim-service-provider-config",
+        keycloak_url=keycloak_url,
+        client_id=scim_client.client_id,
+        client_secret=scim_client.client_secret,
+        spec=ScimServiceProviderSpec(
+            realm=realm_name,
+            active=True,
+            bulk_max_operations=MITOL_SCIM_BULK_OPERATIONS,
+        ),
+        authorized_clients=[mitxonline_client.client_id],
+        opts=ResourceOptions(depends_on=[*role_grants, realm]),
     )
 
     # Keyed by the app name the Tiltfile uses, so enabled_apps gates them.
