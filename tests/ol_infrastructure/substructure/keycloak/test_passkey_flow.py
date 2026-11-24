@@ -49,11 +49,19 @@ def test_resource_names_and_aliases_match_the_deployed_flow(resources):
         f"{PREFIX}-passkey-flow",
         f"{PREFIX}-flow-username-form",
         f"{PREFIX}-webauthn-authenticator-flow",
+        f"{PREFIX}-webauthn-register-passwordless",
     }
     assert resources[f"{PREFIX}-flow"].inputs["alias"] == f"{PREFIX}-flow"
     assert (
         resources[f"{PREFIX}-passkey-flow"].inputs["alias"] == f"{PREFIX}-passkey-flow"
     )
+
+
+def test_passkey_registration_action_is_enabled(resources):
+    """The passwordless authenticator won't enroll anyone; this action is the way."""
+    action = resources[f"{PREFIX}-webauthn-register-passwordless"].inputs
+    assert action["alias"] == "webauthn-register-passwordless"
+    assert action["enabled"] is True
 
 
 def test_every_top_level_step_is_alternative(resources):
