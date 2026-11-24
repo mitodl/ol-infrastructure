@@ -154,6 +154,8 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    etag_supported: false
+    change_password_supported: false
     # Custom User-schema mappings, the same as Production's Learn provider so RC
     # provisions the way Production does. The live provider had fullName only
     # (read 2026-11-23); emailOptIn is added on apply.
@@ -185,6 +187,8 @@ config:
     bulk_supported: false
     bulk_max_operations: 250
     bulk_max_payload_size: 1000000
+    etag_supported: false
+    change_password_supported: false
     user_attributes: []
     authentication_list:
     - authentication_type: BEARER
