@@ -30,7 +30,6 @@ import pulumi
 import requests
 from pulumi import dynamic
 from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
 
 from ol_infrastructure.providers.http import raise_for_status_with_body
 from ol_infrastructure.providers.keycloak_scim.remote_provider import (
@@ -56,18 +55,23 @@ READ_ONLY_ATTRIBUTES = ("meta", REALM_INFOS_SCHEMA)
 class ScimServiceProviderSpec(BaseModel):
     """Declared attributes of a realm's inbound SCIM server.
 
-    Only these attributes are managed; every other one keeps its live value.
+    Only these attributes are managed; every other one keeps its live value, as
+    do those left as ``None``.
     """
 
-    model_config = ConfigDict(
-        alias_generator=to_camel, populate_by_name=True, extra="forbid"
-    )
+    model_config = ConfigDict(extra="forbid")
 
     realm: str
     active: bool
+    # Most operations the server accepts in one bulk request; it answers a
+    # larger one with a 500. The plugin's default is 15.
+    bulk_max_operations: int | None = None
 
     def to_scim(self) -> dict[str, Any]:
-        return self.model_dump(by_alias=True, exclude_none=True, exclude={"realm"})
+        scim: dict[str, Any] = {"active": self.active}
+        if self.bulk_max_operations is not None:
+            scim["bulk"] = {"maxOperations": self.bulk_max_operations}
+        return scim
 
 
 def _endpoint(props: dict[str, Any]) -> str:

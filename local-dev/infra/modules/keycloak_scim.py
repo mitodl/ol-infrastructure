@@ -72,6 +72,12 @@ LEARN_PROVIDER: dict[str, Any] = {
         ),
     ],
 }
+# Operations mitol.scim puts in one /Users/Bulk request: its
+# MITOL_SCIM_KEYCLOAK_BULK_OPERATIONS_COUNT default, which no deployed stack
+# overrides. The inbound server has to accept that many, or scim_sync of more
+# than the plugin's default 15 users gets a 500.
+MITOL_SCIM_BULK_OPERATIONS = 250
+
 MITXONLINE_PROVIDER: dict[str, Any] = {
     **COMMON_CAPABILITIES,
     "sort_supported": False,
@@ -126,7 +132,11 @@ def create_scim_remote_providers(  # noqa: PLR0913
         keycloak_url=keycloak_url,
         client_id=scim_client.client_id,
         client_secret=scim_client.client_secret,
-        spec=ScimServiceProviderSpec(realm=realm_name, active=True),
+        spec=ScimServiceProviderSpec(
+            realm=realm_name,
+            active=True,
+            bulk_max_operations=MITOL_SCIM_BULK_OPERATIONS,
+        ),
         authorized_clients=[mitxonline_client.client_id],
         opts=ResourceOptions(depends_on=[*role_grants, realm]),
     )

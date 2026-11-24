@@ -185,6 +185,31 @@ def test_read_reports_authorized_clients_and_diff_ignores_their_order(backend):
     ).changes
 
 
+def test_the_bulk_limit_is_set_inside_the_live_bulk_object(backend):
+    props = _props()
+    props["spec"] = ScimServiceProviderSpec(
+        realm="olapps", active=True, bulk_max_operations=250
+    ).to_scim()
+    provider = ScimServiceProviderConfigProvider()
+
+    provider.create(props)
+
+    assert backend.configs["olapps"]["bulk"] == {
+        "supported": True,
+        "maxOperations": 250,
+    }
+    backend.configs["olapps"]["bulk"]["maxOperations"] = 15
+    outs = provider.read("olapps-config", props).outs
+    assert outs["spec"] == {"active": True, "bulk": {"maxOperations": 15}}
+    assert provider.diff("olapps-config", outs, props).changes
+
+
+def test_an_undeclared_bulk_limit_is_not_sent():
+    assert ScimServiceProviderSpec(realm="olapps", active=True).to_scim() == {
+        "active": True
+    }
+
+
 def test_create_saves_an_unsaved_config_by_post(backend):
     result = ScimServiceProviderConfigProvider().create(_props())
 
