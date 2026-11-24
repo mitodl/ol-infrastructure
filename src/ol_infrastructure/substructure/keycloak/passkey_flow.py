@@ -23,6 +23,9 @@ def create_passkey_browser_flow(
     present the organization authenticator shows its own username form ahead of the
     passkey form.
 
+    It also declares the realm's ``webauthn-register-passwordless`` required action,
+    since the passkey step cannot enroll a user who has no passkey.
+
     :param realm_id: The realm the flow belongs to.
     :param name_prefix: Prefix for the resource names and flow aliases, e.g.
         ``ol-browser-data-platform``. The realm's flow binding points at the alias, so
@@ -81,6 +84,23 @@ def create_passkey_browser_flow(
         authenticator="webauthn-authenticator-passwordless",
         requirement="REQUIRED",
         priority=80,
+        opts=opts,
+    )
+    # The passwordless authenticator refuses a user with no passkey rather than
+    # sending them to set one up (isUserSetupAllowed is false), so this required
+    # action is the only way to enroll: as a default action after a user's first
+    # identity provider login, or from the account console. Nothing declared it
+    # before, and the CI ol-data-platform realm did not have it registered, which
+    # left no way to get a passkey there.
+    keycloak.RequiredAction(
+        f"{name_prefix}-webauthn-register-passwordless",
+        realm_id=realm_id,
+        alias="webauthn-register-passwordless",
+        # Keycloak's own name for it. Without one, Pulumi auto-names it, and that
+        # is the name the admin console shows.
+        name="Webauthn Register Passwordless",
+        enabled=True,
+        default_action=True,
         opts=opts,
     )
     return browser_flow
