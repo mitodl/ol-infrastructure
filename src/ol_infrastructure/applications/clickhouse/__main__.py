@@ -283,6 +283,10 @@ def _stateful_node_affinity(*, use_io_optimized: bool) -> dict[str, Any]:
     that way on 2026-11-23 23:46Z and 2026-11-24 16:25Z (Karpenter and
     aws-node-termination-handler evictions in the EKS audit log, then an EC2
     BidEvictedEvent for each node), dropping Opik's Liquibase target each time.
+
+    :param use_io_optimized: Also require the io-optimized node label.
+    :returns: A pod ``affinity.nodeAffinity`` value.
+    :rtype: dict[str, Any]
     """
     match_expressions: list[dict[str, Any]] = [not_spot_node_match_expression()]
     if use_io_optimized:
@@ -295,24 +299,6 @@ def _stateful_node_affinity(*, use_io_optimized: bool) -> dict[str, Any]:
         }
     }
 
-
-IO_OPTIMIZED_NODE_AFFINITY = kubernetes.core.v1.AffinityArgs(
-    node_affinity=kubernetes.core.v1.NodeAffinityArgs(
-        required_during_scheduling_ignored_during_execution=kubernetes.core.v1.NodeSelectorArgs(
-            node_selector_terms=[
-                kubernetes.core.v1.NodeSelectorTermArgs(
-                    match_expressions=[
-                        kubernetes.core.v1.NodeSelectorRequirementArgs(
-                            key="ol.mit.edu/io_optimized",
-                            operator="In",
-                            values=["true"],
-                        )
-                    ]
-                )
-            ]
-        )
-    )
-)
 
 # Profiles and quotas are expressed in the Altinity operator's native
 # slash-path map form (configuration.profiles / configuration.quotas). The
