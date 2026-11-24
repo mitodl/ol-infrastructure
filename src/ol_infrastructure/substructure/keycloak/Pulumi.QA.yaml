@@ -178,17 +178,17 @@ config:
     enabled: true
     replay_on_failure: false
     # The same capability flags and custom User-schema mappings as
-    # Production's mitxonline provider: no bulk requests, no sort parameters,
-    # no custom mappings. The live provider mapped fullName (read 2026-11-23);
-    # apply deletes it, so RC stops sending mitxonline names, as Production
-    # does. Its live flags were not read.
+    # Production's mitxonline provider: bulk requests on Learn's limits, no
+    # sort parameters, no custom mappings. The live provider mapped fullName
+    # (read 2026-11-23); apply deletes it, so RC stops sending mitxonline
+    # names, as Production does.
     filter_supported: true
     filter_max_results: 50
     sort_supported: false
     patch_supported: true
-    bulk_supported: false
-    bulk_max_operations: 250
-    bulk_max_payload_size: 1000000
+    bulk_supported: true
+    bulk_max_operations: 100
+    bulk_max_payload_size: 1048576
     etag_supported: false
     change_password_supported: false
     user_attributes: []

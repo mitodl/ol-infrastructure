@@ -45,9 +45,9 @@ MITXONLINE_SCIM_BASE_URL = (
 # Pulumi.Production.yaml), so local-dev sends the request shapes Production
 # does. Every flag is declared, off ones included, because loading the default
 # configuration resets undeclared ones to RFC defaults. Production's mitxonline
-# provider sends no bulk requests and no sort parameters, and maps neither
-# fullName nor emailOptIn, so a Keycloak name change does not reach
-# mitxonline's name here either; add fullName to its list to test that.
+# provider sends bulk requests on Learn's limits but no sort parameters, and
+# maps neither fullName nor emailOptIn, so a Keycloak name change does not
+# reach mitxonline's name here either; add fullName to its list to test that.
 COMMON_CAPABILITIES: dict[str, Any] = {
     "filter_supported": True,
     "filter_max_results": 50,
@@ -73,9 +73,9 @@ LEARN_PROVIDER: dict[str, Any] = {
 MITXONLINE_PROVIDER: dict[str, Any] = {
     **COMMON_CAPABILITIES,
     "sort_supported": False,
-    "bulk_supported": False,
-    "bulk_max_operations": 250,
-    "bulk_max_payload_size": 1000000,
+    "bulk_supported": True,
+    "bulk_max_operations": 100,
+    "bulk_max_payload_size": 1048576,
     "user_attributes": [],
 }
 
