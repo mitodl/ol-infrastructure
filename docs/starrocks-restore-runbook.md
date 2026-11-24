@@ -103,8 +103,23 @@ kubectl -n starrocks exec lakehouse-starrocks-fe-0 -c fe -- \
     -e "SET PASSWORD FOR root = PASSWORD(\"$pw\")"'
 ```
 
-A snapshot restore brings back root's password as of the snapshot. Run the same
-command if the Secret has changed since.
+A snapshot restore instead brings back root's password as of the snapshot, so
+that command (which logs in with no password) gets `ERROR 1045` there. If the
+Secret changed after the snapshot, log in with the snapshot-era password and set
+the current one. The old value is `starrocks:root_password` in the applications
+stack's config as of the snapshot. Get it with `pulumi config get
+starrocks:root_password --stack lakehouse.<env> --config-file <file>`, where
+`<file>` is `Pulumi.lakehouse.<env>.yaml` from git at that time. Then pass it on
+stdin, so it doesn't show up in a process list:
+
+```bash
+printf '%s\n' "$OLD_ROOT_PASSWORD" | kubectl -n starrocks exec -i \
+  lakehouse-starrocks-fe-0 -c fe -- sh -c 'read -r old; pw="$MYSQL_PWD";
+    MYSQL_PWD="$old" mysql -h127.0.0.1 -P9030 -uroot \
+    -e "SET PASSWORD FOR root = PASSWORD(\"$pw\")"'
+```
+
+If the Secret did not change, there is nothing to do.
 
 ## Path 1: rebuild
 
@@ -137,11 +152,19 @@ Use this when the FE metadata is gone or untrustworthy and nothing hand-made in
 7. Set the FE replicas back to the stack's configured count (CI runs one) and
    `pulumi up` on `applications/starrocks`. The followers start on empty volumes
    and join through `--helper`.
-8. Re-run the substructure SQL. The `substructure/starrocks` Command resources
-   are already "created" in state and their triggers (where they have any) hash
-   SQL that has not changed, so an `up` will not run them against the empty FE.
-   First remove them from state (this part runs fine from a laptop), so the next
-   `up` creates them:
+8. Re-run the substructure SQL. Check first that the stack's Concourse deploy
+   job (named below) can run now, because once the Commands are out of state
+   the stack has no setup SQL until that job runs. Production's deploy is
+   chained on the "[bot] Pulumi ol-substructure-starrocks lakehouse.QA
+   deployed." issue in `GH_ISSUES_DEFAULT_REPOSITORY`
+   (`ol_concourse/pipelines/constants.py`) being closed, and the QA and
+   Production pipelines have a `preview-...` job (topology `preview-gated`).
+   Clear whichever gate the job is waiting on.
+
+   The `substructure/starrocks` Command resources are already "created" in
+   state and their triggers (where they have any) hash SQL that has not changed,
+   so an `up` will not run them against the empty FE. First remove them from
+   state (this part runs fine from a laptop), so the next `up` creates them:
    `pulumi state delete --target-dependents <urn>` on each
    `command:local:Command` that is still in state, starting with
    `starrocks-<env>-roles-setup`, which the grant and resource-group Commands
@@ -158,12 +181,10 @@ Use this when the FE metadata is gone or untrustworthy and nothing hand-made in
    `deploy-ol-substructure-starrocks-lakehouse.ci` on cicd-ci.odl.mit.edu,
    Production is `pulumi-starrocks-substructure` /
    `deploy-ol-substructure-starrocks-lakehouse-production` on cicd.odl.mit.edu,
-   and QA's runs on cicd-qa.odl.mit.edu. Production's pipeline also has a
-   `preview-...` job; run it first if the deploy job waits on it. The Commands
-   run `mysql` wherever Pulumi
-   runs, against the FE's internal NLB, which admits the Concourse workers but
-   not a laptop. A local `up` fails each Command with `ERROR 2002 Can't connect`
-   after about nine minutes.
+   and QA's runs on cicd-qa.odl.mit.edu. The Commands run `mysql` wherever
+   Pulumi runs, against the FE's internal NLB, which admits the Concourse
+   workers but not a laptop. A local `up` fails each Command with `ERROR 2002
+   Can't connect` after about nine minutes.
 9. Revoke and reissue the VaultDynamicSecrets in the consumers' namespaces
    (Superset, ol-analytics-api, OpenMetadata, mit-learn) so they get users that
    exist in the new FE.
@@ -250,17 +271,33 @@ restores the cluster as of the last snapshot, at most one hour old.
    restart restores again. Applying the `remove` patch rolls FE 0, which then
    starts from the restored metadata. Start the operator; the CN StatefulSet
    stays at zero as long as the `StarRocksCluster` resource doesn't change, so
-   run no `pulumi up` on `applications/starrocks` until step 9. Set root's
-   password if the Secret changed after the snapshot.
+   run no `pulumi up` on `applications/starrocks` until step 9. The CN HPA also
+   writes to that resource, so check `kubectl get sts lakehouse-starrocks-cn`
+   before and after step 8 and scale it back to zero if it has come up. If the
+   Secret changed after the snapshot,
+   [set root's password](#setting-roots-password-on-an-empty-fe) with the
+   snapshot-era one.
 8. Bring authorization back to now while the CNs are still at zero, so nothing
    can read data yet. The restored FE has the users, grants, catalogs and
    settings of the snapshot (in CI the snapshot interval came back as it was at
    snapshot time), and Pulumi state was not rewound with it, so a plain
-   `pulumi up` changes nothing. Run Path 1 step 8 (Command state reset, then the
-   Concourse deploy). Then drop every restored Vault user (`SHOW USERS`, names
-   from the `database-starrocks` roles' username template) with no live lease
-   under `vault list sys/leases/lookup/database-starrocks/creds/<role>`, and do
-   Path 1 step 9. Writers stay paused until step 10.
+   `pulumi up` changes nothing.
+   1. Run Path 1 step 8 (gate check, Command state reset, Concourse deploy).
+   2. Replaying the Commands restores what the code grants. It revokes only
+      the layer grants that `lake_grants` tracks, so a grant made by hand after
+      the code ran comes back with the snapshot. Compare `SHOW GRANTS FOR ROLE
+      <role>` for each custom role, and `SHOW GRANTS FOR` each non-Vault user,
+      with the SQL the deploy just ran, and revoke anything extra.
+   3. Retire every restored Vault user. `vault list
+      sys/leases/lookup/database-starrocks/creds/<role>` lists lease IDs, not
+      user names, so revoke them all with `vault lease revoke -prefix
+      database-starrocks/creds/`. A lease whose user isn't in the restored FE
+      fails to revoke; confirm the user is absent (`SHOW USERS`), then revoke
+      that lease with `vault lease revoke -force -prefix <lease-id>` (`-force`
+      requires `-prefix`). Drop any `v-` user still listed afterwards.
+   4. Do Path 1 step 9, which issues every consumer a new user.
+
+   Writers stay paused until step 10.
 9. Scale the CN StatefulSet back to the `StarRocksCluster`'s CN replicas; the
    CNs start with empty local caches and register with the restored FE (in CI
    the snapshot's CN record matched the pod's host name). Then scale the FE
