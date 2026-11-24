@@ -594,15 +594,7 @@ def setup_grafana(
                                         "sampling_percentage": 15,
                                     },
                                 ],
-                                # chart v4.0.0 bug: alloy-sampler.yaml passes an
-                                # incomplete context (missing .Chart/.Release) when
-                                # calling collectors.remoteConfig.alloy. If the
-                                # sampler inherits collectorCommon.alloy.remoteConfig
-                                # (enabled + inline credentials), the template crashes
-                                # on secrets.kubernetesSecretName. Disable remoteConfig
-                                # explicitly on the sampler collector to avoid this.
                                 "collector": {
-                                    "remoteConfig": {"enabled": False},
                                     # The chart ships the sampler with no requests
                                     # or limits, which left it BestEffort -- first
                                     # in line for eviction under node pressure.
@@ -1190,8 +1182,12 @@ def setup_grafana(
                         },
                     },
                 },
-                # v4: remoteConfig and shared extraEnv go under collectorCommon.alloy;
-                #     named alloy instances replaced by collectors map with presets
+                # v4: shared extraEnv goes under collectorCommon.alloy; named
+                #     alloy instances replaced by collectors map with presets.
+                # No remoteConfig: we define no Fleet Management pipelines, and
+                # the Grafana-managed self_monitoring ones re-scraped every
+                # Alloy self-metric without a cluster label or our drop_metrics
+                # (~8.4k duplicate series in prod).
                 "collectorCommon": {
                     "alloy": {
                         # Reaches all five Alloy instances, the tail-sampling
@@ -1203,17 +1199,6 @@ def setup_grafana(
                             "podLabels": collector_labels,
                         },
                         "extraEnv": alloy_extra_env_vars,
-                        "remoteConfig": {
-                            "enabled": True,
-                            "url": "https://fleet-management-prod-001.grafana.net",
-                            "auth": {
-                                "type": "basic",
-                                "username": grafana_vault_secrets[
-                                    "k8s_monitoring_tracing_username"
-                                ],
-                                "password": grafana_cloud_api_key,
-                            },
-                        },
                     },
                 },
                 "collectors": {
