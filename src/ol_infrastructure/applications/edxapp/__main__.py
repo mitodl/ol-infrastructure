@@ -44,6 +44,9 @@ from bridge.lib.magic_numbers import (
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_resources import create_k8s_resources
+from ol_infrastructure.applications.edxapp.meilisearch import (
+    edxapp_meilisearch_api_key,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
@@ -576,6 +579,10 @@ edxapp_vault_mount = vault.Mount(
 edxapp_static_secrets = read_yaml_secrets(
     Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
 )
+if Config("meilisearch").get_bool("enabled"):
+    edxapp_static_secrets["meilisearch_api_key"] = edxapp_meilisearch_api_key(
+        edxapp_static_secrets["meilisearch_master_key"]
+    )
 edxapp_secrets = vault.generic.Secret(
     "edxapp-static-secrets",
     path=edxapp_vault_mount.path.apply("{}/edxapp".format),
