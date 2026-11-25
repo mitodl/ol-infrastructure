@@ -53,6 +53,7 @@ The JupyterHub development environment is managed by the separate
 """
 
 import json
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -284,12 +285,14 @@ kubernetes.core.v1.ResourceQuota(
     ),
     spec=kubernetes.core.v1.ResourceQuotaSpecArgs(
         hard={
-            "pods": "60",
-            "requests.cpu": "12",
-            "requests.memory": "40Gi",
-            "limits.memory": "72Gi",
-            "requests.ephemeral-storage": "80Gi",
-            "limits.ephemeral-storage": "200Gi",
+            # 40 apps at the publisher's defaults. A pod counts its larger of
+            # the app container and the init containers' LimitRange defaults.
+            "pods": "40",
+            "requests.cpu": "4",
+            "requests.memory": "20Gi",
+            "limits.memory": "40Gi",
+            "requests.ephemeral-storage": "40Gi",
+            "limits.ephemeral-storage": "320Gi",
         },
     ),
 )
@@ -568,22 +571,56 @@ notebook_publisher_marimo_port = 2718
 notebook_publisher_runtime_image = (
     f"ghcr.io/mitodl/marimo-runtime:{MARIMO_RUNTIME_VERSION}"
 )
-# Keys the publisher's openid-connect entries may carry: the shared config plus
-# the per-route ones it sets.  Anything else (e.g. an introspection endpoint)
-# could send the client secret the secretRef merges in somewhere else.
-published_route_oidc_keys = sorted(
-    {
-        *marimo_oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"],
-        "unauth_action",
-        "logout_path",
-        "post_logout_redirect_uri",
-        "set_access_token_header",
-        "set_id_token_header",
-        "set_userinfo_header",
-        "set_raw_id_token_header",
-        "set_refresh_token_header",
-    }
+# The exact openid-connect config a published route carries: the shared config
+# with the per-route settings the publisher adds.  Another key (e.g. an
+# introspection endpoint) could send the client secret the secretRef merges in
+# somewhere else, and another value could forward more of the viewer's tokens
+# to notebook code.  CEL in admission policies rejects map literals with mixed
+# value types, so the check compares key by key, with a size check at each
+# level; the two per-route paths are built from the route's name.
+_published_route_oidc_config = {
+    **marimo_oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"],
+    "set_access_token_header": True,
+    "set_id_token_header": False,
+    "set_userinfo_header": False,
+    "set_raw_id_token_header": False,
+    "set_refresh_token_header": False,
+}
+_per_route_oidc_paths = {
+    "logout_path": "'/' + object.metadata.name + '/logout/oidc'",
+    "post_logout_redirect_uri": "'/' + object.metadata.name + '/'",
+}
+
+
+def _cel_equals(expression: str, value: Any) -> list[str]:
+    """Return CEL conditions that hold when ``expression`` equals ``value``."""
+    if isinstance(value, dict):
+        return [f"size({expression}) == {len(value)}"] + [
+            condition
+            for key, item in sorted(value.items())
+            for condition in _cel_equals(f"{expression}[{json.dumps(key)}]", item)
+        ]
+    return [f"{expression} == {json.dumps(value)}"]
+
+
+published_route_oidc_config_cel = " && ".join(
+    [
+        *_cel_equals(
+            "p.config",
+            _published_route_oidc_config | dict.fromkeys(_per_route_oidc_paths, ""),
+        )
+    ]
 )
+for _key, _path in _per_route_oidc_paths.items():
+    published_route_oidc_config_cel = published_route_oidc_config_cel.replace(
+        f'p.config["{_key}"] == ""', f'p.config["{_key}"] == {_path}'
+    )
+published_route_stripped_headers = [
+    "Cookie",
+    "X-ID-Token",
+    "X-Userinfo",
+    "X_Access_Token",
+]
 
 
 def _admission_policy(  # noqa: PLR0913
@@ -679,8 +716,13 @@ _admission_policy(
             "Published notebooks have no sidecars, mounts, storage, git source or env.",
         ),
         (
-            f"object.spec.mode == 'run' && object.spec.image == "
+            # An app already on an older runtime image keeps it on UPDATE, so a
+            # pin bump doesn't block the publisher's restore of the previous
+            # version.
+            f"object.spec.mode == 'run' && (object.spec.image == "
             f"'{notebook_publisher_runtime_image}'"
+            " || (request.operation == 'UPDATE'"
+            " && object.spec.image == oldObject.spec.image))"
             f" && object.spec.port == {notebook_publisher_marimo_port}",
             "Published notebooks run in the runtime image, in run mode.",
         ),
@@ -786,14 +828,14 @@ _admission_policy(
         (
             "variables.http.plugins.all(p, p.name != 'openid-connect'"
             f" || (p.secretRef == '{marimo_oidc.secret_name}'"
-            f" && p.config.all(k, k in {json.dumps(published_route_oidc_keys)})))",
+            f" && {published_route_oidc_config_cel}))",
             "A published route's OIDC config can only change the per-route settings.",
         ),
         (
             "variables.http.plugins.all(p, p.name != 'proxy-rewrite'"
             " || (p.secretRef.startsWith(object.metadata.name + '-route-auth-')"
-            " && p.config.all(k, k == 'headers')"
-            " && p.config.headers.all(k, k == 'remove')))",
+            " && p.config == {'headers': {'remove':"
+            f" {json.dumps(published_route_stripped_headers)}}}}}))",
             "A published route only strips headers and injects its own token.",
         ),
     ],
