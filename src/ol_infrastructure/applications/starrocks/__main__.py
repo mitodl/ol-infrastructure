@@ -907,6 +907,11 @@ if starrocks_config.get_bool("use_cn"):
 # byte-identical.
 # Reviewed for 1.11.8: the starrocks subchart changed only its Chart.yaml
 # version; values.yaml and the fe.conf config block are unchanged.
+# The dedicated-nodepool cn.conf above copies starrocksCnSpec.config from the
+# same values.yaml (5 lines in 1.11.8), so review it on a chart bump too. It
+# sets neither storage_root_path nor spill_local_storage_dir: the CN defaults
+# them to ${STARROCKS_HOME}/storage and /spill, which a running CN reports as
+# /opt/starrocks/cn/storage and /opt/starrocks/cn/spill, the emptyDir mounts.
 #
 # fe.conf is rendered into a ConfigMap, which the shared cluster readonly role
 # can read, so no secret value goes into it. The FE's config loader
@@ -922,7 +927,8 @@ if (
     or starrocks_config.get_bool("use_be")
 ) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7", "1.11.8")):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.6-1.11.8; review defaults"
+        f"_FE_CONFIG_BASE and the dedicated-nodepool cn.conf were sourced from"
+        f" chart 1.11.6-1.11.8; review defaults"
         f" for {STARROCKS_CHART_VERSION} before deploying with SSL, CN, or BE"
         f" enabled"
     )
