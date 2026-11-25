@@ -113,7 +113,8 @@ Per environment, for `consumer in {mitlearn, learn-ai, mitxonline}`:
 
 Stack outputs: `resource_group_id`, `cognitive_accounts` (consumer to `{id, endpoint}`),
 `model_deployments`, `workload_identities` (consumer to `{client_id, principal_id}`),
-`tenant_id`.
+`tenant_id`, and for consumers with decision models `decision_accounts` (consumer to
+`{id, endpoint}`) and `decision_model_deployments`.
 
 ### 4.1 Federated identity credential
 

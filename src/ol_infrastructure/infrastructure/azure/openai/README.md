@@ -118,7 +118,8 @@ Pinning also switches that deployment to `NoAutoUpgrade`, so a new default versi
 cannot change model behaviour under a running application with no deploy and no diff.
 
 Production pins them to the versions CI and QA have been serving. CI and QA stay on
-auto-upgrade, so they pick up a new default version first.
+auto-upgrade, so they pick up a new default version first. Decision models are the
+exception: every stack pins them, CI and QA included.
 
 Capacity (`azure_openai:model_capacity`, in thousands of tokens per minute) defaults to
 5 outside Production. **Production has no default and must be set explicitly** — the
@@ -208,7 +209,8 @@ To add a model:
 3. Add the model to `ModelConfig.models`.
 
 4. Pin the version in `Pulumi.Production.yaml` under `azure_openai:model_versions`,
-   using the version from step 1. CI and QA stay unpinned and auto-upgrade.
+   using the version from step 1. CI and QA stay unpinned and auto-upgrade; a
+   decision model is pinned in every stack instead.
 
 5. Update the model list at the top of this README, then `pulumi preview` each stack.
    Expect one new `Deployment` per consumer. `ModelConfig` fails the preview if a
