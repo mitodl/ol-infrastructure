@@ -602,6 +602,23 @@ kubectl -n clickhouse get sts chi-clickhouse-default-0-<n> \
   -o jsonpath='{.spec.volumeClaimTemplates[*].spec.storageClassName}'
 ```
 
+If the replica is replica 0, stop opik-backend before deleting anything. Its
+`backend-migrations` init container runs Liquibase against replica 0's per-host
+Service (`CLICKHOUSE_MIGRATIONS_HOST` in `applications/opik`), which selects
+the pod whether or not it carries the ready label and publishes it before it is
+Ready. An opik-backend pod that starts while replica 0 is empty (an eviction, a
+node replacement, an opik apply, or an init container already crash-looping
+because replica 0 was unreachable) finds no ledger there, creates a local one,
+and replays every changeset against the empty replica. Pods already running
+don't rerun migrations, but nothing prevents a new one. Opik is down until the
+ledger check at the end of this section passes, and an opik stack apply
+restores the chart's `replicaCount`, so hold opik applies too:
+
+```bash
+kubectl -n opik get deployment opik-backend -o jsonpath='{.spec.replicas}'   # note it
+kubectl -n opik scale deployment/opik-backend --replicas=0
+```
+
 Then delete the Pending PVC and pod, and the StatefulSet recreates both from the
 template. Only do this for a PVC with no volume bound (`kubectl get pvc` shows
 `Pending` and an empty `VOLUME`); a bound PVC holds that replica's data.
@@ -649,24 +666,19 @@ until 2026-11-25; see [Opik's Liquibase ledger](#opiks-liquibase-ledger). The
 source is replica 0 unless replica 0 is the one being rebuilt; then use replica
 1.
 
-When replica 0 is the one being rebuilt, stop opik-backend first. Its
-`backend-migrations` init container runs Liquibase against replica 0's per-host
-Service (`CLICKHOUSE_MIGRATIONS_HOST` in `applications/opik`), which selects
-the pod whether or not it carries the ready label and publishes it before it is
-Ready. A new opik-backend pod (an eviction, a node replacement, an opik apply)
-would find no ledger there, create a local one, and replay every changeset
-against the empty replica. Pods already running don't rerun migrations, so the
-risk is only a new one, but nothing prevents one appearing. Opik is down until
-the ledger check below passes:
+When rebuilding replica 0, check that Liquibase didn't get there first (see the
+opik-backend scale-down above). Before the copy, the rebuilt replica holds no
+tables in either database, so this must return nothing:
 
 ```bash
-kubectl -n opik scale deployment/opik-backend --replicas=0
+k() { kubectl -n clickhouse exec "$@"; }
+k chi-clickhouse-default-0-0-0 -- clickhouse-client -q "SELECT database, name, engine
+    FROM system.tables WHERE database IN ('opik_db', 'default')"
 ```
 
-If one ran first (replica 0's `default.DATABASECHANGELOG` exists with engine
-`MergeTree`, not `ReplicatedMergeTree`), stop and compare replica 0's tables
-with replica 1's before copying anything. That path has not been worked
-through.
+If it lists anything, an opik-backend pod ran migrations against the empty
+replica. Stop and compare replica 0's tables with replica 1's
+before copying anything. That path has not been worked through.
 
 Check that `opik_db` and `default` on the source hold nothing but `Replicated*`
 tables and materialized views (on 2026-11-25: 38 tables and one view in
@@ -730,7 +742,8 @@ The changelog row count must match `SRC`, and `LOCKED` must be 0 on both: a lock
 taken by a migration that was running when replica 0 died replicates with the
 rest, and the next migration run waits on it. Clear a stale one with
 `ALTER TABLE default.DATABASECHANGELOGLOCK UPDATE LOCKED = 0, LOCKGRANTED = NULL,
-LOCKEDBY = NULL WHERE ID = 1`, and only when no opik-backend pod is running.
+LOCKEDBY = NULL WHERE ID = 1 SETTINGS mutations_sync = 2` (it waits for every
+replica), and only when no opik-backend pod is running.
 
 ```bash
 for p in "$DST" "$SRC"; do
