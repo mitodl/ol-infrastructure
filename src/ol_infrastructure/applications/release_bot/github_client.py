@@ -837,8 +837,13 @@ def _request_abandon_sync(repo_slug: str, version: str) -> None:
             present = True
         else:
             # For a release no longer in flight, or an older one, which the
-            # job never abandons. Nothing else would ever delete it.
-            ref.delete()
+            # job never abandons. Nothing else would ever delete it, but one
+            # left behind is harmless, so failing to delete it (e.g. a 422 on
+            # a ref already gone) must not block the request made here.
+            try:
+                ref.delete()
+            except Exception:
+                log.exception("Failed to delete stale abandon request %s", ref.ref)
     if present:
         return
     # At the head of the release branch, so a release that stopped being in

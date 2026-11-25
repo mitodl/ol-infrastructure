@@ -4,6 +4,7 @@ selection, and PyGithub-backed API wrappers.
 
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import github_client as github
 import pytest
@@ -1025,6 +1026,22 @@ def test_request_abandon_drops_requests_for_other_releases_only(fake_repo):
         "refs/tags/2026.9.7.1",
         "refs/tags/abandon-request/2026.9.9.1",
     ]
+
+
+def test_request_abandon_makes_its_request_when_a_stale_one_cannot_go(fake_repo):
+    """One undeletable stale request must not block every later abandon."""
+    repo = fake_repo(
+        _AbandonRefsRepo(
+            "refs/tags/abandon-request/2026.9.8.1",
+            branches={"releases/2026.9.9.1"},
+        )
+    )
+
+    repo.refs[0].delete = Mock(side_effect=RuntimeError)
+
+    github._request_abandon_sync("mitodl/thing", "2026.9.9.1")
+
+    assert repo.created == [("refs/tags/abandon-request/2026.9.9.1", _BRANCH_SHA)]
 
 
 def test_request_abandon_reuses_a_request_left_for_the_same_release(fake_repo):
