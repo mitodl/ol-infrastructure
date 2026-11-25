@@ -52,10 +52,14 @@ config:
         ondemand: true
         ol.mit.edu/core_node: true
       node_group_options: {}
+      # 4, not 3, as in QA and Production: the ASG spans 4 AZs, so at
+      # desired=3 one AZ has no core node. CI runs a single FE whose EBS
+      # volumes are in us-east-1b (2026-11-25); if a rotation leaves that AZ
+      # without a core node, the FE cannot schedule and CI StarRocks is down.
       scaling:
-        desired: 3
+        desired: 4
         max: 5
-        min: 3
+        min: 4
       tags: {}
       taints: {}
       version:
