@@ -87,3 +87,26 @@ def test_invalid_retired_tables_are_refused(
     monkeypatch.setattr(data_lake_access, "RETIRED_TABLE_ACCESS", retired)
     with pytest.raises(ValueError, match=message):
         validate_governance_access()
+
+
+def test_no_role_reaches_the_superset_metadata_db() -> None:
+    """Either global grant opens every database in SQL Lab, Superset's own included.
+
+    ol-superset roles sync revokes a global grant a role's definition doesn't
+    list, so keeping them out of this file keeps them off the live roles.
+    """
+    roles = json.loads(GOVERNANCE_ROLES_JSON.read_text())
+    global_grants = {"all_database_access", "all_datasource_access"}
+    assert {
+        role["name"]: listed
+        for role in roles
+        if (
+            listed := global_grants
+            & {p["permission"]["name"] for p in role.get("permissions", [])}
+        )
+    } == {}
+    assert [
+        role["name"]
+        for role in roles
+        if "Superset Metadata DB" in role.get("allowed_databases", [])
+    ] == []
