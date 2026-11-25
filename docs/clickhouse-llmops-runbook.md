@@ -647,15 +647,39 @@ Copy `opik_db` and `default`. `default` holds Opik's Liquibase ledger
 in every environment. Production replicas 1 and 2 held plain `MergeTree` copies
 until 2026-11-25; see [Opik's Liquibase ledger](#opiks-liquibase-ledger). The
 source is replica 0 unless replica 0 is the one being rebuilt; then use replica
-1. Rebuild replica 0 before opik-backend restarts: its migrations are pinned to
-replica 0 (`CLICKHOUSE_MIGRATIONS_HOST` in `applications/opik`), and against a
-replica without the ledger they would replay every changeset. The commands
-below are for bash:
+1.
+
+When replica 0 is the one being rebuilt, stop opik-backend first. Its
+`backend-migrations` init container runs Liquibase against replica 0's per-host
+Service (`CLICKHOUSE_MIGRATIONS_HOST` in `applications/opik`), which selects
+the pod whether or not it carries the ready label and publishes it before it is
+Ready. A new opik-backend pod (an eviction, a node replacement, an opik apply)
+would find no ledger there, create a local one, and replay every changeset
+against the empty replica. Pods already running don't rerun migrations, so the
+risk is only a new one, but nothing prevents one appearing. Opik is down until
+the ledger check below passes:
+
+```bash
+kubectl -n opik scale deployment/opik-backend --replicas=0
+```
+
+If one ran first (replica 0's `default.DATABASECHANGELOG` exists with engine
+`MergeTree`, not `ReplicatedMergeTree`), stop and compare replica 0's tables
+with replica 1's before copying anything. That path has not been worked
+through.
+
+Check that `opik_db` and `default` on the source hold nothing but `Replicated*`
+tables and materialized views (on 2026-11-25: 38 tables and one view in
+`opik_db`, the two ledger tables in `default`), since the copy below copies
+nothing else. The commands are for bash; set `SRC` and `DST`:
 
 ```bash
 k() { kubectl -n clickhouse exec "$@"; }
-SRC=chi-clickhouse-default-0-0-0; DST=chi-clickhouse-default-0-<n>-0
+SRC=chi-clickhouse-default-0-<0, or 1 when rebuilding replica 0>-0
+DST=chi-clickhouse-default-0-<n>-0
 DBS="'opik_db', 'default'"
+k "$SRC" -- clickhouse-client -q "SELECT database, engine, count() FROM system.tables
+    WHERE database IN ($DBS) GROUP BY ALL"
 ```
 
 If the replica existed before (its volume was lost or replaced, rather than
@@ -691,26 +715,30 @@ for t in $(k "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM
 done
 ```
 
-When `DST` is replica 0, confirm it has the ledger before anything restarts
-opik-backend. Both counts must match replica 1:
-
-```bash
-for p in "$DST" chi-clickhouse-default-0-1-0; do
-  k "$p" -- clickhouse-client -q "SELECT (SELECT count() FROM default.DATABASECHANGELOG),
-    (SELECT LOCKED FROM default.DATABASECHANGELOGLOCK)"
-done
-```
-
-Check first that `opik_db` holds nothing but `Replicated*` tables and
-materialized views (on 2026-11-23: 38 tables and one view), since this loop
-copies nothing else. The replica is caught up when its `system.replicas` lists
-the same number of tables as replica 0 (Production: the same `opik_db` count)
-with `absolute_delay = 0` and `queue_size = 0`, and `opik_db` has the same table
-count. `ClickHouseReplicaMissingTables` clears once its non-system table count
-matches its peers. Then put it back in the Service:
+The replica is caught up when its `system.replicas` lists the same number of
+tables as `SRC`, with `absolute_delay = 0` and `queue_size = 0`, and `opik_db`
+and `default` each have the same table count as on `SRC`.
+`ClickHouseReplicaMissingTables` clears once its non-system table count matches
+its peers. Then put it back in the Service:
 
 ```bash
 kubectl -n clickhouse label --overwrite pod chi-clickhouse-default-0-<n>-0 clickhouse.altinity.com/ready=yes
+```
+
+When `DST` is replica 0, check the ledger before scaling opik-backend back up.
+The changelog row count must match `SRC`, and `LOCKED` must be 0 on both: a lock
+taken by a migration that was running when replica 0 died replicates with the
+rest, and the next migration run waits on it. Clear a stale one with
+`ALTER TABLE default.DATABASECHANGELOGLOCK UPDATE LOCKED = 0, LOCKGRANTED = NULL,
+LOCKEDBY = NULL WHERE ID = 1`, and only when no opik-backend pod is running.
+
+```bash
+for p in "$DST" "$SRC"; do
+  k "$p" -- clickhouse-client -q "SELECT hostName(),
+    (SELECT count() FROM default.DATABASECHANGELOG) AS changesets,
+    (SELECT groupArray(LOCKED) FROM default.DATABASECHANGELOGLOCK) AS locked"
+done
+kubectl -n opik scale deployment/opik-backend --replicas=<the count before>
 ```
 
 ### Opik's Liquibase ledger

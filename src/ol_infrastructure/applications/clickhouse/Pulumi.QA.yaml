@@ -17,8 +17,9 @@ config:
   # schema back from replica 1 (the schema-copy steps in the runbook's "Replica
   # pod Pending on its data volume", with replica 1 as the source). That loop
   # also copies Opik's Liquibase ledger: default.DATABASECHANGELOG* are
-  # ReplicatedMergeTree on both replicas (180 rows each on 2026-11-04). Left as is until a
-  # recreated replica no longer serves Opik queries before its schema exists.
+  # ReplicatedMergeTree on both replicas (180 rows each on 2026-11-04). Left as
+  # is until a recreated replica no longer serves Opik queries before its
+  # schema exists.
   # Replica 1 was recreated on 2026-10-20 and has 100Gi.
   clickhouse:hot_storage_size: 100Gi
   # QA is the upgrade canary (docs/clickhouse-llmops-runbook.md), so it runs
