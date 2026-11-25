@@ -368,8 +368,9 @@ There are two recovery layers. Neither covers the other's case.
 | AWS Backup | EBS snapshot of every CH and Keeper PVC (`<cluster>-eks-backup-plan`, `infrastructure/aws/eks/aws_backup.py`) | Daily 05:00 UTC, 14 days | A lost or corrupted PVC. Crash-consistent and per volume, not coordinated across replicas. |
 | SQL `BACKUP` | `clickhouse-backup` CronJob: every database except `system` / `INFORMATION_SCHEMA`, to `s3://ol-data-clickhouse-backup-<env>/backups/<UTC timestamp>/` | Daily 03:30 UTC, 14 days (`clickhouse:backup_retention_days`); overwritten or deleted objects kept 7 more days as noncurrent versions | Restoring tables or whole databases, into this cluster or another one at the same or a newer server version. |
 
-The SQL backup runs on replica 0 (`chi-clickhouse-default-0-0`) because Opik's
-Liquibase ledger (`default.DATABASECHANGELOG*`) exists only there. The target is
+The SQL backup runs on replica 0 (`chi-clickhouse-default-0-0`), where Opik's
+migrations run, and `system.backups` only shows runs on the server that ran
+them. The target is
 the `backups` disk (`s3_plain`), the only disk `backups.allowed_disk` permits.
 The cold-tier bucket is not a backup: once tiering is active it holds live
 parts.
@@ -518,11 +519,7 @@ upgrade goes to QA first.
      total_replicas < 2 OR absolute_delay > 0 OR queue_size > 0`.
      Also compare `SELECT count() FROM system.replicas` across both replicas: a
      replica that failed to create its tables has an empty `system.replicas`,
-     so a delay check alone passes on it. In Production use `< 3` and add
-     `AND database != 'default'`: the Liquibase ledger tables
-     (`default.DATABASECHANGELOG*`) are replicated only on replica 0 there, and
-     replicas 1 and 2 hold plain `MergeTree` copies, so they always report
-     `total_replicas = 1`.
+     so a delay check alone passes on it. In Production use `< 3`.
    - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
      reports `zk_server_state leader` with `zk_synced_followers 2`, the others
      `follower`.
@@ -645,28 +642,30 @@ copy the DDL from a healthy replica. The engine arguments use the
 `{shard}`/`{replica}` macros, so the same statement registers the new replica in
 Keeper and it fetches the parts.
 
-Copy `opik_db` everywhere. Copy `default` (the Liquibase ledger) only where
-every replica holds it as `Replicated*`, which is QA. In Production only replica
-0 registers `default.DATABASECHANGELOG*`; replicas 1 and 2 hold plain
-`MergeTree` copies that Liquibase never reads, so leave `default` out of `DBS`
-there and recreate those two copies from the other of replicas 1 and 2 (below).
-The source is replica 0 unless replica 0 is the one being rebuilt; then use
-replica 1. In Production that leaves the ledger unrecoverable from a peer, since
-only replica 0 held it. Restoring it in place is untested (see
-[Restore](#restore) for why restoring into a live cluster is risky), so plan it
-before opik-backend restarts and reruns its migrations. The commands below are
-for bash; set `SRC`, `DST` and `DBS` per case:
+Copy `opik_db` and `default`. `default` holds Opik's Liquibase ledger
+(`default.DATABASECHANGELOG*`), which is `ReplicatedMergeTree` on every replica
+in every environment. Production replicas 1 and 2 held plain `MergeTree` copies
+until 2026-11-25; see [Opik's Liquibase ledger](#opiks-liquibase-ledger). The
+source is replica 0 unless replica 0 is the one being rebuilt; then use replica
+1. Rebuild replica 0 before opik-backend restarts: its migrations are pinned to
+replica 0 (`CLICKHOUSE_MIGRATIONS_HOST` in `applications/opik`), and against a
+replica without the ledger they would replay every changeset. The commands
+below are for bash:
 
 ```bash
 k() { kubectl -n clickhouse exec "$@"; }
 SRC=chi-clickhouse-default-0-0-0; DST=chi-clickhouse-default-0-<n>-0
-DBS="'opik_db', 'default'"   # Production: DBS="'opik_db'"
+DBS="'opik_db', 'default'"
 ```
 
 If the replica existed before (its volume was lost or replaced, rather than
 never created), Keeper still holds its old registration and `CREATE TABLE`
 fails with `REPLICA_ALREADY_EXISTS`. Drop it from the source replica first (a
-replica cannot drop its own registration), for each database in `DBS`:
+replica cannot drop its own registration), for each database in `DBS`. If the
+pod was recreated within the last half minute or so, the drop fails with
+`Can't drop replica ... because it's active` (Code 305): the old server's
+Keeper session and its `is_active` node outlive it until the session times out.
+Wait and run it again.
 
 ```bash
 for db in ${DBS//[\',]/}; do
@@ -692,17 +691,13 @@ for t in $(k "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM
 done
 ```
 
-In Production, when rebuilding replica 1 or 2, also recreate the two plain
-`MergeTree` ledger copies from the other one. They hold no Keeper path, and
-without them the rebuilt replica stays two tables short, which keeps
-`ClickHouseReplicaMissingTables` firing:
+When `DST` is replica 0, confirm it has the ledger before anything restarts
+opik-backend. Both counts must match replica 1:
 
 ```bash
-PEER=chi-clickhouse-default-0-<the other of 1 and 2>-0
-for t in default.DATABASECHANGELOG default.DATABASECHANGELOGLOCK; do
-  k "$PEER" -- clickhouse-client -q "SHOW CREATE TABLE $t FORMAT TSVRaw" \
-    | sed -E 's/^CREATE TABLE/CREATE TABLE IF NOT EXISTS/' \
-    | k -i "$DST" -- clickhouse-client --multiquery
+for p in "$DST" chi-clickhouse-default-0-1-0; do
+  k "$p" -- clickhouse-client -q "SELECT (SELECT count() FROM default.DATABASECHANGELOG),
+    (SELECT LOCKED FROM default.DATABASECHANGELOGLOCK)"
 done
 ```
 
@@ -717,6 +712,37 @@ matches its peers. Then put it back in the Service:
 ```bash
 kubectl -n clickhouse label --overwrite pod chi-clickhouse-default-0-<n>-0 clickhouse.altinity.com/ready=yes
 ```
+
+### Opik's Liquibase ledger
+
+opik-backend's `backend-migrations` init container runs Liquibase on every
+restart, against replica 0 only (`CLICKHOUSE_MIGRATIONS_HOST`). Liquibase keeps
+its ledger in `default.DATABASECHANGELOG` and `default.DATABASECHANGELOGLOCK`,
+not in `opik_db`. A replica without them would look like a fresh install and
+replay every changeset.
+
+Both tables are `ReplicatedMergeTree` at
+`/clickhouse/tables/{shard}/default/DATABASECHANGELOG*` on every replica, so
+losing any one replica's volume, replica 0 included, is recovered from a peer by
+[Replica pod Pending on its data volume](#replica-pod-pending-on-its-data-volume).
+That path (old registration dropped from a peer, DDL copied, rows fetched) was
+exercised for replica 0 on a local two-replica 26.3 cluster on 2026-11-25.
+
+Until 2026-11-25 Production replicas 1 and 2 held plain `MergeTree` copies
+(an empty changelog and a stale `LOCKED = 1` row from August), so only replica
+0 had the ledger. On each of them the copies were renamed aside, recreated from
+replica 0's `SHOW CREATE TABLE`, and dropped once `count()` and
+`sum(cityHash64(toString(tuple(*))))` matched replica 0 (180 rows and the lock
+row). Check a replica:
+
+```sql
+SELECT hostName(), table, total_replicas, active_replicas, queue_size
+FROM clusterAllReplicas('default', system.replicas)
+WHERE database = 'default';
+```
+
+Every row should show `total_replicas` and `active_replicas` equal to the
+replica count.
 
 ### Opik failing over TLS (moving Opik back to 8123)
 

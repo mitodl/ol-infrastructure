@@ -1671,11 +1671,12 @@ clickhouse_installation = _create_clickhouse_installation(
 #      readable by any ClickHouse at the same or a newer version.
 #
 # Runs against replica 0 by name, not the load-balanced service. With one
-# shard every replica holds the same replicated data, but Opik's Liquibase
-# ledger (default.DATABASECHANGELOG*) has rows only on replica 0, where
-# migrations are pinned (CLICKHOUSE_MIGRATIONS_HOST in applications/opik).
-# Replicas 1 and 2 carry empty tables of the same name. A restore without the
-# ledger would replay every migration against existing tables.
+# shard every replica holds the same replicated data, Opik's Liquibase ledger
+# (default.DATABASECHANGELOG*) included since 2026-11-25 (runbook, "Opik's
+# Liquibase ledger"), so the backup has it whichever replica runs it. Replica 0
+# is where migrations are pinned (CLICKHOUSE_MIGRATIONS_HOST in
+# applications/opik). A restore without the ledger would replay every
+# migration against existing tables.
 #
 # ASYNC plus polling rather than a synchronous BACKUP: the statement's outcome
 # lives in system.backups on the server, so the job exits non-zero on
