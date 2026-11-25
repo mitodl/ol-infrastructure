@@ -152,7 +152,7 @@ Check current usage against them with `az cognitiveservices usage list -l eastus
 
 `Microsoft-Decision-1.1` draws on `AIServices.GlobalStandard.Microsoft-Decision-1.1`,
 limit 10200 (2026-11-25), and Microsoft does not document its capacity unit. Production
-sets it to 1000 through `model_capacities`, and it deploys for learn-ai only.
+sets it to 5000 through `model_capacities`, and it deploys for learn-ai only.
 
 Quota is pooled **per model and version, per deployment type** — not one pool shared by
 all models. These are `GlobalStandard` deployments, and [Microsoft's

@@ -894,6 +894,12 @@ if memory_enabled:
 # A StackReference to a stack that does not exist fails the whole preview, so this is
 # a config switch that gets flipped per environment once infrastructure/azure/openai
 # has been deployed there.
+if learn_ai_config.get_bool("enable_azure_decision") and not learn_ai_config.get_bool(
+    "enable_azure_openai"
+):
+    # The decision endpoint needs the identity env and token volume below.
+    msg = "learn_ai:enable_azure_decision needs learn_ai:enable_azure_openai"
+    raise ValueError(msg)
 if learn_ai_config.get_bool("enable_azure_openai"):
     azure_openai_stack = make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
     env_vars.update(azure_identity_env(azure_openai_stack, "learn-ai"))
