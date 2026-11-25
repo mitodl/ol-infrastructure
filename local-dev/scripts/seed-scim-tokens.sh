@@ -58,18 +58,27 @@ err()  { printf '\033[1;31m  ✗\033[0m %s\n' "$1" >&2; }
 # update_or_create keyed on the token value: re-running with the same value
 # refreshes the expiry instead of stacking duplicate rows, and the unique
 # constraint on token would reject a plain create.
+#
+# The heredoc is quoted and the values are read from the environment, which
+# kubectl exec passes through argv rather than a shell: a token holding a quote
+# or a backslash would otherwise be interpolated into a Python string literal and
+# either break the program or run as part of it.
 scim_token_program() {
-    local token="$1" scope="$2"
-    cat <<PY
+    cat <<'PY'
 import datetime
+import os
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from oauth2_provider.models import AccessToken
 
+username = os.environ["SCIM_SERVICE_USERNAME"]
+scope = os.environ["SCIM_SCOPE"]
+
 User = get_user_model()
 owner, created_user = User.objects.get_or_create(
-    username="${SERVICE_USERNAME}",
-    defaults={"email": "${SERVICE_USERNAME}"},
+    username=username,
+    defaults={"email": username},
 )
 owner.is_staff = True
 owner.is_active = True
@@ -77,14 +86,14 @@ owner.set_unusable_password()
 owner.save()
 print("created" if created_user else "reused", "service user", owner.username)
 token, created = AccessToken.objects.update_or_create(
-    token="${token}",
+    token=os.environ["SCIM_TOKEN"],
     defaults={
         "user": owner,
-        "scope": "${scope}",
+        "scope": scope,
         "expires": timezone.now() + datetime.timedelta(days=365),
     },
 )
-print("created" if created else "refreshed", "token for", owner.username, "scope=${scope}")
+print("created" if created else "refreshed", "token for", owner.username, "scope=" + scope)
 PY
 }
 
@@ -124,9 +133,13 @@ seed_app() {
     # mit-learn needs the scope to be exactly "scim": SCIMScopeCheckMiddleware
     # calls token.is_valid(["scim"]) and 401s otherwise. mitxonline ignores
     # scope, so one token shape works for both.
-    if scim_token_program "${APP_TOKEN[$app]}" scim \
+    if scim_token_program \
         | kubectl --context local-dev exec -i -n "${ns}" "deploy/${deploy}" \
-            -- python manage.py shell; then
+            -- env \
+                "SCIM_SERVICE_USERNAME=${SERVICE_USERNAME}" \
+                "SCIM_TOKEN=${APP_TOKEN[$app]}" \
+                "SCIM_SCOPE=scim" \
+                python manage.py shell; then
         ok "${app} SCIM token seeded."
         seeded=$((seeded + 1))
     else
