@@ -23,7 +23,7 @@ resource, so sending the declared attributes alone would reset everything else
 (filters, truststore, attribute mappings) to plugin defaults.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 import pulumi
 import requests
@@ -36,6 +36,15 @@ from ol_infrastructure.providers.http import raise_for_status_with_body
 SCIM_REMOTE_PROVIDER_SCHEMA = (
     "urn:goldfish:params:scim:schemas:core:2.0:ScimRemoteProvider"
 )
+SCIM_SCHEMA_ATTRIBUTE_SCHEMA = (
+    "urn:goldfish:params:scim:schemas:core:2.0:KeycloakResourceSchemaAttribute"
+)
+SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User"
+# Write-only commands on a provider PUT. Both replace the provider's schema
+# configuration, so they are never copied from a live resource into a write.
+CONFIGURATION_COMMANDS = ("useDefaultScimConfiguration", "reloadConfiguration")
+# What read() reports for user_attributes when the provider has no User schema.
+NO_USER_SCHEMA = "no User schema"
 SCIM_CONTENT_TYPE = "application/scim+json"
 REQUEST_TIMEOUT_SECONDS = 30
 ADMIN_REALM = "master"
@@ -56,6 +65,25 @@ class ScimAuthentication(BaseModel):
     client_secret: str | None = None
     token_endpoint: str | None = None
     scope: str | None = None
+
+
+class ScimUserAttribute(BaseModel):
+    """A custom attribute on the provider's User schema.
+
+    The plugin sends a Keycloak user attribute to the target only when the
+    provider's User schema has an attribute for it; the RFC 7643 default schema
+    has none of ours. ``custom_attribute_name`` is the Keycloak user attribute
+    it reads, ``name`` the SCIM attribute it sends (e.g. ``fullName``, which
+    mitol-django-scim targets read for the user's name).
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, extra="forbid"
+    )
+
+    name: str
+    type: Literal["string", "integer", "boolean", "decimal", "dateTime"]
+    custom_attribute_name: str
 
 
 class ScimRemoteProviderSpec(BaseModel):
@@ -86,12 +114,12 @@ class ScimRemoteProviderSpec(BaseModel):
     replay_on_failure: bool | None = None
     retry_interval_in_seconds: int | None = None
     retry_max_attempts: int | None = None
-    # What the plugin believes the target supports. It does not read the
-    # target's /ServiceProviderConfig, so these drive what it sends: with
-    # patch_supported false it issues PUTs instead of PATCHes. Every one
-    # defaults off in the plugin, so a provider created without them is less
-    # capable than the live ones, which were configured through its admin
-    # console.
+    # What the plugin believes the target supports, and so what it sends: with
+    # patch_supported false it issues PUTs instead of PATCHes. Only the
+    # reloadConfiguration command reads the target's /ServiceProviderConfig
+    # (and overwrites these); loading the default configuration resets them to
+    # RFC defaults. A provider created without them is less capable than the
+    # live ones, which were configured through its admin console.
     filter_supported: bool | None = None
     filter_max_results: int | None = None
     sort_supported: bool | None = None
@@ -102,6 +130,11 @@ class ScimRemoteProviderSpec(BaseModel):
     bulk_max_payload_size: int | None = None
     etag_supported: bool | None = None
     authentication_list: list[ScimAuthentication] | None = None
+    # None leaves the provider's schema configuration unmanaged. A list (empty
+    # included) has Pulumi configure it: the default resource types when it has
+    # none, then the listed attributes created or corrected, and any other
+    # custom-mapped attribute deleted. RFC schema attributes are left alone.
+    user_attributes: list[ScimUserAttribute] | None = None
 
     @field_validator("base_url")
     @classmethod
@@ -122,10 +155,18 @@ class ScimRemoteProviderSpec(BaseModel):
             **self.model_dump(
                 by_alias=True,
                 exclude_none=True,
-                exclude={"realm", "authentication_list"},
+                exclude={"realm", "authentication_list", "user_attributes"},
             ),
             "assignedRealm": {"realmName": self.realm},
         }
+
+    def user_attributes_to_scim(self) -> list[dict[str, Any]] | None:
+        """Render the declared User-schema attributes."""
+        if self.user_attributes is None:
+            return None
+        return [
+            attribute.model_dump(by_alias=True) for attribute in self.user_attributes
+        ]
 
     def authentication_to_scim(self) -> list[dict[str, Any]] | None:
         """Render ``authenticationList``, which carries credentials."""
@@ -166,11 +207,36 @@ def _session(props: dict[str, Any]) -> requests.Session:
     return session
 
 
-def _endpoint(props: dict[str, Any]) -> str:
+def _backend(props: dict[str, Any], resource: str) -> str:
     return (
         f"{props['keycloak_url']}/realms/{ADMIN_REALM}"
-        "/scim/admin/backend/scim/v2/RemoteScimProviderConfig"
+        f"/scim/admin/backend/scim/v2/{resource}"
     )
+
+
+def _endpoint(props: dict[str, Any]) -> str:
+    return _backend(props, "RemoteScimProviderConfig")
+
+
+def _list(
+    session: requests.Session, props: dict[str, Any], resource: str
+) -> list[dict[str, Any]]:
+    resources: list[dict[str, Any]] = []
+    total_results = 1
+    while len(resources) < total_results:
+        response = session.get(
+            _backend(props, resource),
+            params={"count": LIST_PAGE_SIZE, "startIndex": len(resources) + 1},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        raise_for_status_with_body(response)
+        page = response.json()
+        page_resources = page.get("Resources", [])
+        if not page_resources:
+            break
+        resources.extend(page_resources)
+        total_results = page["totalResults"]
+    return resources
 
 
 def _restore_ints(value: Any) -> Any:
@@ -202,25 +268,10 @@ def _find_by_name(
 ) -> dict[str, Any] | None:
     # The list endpoint returns providers from every realm the caller is
     # authorized for, and names are not unique, so match on realm as well.
-    resources: list[dict[str, Any]] = []
-    total_results = 1
-    while len(resources) < total_results:
-        response = session.get(
-            _endpoint(props),
-            params={"count": LIST_PAGE_SIZE, "startIndex": len(resources) + 1},
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-        raise_for_status_with_body(response)
-        page = response.json()
-        page_resources = page.get("Resources", [])
-        if not page_resources:
-            break
-        resources.extend(page_resources)
-        total_results = page["totalResults"]
     name = props["spec"]["name"]
     matches = [
         resource
-        for resource in resources
+        for resource in _list(session, props, "RemoteScimProviderConfig")
         if resource["name"] == name
         and (resource.get("assignedRealm") or {}).get("realmName") == props["realm"]
     ]
@@ -277,10 +328,17 @@ def _project(live: Any, declared: Any) -> Any:
 
 
 def _put(
-    session: requests.Session, props: dict[str, Any], live: dict[str, Any]
+    session: requests.Session,
+    props: dict[str, Any],
+    live: dict[str, Any],
+    commands: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     body = _overlay(
-        {key: value for key, value in live.items() if key != "meta"},
+        {
+            key: value
+            for key, value in live.items()
+            if key not in ("meta", *CONFIGURATION_COMMANDS)
+        },
         _declared(props),
     )
     # Replace rather than merge: the plugin prefers realmId over realmName, so
@@ -289,11 +347,180 @@ def _put(
     body["schemas"] = [SCIM_REMOTE_PROVIDER_SCHEMA]
     response = session.put(
         f"{_endpoint(props)}/{live['id']}",
-        json=body,
+        json={**body, **(commands or {})},
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
     raise_for_status_with_body(response)
     return response.json()
+
+
+def _provider_schemas(
+    session: requests.Session, props: dict[str, Any], provider_id: str
+) -> list[dict[str, Any]]:
+    return [
+        schema
+        for schema in _list(session, props, "KeycloakResourceSchemas")
+        if schema.get("scimRemoteProviderId") == provider_id
+    ]
+
+
+def _user_schema(schemas: list[dict[str, Any]]) -> dict[str, Any] | None:
+    return next(
+        (schema for schema in schemas if schema["schemaId"] == SCIM_USER_SCHEMA),
+        None,
+    )
+
+
+def _live_user_attributes(
+    session: requests.Session, props: dict[str, Any], provider_id: str
+) -> list[dict[str, Any]] | str:
+    """Read the provider's custom mappings in the shape user_attributes declares.
+
+    Declared names come first in declared order and any other live mapping
+    after, sorted, so an unchanged schema compares equal to the declaration.
+    A provider with no User schema reads as NO_USER_SCHEMA, which never equals
+    a declared list, so a refresh schedules the repair.
+    """
+    schema = _user_schema(_provider_schemas(session, props, provider_id))
+    if schema is None:
+        return NO_USER_SCHEMA
+    live = {
+        attribute["name"]: {
+            "name": attribute["name"],
+            "type": attribute["type"],
+            "customAttributeName": attribute["customAttributeName"],
+        }
+        for attribute in _list(session, props, "KeycloakResourceSchemaAttributes")
+        if attribute["schemaId"] == schema["id"]
+        and not attribute.get("parentAttribute")
+        and attribute.get("customAttributeName")
+    }
+    order = [attribute["name"] for attribute in props["user_attributes"]]
+    names = [name for name in order if name in live]
+    names += sorted(name for name in live if name not in order)
+    return [live[name] for name in names]
+
+
+def _configure(
+    session: requests.Session,
+    props: dict[str, Any],
+    provider: dict[str, Any],
+    *,
+    created: bool,
+) -> None:
+    """Make a provider that declares user_attributes able to provision.
+
+    A provider created through the admin backend has no schemas or resource
+    types, and the plugin skips one without them ("no resource-assignments for
+    this provider"), so nothing is provisioned. PUTting
+    useDefaultScimConfiguration loads the RFC 7643 /Users and /Groups types
+    (the command is ignored on POST). reloadConfiguration would import the
+    target's own ResourceTypes instead, but mitol-django-scim advertises them
+    as /scim/v2/Users, which the plugin appends to base_url a second time.
+
+    Loading defaults deletes the provider's schema configuration and resets
+    its capability flags, so it runs only when the provider has no schemas at
+    all (nothing to lose), and the declared attributes are put back after.
+    That covers a provider this resource just created and one left behind by
+    a create that failed after its POST.
+
+    Observed on plugin 4.1.5: configuration written to a provider the plugin
+    has already loaded (and skipped for having no resource types) was not used
+    until Keycloak restarted, while a provider created and configured in one
+    apply was. Repairing a provider that already existed therefore logs a
+    warning to restart Keycloak.
+
+    It also runs only for a provider that declares user_attributes (an empty
+    list counts). A provider whose schema was set up in the admin console and
+    is not declared here stays as inert as it was if Pulumi recreates it, rather
+    than getting a default schema that may not match what the target expects.
+    """
+    declared = props.get("user_attributes")
+    if declared is None:
+        return
+    schemas = _provider_schemas(session, props, provider["id"])
+    if not schemas:
+        loaded = _put(session, props, provider, {"useDefaultScimConfiguration": True})
+        _put(session, props, loaded)
+        schemas = _provider_schemas(session, props, provider["id"])
+        if not created:
+            pulumi.log.warn(
+                f"Remote SCIM provider {props['spec']['name']!r} had no schemas "
+                "and was given the default configuration. Restart Keycloak: the "
+                "scim-for-keycloak plugin keeps skipping a provider it already "
+                "loaded until it reloads its configuration."
+            )
+    user_schema = _user_schema(schemas)
+    if user_schema is None:
+        msg = (
+            f"Remote SCIM provider {props['spec']['name']!r} has schemas but no "
+            "User schema; fix it in the SCIM admin console"
+        )
+        raise RuntimeError(msg)
+    _ensure_user_attributes(session, props, user_schema, declared)
+
+
+def _ensure_user_attributes(
+    session: requests.Session,
+    props: dict[str, Any],
+    schema: dict[str, Any],
+    declared: list[dict[str, Any]],
+) -> None:
+    """Make the User schema's custom attributes exactly the declared ones.
+
+    Declared attributes are created or corrected. A live top-level attribute
+    with a customAttributeName that is not declared is deleted: those are the
+    mappings added in the admin console, so the declared list is the whole set
+    of custom mappings. Attributes from the RFC schema carry no
+    customAttributeName and are left alone.
+    """
+    live = {
+        attribute["name"]: attribute
+        for attribute in _list(session, props, "KeycloakResourceSchemaAttributes")
+        if attribute["schemaId"] == schema["id"]
+        and not attribute.get("parentAttribute")
+    }
+    declared_names = {attribute["name"] for attribute in declared}
+    for name, attribute in live.items():
+        if attribute.get("customAttributeName") and name not in declared_names:
+            response = session.delete(
+                f"{_backend(props, 'KeycloakResourceSchemaAttributes')}"
+                f"/{attribute['id']}",
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            raise_for_status_with_body(response)
+    for attribute in declared:
+        existing = live.get(attribute["name"])
+        if existing is None:
+            response = session.post(
+                _backend(props, "KeycloakResourceSchemaAttributes"),
+                json={
+                    "schemas": [SCIM_SCHEMA_ATTRIBUTE_SCHEMA],
+                    "schemaId": schema["id"],
+                    "mutability": "readWrite",
+                    "returned": "default",
+                    "uniqueness": "none",
+                    "multiValued": False,
+                    "required": False,
+                    "caseExact": False,
+                    **attribute,
+                },
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+        elif any(existing.get(key) != value for key, value in attribute.items()):
+            response = session.put(
+                f"{_backend(props, 'KeycloakResourceSchemaAttributes')}"
+                f"/{existing['id']}",
+                json={
+                    **{key: value for key, value in existing.items() if key != "meta"},
+                    "schemas": [SCIM_SCHEMA_ATTRIBUTE_SCHEMA],
+                    **attribute,
+                },
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+        else:
+            continue
+        raise_for_status_with_body(response)
 
 
 class ScimRemoteProviderProvider(dynamic.ResourceProvider):
@@ -317,6 +544,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
             )
             raise_for_status_with_body(response)
             created = response.json()
+        _configure(session, props, created, created=existing is None)
         return dynamic.CreateResult(id_=created["id"], outs=props)
 
     def read(self, id_: str, props: dict[str, Any]) -> dynamic.ReadResult:
@@ -328,16 +556,17 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
             return dynamic.ReadResult(id_="", outs={})
         raise_for_status_with_body(response)
         live = response.json()
-        return dynamic.ReadResult(
-            id_=id_,
-            outs={
-                **props,
-                "spec": _project(live, props["spec"]),
-                "authentication": _project(
-                    live.get("authenticationList"), props["authentication"]
-                ),
-            },
-        )
+        outs = {
+            **props,
+            "spec": _project(live, props["spec"]),
+            "authentication": _project(
+                live.get("authenticationList"), props["authentication"]
+            ),
+        }
+        # Only a declared schema is read back; an undeclared one stays unmanaged.
+        if props.get("user_attributes") is not None:
+            outs["user_attributes"] = _live_user_attributes(session, props, id_)
+        return dynamic.ReadResult(id_=id_, outs=outs)
 
     def diff(
         self, _id: str, _olds: dict[str, Any], _news: dict[str, Any]
@@ -352,8 +581,9 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
                 "client_secret",
                 "spec",
                 "authentication",
+                "user_attributes",
             )
-            if _olds.get(key) != _news[key]
+            if _olds.get(key) != _news.get(key)
         ]
         return dynamic.DiffResult(changes=bool(changed))
 
@@ -363,7 +593,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
         session = _session(_news)
         response = _get(session, _news, _id)
         raise_for_status_with_body(response)
-        _put(session, _news, response.json())
+        _configure(session, _news, _put(session, _news, response.json()), created=False)
         return dynamic.UpdateResult(outs=_news)
 
     def delete(self, _id: str, _props: dict[str, Any]) -> None:
@@ -411,6 +641,7 @@ class ScimRemoteProvider(dynamic.Resource):
                 "client_secret": pulumi.Output.secret(client_secret),
                 "spec": spec.to_scim(),
                 "authentication": pulumi.Output.secret(spec.authentication_to_scim()),
+                "user_attributes": spec.user_attributes_to_scim(),
             },
             pulumi.ResourceOptions.merge(
                 opts,

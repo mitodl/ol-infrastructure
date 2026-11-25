@@ -155,6 +155,16 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    etag_supported: false
+    change_password_supported: false
+    # Custom User-schema mappings as read from the live provider (2026-11-23).
+    user_attributes:
+    - name: fullName
+      type: string
+      custom_attribute_name: fullName
+    - name: emailOptIn
+      type: integer
+      custom_attribute_name: emailOptIn
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
@@ -165,13 +175,21 @@ config:
     enabled: true
     replay_on_failure: true
     retry_interval_in_seconds: 3600
+    # The live provider (read 2026-11-24) had bulk off from hand configuration;
+    # it was meant to be on. mitxonline's /scim/v2/Bulk is the same mitol.scim
+    # view Learn's provider uses, advertising 1000 operations and 1048576 bytes. Bulk takes Learn's
+    # values. Sort stays off, as live: mitol.scim advertises it unsupported.
+    # No custom mappings, as live, so fullName does not reach mitxonline.
     filter_supported: true
     filter_max_results: 50
-    sort_supported: true
+    sort_supported: false
     patch_supported: true
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    etag_supported: false
+    change_password_supported: false
+    user_attributes: []
     authentication_list:
     - authentication_type: BEARER
       authentication_token:

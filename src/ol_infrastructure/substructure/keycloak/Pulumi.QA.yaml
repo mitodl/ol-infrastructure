@@ -156,6 +156,18 @@ config:
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    etag_supported: false
+    change_password_supported: false
+    # Custom User-schema mappings, the same as Production's Learn provider so RC
+    # provisions the way Production does. The live provider had fullName only
+    # (read 2026-11-23); emailOptIn is added on apply.
+    user_attributes:
+    - name: fullName
+      type: string
+      custom_attribute_name: fullName
+    - name: emailOptIn
+      type: integer
+      custom_attribute_name: emailOptIn
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
@@ -165,13 +177,21 @@ config:
     base_url: https://rc.mitxonline.mit.edu/scim/v2
     enabled: true
     replay_on_failure: false
+    # The same capability flags and custom User-schema mappings as
+    # Production's mitxonline provider: bulk requests on Learn's limits, no
+    # sort parameters, no custom mappings. The live provider mapped fullName
+    # (read 2026-11-23); apply deletes it, so RC stops sending mitxonline
+    # names, as Production does.
     filter_supported: true
     filter_max_results: 50
-    sort_supported: true
+    sort_supported: false
     patch_supported: true
     bulk_supported: true
     bulk_max_operations: 100
     bulk_max_payload_size: 1048576
+    etag_supported: false
+    change_password_supported: false
+    user_attributes: []
     authentication_list:
     - authentication_type: BEARER
       authentication_token:

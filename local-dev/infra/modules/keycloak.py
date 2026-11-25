@@ -13,6 +13,7 @@ seeded by local-dev/scripts/kc-seed-users.sh, which the root Tiltfile runs
 automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
+import json
 from http import HTTPStatus
 
 import httpx
@@ -320,6 +321,18 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             keycloak.RealmUserProfileAttributeArgs(
                 name="emailOptIn",
                 display_name="${emailOptIn}",
+                # Same validator as the production olapps realm: the SCIM
+                # providers send emailOptIn as an integer, and scim-for-keycloak
+                # validates each PATCH locally, so one non-integer value aborts
+                # the provider's whole retry run.
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="options",
+                        config={
+                            "options": json.dumps(["0", "1"], separators=(",", ":"))
+                        },
+                    ),
+                ],
                 required_for_roles=[],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]

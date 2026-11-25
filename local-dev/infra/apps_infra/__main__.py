@@ -81,17 +81,6 @@ mitxonline_scim_token = (
     config.get("mitxonline_scim_token")
     or "local-dev-mitxonline-scim-token"  # pragma: allowlist secret
 )
-# mitxonline's workload comes from its own Tiltfile rather than a manifest in
-# this repo, so its Service is not declared anywhere here. Read off a running
-# cluster; override if it moves:
-#   kubectl --context local-dev -n mitxonline get svc
-# Note the Service is mitxonline-webapp while the Deployment is mitxonline-app,
-# so this is not the name the seed script execs into.
-mitxonline_scim_base_url = (
-    config.get("mitxonline_scim_base_url")
-    or "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/scim/v2"
-)
-
 # Which apps are switched on, forwarded by the Tiltfile from tilt_config.json.
 # Gates the per-app Keycloak clients whose k8s Secrets target a namespace the
 # core stack only creates on demand.
@@ -182,7 +171,6 @@ create_scim_remote_providers(
     realm_name=OLAPPS_REALM,
     learn_scim_token=learn_scim_token,
     mitxonline_scim_token=mitxonline_scim_token,
-    mitxonline_scim_base_url=mitxonline_scim_base_url,
     enabled_apps=enabled_apps,
 )
 
