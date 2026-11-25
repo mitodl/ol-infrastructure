@@ -941,6 +941,22 @@ home_redirect_vcl = (
     f"}}"
 )
 
+# Legacy certificate links (shared on LinkedIn, CVs, emails) redirect to the
+# matching MIT Learn certificate page - per hq#14307. Both sites use the same
+# UUID, so no lookup is needed. The UUID is matched in full so
+# /certificate/program/ can't be read as a course certificate whose UUID is
+# "program". Uses a distinct error code (606) from the redirects above.
+_certificate_uuid = (
+    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
+certificate_redirect_vcl = "\n".join(
+    f'if (req.url.path ~ "^/certificate/{legacy_prefix}({_certificate_uuid})/?$") {{\n'
+    f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/certificate/{learn_type}/" re.group.1;\n'
+    f"  error 606;\n"
+    f"}}"
+    for legacy_prefix, learn_type in (("", "course"), ("program/", "program"))
+)
+
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -1079,6 +1095,14 @@ mitxonline_service = fastly.ServiceVcl(
             type="recv",
         ),
         vcl_snippet(
+            content=certificate_redirect_vcl,
+            name="Redirect certificate pages to MIT Learn",
+            # /certificate/* doesn't overlap any other redirect, so ordering
+            # isn't load-bearing - placed after them for readability only.
+            priority=180,
+            type="recv",
+        ),
+        vcl_snippet(
             content=textwrap.dedent("""\
             if (obj.status == 602) {
               set obj.status = 301;
@@ -1149,6 +1173,23 @@ mitxonline_service = fastly.ServiceVcl(
               return(deliver);
             }"""),
             name="Handle home page redirects to MIT Learn",
+            type="error",
+        ),
+        vcl_snippet(
+            content=textwrap.dedent("""\
+            if (obj.status == 606) {
+              set obj.status = 301;
+              set obj.response = "Moved Permanently";
+              set obj.http.Location = req.http.x-redir-location;
+              set obj.http.Cache-Control = "no-store";
+              if (req.url.qs != "") {
+                # 606's Location never carries a query string, so a plain
+                # "?" append is always correct here.
+                set obj.http.Location = obj.http.Location "?" req.url.qs;
+              }
+              return(deliver);
+            }"""),
+            name="Handle certificate redirects to MIT Learn",
             type="error",
         ),
         vcl_snippet(
