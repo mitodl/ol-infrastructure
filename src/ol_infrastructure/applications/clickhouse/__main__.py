@@ -17,6 +17,7 @@ Requires the ``substructure.aws.eks.data.*`` stack to be deployed (which install
 the NVMe DaemonSet and local-path-provisioner) before deploying to QA/Production.
 """
 
+import hashlib
 import json
 from pathlib import Path
 from textwrap import dedent
@@ -32,11 +33,22 @@ from bridge.lib.constants import (
     CLICKHOUSE_NAMESPACE,
     not_spot_node_match_expression,
 )
-from bridge.lib.magic_numbers import CLICKHOUSE_TERMINATION_GRACE_SECONDS
+from bridge.lib.magic_numbers import (
+    CLICKHOUSE_TERMINATION_GRACE_SECONDS,
+    EIGHT_HOURS_SECONDS,
+    SECONDS_IN_ONE_DAY,
+)
 from bridge.lib.versions import (
     CLICKHOUSE_KEEPER_VERSION,
     CLICKHOUSE_OPERATOR_VERSION,  # noqa: F401 — for traceability
     CLICKHOUSE_SERVER_VERSION,
+    VAULT_PLUGIN_STARROCKS_SHA256,
+)
+from ol_infrastructure.applications.clickhouse.vault_database_roles import (
+    OPIK_CUTOVER_ROLE,
+    REVOCATION_STATEMENTS,
+    VAULT_ADMIN_GRANTS,
+    opik_cutover_creation_statements,
 )
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -191,7 +203,12 @@ CHK_CLUSTER_NAME = "cluster1"
 # TLS listeners, next to the plaintext ones rather than replacing them.
 CLICKHOUSE_HTTPS_PORT = 8443
 CLICKHOUSE_NATIVE_TLS_PORT = 9440
+# The server's mysql_port in every env. It serves TLS whenever openSSL/server
+# is configured, which tls_listeners_enabled does.
+CLICKHOUSE_MYSQL_PORT = 9004
 KEEPER_TLS_PORT = 9281
+VAULT_DATABASE_DEFAULT_TTL_SECONDS = EIGHT_HOURS_SECONDS
+VAULT_DATABASE_MAX_TTL_SECONDS = 7 * SECONDS_IN_ONE_DAY
 CLICKHOUSE_TLS_DIR = "/etc/clickhouse-server/tls"
 KEEPER_TLS_DIR = "/etc/clickhouse-keeper/tls"
 TLS_DISABLED_PROTOCOLS = "sslv2,sslv3,tlsv1,tlsv1_1"
@@ -644,6 +661,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     tls_certificate: Any,
     tls_listeners_enabled: bool,
     keeper_tls_enabled: bool,
+    vault_admin_enabled: bool,
     reconcile_task_id: str | None,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
@@ -786,6 +804,28 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     # reload without a restart.
     def _secret_ref(key: str) -> dict[str, Any]:
         return {"valueFrom": {"secretKeyRef": {"name": users_secret_name, "key": key}}}
+
+    # vault_admin is the login Vault's database secrets engine uses to create
+    # and drop the users it issues (vault_database_roles.py). Vault reaches it
+    # through the internal NLB below, which does not preserve the client IP, so
+    # its connections arrive from the NLB's addresses in the pod subnets and
+    # pod_networks is as narrow as its networks can be. double_sha1 because
+    # the MySQL interface authenticates those users with mysql_native_password,
+    # which any MySQL client speaks; a sha256_password user needs TLS or the
+    # server's RSA key on that path. No access_management: ClickHouse refuses a
+    # users.xml user that sets
+    # it alongside grants (Code 36, and the server does not start), so the
+    # grants are the whole of its access.
+    def _vault_admin(pod_networks: list[str]) -> dict[str, Any]:
+        return {
+            "vault_admin/password_double_sha1_hex": _secret_ref(
+                "vault_admin_double_sha1"
+            ),
+            "vault_admin/profile": "default",
+            "vault_admin/quota": "default",
+            "vault_admin/networks/ip": pod_networks,
+            "vault_admin/grants/query": list(VAULT_ADMIN_GRANTS),
+        }
 
     def _users(networks: list[str]) -> dict[str, Any]:
         return {
@@ -980,9 +1020,19 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         ),
                     },
                     "quotas": _LLMOPS_QUOTAS,
-                    "users": _users(
-                        [*CLICKHOUSE_LOOPBACK_NETWORKS, *kwargs["client_networks"]]
-                    ),
+                    "users": {
+                        **_users(
+                            [
+                                *CLICKHOUSE_LOOPBACK_NETWORKS,
+                                *kwargs["client_networks"],
+                            ]
+                        ),
+                        **(
+                            _vault_admin(kwargs["client_networks"])
+                            if vault_admin_enabled
+                            else {}
+                        ),
+                    },
                 },
                 "templates": {
                     "podTemplates": [
@@ -1207,6 +1257,15 @@ if keeper_tls_enabled and not tls_listeners_enabled:
 # prefixed IDs are excluded), so a new value forces a reconcile of an
 # otherwise unchanged CHI. Unset in normal operation.
 reconcile_task_id = clickhouse_config.get("reconcile_task_id")
+# Vault's database secrets engine issuing ClickHouse users (see "Vault dynamic
+# credentials" below). QA first. Turning it on adds vault_admin's password
+# env var to the pod template, so the operator restarts every replica once.
+vault_database_enabled = clickhouse_config.require_bool("vault_database_enabled")
+vault_admin_password = (
+    clickhouse_config.require_secret("vault_admin_password")
+    if vault_database_enabled
+    else None
+)
 
 ############################################################
 # S3 Cold Storage Bucket
@@ -1370,6 +1429,21 @@ clickhouse_credentials_kv = vault.kv.SecretV2(
         admin=admin_password,
         opik=opik_password,
         interserver=interserver_password,
+        # Sprig has sha1sum but no way to hash the raw digest again, so the
+        # double SHA1 (ClickHouse's password_double_sha1_hex, fixed by the
+        # MySQL protocol) is computed here and only the hash is stored. Vault's
+        # database connection config holds the plaintext.
+        **(
+            {
+                "vault_admin_double_sha1": vault_admin_password.apply(
+                    lambda password: hashlib.sha1(  # noqa: S324
+                        hashlib.sha1(password.encode()).digest()  # noqa: S324
+                    ).hexdigest()
+                )
+            }
+            if vault_admin_password
+            else {}
+        ),
     ).apply(json.dumps),
 )
 
@@ -1389,6 +1463,11 @@ clickhouse_credentials_kv = vault.kv.SecretV2(
 USERS_HASH_TEMPLATES = {
     "admin_sha256": '{{ get .Secrets "admin" | sha256sum }}',
     "opik_sha256": '{{ get .Secrets "opik" | sha256sum }}',
+    **(
+        {"vault_admin_double_sha1": '{{ get .Secrets "vault_admin_double_sha1" }}'}
+        if vault_database_enabled
+        else {}
+    ),
 }
 
 users_secret_name = "clickhouse-users"  # pragma: allowlist secret  # noqa: S105
@@ -1408,9 +1487,14 @@ users_secret = OLVaultK8SSecret(
         refresh_after="1h",
         vaultauth=clickhouse_app.vault_k8s_resources.auth_name,
     ),
+    # A template change makes VSO re-sync straight away, so the KV write has to
+    # land first or a new key renders empty. VSO still syncs after this
+    # resource completes: when a change adds a user, confirm its key is in the
+    # clickhouse-users Secret before applying the CHI, or a replica the
+    # operator restarts fails with CreateContainerConfigError.
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=clickhouse_app.vault_k8s_resources,
+        depends_on=[clickhouse_app.vault_k8s_resources, clickhouse_credentials_kv],
     ),
 )
 
@@ -1633,6 +1717,7 @@ clickhouse_installation = _create_clickhouse_installation(
     tls_certificate=clickhouse_server_certificate,
     tls_listeners_enabled=tls_listeners_enabled,
     keeper_tls_enabled=keeper_tls_enabled,
+    vault_admin_enabled=vault_database_enabled,
     reconcile_task_id=reconcile_task_id,
 )
 
@@ -1990,9 +2075,200 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
                     ),
                 ],
             ),
+            # Vault's NLB (below). Its traffic arrives from the NLB's own
+            # addresses in the pod subnets, not from a pod, so only an ipBlock
+            # matches it.
+            *(
+                [
+                    kubernetes.networking.v1.NetworkPolicyIngressRuleArgs(
+                        from_=data_pod_subnet_cidrs.apply(
+                            lambda cidrs: [
+                                kubernetes.networking.v1.NetworkPolicyPeerArgs(
+                                    ip_block=kubernetes.networking.v1.IPBlockArgs(
+                                        cidr=cidr
+                                    )
+                                )
+                                for cidr in cidrs
+                            ]
+                        ),
+                        ports=[
+                            kubernetes.networking.v1.NetworkPolicyPortArgs(
+                                port=CLICKHOUSE_MYSQL_PORT
+                            ),
+                        ],
+                    )
+                ]
+                if vault_database_enabled
+                else []
+            ),
         ],
     ),
 )
+
+############################################################
+# Vault dynamic credentials
+#
+# Vault's database secrets engine issues ClickHouse users from the roles in
+# vault_database_roles.py. Vault ships no ClickHouse plugin, so this registers
+# vault-plugin-database-starrocks (already in the Vault AMI for
+# substructure/starrocks) under its own catalog name. It is Vault's MySQL plugin
+# sending every statement as COM_QUERY, which ClickHouse's MySQL interface
+# serves on 9004. It does not run rollback statements, so a creation statement
+# that fails after CREATE USER leaves that user behind (see
+# vault_database_roles.py).
+#
+# Vault runs on EC2 in the operations VPC and ClickHouse has only ClusterIP
+# Services, so an internal NLB exposes 9004 to the data VPC. Supplying the SG
+# through the LBC annotation makes it the only authority on the NLB's ingress,
+# and only Vault's SG is admitted.
+############################################################
+if vault_database_enabled:
+    vault_stack = make_stack_reference(
+        projects.VAULT_SERVER, f"operations.{stack_info.name}"
+    )
+    mysql_nlb_security_group = aws.ec2.SecurityGroup(
+        f"clickhouse-{stack_info.env_suffix}-mysql-nlb-security-group",
+        name=f"clickhouse-{stack_info.env_suffix}-mysql-nlb",
+        description="Access control for the ClickHouse MySQL protocol NLB",
+        vpc_id=network_stack.require_output("data_vpc")["id"],
+        ingress=[
+            aws.ec2.SecurityGroupIngressArgs(
+                security_groups=[
+                    vault_stack.require_output("vault_server")["security_group"]
+                ],
+                protocol="tcp",
+                from_port=CLICKHOUSE_MYSQL_PORT,
+                to_port=CLICKHOUSE_MYSQL_PORT,
+                description="Allow Vault to reach the ClickHouse MySQL port.",
+            ),
+        ],
+        # The bridged provider drops AWS's default allow-all egress once any
+        # rule is given, and the NLB needs it to forward to and health-check
+        # the pod targets (target type ip).
+        egress=[
+            aws.ec2.SecurityGroupEgressArgs(
+                cidr_blocks=data_pod_subnet_cidrs,
+                protocol="tcp",
+                from_port=CLICKHOUSE_MYSQL_PORT,
+                to_port=CLICKHOUSE_MYSQL_PORT,
+                description="Allow the NLB to forward to ClickHouse pod targets.",
+            ),
+        ],
+        tags=aws_config.tags,
+    )
+    mysql_nlb_service = kubernetes.core.v1.Service(
+        f"clickhouse-mysql-nlb-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="clickhouse-mysql",
+            namespace=CLICKHOUSE_NAMESPACE,
+            labels={**k8s_global_labels, "app": "clickhouse"},
+            annotations={
+                "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                "service.beta.kubernetes.io/aws-load-balancer-scheme": "internal",
+                "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
+                "service.beta.kubernetes.io/aws-load-balancer-security-groups": (
+                    mysql_nlb_security_group.id
+                ),
+            },
+        ),
+        spec=kubernetes.core.v1.ServiceSpecArgs(
+            type="LoadBalancer",
+            # Same selector as the client Service: a replica the operator has
+            # taken out of service gets no new connections.
+            selector={
+                "clickhouse.altinity.com/chi": "clickhouse",
+                "clickhouse.altinity.com/ready": "yes",
+            },
+            ports=[
+                kubernetes.core.v1.ServicePortArgs(
+                    name="mysql",
+                    port=CLICKHOUSE_MYSQL_PORT,
+                    target_port=CLICKHOUSE_MYSQL_PORT,
+                    protocol="TCP",
+                ),
+            ],
+        ),
+    )
+    mysql_nlb_host = mysql_nlb_service.status.apply(
+        lambda status: status.load_balancer.ingress[0].hostname
+    )
+
+    vault_database_mount = vault.Mount(
+        f"clickhouse-{stack_info.env_suffix}-vault-database-mount",
+        path="database-clickhouse",
+        type="database",
+        max_lease_ttl_seconds=VAULT_DATABASE_MAX_TTL_SECONDS,
+        default_lease_ttl_seconds=VAULT_DATABASE_DEFAULT_TTL_SECONDS,
+        description=f"Dynamic credentials for ClickHouse ({clickhouse_env})",
+    )
+    # Its own catalog entry for the same binary, so this stack and
+    # substructure/starrocks each own what they register.
+    vault_database_plugin = vault.Plugin(
+        f"clickhouse-{stack_info.env_suffix}-vault-database-plugin",
+        type="database",
+        name="clickhouse-database-plugin",
+        command="vault-plugin-database-starrocks",
+        sha256=VAULT_PLUGIN_STARROCKS_SHA256,
+    )
+    # tls=skip-verify: the server's certificate comes from this stack's CA and
+    # names the cluster Services, not the NLB's AWS hostname, and the plugin's
+    # connection producer takes no CA. Never call rotate-root on this mount:
+    # vault_admin is a users.xml user, which ALTER USER cannot change.
+    vault_database_connection = vault.generic.Secret(
+        f"clickhouse-{stack_info.env_suffix}-vault-database-connection",
+        path=Output.concat(vault_database_mount.path, "/config/clickhouse"),
+        # Vault redacts the password on read, which would diff on every run.
+        disable_read=True,
+        data_json=Output.all(mysql_nlb_host, vault_admin_password).apply(
+            lambda args: json.dumps(
+                {
+                    "plugin_name": "clickhouse-database-plugin",
+                    "connection_url": (
+                        f"{{{{username}}}}:{{{{password}}}}@tcp({args[0]}:"
+                        f"{CLICKHOUSE_MYSQL_PORT})/"
+                        f"{'?tls=skip-verify' if tls_listeners_enabled else ''}"
+                    ),
+                    "username": "vault_admin",
+                    "password": args[1],
+                    "allowed_roles": [OPIK_CUTOVER_ROLE],
+                    # The first apply writes this before the NLB has healthy
+                    # targets and before the operator has rolled vault_admin
+                    # onto the replicas, so a check here would fail it.
+                    "verify_connection": False,
+                    "username_template": (
+                        '{{printf "v-%.8s-%.8s-%.20s"'
+                        " (.DisplayName) (.RoleName) (random 20) | truncate 32}}"
+                    ),
+                }
+            )
+        ),
+        opts=ResourceOptions(
+            parent=vault_database_mount,
+            depends_on=[vault_database_plugin],
+        ),
+    )
+    # The cutover backfill is budgeted in days, and a driver opens a new
+    # connection per chunk, so the lease is renewable for a week; issue one per
+    # working session and revoke it when the window closes.
+    vault.database.SecretBackendRole(
+        f"clickhouse-{stack_info.env_suffix}-vault-database-role-{OPIK_CUTOVER_ROLE}",
+        backend=vault_database_mount.path,
+        db_name="clickhouse",
+        name=OPIK_CUTOVER_ROLE,
+        # Loopback covers clickhouse-client through kubectl exec or
+        # port-forward; the pod subnets cover a driver running in the cluster.
+        creation_statements=data_pod_subnet_cidrs.apply(
+            lambda cidrs: opik_cutover_creation_statements(
+                [*CLICKHOUSE_LOOPBACK_NETWORKS, *cidrs]
+            )
+        ),
+        revocation_statements=REVOCATION_STATEMENTS,
+        default_ttl=VAULT_DATABASE_DEFAULT_TTL_SECONDS,
+        max_ttl=VAULT_DATABASE_MAX_TTL_SECONDS,
+        opts=ResourceOptions(parent=vault_database_connection),
+    )
+    export("vault_database_mount", vault_database_mount.path)
 
 ############################################################
 # Monitoring — ServiceMonitor for Prometheus Operator

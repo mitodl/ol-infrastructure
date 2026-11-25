@@ -201,10 +201,28 @@ so we run the equivalent statements ourselves (step 7).
    change) and confirm with `kubectl -n opik rollout status`:
    - `ANALYTICS_DB_DATA_MODEL_TRACE_DELETION_EVENTS_CAPTURE_ENABLED=true`
    - `ANALYTICS_DB_DATA_MODEL_SPAN_DELETION_EVENTS_CAPTURE_ENABLED=true`
-5. Provision the least-privilege cutover user described under "Required
-   privileges" upstream (column-scoped `ALTER UPDATE(_row_exists)`, the
-   four-privilege `RENAME`/`EXCHANGE` rule). Then run `delta_replay.sh` once
-   anchored at the current instant as the privilege smoke test.
+5. Issue the cutover user from Vault. The `opik-cutover` role on the
+   `database-clickhouse` mount holds the forward path of upstream's "Required
+   privileges" (all four privileges on every `RENAME`/`EXCHANGE` name,
+   `ALTER DELETE` plus column-scoped `ALTER UPDATE(_row_exists)` for the
+   lightweight deletes, no `TRUNCATE`); the statements are in
+   `applications/clickhouse/vault_database_roles.py`. The mount exists only
+   where `clickhouse:vault_database_enabled` is true.
+   ```bash
+   vault read -format=json database-clickhouse/creds/opik-cutover > /tmp/cutover-creds.json
+   export CLICKHOUSE_USER=$(jq -r .data.username /tmp/cutover-creds.json)
+   export CLICKHOUSE_PASSWORD=$(jq -r .data.password /tmp/cutover-creds.json)
+   export CUTOVER_LEASE=$(jq -r .lease_id /tmp/cutover-creds.json)
+   rm /tmp/cutover-creds.json
+   ```
+   Pass the password through `CLICKHOUSE_PASSWORD`, as the drivers do, not
+   `--password <value>`: Vault's passwords can start with `-`. The user may
+   log in from loopback (the port-forward) and the data cluster's pod
+   subnets. The lease lasts 8 hours; `vault lease renew "$CUTOVER_LEASE"`
+   extends it, up to 7 days, and a lapsed lease drops the user mid-backfill.
+   `vault lease revoke "$CUTOVER_LEASE"` when the window closes. Then run
+   `delta_replay.sh` once anchored at the current instant as the privilege
+   smoke test.
 6. Freeze Opik chart upgrades (Renovate) from the backfill until `finalize.sh`.
    A Liquibase change to `traces` or `spans` mid-window races the swap.
 7. Take an on-demand SQL backup and don't start until it has finished:
