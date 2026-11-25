@@ -1113,17 +1113,37 @@ if stack_info.env_suffix == "production":
 # other stacks don't get it. Copied out of the mitlearn SOPS file rather than
 # granting this policy MIT Learn's own mount, so the two share one key (and its
 # daily quota) without dagster being able to read the rest of Learn's secrets.
+#
+# Production also gets the credentials the source reads caption tracks with:
+# the OAuth client made by hand in mitol01 and a refresh token per channel, a
+# mapping of a label to a token (see the gcp stack's README, "YouTube captions
+# for the data platform"). Production only, because the captions quota is the
+# client's project's for the day and a QA run would spend it too. Without them
+# the source loads no transcripts.
 if stack_info.env_suffix in ("qa", "production"):
+    youtube_secrets = {
+        "developer_key": read_yaml_secrets(
+            Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml")
+        )["youtube_developer_key"]
+    }
+    if stack_info.env_suffix == "production":
+        youtube_captions = read_yaml_secrets(
+            Path("ol_data/youtube_captions.production.yaml")
+        )
+        youtube_secrets.update(
+            {
+                key: youtube_captions[key]
+                for key in (
+                    "captions_client_id",
+                    "captions_client_secret",
+                    "captions_refresh_tokens",
+                )
+            }
+        )
     vault.generic.Secret(
         f"dagster-youtube-{stack_info.env_suffix}",
         path="secret-data/pipelines/youtube",
-        data_json=json.dumps(
-            {
-                "developer_key": read_yaml_secrets(
-                    Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml")
-                )["youtube_developer_key"]
-            }
-        ),
+        data_json=json.dumps(youtube_secrets),
         opts=ResourceOptions(delete_before_replace=True),
     )
 
