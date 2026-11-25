@@ -868,6 +868,84 @@ async def _cmd_abandon(repos, ack, respond, command, context):
         await _abandon(respond, app_name, cfg, (context or {}).get("user_id"))
 
 
+async def _abandon_build_running(respond, app_name, cfg, job: str) -> bool:
+    """Refuse, and return True, unless the abandon job is idle.
+
+    A build already pending or running needs the request its command made.
+    A second command would reuse that request and, if its own trigger
+    failed, withdraw it, so the first build would refuse. A queued build also
+    reads what is in flight only when it starts, so a request for a release
+    cut since would let it cancel that release instead. `_app_lock`
+    serializes the commands, and the first one's build exists (pending)
+    before the lock is released, so the second one sees it.
+    """
+    try:
+        running = await concourse.active_build_url(cfg.pipeline, job)
+    except Exception:
+        log.exception("Failed to check for a running abandon build: %s", app_name)
+        await _refuse(
+            respond,
+            f"❌ Could not check whether an abandon build for `{app_name}` is "
+            "already running. Nothing abandoned or cancelled.",
+        )
+        return True
+    if running:
+        await _refuse(
+            respond,
+            f"🚧 An abandon build for `{app_name}` is already running: "
+            f"{running}. Nothing abandoned or cancelled. Check "
+            f"`/doof release-status {app_name}` once it finishes.",
+        )
+        return True
+    return False
+
+
+async def _withdraw_abandon_request(app_name, cfg, version: str) -> list[str]:
+    """Withdraw the abandon request for *version*, for an abandon not triggered.
+
+    Left behind, the request would let a later manual run of the abandon job
+    cancel *version* with nobody in Slack asking for it. Returns the line to
+    add to the reply when the withdrawal fails.
+    """
+    try:
+        await github.withdraw_abandon_request(cfg.repo, version)
+    except Exception:
+        log.exception("Failed to withdraw abandon request for %s", app_name)
+        return [
+            f"The abandon request for {version} may still be pending, so a "
+            "manual run of the abandon job would cancel it."
+        ]
+    return []
+
+
+async def _reconcile_failed_abandon_trigger(
+    app_name, cfg, job: str, version: str
+) -> tuple[str | None, list[str]]:
+    """Return the build a failed trigger created anyway, or why there is none.
+
+    The trigger can fail after Concourse created the build, for example when
+    the response times out. Withdrawing the request would make that build
+    refuse, so the request is withdrawn only once the job is seen idle.
+    """
+    failed = f"❌ Failed to trigger release abandon for `{app_name}`."
+    try:
+        running = await concourse.active_build_url(cfg.pipeline, job)
+    except Exception:
+        log.exception("Failed to check for an abandon build: %s", app_name)
+        return None, [
+            failed,
+            "Could not check whether the build started anyway, so the abandon "
+            f"request for {version} is still pending: a build that did start "
+            "needs it. Check "
+            f"{concourse.job_url(cfg.pipeline, job)}. With no build there, a "
+            f"manual run of the job would cancel {version}.",
+        ]
+    if running:
+        log.warning("Abandon trigger for %s failed but %s started", app_name, running)
+        return running, []
+    return None, [failed, *await _withdraw_abandon_request(app_name, cfg, version)]
+
+
 async def _abandon(respond, app_name, cfg, requester: str | None = None):
     # Read before mutating: a lookup that failed after the cancel would report
     # "nothing abandoned" with the requests already deleted.
@@ -879,6 +957,9 @@ async def _abandon(respond, app_name, cfg, requester: str | None = None):
             f"❌ Could not check `{app_name}`'s release state. Nothing abandoned "
             "or cancelled."
         )
+        return
+    job = config.job_name(app_name, cfg, "abandon_job")
+    if in_flight and await _abandon_build_running(respond, app_name, cfg, job):
         return
     try:
         cancelled = await github.cancel_hotfix_requests(cfg.repo)
@@ -899,40 +980,37 @@ async def _abandon(respond, app_name, cfg, requester: str | None = None):
     # The job takes no parameters and reads what is in flight when it runs.
     # The request names the release seen here, and the release resource
     # refuses any other, such as one a supersede cut in the meantime.
+    version = in_flight["version"]
     try:
-        await github.request_abandon(cfg.repo, in_flight["version"])
+        await github.request_abandon(cfg.repo, version)
     except Exception:
         log.exception("Failed to request abandon of %s", app_name)
         lines.append(
-            f"❌ Could not request the abandon of `{app_name}` "
-            f"{in_flight['version']}; nothing abandoned. Check "
-            f"`/doof release-status {app_name}` before trying again."
+            f"❌ Could not request the abandon of `{app_name}` {version}; "
+            f"nothing abandoned. Check `/doof release-status {app_name}` "
+            "before trying again."
         )
+        # GitHub can create the tag and then fail the response. Nothing was
+        # triggered and no abandon build is running, so withdrawing it is safe.
+        lines.extend(await _withdraw_abandon_request(app_name, cfg, version))
         await respond("\n".join(lines))
         return
     try:
-        build_url = await concourse.trigger_job(
-            cfg.pipeline, config.job_name(app_name, cfg, "abandon_job")
-        )
+        build_url = await concourse.trigger_job(cfg.pipeline, job)
     except Exception:
         log.exception("Failed to trigger abandon for %s", app_name)
-        # Any cancelled-hotfix lines already collected are a real state
-        # change that happened before this failure; dropping them would tell
-        # the user nothing was abandoned when their hotfix requests are
-        # already gone.
-        lines.append(f"❌ Failed to trigger release abandon for `{app_name}`.")
-        # Left behind, the request would let a later manual trigger of the
-        # job cancel this release with nobody in Slack asking for it.
-        try:
-            await github.withdraw_abandon_request(cfg.repo, in_flight["version"])
-        except Exception:
-            log.exception("Failed to withdraw abandon request for %s", app_name)
-            lines.append(
-                f"The abandon request for {in_flight['version']} is still "
-                "pending, so a manual run of the abandon job would cancel it."
-            )
-        await respond("\n".join(lines))
-        return
+        running, failure = await _reconcile_failed_abandon_trigger(
+            app_name, cfg, job, version
+        )
+        if running is None:
+            # Any cancelled-hotfix lines already collected are a real state
+            # change that happened before this failure; dropping them would
+            # tell the user nothing was abandoned when their hotfix requests
+            # are already gone.
+            lines.extend(failure)
+            await respond("\n".join(lines))
+            return
+        build_url = running
     _release_requesters.pop(app_name, None)
     # Report the trigger rather than a deletion: the build can still refuse,
     # e.g. when a release cut since is what its own check finds in flight. A
@@ -1588,10 +1666,11 @@ async def _abandon_failure_text(  # noqa: PLR0913
     would cancel that one, so it is never suggested for it.
 
     *version* is what `/doof abandon` saw before triggering, and the job
-    re-reads what is in flight when it runs. A release cut in the seconds
-    between is the one the build cancels, and this text then names the wrong
-    release. Binding the build to *version* closes that gap; until then this
-    is the same race the job already has.
+    re-reads what is in flight when it runs. The abandon request
+    `/doof abandon` pushes names *version*, and with `require_request` set on
+    the job the release resource refuses any other, so a release cut in the
+    seconds between is refused, not cancelled, and this text names the
+    release the build was bound to.
     """
     mention = f"<@{requester}> " if requester else ""
     lines = [
