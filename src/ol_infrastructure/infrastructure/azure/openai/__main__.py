@@ -11,6 +11,10 @@ one Kubernetes ServiceAccount subject, and holds `Cognitive Services OpenAI User
 exactly one account. There is no credential to store, rotate, or revoke anywhere in
 this project's output.
 
+A consumer with Microsoft-format models (the decision model) also gets a second,
+AIServices-kind account for them, and its same identity holds `Cognitive Services User`
+on that account only.
+
 Managed identities rather than app registrations is the load-bearing choice. An app
 registration is an Entra directory object, and creating one needs a Microsoft Graph
 app role that only a Privileged Role Administrator can consent to -- the blocker that
@@ -40,6 +44,11 @@ azure_secrets = read_yaml_secrets(
 # Built-in Azure role, identical in every tenant. Data-plane inference only: it grants
 # no control over the account, its keys, or its deployments.
 COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID = "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+# Built-in, granted on the decision accounts only. OpenAI User's data actions are all
+# under Microsoft.CognitiveServices/accounts/OpenAI/*; this role's data action is
+# Microsoft.CognitiveServices/*, which includes the Microsoft-format models' inference
+# path.
+COGNITIVE_SERVICES_USER_ROLE_ID = "a97b65f3-24c7-4388-baec-2e87135dc908"
 
 # Azure rejects a federated credential with any other audience count:
 # "Federated identity credentials must have exactly one audience".
@@ -160,6 +169,16 @@ class ModelConfig(BaseModel):
         }
     )
 
+    # Microsoft-format models, deployed on a second, AIServices-kind account for each
+    # consumer listed. Azure offers Microsoft-Decision-1.1 only on AIServices and MaaS
+    # accounts, and the accounts above are kind OpenAI. Each of these models must have
+    # a model_versions entry in every stack: Microsoft's own deployment example passes
+    # a version, and whether Azure accepts a Microsoft-format deployment with none (and
+    # auto-upgrades it) is unverified.
+    consumer_decision_models: dict[str, list[str]] = Field(
+        default_factory=lambda: {"learn-ai": ["Microsoft-Decision-1.1"]}
+    )
+
     # Per-model capacity overrides. Each model draws on its own quota pool, so a model
     # whose pool is smaller or larger than the chat models' can be sized on its own.
     model_capacities: dict[str, PositiveInt] = Field(default_factory=dict)
@@ -193,7 +212,11 @@ class ModelConfig(BaseModel):
         deploys, so a misspelled key (e.g. `mit-learn`) previews clean and changes
         nothing.
         """
-        for field_name in ("consumer_extra_models", "consumer_model_capacities"):
+        for field_name in (
+            "consumer_extra_models",
+            "consumer_decision_models",
+            "consumer_model_capacities",
+        ):
             unknown_consumers = set(getattr(self, field_name)) - set(CONSUMER_SUBJECTS)
             if unknown_consumers:
                 msg = (
@@ -202,7 +225,17 @@ class ModelConfig(BaseModel):
                     f"{sorted(CONSUMER_SUBJECTS)}"
                 )
                 raise ValueError(msg)
-        deployed = set(self.models).union(*self.consumer_extra_models.values())
+        decision_models = set().union(*self.consumer_decision_models.values())
+        unpinned = decision_models - set(self.model_versions)
+        if unpinned:
+            msg = (
+                f"consumer_decision_models deploys {sorted(unpinned)} with no version; "
+                "set azure_openai:model_versions for each in this stack"
+            )
+            raise ValueError(msg)
+        deployed = set(self.models).union(
+            *self.consumer_extra_models.values(), decision_models
+        )
         for field_name in ("model_capacities", "model_versions"):
             undeployed = set(getattr(self, field_name)) - deployed
             if undeployed:
@@ -215,12 +248,13 @@ class ModelConfig(BaseModel):
             consumer_models = {
                 *self.models,
                 *self.consumer_extra_models.get(consumer, []),
+                *self.consumer_decision_models.get(consumer, []),
             }
             undeployed = set(capacities) - consumer_models
             if undeployed:
                 msg = (
                     f"consumer_model_capacities names models that are not deployed "
-                    f"on {consumer}'s account {sorted(undeployed)}; its models are "
+                    f"on {consumer}'s accounts {sorted(undeployed)}; its models are "
                     f"{sorted(consumer_models)}"
                 )
                 raise ValueError(msg)
@@ -236,6 +270,7 @@ deployment_config = ModelConfig.model_validate(
 )
 model_names = deployment_config.models
 consumer_extra_models = deployment_config.consumer_extra_models
+consumer_decision_models = deployment_config.consumer_decision_models
 model_capacities = deployment_config.model_capacities
 consumer_model_capacities = deployment_config.consumer_model_capacities
 model_versions = deployment_config.model_versions
@@ -266,18 +301,27 @@ resource_group = azure_native.resources.ResourceGroup(
     opts=azure_opts,
 )
 
-cognitive_accounts: dict[str, azure_native.cognitiveservices.Account] = {}
-deployment_names: dict[str, list[str]] = {}
-workload_identities: dict[str, azure_native.managedidentity.UserAssignedIdentity] = {}
 
-for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items():
-    account_name = f"ol-openai-{consumer}-{stack_info.env_suffix}"
-    account = azure_native.cognitiveservices.Account(
+def role_definition_id(role_id: str) -> Output[str]:
+    """Subscription-scoped id of a built-in Azure role."""
+    return Output.concat(
+        "/subscriptions/",
+        azure_secrets["subscription_id"],
+        "/providers/Microsoft.Authorization/roleDefinitions/",
+        role_id,
+    )
+
+
+def create_account(
+    account_name: str, kind: str, consumer: str
+) -> azure_native.cognitiveservices.Account:
+    """Keyless Cognitive Services account reachable only with an Entra token."""
+    return azure_native.cognitiveservices.Account(
         account_name,
         account_name=account_name,
         resource_group_name=resource_group.name,
         location=location,
-        kind="OpenAI",
+        kind=kind,
         sku=azure_native.cognitiveservices.SkuArgs(name="S0"),
         properties=azure_native.cognitiveservices.AccountPropertiesArgs(
             # Required for Entra ID token auth. Without a custom subdomain the
@@ -296,21 +340,38 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
         tags=resource_tags | {"consumer": consumer},
         opts=azure_opts,
     )
-    cognitive_accounts[consumer] = account
 
-    deployment_names[consumer] = []
-    # Azure allows one deployment operation per account at a time and answers a second
-    # with 409 RequestConflict ("Another operation is being performed on the parent
-    # resource"), so each deployment waits for the one before it.
-    #
-    # That covers creates and updates. It cannot cover deleting two models that are not
-    # adjacent in the chain below (model_names, then this consumer's extra models) in
-    # one apply: Pulumi runs deletes of removed resources after everything else,
-    # batched by direct dependency only (ScheduleDeletes in
-    # pkg/resource/deploy/step_generator.go), so both land in the same parallel batch
-    # and one can 409. Remove one model per apply.
+
+def deploy_models(
+    account: azure_native.cognitiveservices.Account,
+    account_name: str,
+    consumer: str,
+    models: list[str],
+    model_format: str,
+) -> list[str]:
+    """Deploy each model on the account, one deployment operation at a time.
+
+    Azure allows one deployment operation per account at a time and answers a second
+    with 409 RequestConflict ("Another operation is being performed on the parent
+    resource"), so each deployment waits for the one before it.
+
+    That covers creates and updates. It cannot cover deleting two models that are not
+    adjacent in the chain (for the OpenAI accounts, model_names then the consumer's
+    extra models) in one apply: Pulumi runs deletes of removed resources after
+    everything else, batched by direct dependency only (ScheduleDeletes in
+    pkg/resource/deploy/step_generator.go), so both land in the same parallel batch
+    and one can 409. Remove one model per apply.
+
+    :param account: The account the deployments belong to.
+    :param account_name: Prefix of each deployment's Pulumi resource name.
+    :param consumer: Key into consumer_model_capacities.
+    :param models: Models to deploy, each under a deployment named after it.
+    :param model_format: Azure's model format, e.g. ``OpenAI`` or ``Microsoft``.
+    :returns: The deployment names, in the order they were created.
+    :rtype: list[str]
+    """
     previous_deployment: azure_native.cognitiveservices.Deployment | None = None
-    for model_name in [*model_names, *consumer_extra_models.get(consumer, [])]:
+    for model_name in models:
         pinned_version = model_versions.get(model_name)
         previous_deployment = azure_native.cognitiveservices.Deployment(
             f"{account_name}-{model_name}",
@@ -325,7 +386,7 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
             ),
             properties=azure_native.cognitiveservices.DeploymentPropertiesArgs(
                 model=azure_native.cognitiveservices.DeploymentModelArgs(
-                    format="OpenAI",
+                    format=model_format,
                     name=model_name,
                     version=pinned_version,
                 ),
@@ -341,7 +402,44 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
                 )
             ),
         )
-        deployment_names[consumer].append(model_name)
+    return list(models)
+
+
+def assign_role(
+    resource_name: str,
+    scope: Output[str],
+    principal_id: Output[str] | str,
+    principal_type: str,
+    role_id: str,
+) -> None:
+    """Grant a built-in role to one principal on one account."""
+    azure_native.authorization.RoleAssignment(
+        resource_name,
+        scope=scope,
+        principal_id=principal_id,
+        principal_type=principal_type,
+        role_definition_id=role_definition_id(role_id),
+        opts=azure_opts,
+    )
+
+
+cognitive_accounts: dict[str, azure_native.cognitiveservices.Account] = {}
+deployment_names: dict[str, list[str]] = {}
+decision_accounts: dict[str, azure_native.cognitiveservices.Account] = {}
+decision_deployment_names: dict[str, list[str]] = {}
+workload_identities: dict[str, azure_native.managedidentity.UserAssignedIdentity] = {}
+
+for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items():
+    account_name = f"ol-openai-{consumer}-{stack_info.env_suffix}"
+    account = create_account(account_name, "OpenAI", consumer)
+    cognitive_accounts[consumer] = account
+    deployment_names[consumer] = deploy_models(
+        account,
+        account_name,
+        consumer,
+        [*model_names, *consumer_extra_models.get(consumer, [])],
+        "OpenAI",
+    )
 
     identity = azure_native.managedidentity.UserAssignedIdentity(
         account_name,
@@ -369,35 +467,56 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
     # Account scope, not resource-group scope. This scoping is the whole reason each
     # consumer gets its own account: it is what stops one app's identity from reaching
     # another app's endpoint.
-    azure_native.authorization.RoleAssignment(
+    #
+    # principal_type is asserted rather than looked up, because a freshly created
+    # identity that has not yet replicated fails the assignment with PrincipalNotFound
+    # otherwise.
+    assign_role(
         f"{account_name}-openai-user",
-        scope=account.id,
-        principal_id=identity.principal_id,
-        # A freshly created identity that has not yet replicated fails the assignment
-        # with PrincipalNotFound unless the type is asserted rather than looked up.
-        principal_type="ServicePrincipal",
-        role_definition_id=Output.concat(
-            "/subscriptions/",
-            azure_secrets["subscription_id"],
-            "/providers/Microsoft.Authorization/roleDefinitions/",
-            COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID,
-        ),
-        opts=azure_opts,
+        account.id,
+        identity.principal_id,
+        "ServicePrincipal",
+        COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID,
     )
-
     if developer_group_object_id:
-        azure_native.authorization.RoleAssignment(
+        assign_role(
             f"{account_name}-developer-openai-user",
-            scope=account.id,
-            principal_id=developer_group_object_id,
-            principal_type="Group",
-            role_definition_id=Output.concat(
-                "/subscriptions/",
-                azure_secrets["subscription_id"],
-                "/providers/Microsoft.Authorization/roleDefinitions/",
-                COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID,
-            ),
-            opts=azure_opts,
+            account.id,
+            developer_group_object_id,
+            "Group",
+            COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID,
+        )
+
+    decision_models = consumer_decision_models.get(consumer, [])
+    if not decision_models:
+        continue
+    # A second account rather than a change of kind on the first, because changing an
+    # account's kind replaces it, and the consumer's GPT deployments are live on it.
+    # The same identity reaches both, so the pods need no second federated credential.
+    decision_account_name = f"ol-decision-{consumer}-{stack_info.env_suffix}"
+    decision_account = create_account(decision_account_name, "AIServices", consumer)
+    decision_accounts[consumer] = decision_account
+    decision_deployment_names[consumer] = deploy_models(
+        decision_account,
+        decision_account_name,
+        consumer,
+        decision_models,
+        "Microsoft",
+    )
+    assign_role(
+        f"{decision_account_name}-cognitive-services-user",
+        decision_account.id,
+        identity.principal_id,
+        "ServicePrincipal",
+        COGNITIVE_SERVICES_USER_ROLE_ID,
+    )
+    if developer_group_object_id:
+        assign_role(
+            f"{decision_account_name}-developer-cognitive-services-user",
+            decision_account.id,
+            developer_group_object_id,
+            "Group",
+            COGNITIVE_SERVICES_USER_ROLE_ID,
         )
 
 export("resource_group_id", resource_group.id)
@@ -414,6 +533,17 @@ export(
     },
 )
 export("model_deployments", deployment_names)
+export(
+    "decision_accounts",
+    {
+        consumer: {
+            "id": account.id,
+            "endpoint": account.properties.endpoint,
+        }
+        for consumer, account in decision_accounts.items()
+    },
+)
+export("decision_model_deployments", decision_deployment_names)
 export(
     "workload_identities",
     {

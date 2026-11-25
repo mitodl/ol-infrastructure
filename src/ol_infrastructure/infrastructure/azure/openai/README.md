@@ -32,6 +32,19 @@ a different model would mean a full reindex. In QA and Production the Dagster `m
 account also gets `text-embedding-3-large`, for the embeddings it computes of Learn's
 content, which have to be comparable with Learn's vectors for the same reason.
 
+learn-ai also gets a second account, `ol-decision-learn-ai-{env}`, of kind `AIServices`,
+holding a deployment of `Microsoft-Decision-1.1` (`azure_openai:consumer_decision_models`).
+Azure offers that model only on `AIServices` and `MaaS` accounts, with format
+`Microsoft`, and the accounts above are kind `OpenAI`. Changing an account's kind
+replaces it, which would take down the GPT deployments on it, so the decision model gets
+its own account instead. learn-ai's existing identity holds `Cognitive Services User` on
+it (OpenAI User's data actions are limited to `accounts/OpenAI/*`). Every decision model
+must have an `azure_openai:model_versions` entry in every stack, CI and QA included, and
+the stack fails at preview without one: whether Azure accepts a `Microsoft`-format
+deployment with no version is unverified. learn-ai's pods get the account's endpoint as
+`OL_LLM_AZURE_DECISION_ENDPOINT` once `learn_ai:enable_azure_decision` is set in that
+environment, which has to wait for this stack to apply there.
+
 Each identity holds one federated identity credential trusting the OIDC issuer of the
 EKS cluster its consumer runs on (`applications` for the first three, `data` for
 Dagster) for exactly the subject above, and one `Cognitive Services OpenAI
@@ -64,7 +77,8 @@ created manually, out of band, and needs `Contributor` + `User Access Administra
 
 Application stacks take a `StackReference` on this project and read
 `workload_identities[<consumer>]["client_id"]`, `tenant_id`, and
-`cognitive_accounts[<consumer>]["endpoint"]`. None of those are secret. Pods get a
+`cognitive_accounts[<consumer>]["endpoint"]`, plus `decision_accounts[<consumer>]["endpoint"]`
+for a consumer with decision models. None of those are secret. Pods get a
 projected ServiceAccount token with the `api://AzureADTokenExchange` audience plus the
 four `AZURE_*` environment variables `azure-identity` reads; nothing is mounted from
 Vault and nothing rotates.
@@ -135,6 +149,10 @@ e.g. dagster-ml's QA `text-embedding-3-large` at 300, above the 250K-token reque
 embedder sends.
 
 Check current usage against them with `az cognitiveservices usage list -l eastus`.
+
+`Microsoft-Decision-1.1` draws on `AIServices.GlobalStandard.Microsoft-Decision-1.1`,
+limit 10200 (2026-11-25), and Microsoft does not document its capacity unit. Production
+sets it to 1000 through `model_capacities`, and it deploys for learn-ai only.
 
 Quota is pooled **per model and version, per deployment type** — not one pool shared by
 all models. These are `GlobalStandard` deployments, and [Microsoft's
@@ -217,7 +235,7 @@ deployment fail. Then delete it from the list, along with
 its `model_versions` and capacity entries, which would otherwise fail validation.
 Remove **one model per apply**. Pulumi deletes removed resources in parallel, and Azure
 answers a second concurrent deployment operation on the same account with 409
-`RequestConflict` (see the comment above the deployment loop in `__main__.py`).
+`RequestConflict` (see the `deploy_models` docstring in `__main__.py`).
 
 Version-only changes go through `azure_openai:model_versions` in Production and need no
 code change.
@@ -226,8 +244,9 @@ code change.
 
 Developers authenticate as themselves. The `ol-eng-developer` Entra group (synced from
 MIT's on-prem directory, set as `azure_openai:developer_group_object_id` in
-`Pulumi.CI.yaml`) holds `Cognitive Services OpenAI User` on the four **CI** accounts
-only, nothing on QA or Production. The program refuses that key on any other stack. To
+`Pulumi.CI.yaml`) holds `Cognitive Services OpenAI User` on the four **CI** accounts and
+`Cognitive Services User` on the CI decision account, and nothing on QA or Production.
+The program refuses that key on any other stack. To
 be added, ask the owners of the `owner-ol-eng-developer` list. After `az login`, `DefaultAzureCredential` resolves
 `AzureCliCredential`, so the same application code that runs in the cluster (where it
 resolves `WorkloadIdentityCredential`) works on a laptop with no environment branch.

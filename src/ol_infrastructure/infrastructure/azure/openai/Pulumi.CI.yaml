@@ -5,4 +5,8 @@ config:
   # ol-eng-developer, synced from MIT's on-prem directory; membership is administered by
   # the owner-ol-eng-developer list.
   azure_openai:developer_group_object_id: cc71ef9e-2c4d-4cf6-a965-51bad3fe580e
+  # Decision models are always pinned (see consumer_decision_models in __main__.py).
+  # "1" is the only version Azure offers for it in eastus (2026-11-25).
+  azure_openai:model_versions:
+    Microsoft-Decision-1.1: "1"
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagFZmyRvyui8/iizV43cU3wfAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMMYekFwUZ2b8YXOc0AgEQgDvitR9QrpIN0882Ucz5Fc82XeJOCXax6+t3mL98JEifpvSQ9ZGVuySQq+yyqJSt6iq5kzENPHyf8zsJGQ==

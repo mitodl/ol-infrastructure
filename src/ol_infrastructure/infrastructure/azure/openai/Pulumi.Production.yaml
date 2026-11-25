@@ -18,6 +18,10 @@ config:
   # 8 x 5 in CI and QA is 1240.
   azure_openai:model_capacities:
     gpt-5.4-pro: 300
+    # learn-ai's deployment only. Its pool (AIServices.GlobalStandard) is 10200 units
+    # with 0 used (2026-11-25); 1000 here plus 5 each in CI and QA is 1010. Microsoft
+    # does not document the unit for this model.
+    Microsoft-Decision-1.1: 1000
   # The versions CI and QA have been serving (auto-upgraded there, so they canary new
   # defaults). Pinning makes these NoAutoUpgrade in Production only.
   azure_openai:model_versions:
@@ -35,4 +39,7 @@ config:
     # also deploys on dagster-ml's, using 2000 of its pool here plus QA's 305 and CI's 5.
     text-embedding-3-large: "1"
     text-embedding-3-small: "1"
+    # Pinned in CI and QA too, since decision models must be. "1" is the only version
+    # offered in eastus (2026-11-25).
+    Microsoft-Decision-1.1: "1"
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwFvj91bDLxrOf1sdg9uKj+4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKT8npQNJRUf/wGNXAgEQgDvkzDj1rsUB99dSGpP2zpv6CDG4x604RHcq9OlgCHUicbmNsKuCVvvZYWmdddGQwckfsaIFju5+urIH3Q==

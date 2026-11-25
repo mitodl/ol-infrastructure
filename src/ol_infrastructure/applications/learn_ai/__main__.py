@@ -71,6 +71,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.azure_workload_identity import (
+    azure_decision_env,
     azure_identity_env,
     azure_identity_token_mount,
     azure_identity_token_volume,
@@ -905,6 +906,11 @@ if learn_ai_config.get_bool("enable_azure_openai"):
             or "gpt-4o",
         )
     )
+    # Its own switch for the same reason: decision_accounts exists only once
+    # infrastructure/azure/openai has created the decision account in this
+    # environment. It reuses the identity env and token volume above.
+    if learn_ai_config.get_bool("enable_azure_decision"):
+        env_vars.update(azure_decision_env(azure_openai_stack, "learn-ai"))
     azure_identity_volumes = [azure_identity_token_volume()]
     azure_identity_volume_mounts = [azure_identity_token_mount()]
 else:
