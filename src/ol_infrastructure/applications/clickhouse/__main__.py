@@ -1429,10 +1429,10 @@ clickhouse_credentials_kv = vault.kv.SecretV2(
         admin=admin_password,
         opik=opik_password,
         interserver=interserver_password,
-        # Sprig has sha1sum but no way to hash the raw digest again, so the
-        # double SHA1 (ClickHouse's password_double_sha1_hex, fixed by the
-        # MySQL protocol) is computed here and only the hash is stored. Vault's
-        # database connection config holds the plaintext.
+        # password_double_sha1_hex is SHA1 of the raw SHA1 digest, not of its
+        # hex, so unlike the sha256sum templates below it is computed here
+        # and only the hash is stored. Vault's database connection config
+        # holds the plaintext.
         **(
             {
                 "vault_admin_double_sha1": vault_admin_password.apply(
