@@ -3331,22 +3331,6 @@
       },
       {
         "permission": {
-          "name": "all_database_access"
-        },
-        "view_menu": {
-          "name": "all_database_access"
-        }
-      },
-      {
-        "permission": {
-          "name": "all_datasource_access"
-        },
-        "view_menu": {
-          "name": "all_datasource_access"
-        }
-      },
-      {
-        "permission": {
           "name": "can_read"
         },
         "view_menu": {
@@ -4425,6 +4409,10 @@
           "name": "Scan New Datasources"
         }
       }
+    ],
+    "allowed_databases": [
+      "Trino",
+      "StarRocks - Lakehouse"
     ],
     "allowed_schemas": [
       "ol_warehouse_production_raw",
