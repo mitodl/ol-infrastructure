@@ -27,6 +27,8 @@ from ol_infrastructure.substructure.aws.eks.karpenter_iam import (
     get_cluster_karpenter_iam_policy_document,
 )
 
+CN_ROOT_VOLUME_SIZE = "50Gi"
+
 
 class StarRocksCnNodePoolConfig(BaseModel):
     """A dedicated Karpenter NodePool for StarRocks compute nodes.
@@ -645,8 +647,15 @@ def _setup_starrocks_cn_nodepool(  # noqa: PLR0913
             **default_node_class_spec,
             # Karpenter builds a RAID0 array from every instance-store volume and
             # mounts kubelet, containerd and pod logs on it. The EBS root volume
-            # then holds only the OS.
+            # then holds only the OS, so it doesn't need the default's 300Gi.
             "instanceStorePolicy": "RAID0",
+            "blockDeviceMappings": [
+                {
+                    **mapping,
+                    "ebs": {**mapping["ebs"], "volumeSize": CN_ROOT_VOLUME_SIZE},
+                }
+                for mapping in default_node_class_spec["blockDeviceMappings"]
+            ],
             "tags": aws_config.merged_tags(
                 {"Name": f"{cluster_name}-karpenter-starrocks-cn-nodeclass"}
             ),
@@ -686,7 +695,11 @@ def _setup_starrocks_cn_nodepool(  # noqa: PLR0913
                             "effect": "NoSchedule",
                         }
                     ],
-                    "expireAfter": "720h",
+                    # Expiry ignores disruption budgets (Karpenter deletes the
+                    # NodeClaim once expireAfter passes), so a timed expiry could
+                    # land mid-build. AMI updates still replace these nodes, as
+                    # drift, which the budget below holds outside the window.
+                    "expireAfter": "Never",
                     # A CN stops gracefully within its pod's grace period, so an
                     # hour is only the backstop for a drain that never finishes.
                     "terminationGracePeriod": "1h",
@@ -722,7 +735,8 @@ def _setup_starrocks_cn_nodepool(  # noqa: PLR0913
                 "budgets": [
                     # StarRocks places a query's fragments when it schedules the
                     # query, so replacing a node mid-build fails every query
-                    # running on it. Drift and expiry wait for the window to close.
+                    # running on it. Drift and emptiness wait for the window to
+                    # close.
                     {
                         "nodes": "0",
                         "schedule": nodepool_config.build_window_schedule,
