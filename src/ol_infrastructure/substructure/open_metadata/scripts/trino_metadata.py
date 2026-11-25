@@ -25,7 +25,7 @@ config = {
                 # (ol_warehouse_{env}_{user}_{layer}).
                 "schemaFilterPattern": {
                     "includes": [
-                        r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
+                        r"ol_warehouse_[a-z]+_(dimensional|external|integrations|intermediate|irx|mart|migration|raw|reporting|staging)$",
                         r"ol_data_lake_[a-z]+",
                     ],
                 },
