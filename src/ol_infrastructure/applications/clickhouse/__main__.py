@@ -2186,6 +2186,13 @@ if vault_server is not None:
                     mysql_nlb_security_group.id
                 ),
                 "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=true",
+                # With the client IP preserved, Vault's packets reach the pod
+                # from Vault's VPC, which the node SG does not admit. This makes
+                # the controller attach its shared backend SG to the NLB, which
+                # the node SG does admit. Without it the NLB's health checks
+                # (from its pod-subnet addresses) pass while every Vault
+                # connection is dropped.
+                "service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules": "true",
             },
         ),
         spec=kubernetes.core.v1.ServiceSpecArgs(
