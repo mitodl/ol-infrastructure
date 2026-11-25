@@ -13,6 +13,7 @@ import pytest
 
 from ol_infrastructure.lib import data_lake_access
 from ol_infrastructure.lib.data_lake_access import (
+    DATA_LAKE_LAYERS,
     GOVERNANCE_TABLE_ACCESS,
     layer_database,
     validate_governance_access,
@@ -45,6 +46,18 @@ def test_superset_allowed_datasets_match_table_access() -> None:
         for role, table_layers in GOVERNANCE_TABLE_ACCESS.items()
     }
     assert _superset_allowed_datasets() == expected
+
+
+def test_superset_allowed_schemas_are_lake_layers() -> None:
+    # Any other schema hands a role a non-lake database's datasets, e.g.
+    # `public` on the Superset Metadata DB.
+    lake_schemas = {layer_database("production", layer) for layer in DATA_LAKE_LAYERS}
+    roles = json.loads(GOVERNANCE_ROLES_JSON.read_text())
+    stray = {
+        role["name"]: sorted(set(role.get("allowed_schemas", [])) - lake_schemas)
+        for role in roles
+    }
+    assert {role: schemas for role, schemas in stray.items() if schemas} == {}
 
 
 @pytest.mark.parametrize(
