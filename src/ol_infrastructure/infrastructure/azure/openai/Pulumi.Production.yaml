@@ -19,9 +19,9 @@ config:
   azure_openai:model_capacities:
     gpt-5.4-pro: 300
     # learn-ai's deployment only. Its pool (AIServices.GlobalStandard) is 10200 units
-    # with 0 used (2026-11-25); 1000 here plus 5 each in CI and QA is 1010. Microsoft
+    # with 0 used (2026-11-25); 5000 here plus 5 each in CI and QA is 5010. Microsoft
     # does not document the unit for this model.
-    Microsoft-Decision-1.1: 1000
+    Microsoft-Decision-1.1: 5000
   # The versions CI and QA have been serving (auto-upgraded there, so they canary new
   # defaults). Pinning makes these NoAutoUpgrade in Production only.
   azure_openai:model_versions:
