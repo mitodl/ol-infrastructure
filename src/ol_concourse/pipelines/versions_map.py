@@ -79,7 +79,10 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/label_studio/": ["LABEL_STUDIO_CHART_VERSION"],
     "applications/learn_ai/": ["NGINX_VERSION"],
     "applications/mailgun/": [],
-    "applications/marimo_data/": [],
+    "applications/marimo_data/": [
+        "MARIMO_RUNTIME_VERSION",
+        "NOTEBOOK_PUBLISHER_VERSION",
+    ],
     "applications/micromasters/": ["NGINX_VERSION"],
     "applications/mit_learn/": ["NGINX_VERSION"],
     "applications/mit_learn_nextjs/": [],

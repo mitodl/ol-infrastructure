@@ -149,6 +149,10 @@ MARIMO_JUPYTERLAB_VERSION = "2026.11.18.286.1"
 # ol-data-platform's build_marimo_runtime workflow, tagged the same way.
 # renovate: datasource=docker depName=marimo-runtime packageName=ghcr.io/mitodl/marimo-runtime
 MARIMO_RUNTIME_VERSION = "2026.11.24.5.1"
+# The JupyterHub service that publishes notebooks as MarimoNotebooks, from
+# ol-data-platform's build_notebook_publisher workflow, tagged the same way.
+# renovate: datasource=docker depName=notebook-publisher packageName=ghcr.io/mitodl/notebook-publisher
+NOTEBOOK_PUBLISHER_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
 GRAFANA_K8S_MONITORING_CHART_VERSION = "4.6.1"
 # renovate: datasource=helm depName=loki packageName=loki registryUrl=https://grafana.github.io/helm-charts
