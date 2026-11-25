@@ -181,9 +181,10 @@ def _starrocks_pod_anti_affinity(component: str, *, required: bool) -> dict[str,
     co-locating them after eviction, dropping FE below BDBJE quorum. `component`
     must match the chart's `app.kubernetes.io/component` pod label (fe/be/cn).
     `required` is hard (blocks scheduling) for FE/BE, whose small fixed replica
-    counts make co-location a quorum/redundancy risk; CN uses soft/preferred
-    since it's HPA-autoscaled and a hard constraint would force one Karpenter
-    node per CN replica even at max (10-20) replicas.
+    counts make co-location a quorum/redundancy risk. CN on the shared Karpenter
+    fleet uses soft/preferred, since a hard constraint would force one node per
+    CN replica even at max (10-20) replicas. CN on its dedicated node pool uses
+    hard, because there each CN is sized to fill a node.
     """
     pod_affinity_term = {
         "labelSelector": {
@@ -759,33 +760,80 @@ if starrocks_config.get_bool("use_be"):
 if starrocks_config.get_bool("use_cn"):
     # shared storage configuration
     cn_config = starrocks_config.get_object("cn_config") or {}
+    if cn_config.get("dedicated_nodepool", False):
+        # The starrocks-cn Karpenter NodePool (substructure/aws/eks, config
+        # starrocks:cn_nodepool) is on-demand, tainted, and puts the node's
+        # instance-store NVMe under its ephemeral storage. One CN per node:
+        # the pod is sized to fill the node, and the required anti-affinity
+        # keeps a node loss to one CN. The emptyDirs move datacache (under
+        # storage_root_path) and spill off the container layer and onto that
+        # NVMe.
+        cn_scheduling: dict[str, Any] = {
+            "nodeSelector": {"ol.mit.edu/starrocks_cn": "true"},
+            "tolerations": [
+                {
+                    "key": "ol.mit.edu/starrocks_cn",
+                    "operator": "Equal",
+                    "value": "true",
+                    "effect": "NoSchedule",
+                }
+            ],
+            "affinity": _starrocks_pod_anti_affinity("cn", required=True),
+            "emptyDirs": [
+                {"name": "cn-storage", "mountPath": "/opt/starrocks/cn/storage"},
+                {"name": "cn-spill", "mountPath": "/opt/starrocks/cn/spill"},
+            ],
+            # The chart's cn.conf plus the local disk quotas. Both are
+            # fractions of the NVMe filesystem, which the cache and spill
+            # directories share, and they sum to 0.8 so kubelet's 10%
+            # nodefs.available eviction threshold is never reached. Auto-adjust
+            # is off so the cache keeps a fixed share instead of filling the
+            # disk and shrinking only once usage reaches disk_high_level (90%).
+            "config": "\n".join(
+                (
+                    "sys_log_level = INFO",
+                    "thrift_port = 9060",
+                    "webserver_port = 8040",
+                    "heartbeat_service_port = 9050",
+                    "brpc_port = 8060",
+                    "enable_datacache_disk_auto_adjust = false",
+                    f"datacache_disk_size = {cn_config['datacache_disk_size']}",
+                    "spill_max_dir_bytes_ratio = "
+                    f"{cn_config['spill_max_dir_bytes_ratio']}",
+                )
+            ),
+        }
+    else:
+        cn_scheduling = {
+            # Incident 2026-10-09 (prod): with no node constraint, both CN pods
+            # landed on core nodes, and cn-1 took 16Gi on the only core node in
+            # fe-0's EBS zone. fe-0 sat Pending for days. CN is stateless, so
+            # keep it on the Karpenter fleet and leave core capacity for FE.
+            "affinity": {
+                **_starrocks_pod_anti_affinity("cn", required=False),
+                "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                        "nodeSelectorTerms": [
+                            {
+                                "matchExpressions": [
+                                    {
+                                        "key": "ol.mit.edu/core_node",
+                                        "operator": "NotIn",
+                                        "values": ["true"],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+            },
+        }
     starrocks_values["starrocksCnSpec"] = {
         "imagePullPolicy": "IfNotPresent",
         "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
-        # Incident 2026-10-09 (prod): with no node constraint, both CN pods
-        # landed on core nodes, and cn-1 took 16Gi on the only core node in
-        # fe-0's EBS zone. fe-0 sat Pending for days. CN is stateless, so keep
-        # it on the Karpenter fleet and leave core capacity for FE.
-        "affinity": {
-            **_starrocks_pod_anti_affinity("cn", required=False),
-            "nodeAffinity": {
-                "requiredDuringSchedulingIgnoredDuringExecution": {
-                    "nodeSelectorTerms": [
-                        {
-                            "matchExpressions": [
-                                {
-                                    "key": "ol.mit.edu/core_node",
-                                    "operator": "NotIn",
-                                    "values": ["true"],
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-        },
+        **cn_scheduling,
         "resources": {
             "requests": {
                 # StarRocks recommends 16 CPU cores and 64 GB RAM per CN node.
@@ -1321,12 +1369,14 @@ for component, port, keep_metrics in (
         opts=ResourceOptions(depends_on=[starrocks_release]),
     )
 
-if stack_info.name == "Production":
+if fe_config.get("replicas", 3) > 1:
     # Backstop for any voluntary-eviction path other than Karpenter (e.g. a
     # manual `kubectl drain`, an EKS-managed node group upgrade) that respects
     # PDBs but not the karpenter.sh/do-not-disrupt annotation set above.
     # max_unavailable=1 preserves FE's 2-of-3 quorum requirement while still
     # allowing one replica at a time to be evicted when genuinely necessary.
+    # QA runs the same three-FE quorum, so it gets the same budget. CI's single
+    # FE does not: a budget there would block every drain of its node.
     starrocks_fe_pdb = kubernetes.policy.v1.PodDisruptionBudget(
         f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-fe-pdb",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
