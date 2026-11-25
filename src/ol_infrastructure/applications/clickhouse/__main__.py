@@ -661,7 +661,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     tls_certificate: Any,
     tls_listeners_enabled: bool,
     keeper_tls_enabled: bool,
-    vault_admin_enabled: bool,
+    vault_admin_networks: "Output[list[str]] | None",
     reconcile_task_id: str | None,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
@@ -806,24 +806,24 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         return {"valueFrom": {"secretKeyRef": {"name": users_secret_name, "key": key}}}
 
     # vault_admin is the login Vault's database secrets engine uses to create
-    # and drop the users it issues (vault_database_roles.py). Vault reaches it
-    # through the internal NLB below, which does not preserve the client IP, so
-    # its connections arrive from the NLB's addresses in the pod subnets and
-    # pod_networks is as narrow as its networks can be. double_sha1 because
-    # the MySQL interface authenticates those users with mysql_native_password,
-    # which any MySQL client speaks; a sha256_password user needs TLS or the
-    # server's RSA key on that path. No access_management: ClickHouse refuses a
-    # users.xml user that sets
-    # it alongside grants (Code 36, and the server does not start), so the
-    # grants are the whole of its access.
-    def _vault_admin(pod_networks: list[str]) -> dict[str, Any]:
+    # and drop the users it issues (vault_database_roles.py). networks is
+    # Vault's VPC, which reaches the pods only through the NLB below (it
+    # preserves the client IP, and only Vault's SG may use it), so no pod on
+    # the data cluster can log in as vault_admin even with its password.
+    # double_sha1 because the MySQL interface authenticates those users with
+    # mysql_native_password, which any MySQL client speaks; a sha256_password
+    # user needs TLS or the server's RSA key on that path. No
+    # access_management: ClickHouse refuses a users.xml user that sets it
+    # alongside grants (Code 36, and the server does not start), so the grants
+    # are the whole of its access.
+    def _vault_admin(networks: list[str]) -> dict[str, Any]:
         return {
             "vault_admin/password_double_sha1_hex": _secret_ref(
                 "vault_admin_double_sha1"
             ),
             "vault_admin/profile": "default",
             "vault_admin/quota": "default",
-            "vault_admin/networks/ip": pod_networks,
+            "vault_admin/networks/ip": networks,
             "vault_admin/grants/query": list(VAULT_ADMIN_GRANTS),
         }
 
@@ -882,6 +882,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         storage_config=storage_config_xml,
         irsa_role_arn=irsa_role_arn,
         client_networks=client_networks,
+        vault_admin_networks=vault_admin_networks or [],
     ).apply(
         lambda kwargs: kubernetes.apiextensions.CustomResource(
             f"clickhouse-installation-{env_suffix}",
@@ -1028,8 +1029,8 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                             ]
                         ),
                         **(
-                            _vault_admin(kwargs["client_networks"])
-                            if vault_admin_enabled
+                            _vault_admin(kwargs["vault_admin_networks"])
+                            if kwargs["vault_admin_networks"]
                             else {}
                         ),
                     },
@@ -1264,6 +1265,21 @@ vault_database_enabled = clickhouse_config.require_bool("vault_database_enabled"
 vault_admin_password = (
     clickhouse_config.require_secret("vault_admin_password")
     if vault_database_enabled
+    else None
+)
+vault_server = (
+    make_stack_reference(
+        projects.VAULT_SERVER, f"operations.{stack_info.name}"
+    ).require_output("vault_server")
+    if vault_database_enabled
+    else None
+)
+# Vault's servers connect from addresses in this VPC (an ASG, so no fixed IPs).
+vault_vpc_cidrs = (
+    aws.ec2.get_vpc_output(id=vault_server["vpc_id"]).cidr_block.apply(
+        lambda cidr: [cidr]
+    )
+    if vault_server is not None
     else None
 )
 
@@ -1717,7 +1733,7 @@ clickhouse_installation = _create_clickhouse_installation(
     tls_certificate=clickhouse_server_certificate,
     tls_listeners_enabled=tls_listeners_enabled,
     keeper_tls_enabled=keeper_tls_enabled,
-    vault_admin_enabled=vault_database_enabled,
+    vault_admin_networks=vault_vpc_cidrs,
     reconcile_task_id=reconcile_task_id,
 )
 
@@ -2075,19 +2091,21 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
                     ),
                 ],
             ),
-            # Vault's NLB (below). Its traffic arrives from the NLB's own
-            # addresses in the pod subnets, not from a pod, so only an ipBlock
-            # matches it.
+            # Vault's NLB (below). It preserves the client IP, so Vault's
+            # connections arrive from Vault's VPC; its health checks come from
+            # the NLB's own addresses in the pod subnets. Neither is a pod, so
+            # only an ipBlock matches.
             *(
                 [
                     kubernetes.networking.v1.NetworkPolicyIngressRuleArgs(
-                        from_=data_pod_subnet_cidrs.apply(
-                            lambda cidrs: [
+                        from_=Output.all(vault_vpc_cidrs, data_pod_subnet_cidrs).apply(
+                            lambda cidr_lists: [
                                 kubernetes.networking.v1.NetworkPolicyPeerArgs(
                                     ip_block=kubernetes.networking.v1.IPBlockArgs(
                                         cidr=cidr
                                     )
                                 )
+                                for cidrs in cidr_lists
                                 for cidr in cidrs
                             ]
                         ),
@@ -2120,12 +2138,11 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
 # Vault runs on EC2 in the operations VPC and ClickHouse has only ClusterIP
 # Services, so an internal NLB exposes 9004 to the data VPC. Supplying the SG
 # through the LBC annotation makes it the only authority on the NLB's ingress,
-# and only Vault's SG is admitted.
+# and only Vault's SG is admitted. The NLB preserves the client IP, which is
+# what lets vault_admin's networks name Vault's VPC instead of the pod subnets
+# the NLB's own addresses sit in.
 ############################################################
-if vault_database_enabled:
-    vault_stack = make_stack_reference(
-        projects.VAULT_SERVER, f"operations.{stack_info.name}"
-    )
+if vault_server is not None:
     mysql_nlb_security_group = aws.ec2.SecurityGroup(
         f"clickhouse-{stack_info.env_suffix}-mysql-nlb-security-group",
         name=f"clickhouse-{stack_info.env_suffix}-mysql-nlb",
@@ -2133,9 +2150,7 @@ if vault_database_enabled:
         vpc_id=network_stack.require_output("data_vpc")["id"],
         ingress=[
             aws.ec2.SecurityGroupIngressArgs(
-                security_groups=[
-                    vault_stack.require_output("vault_server")["security_group"]
-                ],
+                security_groups=[vault_server["security_group"]],
                 protocol="tcp",
                 from_port=CLICKHOUSE_MYSQL_PORT,
                 to_port=CLICKHOUSE_MYSQL_PORT,
@@ -2170,6 +2185,7 @@ if vault_database_enabled:
                 "service.beta.kubernetes.io/aws-load-balancer-security-groups": (
                     mysql_nlb_security_group.id
                 ),
+                "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=true",
             },
         ),
         spec=kubernetes.core.v1.ServiceSpecArgs(

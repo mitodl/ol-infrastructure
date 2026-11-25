@@ -220,7 +220,12 @@ so we run the equivalent statements ourselves (step 7).
    log in from loopback (the port-forward) and the data cluster's pod
    subnets. The lease lasts 8 hours; `vault lease renew "$CUTOVER_LEASE"`
    extends it, up to 7 days, and a lapsed lease drops the user mid-backfill.
-   `vault lease revoke "$CUTOVER_LEASE"` when the window closes. Then run
+   `vault lease revoke "$CUTOVER_LEASE"` when the window closes. Issue it
+   only with every replica up: each statement runs `ON CLUSTER`, so a down
+   replica fails the request part way and leaves a user with no lease (drop
+   it with `DROP USER ... ON CLUSTER '{cluster}'`). A replica rebuilt from an
+   empty volume during the window does not get the user back; issue a new
+   one. Then run
    `delta_replay.sh` once anchored at the current instant as the privilege
    smoke test.
 6. Freeze Opik chart upgrades (Renovate) from the backfill until `finalize.sh`.
