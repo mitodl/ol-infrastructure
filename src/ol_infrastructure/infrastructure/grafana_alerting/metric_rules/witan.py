@@ -52,9 +52,38 @@ calls in the window the ratio is 0/0 = NaN, which never satisfies the
 comparison, so a graph lost during a quiet period is not reported until someone
 tries to use it. The boot-time half of the signal is in
 log_rules/witan.py::WitanGraphBlockedAtStartup, which is not traffic-dependent but
-only has something to say when a pod starts. Closing the remaining window needs
-an authenticated synthetic probe that asserts ``council`` is queryable; that is
-tracked separately and is not something an alert rule can do.
+only has something to say when a pod starts. The quiet-period window is
+narrowed, not closed, by the authenticated ``witan-council-probe`` CronJob
+(applications/omnigraph/council_probe.py), which queries ``council`` on
+omnigraph-server every 15 minutes whether or not anyone else does. It is a
+weaker signal than this rule in three ways: a failed run reaches Rootly as
+WorkloadJobFailedCritical, which saas/rootly demotes to the non-paging urgency;
+it skips the 03:00Z hour where the nightly maintenance window stops the data
+tier; and it bypasses witan, so it says nothing about a failure on witan's side
+of the connection.
+
+★ The ratio is also gated on a minimum call count, ``_MIN_CALLS``. Without it,
+a handful of calls that witan rejects on purpose are the whole denominator
+during a quiet hour and read as a 100% failure rate: the 2026-11-25 04:08Z page
+was four rejected calls (``repo=""`` on task_ready, and a code graph that is
+not provisioned) with no successful call in the same windows. Replayed against
+production at 5-minute steps over the 30 days to 2026-11-25, the ungated
+expression held past the 15-minute pending period 16 times; gated at 10 calls
+it does so 8 times and at 20 calls twice. One of those two is the real one --
+omnigraph-server refusing connections on 2026-11-19 from 20:40Z, at 75-98 calls
+per 10 minutes -- and the other is a single client looping on a code graph
+that is not provisioned (132 ClusterGraphMissing refusals in the 45 minutes to
+01:20Z the same day), which a volume floor cannot tell from an outage.
+Separating that case needs the refusal on the counter as a label, which is a
+witan change.
+
+The gate costs coverage. 85% of the production 10-minute windows that had any
+calls had at least 20; in the other 15% a lost graph is now left to the council
+probe, with the limits above. The gate also removes the series rather than
+zeroing it, so traffic dropping under the floor mid-outage resolves a firing
+alert the same way traffic dropping to zero always has. That did not happen on
+2026-11-19: gated and ungated, the expression holds for the same six
+evaluations.
 
 WitanDailyMaintenanceStale: the daily bucket eks_general.py does not have
 ---------------------------------------------------------------------------
@@ -182,6 +211,10 @@ _PROD_CLUSTERS = ".*-(production)"
 # in the denominator and not the numerator, which is correct.
 _ERROR_RATIO_THRESHOLD = 0.5
 
+# Calls in the ratio's own 10-minute window below which the ratio is not
+# evaluated. See the module docstring for the replay this was sized against.
+_MIN_CALLS = 20
+
 # One missed nightly run plus half a day.
 _DAILY_STALE_SECONDS = 129600
 
@@ -233,6 +266,8 @@ _ERROR_RATE_DESCRIPTION = (
     " it logs error_type=ToolError, refused=false and an `omnigraph ... failed`"
     " message in error. A missing code graph logs ClusterGraphMissing with"
     " refused=true."
+    f" The ratio is only evaluated over windows with at least {_MIN_CALLS} calls,"
+    " so a few rejected calls in a quiet hour do not fire this."
 )
 
 _DAILY_STALE_SUMMARY = (
@@ -318,6 +353,10 @@ def _error_ratio_expr(cluster_filter: str) -> str:
     the notification policy's ``group_bies`` -- so aggregating any finer would
     produce labels the router cannot bundle on. There is one witan service per
     stack, which makes ``cluster`` the whole of the resource identity anyway.
+
+    The ratio is the left operand of the ``and``, so it stays the value the
+    rule reports; the call-count gate on the right only decides whether there
+    is a series at all.
     """
     return (
         "(\n"
@@ -329,7 +368,11 @@ def _error_ratio_expr(cluster_filter: str) -> str:
         "  sum by (cluster) (\n"
         f'    rate(witan_tool_calls_total{{cluster=~"{cluster_filter}"}}[10m])\n'
         "  )\n"
-        f") > {_ERROR_RATIO_THRESHOLD}"
+        f") > {_ERROR_RATIO_THRESHOLD}\n"
+        "and on (cluster)\n"
+        "sum by (cluster) (\n"
+        f'  increase(witan_tool_calls_total{{cluster=~"{cluster_filter}"}}[10m])\n'
+        f") >= {_MIN_CALLS}"
     )
 
 
