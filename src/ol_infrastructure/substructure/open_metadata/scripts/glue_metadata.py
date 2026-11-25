@@ -44,7 +44,7 @@ config = {
                 # the dbt model directory names from ol-data-platform.
                 "schemaFilterPattern": {
                     "includes": [
-                        "ol_warehouse_[a-z]+_(dimensional|external|intermediate|mart|migration|reporting|staging)$",
+                        "ol_warehouse_[a-z]+_(dimensional|external|integrations|intermediate|mart|migration|reporting|staging)$",
                         "ol_data_lake_[a-z]+",
                     ],
                 },

@@ -271,6 +271,40 @@ POLICIES: list[OpenMetadataPolicySpec] = [
             ),
         ],
     ),
+    # What ol-data-platform's `ol-dbt articles sync` needs: read the team that
+    # owns each article, POST a missing Context Center page (Create), and PATCH
+    # an existing one's description and relatedEntities (EditAll covers
+    # both).  It patches rather than
+    # PUTs because a bot's PUT keeps a stored description
+    # (EntityUpdater.keepsStoredDescription).  The page's relatedEntities are
+    # stored as a relationship from each table to the page, which the server
+    # does not authorize against the table (KnowledgePageRepository), so the
+    # bot needs nothing on tables beyond DefaultBotRole's ViewAll for the
+    # lookups.
+    OpenMetadataPolicySpec(
+        name="ArticlesSyncBotPolicy",
+        display_name="Articles Sync Bot Policy",
+        description=(
+            "Lets ol-dbt articles sync publish ol-data-platform's articles/ as "
+            "Context Center articles."
+        ),
+        rules=[
+            OpenMetadataPolicyRule(
+                name="ArticlesSyncBotRule-Pages",
+                description="Read, create and rewrite Context Center pages.",
+                effect="allow",
+                resources=["page"],
+                operations=["Create", "EditAll", "ViewBasic"],
+            ),
+            OpenMetadataPolicyRule(
+                name="ArticlesSyncBotRule-Teams",
+                description="Read the teams that own the articles.",
+                effect="allow",
+                resources=["team"],
+                operations=["ViewBasic"],
+            ),
+        ],
+    ),
 ]
 
 # These names are the values Keycloak sends in the `roles` claim, so renaming
@@ -315,6 +349,12 @@ ROLES: list[OpenMetadataRoleSpec] = [
         display_name="Glossary Sync Bot Role",
         description="Role of glossary-sync-bot.",
         policies=["GlossarySyncBotPolicy", "HideAlertDestinationsPolicy"],
+    ),
+    OpenMetadataRoleSpec(
+        name="ArticlesSyncBotRole",
+        display_name="Articles Sync Bot Role",
+        description="Role of articles-sync-bot.",
+        policies=["ArticlesSyncBotPolicy", "HideAlertDestinationsPolicy"],
     ),
 ]
 

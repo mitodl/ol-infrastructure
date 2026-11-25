@@ -547,7 +547,12 @@ def test_every_user_keeps_organization_policy_and_loses_alert_reads() -> None:
         ("deny", ["eventsubscription"], ["All"])
     ]
     # Bots inherit no team policies, so the bots with custom roles carry it.
-    for role in ("DagsterBotRole", "GlossarySyncBotRole", "MetricsSyncBotRole"):
+    for role in (
+        "ArticlesSyncBotRole",
+        "DagsterBotRole",
+        "GlossarySyncBotRole",
+        "MetricsSyncBotRole",
+    ):
         spec = next(spec for spec in ROLES if spec.name == role)
         assert "HideAlertDestinationsPolicy" in spec.policies
 
@@ -565,6 +570,19 @@ def test_glossary_sync_bot_reaches_only_the_glossary() -> None:
     } == {
         ("allow", ("glossary",), ("Create", "EditDescription", "ViewBasic")),
         ("allow", ("glossaryTerm",), ("Create", "EditAll", "ViewBasic")),
+        ("allow", ("team",), ("ViewBasic",)),
+    }
+
+
+def test_articles_sync_bot_reaches_only_context_center_pages() -> None:
+    role = next(spec for spec in ROLES if spec.name == "ArticlesSyncBotRole")
+    assert role.policies == ["ArticlesSyncBotPolicy", "HideAlertDestinationsPolicy"]
+    policy = next(spec for spec in POLICIES if spec.name == "ArticlesSyncBotPolicy")
+    assert {
+        (rule.effect, tuple(rule.resources), tuple(rule.operations))
+        for rule in policy.rules
+    } == {
+        ("allow", ("page",), ("Create", "EditAll", "ViewBasic")),
         ("allow", ("team",), ("ViewBasic",)),
     }
 

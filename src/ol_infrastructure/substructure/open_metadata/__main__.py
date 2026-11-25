@@ -704,7 +704,7 @@ dbt_artifacts_prefix = "openmetadata/dbt-artifacts"
 # from resolving dev-namespace model names that don't exist in OM; the domains
 # job assigns tables in the same schemas.
 LAKE_DBT_SCHEMA_INCLUDES = [
-    r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
+    r"ol_warehouse_[a-z]+_(dimensional|external|integrations|intermediate|irx|mart|migration|raw|reporting|staging)$",
     r"ol_data_lake_[a-z]+",
 ]
 
@@ -1248,6 +1248,36 @@ vault.generic.Secret(
     path="secret-concourse/infrastructure/openmetadata_glossary_bot",
     data_json=Output.json_dumps(
         {"token": glossary_sync_bot.token, "server_url": om_api_url}
+    ),
+)
+
+# articles-sync-bot runs ol-data-platform's `ol-dbt articles sync`, which
+# publishes documents from that repository as Context Center articles. A bot of
+# its own keeps the articles' version history attributable to the sync. The
+# articles name the data-platform team as owner, so it waits for the teams as
+# the glossary bot does.
+articles_sync_bot = OpenMetadataBot(
+    f"om-articles-sync-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="articles-sync-bot",
+        display_name="Articles sync",
+        description=(
+            "Publishes ol-data-platform's articles/ as Context Center articles."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"articles-sync-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["ArticlesSyncBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[om_roles["ArticlesSyncBotRole"], *om_teams]),
+)
+
+# Read by the ol-data-articles-sync pipeline, as the glossary sync's token is.
+vault.generic.Secret(
+    f"om-articles-sync-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-concourse/infrastructure/openmetadata_articles_bot",
+    data_json=Output.json_dumps(
+        {"token": articles_sync_bot.token, "server_url": om_api_url}
     ),
 )
 
