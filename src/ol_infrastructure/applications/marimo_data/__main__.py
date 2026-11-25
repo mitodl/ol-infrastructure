@@ -273,7 +273,8 @@ kubernetes.core.v1.NamespacePatch(
 # Each publisher user may have NOTEBOOK_PUBLISHER_MAX_NOTEBOOKS_PER_USER apps
 # (10 by default) at 100m CPU / 512Mi-1Gi memory / 1Gi-8Gi ephemeral storage.
 # The quota bounds the namespace as a whole so published apps can't starve the
-# data cluster.
+# data cluster.  The publisher itself runs in the hub's namespace, so a full
+# quota blocks new publishes but never the publisher's own rollout.
 kubernetes.core.v1.ResourceQuota(
     f"marimo-resource-quota-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -288,7 +289,7 @@ kubernetes.core.v1.ResourceQuota(
             "requests.memory": "40Gi",
             "limits.memory": "72Gi",
             "requests.ephemeral-storage": "80Gi",
-            "limits.ephemeral-storage": "500Gi",
+            "limits.ephemeral-storage": "200Gi",
         },
     ),
 )
@@ -321,18 +322,25 @@ notebook_publisher_name = "notebook-publisher"
 notebook_publisher_port = 8000
 notebook_publisher_labels = application_labels | {
     "app.kubernetes.io/name": notebook_publisher_name,
-    # The JupyterHub chart's NetworkPolicy admits hub API clients by this label.
+    # The JupyterHub chart's NetworkPolicy admits hub API clients in its own
+    # namespace by this label.
     "hub.jupyter.org/network-access-hub": "true",
 }
 notebook_publisher_selector = {"app.kubernetes.io/name": notebook_publisher_name}
 # The jupyterhub_data stack deploys the hub chart here; its API Service is `hub`.
+# The publisher runs here too, next to the hub and outside the namespace whose
+# quota and admission policies constrain the apps it publishes; a Role in
+# marimo gives it access there.
 jupyterhub_namespace = "jupyter-data"
+notebook_publisher_username = (
+    f"system:serviceaccount:{jupyterhub_namespace}:{notebook_publisher_name}"
+)
 
 notebook_publisher_service_account = kubernetes.core.v1.ServiceAccount(
     f"notebook-publisher-service-account-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=notebook_publisher_name,
-        namespace=marimo_namespace,
+        namespace=jupyterhub_namespace,
         labels=application_labels,
     ),
 )
@@ -355,7 +363,9 @@ notebook_publisher_role = kubernetes.rbac.v1.Role(
         kubernetes.rbac.v1.PolicyRuleArgs(
             api_groups=["apisix.apache.org"],
             resources=["apisixroutes"],
-            verbs=["get", "create", "update"],
+            # delete only matters if OwnerReferencesPermissionEnforcement is
+            # on: it then requires it to set ownerReferences.
+            verbs=["get", "create", "update", "delete"],
         ),
         kubernetes.rbac.v1.PolicyRuleArgs(
             api_groups=[""],
@@ -391,7 +401,7 @@ kubernetes.rbac.v1.RoleBinding(
         kubernetes.rbac.v1.SubjectArgs(
             kind="ServiceAccount",
             name=notebook_publisher_service_account.metadata.name,
-            namespace=marimo_namespace,
+            namespace=jupyterhub_namespace,
         )
     ],
 )
@@ -403,7 +413,7 @@ notebook_publisher_config_map = kubernetes.core.v1.ConfigMap(
     f"notebook-publisher-config-map-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=f"{notebook_publisher_name}-config",
-        namespace=marimo_namespace,
+        namespace=jupyterhub_namespace,
         labels=application_labels,
     ),
     data={
@@ -423,7 +433,7 @@ kubernetes.apps.v1.Deployment(
     f"notebook-publisher-deployment-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=notebook_publisher_name,
-        namespace=marimo_namespace,
+        namespace=jupyterhub_namespace,
         labels=notebook_publisher_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
@@ -537,7 +547,7 @@ kubernetes.core.v1.Service(
     f"notebook-publisher-service-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=notebook_publisher_name,
-        namespace=marimo_namespace,
+        namespace=jupyterhub_namespace,
         labels=application_labels,
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
@@ -550,94 +560,241 @@ kubernetes.core.v1.Service(
     ),
 )
 
-# Admission checks on every MarimoNotebook, so that write access to them (the
-# publisher's, if it were compromised) can't become access to anything else in
-# the namespace.  Each rule mirrors what the publisher renders.
-_overrides = "object.spec.podOverrides"
-_containers = f"{_overrides}.containers + ({_overrides}.?initContainers.orValue([]))"
-marimo_notebook_policy = kubernetes.admissionregistration.v1.ValidatingAdmissionPolicy(
-    f"marimo-notebook-admission-policy-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="marimo-published-notebooks",
-        labels=application_labels,
-    ),
-    spec=kubernetes.admissionregistration.v1.ValidatingAdmissionPolicySpecArgs(
-        failure_policy="Fail",
-        match_constraints=kubernetes.admissionregistration.v1.MatchResourcesArgs(
-            resource_rules=[
-                kubernetes.admissionregistration.v1.NamedRuleWithOperationsArgs(
-                    api_groups=["marimo.io"],
-                    api_versions=["*"],
-                    operations=["CREATE", "UPDATE"],
-                    resources=["marimos"],
-                )
-            ]
-        ),
-        validations=[
-            kubernetes.admissionregistration.v1.ValidationArgs(
-                expression=expression, message=message
-            )
-            for expression, message in [
-                (
-                    f"object.metadata.name != '{notebook_publisher_name}'",
-                    "The publisher's own Service has this name.",
-                ),
-                (
-                    "!has(object.spec.sidecars) && !has(object.spec.mounts)"
-                    " && !has(object.spec.storage) && !has(object.spec.source)",
-                    "Published notebooks have no sidecars, mounts, storage or "
-                    "git source.",
-                ),
-                (
-                    "object.spec.auth.password.secretKeyRef.name.startsWith("
-                    "object.metadata.name + '-token-')",
-                    "The marimo token must come from the app's own token Secret.",
-                ),
-                (
-                    "!has(object.spec.env) || object.spec.env.all(e, "
-                    "!has(e.valueFrom))",
-                    "Notebook env can't reference Secrets or other objects.",
-                ),
-                (
-                    f"{_overrides}.serviceAccountName == 'marimo-published'"
-                    f" && {_overrides}.automountServiceAccountToken == false",
-                    "Published notebooks run as marimo-published with no API token.",
-                ),
-                (
-                    f"!has({_overrides}.volumes)",
-                    "podOverrides can't add volumes.",
-                ),
-                (
-                    f"{_overrides}.containers.all(c, c.name == 'marimo')"
-                    f" && {_overrides}.?initContainers.orValue([]).all(c, "
-                    "c.name in ['copy-content', 'setup-venv'])",
-                    "podOverrides can only adjust the operator's own containers.",
-                ),
-                (
-                    f"({_containers}).all(c, !has(c.image) && !has(c.envFrom)"
-                    " && !has(c.volumeMounts) && !has(c.command)"
-                    " && (!has(c.env) || c.env.all(e, !has(e.valueFrom))))",
-                    "podOverrides containers can't change image, command, env "
-                    "sources or mounts.",
-                ),
-            ]
-        ],
-    ),
+# Admission policies, so that write access to MarimoNotebooks, Secrets and
+# ApisixRoutes in marimo (the publisher's, if it were compromised) can't become
+# access to anything else.  Each one admits only the shape the publisher
+# renders (ol-data-platform services/notebook-publisher, render.py).
+notebook_publisher_marimo_port = 2718
+notebook_publisher_runtime_image = (
+    f"ghcr.io/mitodl/marimo-runtime:{MARIMO_RUNTIME_VERSION}"
+)
+# Keys the publisher's openid-connect entries may carry: the shared config plus
+# the per-route ones it sets.  Anything else (e.g. an introspection endpoint)
+# could send the client secret the secretRef merges in somewhere else.
+published_route_oidc_keys = sorted(
+    {
+        *marimo_oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"],
+        "unauth_action",
+        "logout_path",
+        "post_logout_redirect_uri",
+        "set_access_token_header",
+        "set_id_token_header",
+        "set_userinfo_header",
+        "set_raw_id_token_header",
+        "set_refresh_token_header",
+    }
 )
 
-kubernetes.admissionregistration.v1.ValidatingAdmissionPolicyBinding(
-    f"marimo-notebook-admission-policy-binding-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name="marimo-published-notebooks",
-        labels=application_labels,
-    ),
-    spec=kubernetes.admissionregistration.v1.ValidatingAdmissionPolicyBindingSpecArgs(
-        policy_name=marimo_notebook_policy.metadata.name,
-        validation_actions=["Deny"],
-        match_resources=kubernetes.admissionregistration.v1.MatchResourcesArgs(
-            namespace_selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels={"kubernetes.io/metadata.name": marimo_namespace}
-            )
+
+def _admission_policy(  # noqa: PLR0913
+    name: str,
+    resource_group: str,
+    resource: str,
+    validations: list[tuple[str, str]],
+    *,
+    variables: dict[str, str] | None = None,
+    requested_by: str | None = None,
+) -> None:
+    """Deny CREATE and UPDATE of a resource in marimo unless every rule holds.
+
+    :param requested_by: Only check requests from this user.
+    """
+    policy = kubernetes.admissionregistration.v1.ValidatingAdmissionPolicy(
+        f"{name}-admission-policy-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=name, labels=application_labels
         ),
-    ),
+        spec=kubernetes.admissionregistration.v1.ValidatingAdmissionPolicySpecArgs(
+            failure_policy="Fail",
+            match_constraints=kubernetes.admissionregistration.v1.MatchResourcesArgs(
+                resource_rules=[
+                    kubernetes.admissionregistration.v1.NamedRuleWithOperationsArgs(
+                        api_groups=[resource_group],
+                        api_versions=["*"],
+                        operations=["CREATE", "UPDATE"],
+                        resources=[resource],
+                    )
+                ]
+            ),
+            match_conditions=[
+                kubernetes.admissionregistration.v1.MatchConditionArgs(
+                    name="requested-by",
+                    expression=f"request.userInfo.username == '{requested_by}'",
+                )
+            ]
+            if requested_by
+            else None,
+            variables=[
+                kubernetes.admissionregistration.v1.VariableArgs(
+                    name=variable, expression=expression
+                )
+                for variable, expression in (variables or {}).items()
+            ],
+            validations=[
+                kubernetes.admissionregistration.v1.ValidationArgs(
+                    expression=expression, message=message
+                )
+                for expression, message in validations
+            ],
+        ),
+    )
+    kubernetes.admissionregistration.v1.ValidatingAdmissionPolicyBinding(
+        f"{name}-admission-policy-binding-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=name, labels=application_labels
+        ),
+        spec=kubernetes.admissionregistration.v1.ValidatingAdmissionPolicyBindingSpecArgs(
+            policy_name=policy.metadata.name,
+            validation_actions=["Deny"],
+            match_resources=kubernetes.admissionregistration.v1.MatchResourcesArgs(
+                namespace_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                    match_labels={"kubernetes.io/metadata.name": marimo_namespace}
+                )
+            ),
+        ),
+    )
+
+
+_marimo_args = ", ".join(
+    f"'{arg}'"
+    for arg in [
+        "run",
+        "--headless",
+        "--host=0.0.0.0",
+        f"--port={notebook_publisher_marimo_port}",
+        "--token-password-file",
+        "/etc/marimo/password",
+    ]
+)
+_admission_policy(
+    "marimo-published-notebooks",
+    "marimo.io",
+    "marimos",
+    variables={"overrides": "object.spec.podOverrides"},
+    validations=[
+        (
+            "!has(object.spec.sidecars) && !has(object.spec.mounts)"
+            " && !has(object.spec.storage) && !has(object.spec.source)"
+            " && !has(object.spec.env)",
+            "Published notebooks have no sidecars, mounts, storage, git source or env.",
+        ),
+        (
+            f"object.spec.mode == 'run' && object.spec.image == "
+            f"'{notebook_publisher_runtime_image}'"
+            f" && object.spec.port == {notebook_publisher_marimo_port}",
+            "Published notebooks run in the runtime image, in run mode.",
+        ),
+        (
+            "object.spec.auth.password.secretKeyRef.key == 'password'"
+            " && object.spec.auth.password.secretKeyRef.name.startsWith("
+            "object.metadata.name + '-token-')",
+            "The marimo token must come from the app's own token Secret.",
+        ),
+        (
+            "variables.overrides.all(k, k in ['serviceAccountName',"
+            " 'automountServiceAccountToken', 'securityContext', 'initContainers',"
+            " 'containers'])",
+            "podOverrides can only set the ServiceAccount, security contexts and "
+            "marimo's args.",
+        ),
+        (
+            "variables.overrides.serviceAccountName == 'marimo-published'"
+            " && variables.overrides.automountServiceAccountToken == false",
+            "Published notebooks run as marimo-published with no API token.",
+        ),
+        (
+            "variables.overrides.containers.all(c, c.name == 'marimo'"
+            " && c.all(k, k in ['name', 'args', 'securityContext'])"
+            f" && c.args == [{_marimo_args},"
+            " '--base-url=/' + object.metadata.name,"
+            " '--sandbox', '/home/marimo/notebooks/notebook.py'])",
+            "podOverrides can only give marimo its base URL.",
+        ),
+        (
+            "variables.overrides.?initContainers.orValue([]).all(c,"
+            " c.name in ['copy-content', 'setup-venv']"
+            " && c.all(k, k in ['name', 'securityContext']))",
+            "podOverrides can only set the init containers' security contexts.",
+        ),
+    ],
+)
+
+_admission_policy(
+    "marimo-published-notebook-secrets",
+    "",
+    "secrets",
+    requested_by=notebook_publisher_username,
+    variables={
+        "is_token": "object.metadata.name.matches('-token-[0-9a-f]{8}$')",
+        "keys": (
+            "object.?data.orValue({}).map(k, k)"
+            " + object.?stringData.orValue({}).map(k, k)"
+        ),
+    },
+    validations=[
+        (
+            "object.type == 'Opaque' && object.metadata.name.matches("
+            "'^[a-z]([-a-z0-9]*[a-z0-9])?-(token|route-auth)-[0-9a-f]{8}$')",
+            "The publisher only writes Opaque token and route-auth Secrets.",
+        ),
+        (
+            "variables.keys.all(k, variables.is_token ? k == 'password'"
+            " : k == 'headers.set.Authorization')",
+            "A token Secret holds only the password; a route-auth Secret only the "
+            "Authorization header.",
+        ),
+    ],
+)
+
+_admission_policy(
+    "marimo-published-routes",
+    "apisix.apache.org",
+    "apisixroutes",
+    variables={"http": "object.spec.http[0]"},
+    validations=[
+        (
+            "!has(object.spec.stream) && size(object.spec.http) == 1"
+            " && object.spec.ingressClassName == 'apache-apisix'",
+            "A published route has one HTTP rule.",
+        ),
+        (
+            f"variables.http.match.hosts == ['{apps_domain}']"
+            " && variables.http.match.paths == ['/' + object.metadata.name,"
+            " '/' + object.metadata.name + '/*']"
+            " && !has(variables.http.match.exprs)"
+            " && !has(variables.http.match.filter_func)",
+            "A published route serves only its own path on the apps host.",
+        ),
+        (
+            "size(variables.http.backends) == 1"
+            " && variables.http.backends[0].serviceName == object.metadata.name"
+            " && variables.http.backends[0].servicePort == "
+            f"{notebook_publisher_marimo_port}"
+            " && !has(variables.http.upstreams)"
+            " && !has(variables.http.authentication)",
+            "A published route sends traffic only to its own app.",
+        ),
+        (
+            "variables.http.plugin_config_name == "
+            f"'{marimo_shared_plugins.resource_name}'"
+            " && !has(variables.http.plugin_config_namespace)"
+            " && size(variables.http.plugins) == 2"
+            " && variables.http.plugins.all(p, p.name in"
+            " ['openid-connect', 'proxy-rewrite'])",
+            "A published route uses the shared plugins, OIDC and the token rewrite.",
+        ),
+        (
+            "variables.http.plugins.all(p, p.name != 'openid-connect'"
+            f" || (p.secretRef == '{marimo_oidc.secret_name}'"
+            f" && p.config.all(k, k in {json.dumps(published_route_oidc_keys)})))",
+            "A published route's OIDC config can only change the per-route settings.",
+        ),
+        (
+            "variables.http.plugins.all(p, p.name != 'proxy-rewrite'"
+            " || (p.secretRef.startsWith(object.metadata.name + '-route-auth-')"
+            " && p.config.all(k, k == 'headers')"
+            " && p.config.headers.all(k, k == 'remove')))",
+            "A published route only strips headers and injects its own token.",
+        ),
+    ],
 )

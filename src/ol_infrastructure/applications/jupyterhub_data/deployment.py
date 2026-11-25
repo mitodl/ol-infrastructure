@@ -671,14 +671,14 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         ),
                     },
                     "config": auth_config,
-                    # The notebook publisher (marimo_data stack) runs in the
-                    # marimo namespace; the hub proxies
+                    # The notebook publisher (deployed by the marimo_data
+                    # stack into this namespace); the hub proxies
                     # /services/notebook-publisher/ to it. It identifies callers
                     # by their hub token and needs no API token of its own.
                     "services": {
                         NOTEBOOK_PUBLISHER_SERVICE: {
                             "url": (
-                                f"http://{NOTEBOOK_PUBLISHER_SERVICE}.marimo"
+                                f"http://{NOTEBOOK_PUBLISHER_SERVICE}.{namespace}"
                                 ".svc.cluster.local:8000"
                             ),
                             "display": False,
