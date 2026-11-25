@@ -540,34 +540,33 @@ local_resource(
 # create that times out on a fresh cluster still lands in Keycloak, and the
 # second run adopts it; without the retry the resource stays red, and
 # kc-seed-users and every app wait on it until someone retriggers it by hand.
-# The SCIM remote-provider resource talks to Keycloak over its mkcert-signed
-# hostname with plain requests, which has no way to be told about that CA
-# per-call, so the stack runs with REQUESTS_CA_BUNDLE pointed at the bundle
-# setup.sh writes: certifi's roots plus the mkcert root, concatenated because the
-# variable REPLACES the trust store rather than adding to it.
 #
-# Set only when the file is there. requests raises "Could not find a suitable TLS
-# CA certificate bundle, invalid path" on a missing one, which would break every
-# HTTPS call in the program, not just the SCIM resource — a checkout whose certs
-# predate this bundle would fail with an error naming a path instead of a cause.
+# REQUESTS_CA_BUNDLE is how the SCIM remote-provider resource trusts the mkcert
+# root that signs sso.ol.<domain>; it is the one resource here that calls
+# Keycloak from Python rather than through pulumi_keycloak. Set unconditionally
+# and pointed at a file write-ca-bundle.sh creates in the command below, rather
+# than at one setup.sh may or may not have left behind: this env is computed when
+# the Tiltfile loads, so a file that appears later is not picked up until the
+# next reload, and `tilt trigger local-infra-apps` alone would keep failing.
 apps_infra_env = {
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
+    "REQUESTS_CA_BUNDLE": "{}/local-dev/certs/combined-ca.pem".format(config.main_dir),
 }
-_ca_bundle = "{}/local-dev/certs/combined-ca.pem".format(config.main_dir)
-if os.path.exists(_ca_bundle):
-    apps_infra_env["REQUESTS_CA_BUNDLE"] = _ca_bundle
-else:
-    print("[scim] no %s; the Keycloak SCIM resource will fail TLS. Re-run local-dev/scripts/setup.sh." % _ca_bundle)
 
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
+    #
+    # write-ca-bundle.sh runs first, and a failure there stops the build: without
+    # the bundle every Keycloak call in the program fails, `--refresh` hits one
+    # before the program runs, and requests reports a missing bundle as an
+    # invalid path rather than as a cause.
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {bundle} >/dev/null && {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, bundle="{}/local-dev/scripts/write-ca-bundle.sh".format(config.main_dir), wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
     env=apps_infra_env,
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./src/ol_infrastructure/providers/keycloak_scim", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./src/ol_infrastructure/providers/keycloak_scim", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/write-ca-bundle.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )

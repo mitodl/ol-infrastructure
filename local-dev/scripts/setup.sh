@@ -108,7 +108,6 @@ MKCERT_DOMAINS=(
 CERT_DIR="${REPO_ROOT}/local-dev/certs"
 CERT_FILE="${CERT_DIR}/local-dev.pem"
 KEY_FILE="${CERT_DIR}/local-dev-key.pem"
-CA_BUNDLE_FILE="${CERT_DIR}/combined-ca.pem"
 
 # ---------------------------------------------------------------------------
 # Flags
@@ -442,33 +441,6 @@ else
     fi
 
     rm -rf "${_KEYTOOL_SHIM}"
-fi
-
-# Bundle certifi's roots with the mkcert root for REQUESTS_CA_BUNDLE, which the
-# Tiltfile sets on the apps-infra stack so the SCIM remote-provider resource can
-# reach Keycloak over its mkcert-signed hostname. requests REPLACES its trust
-# store with that file rather than adding to it, so a bare rootCA.pem would break
-# every public-CA call in the same program.
-#
-# Outside the certificate block on purpose: --skip-certs still needs the bundle,
-# and so does a checkout whose certs predate this step. requests fails with
-# "invalid path" rather than a TLS error when the file is missing, which is not a
-# useful thing to debug.
-#
-# certifi comes from the venv the Pulumi programs actually run under, so the
-# bundle matches their trust store. Rewritten unconditionally: a bundle kept from
-# an older certifi silently pins a stale root set.
-_VENV_PYTHON="${REPO_ROOT}/.venv/bin/python"
-if [[ ! -f "${CERT_DIR}/rootCA.pem" ]]; then
-    warn "No ${CERT_DIR}/rootCA.pem; skipping the combined CA bundle."
-    warn "Re-run setup.sh without --skip-certs, or Keycloak SCIM config will fail."
-elif [[ ! -x "${_VENV_PYTHON}" ]]; then
-    warn "No venv at ${_VENV_PYTHON}; skipping the combined CA bundle."
-    warn "Run 'uv sync' then re-run setup.sh, or Keycloak SCIM config will fail."
-else
-    _CERTIFI_PEM=$("${_VENV_PYTHON}" -c 'import certifi; print(certifi.where())')
-    cat "${_CERTIFI_PEM}" "${CERT_DIR}/rootCA.pem" > "${CA_BUNDLE_FILE}"
-    ok "Combined CA bundle written to ${CA_BUNDLE_FILE}"
 fi
 
 # ---------------------------------------------------------------------------

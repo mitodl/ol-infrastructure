@@ -47,6 +47,48 @@ APISIX_TRUSTED_CA_FILENAME = "ca-bundle.pem"
 # has the name Debian and Alpine images read there.
 CA_BUNDLE_CONFIGMAP = "local-dev-ca-bundle"
 CA_BUNDLE_FILENAME = "ca-certificates.crt"
+# The same bundle on the host, for a Pulumi program's own HTTPS calls to a local
+# hostname — REQUESTS_CA_BUNDLE points the apps-infra stack at it so the SCIM
+# remote-provider resource can reach Keycloak. Written by
+# local-dev/scripts/write-ca-bundle.sh before the stack runs, not by the stack:
+# `pulumi up --refresh` does its read() pass before the program, so a program
+# that wrote the bundle would write it after the first call that needs it.
+HOST_CA_BUNDLE_FILENAME = "combined-ca.pem"
+
+
+def read_mkcert_root(ca_cert_path: Path) -> str:
+    """Read the mkcert root CA, or explain how to generate it."""
+    try:
+        return ca_cert_path.read_text()
+    except FileNotFoundError as e:
+        msg = (
+            f"mkcert root CA not found: {ca_cert_path}\n"
+            "Run ./local-dev/scripts/setup.sh to generate local TLS certificates."
+        )
+        raise SystemExit(msg) from e
+
+
+def trusted_ca_bundle(ca_cert_content: str) -> str:
+    """Public roots plus the mkcert root.
+
+    Whoever reads this reads it *instead of* their own trust store, so the public
+    roots have to be in it. certifi comes from the venv the Pulumi programs run
+    under, which keeps the bundle's public roots and theirs the same.
+    """
+    return Path(certifi.where()).read_text() + "\n" + ca_cert_content
+
+
+def write_host_ca_bundle(ca_cert_path: Path) -> Path:
+    """Write the trust bundle next to the mkcert root and return its path.
+
+    Rewritten on every call rather than generated once by setup.sh: a checkout
+    whose certs predate the bundle then heals itself instead of failing with a
+    TLS error that names no cause, and a bundle kept from an older certifi
+    cannot silently pin a stale root set.
+    """
+    bundle_path = ca_cert_path.parent / HOST_CA_BUNDLE_FILENAME
+    bundle_path.write_text(trusted_ca_bundle(read_mkcert_root(ca_cert_path)))
+    return bundle_path
 
 
 def create_tls_resources(
@@ -61,14 +103,7 @@ def create_tls_resources(
     tls_cert_b64 = read_file_b64(cert_path)
     tls_key_b64 = read_file_b64(key_path)
 
-    try:
-        ca_cert_content = ca_cert_path.read_text()
-    except FileNotFoundError as e:
-        msg = (
-            f"mkcert root CA not found: {ca_cert_path}\n"
-            "Run ./local-dev/scripts/setup.sh to generate local TLS certificates."
-        )
-        raise SystemExit(msg) from e
+    ca_cert_content = read_mkcert_root(ca_cert_path)
 
     def _tls_secret(
         resource_name: str, namespace: str, parent: k8s.core.v1.Namespace
@@ -106,17 +141,16 @@ def create_tls_resources(
         for ns in app_namespaces
     }
 
-    # The full public bundle as well as the mkcert root: whoever reads this file
-    # reads it instead of the image's system store. For APISIX the mkcert root
-    # is what lets openid-connect verify Keycloak: the discovery document's
-    # token and JWKS endpoints are on sso.ol.<domain>, which the CoreDNS
-    # override sends back through APISIX's own mkcert certificate.
-    trusted_ca_bundle = Path(certifi.where()).read_text() + "\n" + ca_cert_content
+    # For APISIX the mkcert root is what lets openid-connect verify Keycloak:
+    # the discovery document's token and JWKS endpoints are on sso.ol.<domain>,
+    # which the CoreDNS override sends back through APISIX's own mkcert
+    # certificate.
+    ca_bundle = trusted_ca_bundle(ca_cert_content)
     app_ca_bundle_configmaps = {
         ns: k8s.core.v1.ConfigMap(
             f"{CA_BUNDLE_CONFIGMAP}-{ns}",
             metadata={"name": CA_BUNDLE_CONFIGMAP, "namespace": ns},
-            data={CA_BUNDLE_FILENAME: trusted_ca_bundle},
+            data={CA_BUNDLE_FILENAME: ca_bundle},
             opts=_k8s(parent=namespaces[ns]),
         )
         for ns in app_namespaces
@@ -124,7 +158,7 @@ def create_tls_resources(
     apisix_trusted_ca = k8s.core.v1.Secret(
         "apisix-trusted-ca",
         metadata={"name": "apisix-trusted-ca", "namespace": "operations"},
-        string_data={APISIX_TRUSTED_CA_FILENAME: trusted_ca_bundle},
+        string_data={APISIX_TRUSTED_CA_FILENAME: ca_bundle},
         opts=_k8s(parent=namespaces["operations"]),
     )
 
@@ -135,7 +169,5 @@ def create_tls_resources(
         app_ca_configmaps=app_ca_configmaps,
         app_ca_bundle_configmaps=app_ca_bundle_configmaps,
         apisix_trusted_ca=apisix_trusted_ca,
-        apisix_trusted_ca_checksum=hashlib.sha256(
-            trusted_ca_bundle.encode()
-        ).hexdigest(),
+        apisix_trusted_ca_checksum=hashlib.sha256(ca_bundle.encode()).hexdigest(),
     )

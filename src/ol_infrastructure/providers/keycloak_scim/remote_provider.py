@@ -138,6 +138,13 @@ class ScimRemoteProviderSpec(BaseModel):
 
 
 def _session(props: dict[str, Any]) -> requests.Session:
+    # TLS verification is left to requests, which means the ambient trust store
+    # and REQUESTS_CA_BUNDLE. Deliberately not a resource input: refresh and
+    # delete call read()/delete() with the props recorded in state, so a trust
+    # setting carried as an input is the stale one on exactly the paths that
+    # need it, and on the first run after it was introduced it is absent
+    # entirely. local-dev points the variable at a bundle holding the mkcert
+    # root; see local-dev/scripts/write-ca-bundle.sh.
     token_response = requests.post(
         f"{props['keycloak_url']}/realms/{ADMIN_REALM}/protocol/openid-connect/token",
         data={
