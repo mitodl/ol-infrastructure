@@ -16,4 +16,8 @@ config:
   azure_openai:consumer_model_capacities:
     dagster-ml:
       text-embedding-3-large: 300
+  # Decision models are always pinned (see consumer_decision_models in __main__.py).
+  # "1" is the only version Azure offers for it in eastus (2026-11-25).
+  azure_openai:model_versions:
+    Microsoft-Decision-1.1: "1"
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgEluXO5SGsWhst5HcBT6UidAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMvxlWDyhg8T0jNsUUAgEQgDtrPf/zeoHEYu7rkChUU4XgLAtrxrZ5SM+E0lLXTm92hyQytrVB5NFYjRdg3zb7vpyzQns9l6g5BItmsQ==

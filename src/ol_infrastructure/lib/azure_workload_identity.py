@@ -102,3 +102,22 @@ def azure_openai_env(
         "AZURE_OPENAI_API_VERSION": api_version,
         "AZURE_OPENAI_DEFAULT_DEPLOYMENT": default_deployment,
     }
+
+
+def azure_decision_env(
+    azure_openai_stack: StackReference,
+    consumer: str,
+) -> dict[str, Any]:
+    """Endpoint of a consumer's decision-model account, for ol-llm.
+
+    The account authenticates the same identity as :func:`azure_identity_env`, so this
+    adds no credential.
+
+    :param azure_openai_stack: StackReference on ``infrastructure/azure/openai``.
+    :param consumer: Key into that stack's ``decision_accounts`` output.
+    """
+    return {
+        "OL_LLM_AZURE_DECISION_ENDPOINT": azure_openai_stack.require_output(
+            "decision_accounts"
+        ).apply(lambda accounts: accounts[consumer]["endpoint"]),
+    }

@@ -91,6 +91,11 @@ Per environment, for `consumer in {mitlearn, learn-ai, mitxonline}`:
   "additive migration" rationale that conflated Azure account keys with the unrelated OpenAI
   API key.) `custom_sub_domain_name` **must** be set or the account accepts only API-key auth,
   which defeats Entra token auth entirely.
+  (Added 2026-11-25.) A consumer with Microsoft-format models also gets
+  `ol-decision-{consumer}-{env}`, `kind="AIServices"`, set up the same way, because Azure
+  offers `Microsoft-Decision-1.1` only on `AIServices` and `MaaS` accounts. Its identity
+  holds `Cognitive Services User` on that account. learn-ai is the only such consumer;
+  see the project README.
 - `azure_native.cognitiveservices.Deployment` for `gpt-4o`, `gpt-5-mini`, `gpt-5.2` on each
   account. (`gpt-5-mini` replaced `gpt-4o-mini` on 2026-09-22: Azure refuses new
   deployments of `gpt-4o-mini`'s only version, `2024-07-18`, with `ServiceModelDeprecating`.) Model versions stay unpinned by default (which versions exist is a property of the
@@ -108,7 +113,8 @@ Per environment, for `consumer in {mitlearn, learn-ai, mitxonline}`:
 
 Stack outputs: `resource_group_id`, `cognitive_accounts` (consumer to `{id, endpoint}`),
 `model_deployments`, `workload_identities` (consumer to `{client_id, principal_id}`),
-`tenant_id`.
+`tenant_id`, and for consumers with decision models `decision_accounts` (consumer to
+`{id, endpoint}`) and `decision_model_deployments`.
 
 ### 4.1 Federated identity credential
 
