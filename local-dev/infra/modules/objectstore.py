@@ -18,6 +18,7 @@ effect. The draft/live/test site routes read from the object store with no
 credentials, so without that grant every published page would 403.
 """
 
+import hashlib
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -257,6 +258,19 @@ def create_object_store(
         opts=_k8s(parent=stateful_set),
     )
 
+    script = k8s.core.v1.ConfigMap(
+        "rustfs-bootstrap-script",
+        metadata={
+            "name": "rustfs-bootstrap-script",
+            "namespace": "local-infra",
+        },
+        data={"bootstrap.sh": _BOOTSTRAP_SCRIPT},
+        opts=_k8s(parent=local_infra_ns),
+    )
+    # On the Job's pod template, so an edit to the script replaces the Job and
+    # runs it again instead of only updating the ConfigMap.
+    script_checksum = hashlib.sha256(_BOOTSTRAP_SCRIPT.encode()).hexdigest()
+
     bootstrap_job = k8s.batch.v1.Job(
         "rustfs-bootstrap-buckets",
         metadata={
@@ -265,8 +279,8 @@ def create_object_store(
         },
         spec={
             # The Job body is idempotent but its spec is immutable, so bumping
-            # the bucket list means Pulumi replaces the Job rather than
-            # patching it.
+            # the bucket list or the script means Pulumi replaces the Job
+            # rather than patching it.
             #
             # No ttlSecondsAfterFinished: the finished Job stays in the
             # cluster. With a TTL, Kubernetes deleted it after it succeeded,
@@ -274,7 +288,10 @@ def create_object_store(
             # every `pulumi up` created it again and waited for it to finish.
             "backoffLimit": 6,
             "template": {
-                "metadata": {"labels": {"app": "rustfs-bootstrap"}},
+                "metadata": {
+                    "labels": {"app": "rustfs-bootstrap"},
+                    "annotations": {"checksum/bootstrap": script_checksum},
+                },
                 "spec": {
                     "restartPolicy": "OnFailure",
                     "containers": [
@@ -335,18 +352,10 @@ def create_object_store(
         # exists", leaving the stack wedged until the Job is deleted by
         # hand.
         opts=_k8s(
-            parent=stateful_set, depends_on=[service], delete_before_replace=True
+            parent=stateful_set,
+            depends_on=[service, script],
+            delete_before_replace=True,
         ),
-    )
-
-    k8s.core.v1.ConfigMap(
-        "rustfs-bootstrap-script",
-        metadata={
-            "name": "rustfs-bootstrap-script",
-            "namespace": "local-infra",
-        },
-        data={"bootstrap.sh": _BOOTSTRAP_SCRIPT},
-        opts=_k8s(parent=local_infra_ns),
     )
 
     # Browser-facing S3 endpoint. Apps hand the browser URLs under this host
