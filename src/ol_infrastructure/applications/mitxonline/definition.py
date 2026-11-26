@@ -15,7 +15,14 @@ API, so that importing it needs no provider.
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
 from bridge.lib.constants import (
     LearnSession,
@@ -231,7 +238,7 @@ class MitxonlineBindings(BaseModel):
     sizing: MitxonlineSizing
     granian_worker_startup_rss: int | None = None
     granian_reload: bool = False
-    oidc_timeout: int | None = None
+    oidc_timeout: PositiveInt | None = None
     """Seconds the openid-connect plugin on MITx Online's own hosts (the login
     routes) waits on Keycloak; unset keeps the plugin's default (3)."""
     dev_shell: bool = False

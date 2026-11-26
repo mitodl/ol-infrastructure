@@ -360,6 +360,12 @@ def test_oidc_timeout_is_unset_unless_the_bindings_set_it():
     assert definition.direct_oidc_config(local).oidc_timeout == 10
 
 
+@pytest.mark.parametrize("timeout", [0, -1])
+def test_oidc_timeout_must_be_positive_in_the_bindings(timeout):
+    with pytest.raises(ValidationError, match="oidc_timeout"):
+        _local_bindings(oidc_secret_name=LOCAL_OIDC_SECRET, oidc_timeout=timeout)
+
+
 def test_routes_follow_the_bound_hostnames():
     direct, prefixed = _route_groups(_deployed_bindings())
 

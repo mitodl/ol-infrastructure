@@ -197,7 +197,7 @@ def create_identity_core(  # noqa: PLR0913
             # a 1s check) then restarts it under the same load, and a restart
             # costs ~1.5 cores and every sign-in until it is back.
             "resources": {
-                "requests": {"cpu": "500m", "memory": "1700Mi"},
+                "requests": {"cpu": "500m"},
                 "limits": {"memory": "2Gi"},
             },
             "livenessProbe": {"periodSeconds": 10, "failureThreshold": 12},
