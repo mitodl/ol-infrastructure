@@ -751,6 +751,9 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
+    # Seconds the plugin waits on each call to the provider (the token
+    # exchange, userinfo, discovery). None leaves the plugin's default, 3.
+    oidc_timeout: PositiveInt | None = None
     # What the plugin forwards to the upstream.  X-Userinfo (base64 JSON, keyed
     # by ``sub``) is the identity every Django app authenticates off through
     # mitol-apigateway.  The tokens are opt-in: an upstream that never reads
@@ -899,6 +902,12 @@ class OLApisixOIDCResources(ComponentResource):
             "set_raw_id_token_header": False,
             "set_refresh_token_header": False,
             **session_config,
+            # Unset leaves the plugin default (3s).
+            **(
+                {"timeout": oidc_config.oidc_timeout}
+                if oidc_config.oidc_timeout is not None
+                else {}
+            ),
         }
 
         if oidc_config.oidc_access_token_expires_leeway:

@@ -15,7 +15,14 @@ API, so that importing it needs no provider.
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
 from bridge.lib.constants import (
     LearnSession,
@@ -231,6 +238,9 @@ class MitxonlineBindings(BaseModel):
     sizing: MitxonlineSizing
     granian_worker_startup_rss: int | None = None
     granian_reload: bool = False
+    oidc_timeout: PositiveInt | None = None
+    """Seconds the openid-connect plugin on MITx Online's own hosts (the login
+    routes) waits on Keycloak; unset keeps the plugin's default (3)."""
     dev_shell: bool = False
     slack_channel: str | None = None
     celery_redis: OLApplicationK8sCeleryRedisConfig | None = None
@@ -515,6 +525,7 @@ def direct_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
     return _oidc_config(
         bindings,
         application_name="mitxonline-k8s-no-prefix",
+        oidc_timeout=bindings.oidc_timeout,
         oidc_logout_path=route_group.logout_path,
         oidc_post_logout_redirect_uri=route_group.post_logout_uri,
         oidc_session_cookie_domain=bindings.hostnames.api.removeprefix("api"),
