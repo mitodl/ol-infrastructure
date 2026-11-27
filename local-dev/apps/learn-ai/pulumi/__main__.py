@@ -168,6 +168,9 @@ LOCAL_ENV_DEFAULTS = {
     # MAILGUN_KEY is in secrets.yaml.
     "MAILGUN_SENDER_DOMAIN": f"ol.{root_domain}",
     "MAILGUN_FROM_EMAIL": f"MIT Learn AI <noreply@ol.{root_domain}>",
+    # The support agent files a stub ticket instead of calling Zendesk, whose
+    # OAuth client is unset in secrets.yaml.
+    "AI_ZENDESK_STUB_MODE": "True",
     "MITOL_COOKIE_NAME": "learn-ai-auth",
     "MITOL_COOKIE_DOMAIN": f".{root_domain}",
     # learn-ai is also served at api.learn.<root>/ai/*, the host where mit-learn
