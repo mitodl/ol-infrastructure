@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 import requests
 import yaml as pyyaml
-from pulumi import Alias, ResourceOptions, get_project, get_stack
+from pulumi import Alias, ResourceOptions, get_project, get_stack, log
 
 from bridge.lib.versions import (
     OPENSEARCH_CHART_VERSION,
@@ -21,6 +21,12 @@ from bridge.lib.versions import (
 )
 
 TIKA_CHART_REPO = "https://apache.jfrog.io/artifactory/tika"
+# The appVersion of the chart at TIKA_CHART_VERSION when it was last checked.
+# Used only when the chart index cannot be read, so a slow or offline link
+# starts Tika on a known image instead of failing the whole core program.
+# Move it with TIKA_CHART_VERSION. tests/local_dev/test_tika_image_tag.py fails
+# a chart bump that leaves it behind.
+TIKA_FALLBACK_IMAGE_TAG = "3.2.2.0-full"
 
 
 def tika_image_tag() -> str:
@@ -31,12 +37,29 @@ def tika_image_tag() -> str:
     Local-dev keeps its own Deployment, because swapping it for the chart on an
     existing cluster collides with the Deployment and Service already named
     ``tika``, so it reads the tag from the chart index instead of repeating it.
+    If the index cannot be fetched or has no entry for that version, it warns
+    and returns ``TIKA_FALLBACK_IMAGE_TAG``.
     """
-    resp = requests.get(f"{TIKA_CHART_REPO}/index.yaml", timeout=30)
-    resp.raise_for_status()
-    entries = pyyaml.safe_load(resp.text)["entries"]["tika"]
-    (entry,) = (e for e in entries if e["version"] == TIKA_CHART_VERSION)
-    return entry["appVersion"]
+    index_url = f"{TIKA_CHART_REPO}/index.yaml"
+    try:
+        resp = requests.get(index_url, timeout=30)
+        resp.raise_for_status()
+        entries = pyyaml.safe_load(resp.text)["entries"]["tika"]
+        (entry,) = (e for e in entries if e["version"] == TIKA_CHART_VERSION)
+        tag = str(entry["appVersion"])
+    except (
+        requests.RequestException,
+        pyyaml.YAMLError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        log.warn(
+            f"Could not read the image tag of Tika chart {TIKA_CHART_VERSION} "
+            f"from {index_url} ({exc!r}). Using {TIKA_FALLBACK_IMAGE_TAG}."
+        )
+        return TIKA_FALLBACK_IMAGE_TAG
+    return tag
 
 
 @dataclass
