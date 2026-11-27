@@ -19,6 +19,10 @@ program_dir="$repo_root/local-dev/apps/$app/pulumi"
 project="$(sed -n 's/^name: *//p' "$program_dir/Pulumi.yaml")"
 STACK="Dev"
 export PULUMI_CONFIG_PASSPHRASE=""
+# Pulumi would otherwise download a plugin for every provider in the
+# repository's virtualenv before each run; pulumi-plugins.py below installs the
+# ones this program uses (see the comment there).
+export PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION=true
 # uv honours FORCE_COLOR/CLICOLOR_FORCE even when piped, and Pulumi's Python
 # host parses `uv export` stdout as TOML, so a colour-forcing environment fails
 # `pulumi up` ("TOML files cannot contain control characters"). Tilt sets
@@ -41,6 +45,7 @@ if compgen -G "$lock_dir/*.json" >/dev/null; then
     exit 1
 fi
 uv run --project "$repo_root" pulumi stack select --create "$STACK" 1>&2
+uv run --project "$repo_root" python "$repo_root/local-dev/scripts/pulumi-plugins.py" "$STACK" pulumi_kubernetes 1>&2
 # The same kill, landing between an object's creation and the end of its await
 # (the Job's await lasts as long as migrate), leaves a pending create in the
 # checkpoint and an object the state doesn't know: up then fails with "already
