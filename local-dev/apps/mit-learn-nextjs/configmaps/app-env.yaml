@@ -27,3 +27,8 @@ data:
   NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT: "https://api.learn.mit.test/ai/http/syllabus_agent/"
   NEXT_PUBLIC_LEARN_AI_SEARCH_SUMMARY_ENDPOINT: "https://api.learn.mit.test/ai/http/search_summary_agent/"
   NEXT_PUBLIC_LEARN_AI_CSRF_COOKIE_NAME: "learn_ai_csrftoken"
+  # The Contact us launcher renders only with this endpoint set and the
+  # contact-us feature flag on.
+  NEXT_PUBLIC_LEARN_AI_SUPPORT_ENDPOINT: "https://api.learn.mit.test/ai/http/support_agent/"
+  # With no PostHog key, a flag's value comes from NEXT_PUBLIC_FEATURE_<flag>.
+  NEXT_PUBLIC_FEATURE_contact_us: "true"

@@ -231,6 +231,36 @@ APPS = [
                 "description": "Backpopulate tutor checkpoints from Open edX",
                 "cmd": "python manage.py backpopulate_tutor_checkpoints",
             },
+            {
+                "label": "seed-learn-ai-superuser",
+                "description": "Make admin@ol.test a superuser, for /admin/ on ai.learn",
+                # learn-ai finds gateway users by global_id (the Keycloak user
+                # id) and creates them unprivileged, so the row gets
+                # admin@ol.test's id, resolved on the host, and its first login
+                # finds it. Run after that login, it promotes the existing row.
+                # is_active too: learn-ai's User defaults it to False, and the
+                # admin site turns away inactive staff.
+                "cmd": (
+                    "python manage.py shell -c " +
+                    "'import os; " +
+                    "from django.contrib.auth import get_user_model; " +
+                    "U = get_user_model(); " +
+                    "u, created = U.objects.get_or_create(" +
+                    "global_id=os.environ[\"ADMIN_GLOBAL_ID\"], " +
+                    "defaults={\"username\": \"admin@ol.test\", " +
+                    "\"email\": \"admin@ol.test\", \"name\": \"Admin\"}); " +
+                    "u.set_unusable_password(); " +
+                    "u.is_active = True; u.is_staff = True; " +
+                    "u.is_superuser = True; u.save(); " +
+                    "print((\"created\" if created else \"promoted\"), u.email)'"
+                ),
+                "host_env": {
+                    "ADMIN_GLOBAL_ID": "LOCAL_DEV_ROOT_DOMAIN={rd} {main}/local-dev/scripts/kc-user-id.sh admin@ol.test".format(
+                        rd=root_domain, main=config.main_dir,
+                    ),
+                },
+                "resource_deps": ["kc-seed-users"],
+            },
         ],
     },
     {
