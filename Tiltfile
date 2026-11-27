@@ -238,6 +238,8 @@ APPS = [
                 # id) and creates them unprivileged, so the row gets
                 # admin@ol.test's id, resolved on the host, and its first login
                 # finds it. Run after that login, it promotes the existing row.
+                # is_active too: learn-ai's User defaults it to False, and the
+                # admin site turns away inactive staff.
                 "cmd": (
                     "python manage.py shell -c " +
                     "'import os; " +
@@ -248,7 +250,8 @@ APPS = [
                     "defaults={\"username\": \"admin@ol.test\", " +
                     "\"email\": \"admin@ol.test\", \"name\": \"Admin\"}); " +
                     "u.set_unusable_password(); " +
-                    "u.is_staff = True; u.is_superuser = True; u.save(); " +
+                    "u.is_active = True; u.is_staff = True; " +
+                    "u.is_superuser = True; u.save(); " +
                     "print((\"created\" if created else \"promoted\"), u.email)'"
                 ),
                 "host_env": {
