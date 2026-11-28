@@ -602,6 +602,13 @@ kubectl -n clickhouse get sts chi-clickhouse-default-0-<n> \
   -o jsonpath='{.spec.volumeClaimTemplates[*].spec.storageClassName}'
 ```
 
+The rest of this section rebuilds the replica from a healthy peer, so it only
+applies to QA and Production. CI runs one replica (`clickhouse:replicas: '1'`
+in `Pulumi.CI.yaml`) and has no EBS snapshots (`eks:backup: false` in the data
+CI EKS stack), so a lost CI volume is the total-loss case in
+[Backup and Restore](#backup-and-restore): rebuild the cluster with its own
+Keeper and restore the SQL backup. That has not been done in CI.
+
 If the replica is replica 0, stop opik-backend before deleting anything. Its
 `backend-migrations` init container runs Liquibase against replica 0's per-host
 Service (`CLICKHOUSE_MIGRATIONS_HOST` in `applications/opik`), which selects
@@ -612,11 +619,15 @@ because replica 0 was unreachable) finds no ledger there, creates a local one,
 and replays every changeset against the empty replica. Pods already running
 don't rerun migrations, but nothing prevents a new one. Opik is down until the
 ledger check at the end of this section passes, and an opik stack apply
-restores the chart's `replicaCount`, so hold opik applies too:
+restores the chart's `replicaCount`, so hold opik applies too. `kubectl scale`
+returns before the old pods terminate, so wait until every opik-backend pod,
+Terminating ones included, is gone before deleting the PVC or pod:
 
 ```bash
 kubectl -n opik get deployment opik-backend -o jsonpath='{.spec.replicas}'   # note it
 kubectl -n opik scale deployment/opik-backend --replicas=0
+kubectl -n opik wait --for=delete pod -l app.kubernetes.io/instance=opik,component=opik-backend --timeout=5m
+kubectl -n opik get pods -l app.kubernetes.io/instance=opik,component=opik-backend   # must list nothing
 ```
 
 Then delete the Pending PVC and pod, and the StatefulSet recreates both from the
@@ -751,6 +762,12 @@ for p in "$DST" "$SRC"; do
     (SELECT count() FROM default.DATABASECHANGELOG) AS changesets,
     (SELECT groupArray(LOCKED) FROM default.DATABASECHANGELOGLOCK) AS locked"
 done
+```
+
+Don't scale opik-backend up unless both queries succeeded, `changesets` is the
+same on both, and `locked` is `[0]` on both. Then:
+
+```bash
 kubectl -n opik scale deployment/opik-backend --replicas=<the count before>
 ```
 
@@ -763,8 +780,9 @@ not in `opik_db`. A replica without them would look like a fresh install and
 replay every changeset.
 
 Both tables are `ReplicatedMergeTree` at
-`/clickhouse/tables/{shard}/default/DATABASECHANGELOG*` on every replica, so
-losing any one replica's volume, replica 0 included, is recovered from a peer by
+`/clickhouse/tables/{shard}/default/DATABASECHANGELOG*` on every replica, so in
+QA and Production losing any one replica's volume, replica 0 included, is
+recovered from a peer by
 [Replica pod Pending on its data volume](#replica-pod-pending-on-its-data-volume).
 That path (old registration dropped from a peer, DDL copied, rows fetched) was
 exercised for replica 0 on a local two-replica 26.3 cluster on 2026-11-25.
