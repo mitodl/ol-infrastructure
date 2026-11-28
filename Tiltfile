@@ -540,15 +540,33 @@ local_resource(
 # create that times out on a fresh cluster still lands in Keycloak, and the
 # second run adopts it; without the retry the resource stays red, and
 # kc-seed-users and every app wait on it until someone retriggers it by hand.
+#
+# REQUESTS_CA_BUNDLE is how the SCIM remote-provider resource trusts the mkcert
+# root that signs sso.ol.<domain>; it is the one resource here that calls
+# Keycloak from Python rather than through pulumi_keycloak. Set unconditionally
+# and pointed at a file write-ca-bundle.sh creates in the command below, rather
+# than at one setup.sh may or may not have left behind: this env is computed when
+# the Tiltfile loads, so a file that appears later is not picked up until the
+# next reload, and `tilt trigger local-infra-apps` alone would keep failing.
+apps_infra_env = {
+    # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
+    # the core stack only creates on demand.
+    "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
+    "REQUESTS_CA_BUNDLE": "{}/local-dev/certs/combined-ca.pem".format(config.main_dir),
+}
+
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
-    # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
-    # the core stack only creates on demand.
-    env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
+    #
+    # write-ca-bundle.sh runs first, and a failure there stops the build: without
+    # the bundle every Keycloak call in the program fails, `--refresh` hits one
+    # before the program runs, and requests reports a missing bundle as an
+    # invalid path rather than as a cause.
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {bundle} >/dev/null && {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, bundle="{}/local-dev/scripts/write-ca-bundle.sh".format(config.main_dir), wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
+    env=apps_infra_env,
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./src/ol_infrastructure/providers/keycloak_scim", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/write-ca-bundle.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
@@ -596,6 +614,22 @@ local_resource(
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
+
+# Write the bearer tokens Keycloak authenticates its outbound SCIM pushes with
+# into each app's database. The apps-infra stack configures the same values on
+# the Keycloak side; the apps validate them as django-oauth-toolkit AccessToken
+# rows, which exist only once something creates them. Runs after kc-seed-users
+# because the token's owner is one of those seeded users.
+#
+# Only the apps that receive SCIM need it, so it is skipped unless one is on.
+if "mit-learn" in enabled_apps or "mitxonline" in enabled_apps:
+    local_resource(
+        "seed-scim-tokens",
+        cmd="{}/local-dev/scripts/seed-scim-tokens.sh".format(config.main_dir),
+        deps=["./local-dev/scripts/seed-scim-tokens.sh"],
+        labels=["infra"],
+        resource_deps=["kc-seed-users"],
+    )
 
 # Re-assert the realm's browser/first-broker-login flow bindings. The Keycloak
 # provider resets them to built-in defaults whenever the keycloak.Realm resource

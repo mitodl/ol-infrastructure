@@ -1,6 +1,15 @@
 ---
 name: ol-local-dev-ol-analytics-api
-runtime: python
+runtime:
+  name: python
+  options:
+    # The pulumi module lives only in the repo's uv venv. Without this the
+    # language host and the pulumi-python dynamic-provider host resolve python3
+    # from $PATH, which in the devenv shell is a nix interpreter with no pulumi
+    # installed. uv sync keeps this venv matching uv.lock; `pulumi install` is
+    # not the way to populate it, since that pip-installs a requirements.txt
+    # this repo does not have.
+    virtualenv: ../../../../.venv
 description: >
   ol-analytics-api for local-dev, rendered from the deployed application
   definition (src/ol_infrastructure/applications/ol_analytics_api/definition.py).
