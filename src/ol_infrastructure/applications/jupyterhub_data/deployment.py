@@ -83,6 +83,12 @@ _HOME_PVC_FROM_TEMPLATE_CONFIG = "\nc.KubeSpawner.remember_pvc_name = False\n"
 # (UV_CACHE_SEED_DIR, set by the image), and an init container copies that into
 # the node-local volume mounted here. The path must match the one the image
 # built with: uv environments hold their own absolute path.
+# The marimo_data stack deploys this service under the same name.
+NOTEBOOK_PUBLISHER_SERVICE = "notebook-publisher"
+NOTEBOOK_PUBLISHER_ACCESS_SCOPE = (
+    f"access:services!service={NOTEBOOK_PUBLISHER_SERVICE}"
+)
+
 _UV_CACHE_DIR = "/var/cache/uv"
 _UV_CACHE_VOLUME = "uv-cache"
 # The seed is about 1Gi. Each further notebook environment hardlinks into the
@@ -665,6 +671,37 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         ),
                     },
                     "config": auth_config,
+                    # The notebook publisher (deployed by the marimo_data
+                    # stack into this namespace); the hub proxies
+                    # /services/notebook-publisher/ to it. It identifies callers
+                    # by their hub token and needs no API token of its own.
+                    "services": {
+                        NOTEBOOK_PUBLISHER_SERVICE: {
+                            "url": (
+                                f"http://{NOTEBOOK_PUBLISHER_SERVICE}.{namespace}"
+                                ".svc.cluster.local:8000"
+                            ),
+                            "display": False,
+                        },
+                    },
+                    # The publisher only accepts tokens that carry its access
+                    # scope. Neither default role grants it, and a server's
+                    # token (JUPYTERHUB_API_TOKEN, what the publish CLI sends)
+                    # is limited to its owner's scopes as well as its own, so
+                    # both roles get it. These replace JupyterHub's default
+                    # role definitions; the other scopes are those defaults.
+                    "loadRoles": {
+                        "user": {
+                            "scopes": ["self", NOTEBOOK_PUBLISHER_ACCESS_SCOPE],
+                        },
+                        "server": {
+                            "scopes": [
+                                "users:activity!user",
+                                "access:servers!server",
+                                NOTEBOOK_PUBLISHER_ACCESS_SCOPE,
+                            ],
+                        },
+                    },
                     "resources": {
                         "requests": {"cpu": "200m", "memory": "512Mi"},
                         "limits": {"memory": "512Mi"},
