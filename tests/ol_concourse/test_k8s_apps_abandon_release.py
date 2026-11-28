@@ -101,6 +101,19 @@ def test_abandon_cancels_the_release_in_flight_not_the_newest_version(app_name):
 
 
 @pytest.mark.parametrize("app_name", APPS)
+def test_abandon_needs_a_request_naming_the_release(app_name):
+    """The build re-reads in_flight; only a request ties it to what was seen.
+
+    Without it, a supersede cut between `/doof abandon` and the build's check
+    is the release the build cancels.
+    """
+    plan = _abandon_plan(app_name)
+    abandon = plan[_index(plan, "put", f"{app_name}-release")]
+
+    assert abandon["params"]["require_request"] is True
+
+
+@pytest.mark.parametrize("app_name", APPS)
 def test_nothing_in_flight_fails_before_anything_is_changed(app_name):
     plan = _abandon_plan(app_name)
     guard = _index(plan, "task", "assert-release-in-flight")

@@ -1958,6 +1958,15 @@ def _build_abandon_release_job(
     2026-11-23). An empty ``in_flight`` means nothing is in flight, and the
     ``assert-release-in-flight`` task fails the build before either put runs.
 
+    ``in_flight`` is read when the build runs, not when it was triggered, and
+    the job takes no parameters. A release cut in between, e.g. by `/doof
+    release <app> supersede`, would be the one cancelled. So the put sets
+    ``require_request``: the release resource refuses a version that no
+    ``abandon-request/<version>`` tag names, before it deletes anything, and
+    `/doof abandon` pushes that tag for the release it saw before it
+    triggers the job. A manual trigger from the Concourse UI with no request
+    is refused the same way.
+
     *serial_groups* puts the job in the release's serial group, as the
     tag-only pipeline does; see _build_tag_release_pipeline.
     """
@@ -2001,6 +2010,7 @@ def _build_abandon_release_job(
                     "action": "abandon",
                     "repo_dir": str(main_repo.name),
                     "version_file": in_flight_file,
+                    "require_request": True,
                 },
                 no_get=True,
             ),

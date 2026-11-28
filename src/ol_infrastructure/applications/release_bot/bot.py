@@ -1563,11 +1563,11 @@ async def _abandon_failure_text(  # noqa: PLR0913
     a release cut in between is a different release, and `/doof abandon`
     would cancel that one, so it is never suggested for it.
 
-    *version* is what `/doof abandon` saw before triggering, and the job
-    re-reads what is in flight when it runs. A release cut in the seconds
-    between is the one the build cancels, and this text then names the wrong
-    release. Binding the build to *version* closes that gap; until then this
-    is the same race the job already has.
+    *version* is what `/doof abandon` saw and requested before triggering.
+    The job re-reads what is in flight when it runs, and the release
+    resource refuses it unless an ``abandon-request/<version>`` tag names
+    it, so a release cut in between is refused rather than cancelled, and
+    this text reports *version* as still in flight or already gone.
     """
     mention = f"<@{requester}> " if requester else ""
     lines = [
