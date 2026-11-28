@@ -150,3 +150,37 @@ spec:
     - serviceName: mfe-authoring
       servicePort: 80
     plugin_config_name: openedx-shared-plugins
+---
+# Meilisearch, which the authoring MFE's Libraries V2 pages query from the
+# browser with a tenant token Studio signs (MEILISEARCH_PUBLIC_URL in
+# configmaps/cms-config.yaml). A path on the Studio host rather than a host of
+# its own, so it needs no new name in /etc/hosts and no CORS: the MFE is served
+# from this host too. meilisearch-js resolves its request paths relative to the
+# URL, so the /meilisearch prefix survives and is stripped here.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: meilisearch-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: meilisearch
+    # Above studio-route's /* on the same host.
+    priority: 10
+    match:
+      hosts:
+      - "studio.mit.test"
+      paths:
+      - "/meilisearch/*"
+    backends:
+    - serviceName: meilisearch
+      servicePort: 7700
+    plugin_config_name: openedx-shared-plugins
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+        - "^/meilisearch/(.*)"
+        - "/$1"

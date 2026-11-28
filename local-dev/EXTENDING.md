@@ -110,7 +110,7 @@ The pattern, and what makes it hold up over time:
    `load_dynamic()` rather than `load()`, because the path depends on
    `MITOL_WORKSPACE_ROOT` and Starlark's `load()` takes a string literal only.
 2. **Say which shared services to reuse.** `manage_infra: False` tells lehrer
-   not to install Valkey/OpenSearch because `local-infra` already has them.
+   not to install Valkey because `local-infra` already has it.
    Anything this cluster genuinely lacks (MariaDB, MongoDB) stays the owning
    repo's to install.
 3. **Layer config deltas; never fork a ConfigMap.** lehrer's manifests read an
