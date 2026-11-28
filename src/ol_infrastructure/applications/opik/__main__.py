@@ -143,18 +143,25 @@ CLICKHOUSE_DATABASE = "opik_db"
 CLICKHOUSE_USER = "opik"
 
 # Liquibase migrations MUST target a single, stable ClickHouse replica rather
-# than the load-balanced ``clickhouse`` service. The changelog bookkeeping
-# tables (DATABASECHANGELOG / DATABASECHANGELOGLOCK) are node-local — the
-# liquibase-clickhouse extension only makes them replicated when a
-# ``liquibaseClickhouse.conf`` declares cluster mode, which the opik chart gives
-# us no way to mount. Round-robining the JDBC pool across the three replicas
-# therefore splits migration state three ways: each node believes a different
-# subset of changesets has run, while the ReplicatedMergeTree metadata they all
-# write lives in shared Keeper. That is how 000017_change_tables_to_replicated
-# ends up replaying its 12-column ``experiments`` DDL against a ZooKeeper path
-# that a further-along replica already advanced to 20 columns, failing with
-# "Missing columns: 'optimization_id'" (comet-ml/opik#2464). The Altinity
-# operator gives every replica a stable headless service, so pin to replica 0.
+# than the load-balanced ``clickhouse`` service. The liquibase-clickhouse
+# extension creates its changelog bookkeeping tables (DATABASECHANGELOG /
+# DATABASECHANGELOGLOCK) node-local unless a ``liquibaseClickhouse.conf``
+# declares cluster mode, which the opik chart gives us no way to mount.
+# Round-robining the JDBC pool across the three replicas therefore splits
+# migration state three ways: each node believes a different subset of
+# changesets has run, while the ReplicatedMergeTree metadata they all write
+# lives in shared Keeper. That is how 000017_change_tables_to_replicated ends
+# up replaying its 12-column ``experiments`` DDL against a ZooKeeper path that a
+# further-along replica already advanced to 20 columns, failing with "Missing
+# columns: 'optimization_id'" (comet-ml/opik#2464). The Altinity operator gives
+# every replica a stable headless service, so pin to replica 0.
+#
+# The ledger tables are now ReplicatedMergeTree on every replica in every
+# environment (Production's replicas 1 and 2 since 2026-11-25; see "Opik's
+# Liquibase ledger" in docs/clickhouse-llmops-runbook.md), so any replica holds
+# the full ledger. The pin stays: a replica rebuilt from an empty volume has
+# no ledger until it is copied back, and Liquibase run there first would create
+# a local one.
 CLICKHOUSE_MIGRATIONS_HOST = "chi-clickhouse-default-0-0.clickhouse.svc.cluster.local"
 
 # Vault KV-v2 mount + path holding the ClickHouse credentials. The ``opik`` key
