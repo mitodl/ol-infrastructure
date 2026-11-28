@@ -28,11 +28,10 @@ config:
     enable_group_level_query_queue: true
     query_queue_concurrency_limit: 0
     query_queue_pending_timeout_second: 300
-  # CN pods here request 4 CPU with a 16 CPU limit. StarRocks caps
-  # exclusive_cpu_cores at the smallest CN's reported cores minus one, and a
-  # CN reports its limit (16 cores), not its request.
-  # The value below is the request minus one, so the dedicated threads have
-  # CPU the pod is guaranteed and one requested core stays shared.
+  # CN pods here request and are limited to 14 CPU, one CN per 16-vCPU node.
+  # StarRocks caps exclusive_cpu_cores at the smallest CN's reported cores
+  # minus one, and a CN reports its limit, not its request, so the cap is 13.
+  # Interactive holds 3 of them, its share when CNs had a 4-CPU request.
   # Keep CN pods uniformly sized (applications/starrocks starrocks:cn_config)
   # and revisit this when they change. mem_limit is a fraction of each CN's
   # query pool, 0.729 of the pod memory limit (three 90% factors; QA measured

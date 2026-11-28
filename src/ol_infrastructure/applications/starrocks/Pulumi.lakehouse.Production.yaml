@@ -38,20 +38,33 @@ config:
     log_storage: 100Gi
   starrocks:use_cn: "true"
   starrocks:cn_config:
+    # One CN per node of the starrocks-cn Karpenter pool (16 vCPU / 128 GiB
+    # with local NVMe, substructure/aws/eks starrocks:cn_nodepool). The
+    # tracking-log scale spike (2026-11-10) could not build the largest
+    # staging models on 16Gi CNs sharing spot nodes: memory, not CPU, was the
+    # limit (no model passed 9 cores), and spill filled the shared root disk.
+    dedicated_nodepool: true
+    # 2 is the floor for interactive traffic and for losing a node. max is
+    # the node pool's 6-node limit. The CPU HPA rarely fires at a 14-core
+    # request, which is intended: adding CNs for the build window belongs to a
+    # scheduled scale-up, not to CPU load.
     min_replicas: 2
-    max_replicas: 20
+    max_replicas: 6
     cpu_target_utilization_percentage: 80
-    # Measured 2026-09-29 over 90 days: CN peaked at 2.5 cores (1m rate) and
-    # 5.7Gi working set per pod, against a 16 CPU / 32Gi Guaranteed request.
-    # The request is what the HPA's 80% target is measured against, so at 16
-    # CPU it could only scale out at 12.8 cores avg and never had. At 4 CPU it
-    # scales out at 3.2 cores avg, above today's peak but well before a real
-    # scan workload saturates a pod. The 16-core limit only lets a pod burst
-    # into CPU its node has idle; unlike the old request, it reserves nothing.
-    cpu_request: 4000m
-    cpu_limit: 16000m
-    memory_request: 16Gi
-    memory_limit: 16Gi
+    # Requests equal limits, so the pod is Guaranteed. Measured on
+    # data-production 2026-11-25: a 4xlarge node has 15.89 allocatable cores,
+    # an r7i.4xlarge 120.9 GiB allocatable memory, and the daemonsets on a CN
+    # node request 0.47 cores and 1.0 GiB. 14 cores and 108Gi leave room for
+    # daemonset growth.
+    cpu_request: 14000m
+    cpu_limit: 14000m
+    memory_request: 108Gi
+    memory_limit: 108Gi
+    # Fractions of the NVMe filesystem (950 GB on r6id/r8id, 3.75 TB on
+    # i4i). The scale spike spilled about 82 GiB per CN at 42% of the
+    # mitxresidential tracking-log build.
+    datacache_disk_size: 40%
+    spill_max_dir_bytes_ratio: 0.4
   starrocks:enable_data_lake_integration: "true"
   starrocks:gravitino_catalog_enabled: "true"
   starrocks:ssl_enabled: "true"

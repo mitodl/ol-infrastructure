@@ -7,3 +7,20 @@ config:
   environment:target_vpc: data_vpc
   starrocks:enable_operator: true
   starrocks:operator_fe_ssl_mode: REQUIRED
+  # Dedicated on-demand nodes for StarRocks CNs, one CN per node (see
+  # karpenter.py and applications/starrocks cn_config). Every type here is
+  # 16 vCPU / 128 GiB with local NVMe, so CN pods stay uniformly sized;
+  # Karpenter launches the cheapest one available (r6id.4xlarge,
+  # $1.21/h on-demand in us-east-1 on 2026-11-25). The limits allow 6 nodes,
+  # the CN autoscaler's max_replicas.
+  starrocks:cn_nodepool:
+    instance_types:
+    - r6id.4xlarge
+    - r8id.4xlarge
+    - i4i.4xlarge
+    cpu_limit: 96
+    memory_limit: 768Gi
+    # The nightly ingest starts at 00:00 UTC and the dbt layer and the b2b
+    # MVs build after it, through about 07:00 UTC.
+    build_window_schedule: "0 0 * * *"
+    build_window_duration: 8h

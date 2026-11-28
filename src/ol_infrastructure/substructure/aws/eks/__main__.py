@@ -37,7 +37,10 @@ from ol_infrastructure.substructure.aws.eks.clickhouse_operator import (
     setup_clickhouse_operator,
 )
 from ol_infrastructure.substructure.aws.eks.grafana import setup_grafana
-from ol_infrastructure.substructure.aws.eks.karpenter import setup_karpenter
+from ol_infrastructure.substructure.aws.eks.karpenter import (
+    StarRocksCnNodePoolConfig,
+    setup_karpenter,
+)
 from ol_infrastructure.substructure.aws.eks.keda import setup_keda
 from ol_infrastructure.substructure.aws.eks.marimo_operator import (
     setup_marimo_operator,
@@ -348,6 +351,7 @@ setup_grafana(
 )
 
 # Setup Karpenter
+_starrocks_cn_nodepool = Config("starrocks").get_object("cn_nodepool")
 setup_karpenter(
     cluster_name=cluster_name,
     cluster_stack=cluster_stack,
@@ -357,6 +361,11 @@ setup_karpenter(
     aws_account=aws_account,
     k8s_global_labels=k8s_global_labels,
     stack_info=stack_info,
+    starrocks_cn_nodepool=(
+        StarRocksCnNodePoolConfig.model_validate(_starrocks_cn_nodepool)
+        if _starrocks_cn_nodepool is not None
+        else None
+    ),
 )
 
 ############################################################

@@ -1,11 +1,13 @@
 # ruff: noqa: E501
 import json
 import re
+from typing import Any
 
 import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, ResourceOptions, StackReference
+from pydantic import BaseModel, Field
 
 from bridge.lib.magic_numbers import AWS_EVENT_TARGET_GROUP_NAME_MAX_LENGTH
 from bridge.lib.versions import KARPENTER_CHART_VERSION
@@ -24,6 +26,24 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.substructure.aws.eks.karpenter_iam import (
     get_cluster_karpenter_iam_policy_document,
 )
+
+CN_ROOT_VOLUME_SIZE = "50Gi"
+
+
+class StarRocksCnNodePoolConfig(BaseModel):
+    """A dedicated Karpenter NodePool for StarRocks compute nodes.
+
+    Every instance type listed must have the same vCPU count and memory, because
+    the CN pod is sized to fill one node and StarRocks caps a resource group's
+    exclusive_cpu_cores at the smallest CN's core count.
+    """
+
+    instance_types: list[str] = Field(min_length=1)
+    cpu_limit: int = Field(gt=0)
+    memory_limit: str
+    # Karpenter disrupts no CN node while this window is open (cron, UTC).
+    build_window_schedule: str
+    build_window_duration: str
 
 
 def extract_version(ami_name: str) -> str:
@@ -50,10 +70,15 @@ def setup_karpenter(  # noqa: PLR0913
     aws_account: aws.GetCallerIdentityResult,
     k8s_global_labels: dict[str, str],
     stack_info: StackInfo,
+    starrocks_cn_nodepool: StarRocksCnNodePoolConfig | None = None,
 ):
     """
     Set up Karpenter resources including SQS queue, EventBridge rules, IAM roles/policies,
     Helm chart installation, and default NodePool/EC2NodeClass.
+
+    With ``starrocks_cn_nodepool``, also a tainted on-demand NodePool for StarRocks
+    CNs, whose EC2NodeClass puts the instance-store NVMe under the node's ephemeral
+    storage.
 
     Args:
         cluster_name: The name of the EKS cluster.
@@ -357,6 +382,43 @@ def setup_karpenter(  # noqa: PLR0913
     # Get KMS key ARN for EBS encryption
     kms_ebs_id = kms_stack.require_output("kms_ec2_ebs_key")["id"]
 
+    default_node_class_spec = {
+        "kubelet": {},
+        "blockDeviceMappings": [
+            {
+                "deviceName": "/dev/xvda",
+                "ebs": {
+                    "volumeSize": "300Gi",
+                    "volumeType": "gp3",
+                    "iops": 3000,
+                    "throughput": 125,
+                    "deleteOnTermination": True,
+                    "encrypted": True,
+                    "kmsKeyID": kms_ebs_id,
+                },
+            }
+        ],
+        "subnetSelectorTerms": cluster_stack.require_output("pod_subnet_ids").apply(
+            lambda ids: [{"id": subnet_id} for subnet_id in ids]
+        ),
+        "securityGroupSelectorTerms": [
+            {
+                "id": cluster_stack.require_output("node_group_security_group_ids")[
+                    "worker-xlarge"
+                ]
+            },
+        ],
+        "instanceProfile": cluster_stack.require_output("node_instance_profile"),
+        # Dynamically select the EKS Optimized AL2023 AMI based on cluster version
+        "amiSelectorTerms": [
+            {"alias": ami_alias},
+        ],
+        # A plain shell script; Karpenter puts it after its own NodeConfig part.
+        "userData": DISABLE_SCTP_USER_DATA,
+        "tags": aws_config.merged_tags(
+            {"Name": f"{cluster_name}-karpenter-default-nodeclass"}
+        ),
+    }
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-karpenter-default-node-class",
         api_version="karpenter.k8s.aws/v1",  # Correct API version for EC2NodeClass
@@ -366,43 +428,7 @@ def setup_karpenter(  # noqa: PLR0913
             namespace="operations",
             labels=k8s_global_labels,
         ),
-        spec={
-            "kubelet": {},
-            "blockDeviceMappings": [
-                {
-                    "deviceName": "/dev/xvda",
-                    "ebs": {
-                        "volumeSize": "300Gi",
-                        "volumeType": "gp3",
-                        "iops": 3000,
-                        "throughput": 125,
-                        "deleteOnTermination": True,
-                        "encrypted": True,
-                        "kmsKeyID": kms_ebs_id,
-                    },
-                }
-            ],
-            "subnetSelectorTerms": cluster_stack.require_output("pod_subnet_ids").apply(
-                lambda ids: [{"id": subnet_id} for subnet_id in ids]
-            ),
-            "securityGroupSelectorTerms": [
-                {
-                    "id": cluster_stack.require_output("node_group_security_group_ids")[
-                        "worker-xlarge"
-                    ]
-                },
-            ],
-            "instanceProfile": cluster_stack.require_output("node_instance_profile"),
-            # Dynamically select the EKS Optimized AL2023 AMI based on cluster version
-            "amiSelectorTerms": [
-                {"alias": ami_alias},
-            ],
-            # A plain shell script; Karpenter puts it after its own NodeConfig part.
-            "userData": DISABLE_SCTP_USER_DATA,
-            "tags": aws_config.merged_tags(
-                {"Name": f"{cluster_name}-karpenter-default-nodeclass"}
-            ),
-        },
+        spec=default_node_class_spec,
         opts=ResourceOptions(
             provider=k8s_provider,
             depends_on=[karpenter_release],  # Ensure Karpenter CRDs are available
@@ -574,4 +600,155 @@ def setup_karpenter(  # noqa: PLR0913
             provider=k8s_provider,
             depends_on=[karpenter_release],
         ),
+    )
+
+    if starrocks_cn_nodepool is not None:
+        _setup_starrocks_cn_nodepool(
+            cluster_name=cluster_name,
+            k8s_provider=k8s_provider,
+            k8s_global_labels=k8s_global_labels,
+            default_node_class_spec=default_node_class_spec,
+            aws_config=aws_config,
+            nodepool_config=starrocks_cn_nodepool,
+            depends_on=karpenter_release,
+        )
+
+
+def _setup_starrocks_cn_nodepool(  # noqa: PLR0913
+    *,
+    cluster_name: str,
+    k8s_provider: kubernetes.Provider,
+    k8s_global_labels: dict[str, str],
+    default_node_class_spec: dict[str, Any],
+    aws_config: AWSBase,
+    nodepool_config: StarRocksCnNodePoolConfig,
+    depends_on: pulumi.Resource,
+) -> None:
+    """Create the StarRocks CN EC2NodeClass and NodePool.
+
+    The tracking-log scale spike (2026-11-10) could not build the largest staging
+    models on CNs that shared spot nodes and a 300 GiB gp3 root volume: spot
+    reclaims killed long queries, and spill and datacache filled the shared disk.
+    These nodes are on-demand, hold one CN each (the taint keeps everything but
+    daemonsets off), and expose the instance-store NVMe as the node's ephemeral
+    storage, so the CN's emptyDir cache and spill directories land on it.
+    """
+    node_class_name = "starrocks-cn"
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-karpenter-starrocks-cn-node-class",
+        api_version="karpenter.k8s.aws/v1",
+        kind="EC2NodeClass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=node_class_name,
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        spec={
+            **default_node_class_spec,
+            # Karpenter builds a RAID0 array from every instance-store volume and
+            # mounts kubelet, containerd and pod logs on it. The EBS root volume
+            # then holds only the OS, so it doesn't need the default's 300Gi.
+            "instanceStorePolicy": "RAID0",
+            "blockDeviceMappings": [
+                {
+                    **mapping,
+                    "ebs": {**mapping["ebs"], "volumeSize": CN_ROOT_VOLUME_SIZE},
+                }
+                for mapping in default_node_class_spec["blockDeviceMappings"]
+            ],
+            "tags": aws_config.merged_tags(
+                {"Name": f"{cluster_name}-karpenter-starrocks-cn-nodeclass"}
+            ),
+        },
+        opts=ResourceOptions(provider=k8s_provider, depends_on=[depends_on]),
+    )
+
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-karpenter-starrocks-cn-node-pool",
+        api_version="karpenter.sh/v1",
+        kind="NodePool",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="starrocks-cn",
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "template": {
+                "metadata": {
+                    "labels": {
+                        **k8s_global_labels,
+                        "ol.mit.edu/core_node": "false",
+                        "ol.mit.edu/gpu_node": "false",
+                        "ol.mit.edu/starrocks_cn": "true",
+                    },
+                },
+                "spec": {
+                    "nodeClassRef": {
+                        "group": "karpenter.k8s.aws",
+                        "kind": "EC2NodeClass",
+                        "name": node_class_name,
+                    },
+                    "taints": [
+                        {
+                            "key": "ol.mit.edu/starrocks_cn",
+                            "value": "true",
+                            "effect": "NoSchedule",
+                        }
+                    ],
+                    # Expiry ignores disruption budgets (Karpenter deletes the
+                    # NodeClaim once expireAfter passes), so a timed expiry could
+                    # land mid-build. AMI updates still replace these nodes, as
+                    # drift, which the budget below holds outside the window.
+                    "expireAfter": "Never",
+                    # A CN stops gracefully within its pod's grace period, so an
+                    # hour is only the backstop for a drain that never finishes.
+                    "terminationGracePeriod": "1h",
+                    "requirements": [
+                        {
+                            "key": "node.kubernetes.io/instance-type",
+                            "operator": "In",
+                            "values": nodepool_config.instance_types,
+                        },
+                        {
+                            "key": "kubernetes.io/arch",
+                            "operator": "In",
+                            "values": ["amd64"],
+                        },
+                        {
+                            "key": "kubernetes.io/os",
+                            "operator": "In",
+                            "values": ["linux"],
+                        },
+                        {
+                            "key": "karpenter.sh/capacity-type",
+                            "operator": "In",
+                            "values": ["on-demand"],
+                        },
+                    ],
+                },
+            },
+            "disruption": {
+                # A node holds one CN, so an underutilized node is still in use.
+                # Only remove nodes the CN autoscaler has emptied.
+                "consolidationPolicy": "WhenEmpty",
+                "consolidateAfter": "10m",
+                "budgets": [
+                    # StarRocks places a query's fragments when it schedules the
+                    # query, so replacing a node mid-build fails every query
+                    # running on it. Drift and emptiness wait for the window to
+                    # close.
+                    {
+                        "nodes": "0",
+                        "schedule": nodepool_config.build_window_schedule,
+                        "duration": nodepool_config.build_window_duration,
+                    },
+                    {"nodes": "1"},
+                ],
+            },
+            "limits": {
+                "cpu": str(nodepool_config.cpu_limit),
+                "memory": nodepool_config.memory_limit,
+            },
+        },
+        opts=ResourceOptions(provider=k8s_provider, depends_on=[depends_on]),
     )
