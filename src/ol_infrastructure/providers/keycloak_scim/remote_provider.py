@@ -86,6 +86,21 @@ class ScimRemoteProviderSpec(BaseModel):
     replay_on_failure: bool | None = None
     retry_interval_in_seconds: int | None = None
     retry_max_attempts: int | None = None
+    # What the plugin believes the target supports. It does not read the
+    # target's /ServiceProviderConfig, so these drive what it sends: with
+    # patch_supported false it issues PUTs instead of PATCHes. Every one
+    # defaults off in the plugin, so a provider created without them is less
+    # capable than the live ones, which were configured through its admin
+    # console.
+    filter_supported: bool | None = None
+    filter_max_results: int | None = None
+    sort_supported: bool | None = None
+    patch_supported: bool | None = None
+    change_password_supported: bool | None = None
+    bulk_supported: bool | None = None
+    bulk_max_operations: int | None = None
+    bulk_max_payload_size: int | None = None
+    etag_supported: bool | None = None
     authentication_list: list[ScimAuthentication] | None = None
 
     @field_validator("base_url")

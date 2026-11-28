@@ -132,6 +132,13 @@ config:
     base_url: https://api.ci.learn.mit.edu/scim/v2
     enabled: true
     replay_on_failure: false
+    filter_supported: true
+    filter_max_results: 50
+    sort_supported: true
+    patch_supported: true
+    bulk_supported: true
+    bulk_max_operations: 100
+    bulk_max_payload_size: 1048576
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
