@@ -47,6 +47,7 @@ config:
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
     MITOL_ENVIRONMENT: "ci"
+    MITOL_SUPPORT_EMAIL: "odl-learn-ci-support@mit.edu"
     NODE_ENV: "development"
     PROBLEM_SET_URL: https://api.ci.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
