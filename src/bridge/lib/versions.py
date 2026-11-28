@@ -128,7 +128,7 @@ TRAEFIK_CHART_VERSION = "42.4.0"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.10.3"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
-VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.6.2"
+VAULT_SECRETS_OPERATOR_CHART_VERSION = "2.0.0"
 # renovate: datasource=docker depName=nginx
 NGINX_VERSION = "1.31.9"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
