@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 import yaml
 
 SCRIPT_PATH = Path(__file__).resolve().parents[3] / "scripts" / "eks" / "eks.py"
@@ -50,6 +51,12 @@ def isolated_cache_dir(eks_module, monkeypatch, tmp_path):
     monkeypatch.setattr(eks_module, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(eks_module, "EXEC_DEBUG_LOG_PATH", tmp_path / "exec-debug.log")
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def unreachable_vault(eks_module, monkeypatch):
+    """Keep any unstubbed Vault call from reaching the production Vault."""
+    monkeypatch.setattr(eks_module, "PRODUCTION_VAULT_ADDRESS", "http://127.0.0.1:1")
 
 
 @pytest.fixture
@@ -298,6 +305,56 @@ def test_append_exec_debug_event_is_disabled_by_default(
 
 
 @pytest.mark.unit
+def test_dump_json_makes_existing_cache_private(eks_module):
+    """A group-readable cache directory and file are made owner-only on write."""
+    cache_path = eks_module.cache_file("aws-creds-developer")
+    eks_module.CACHE_DIR.chmod(0o755)
+    cache_path.write_text("{}")
+    cache_path.chmod(0o644)
+
+    eks_module.dump_json(cache_path, {"session_token": "secret"})
+
+    assert eks_module.CACHE_DIR.stat().st_mode & 0o777 == 0o700
+    assert cache_path.stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.unit
+def test_dump_json_replaces_the_file_instead_of_rewriting_it(eks_module):
+    """Cache readers take no lock, so a rewrite in place could show them an
+    empty file; a new file renamed over the old one cannot.
+    """
+    cache_path = eks_module.cache_file("aws-creds-developer")
+    eks_module.dump_json(cache_path, {"session_token": "old"})
+    old_inode = cache_path.stat().st_ino
+
+    eks_module.dump_json(cache_path, {"session_token": "new"})
+
+    assert cache_path.stat().st_ino != old_inode
+    assert eks_module.load_json(cache_path) == {"session_token": "new"}
+    assert [path.name for path in eks_module.CACHE_DIR.iterdir()] == [cache_path.name]
+
+
+@pytest.mark.unit
+def test_cache_hit_makes_cache_dir_private(eks_module):
+    """A group-readable cache directory is made owner-only even on a cache hit."""
+    expires_at = eks_module.json_datetime_now() + eks_module.timedelta(hours=1)
+    eks_module.dump_json(
+        eks_module.cache_file("aws-creds-developer"),
+        {
+            "access_key": "a",
+            "secret_key": "s",
+            "session_token": "t",
+            "expires_at": expires_at.isoformat(),
+        },
+    )
+    eks_module.CACHE_DIR.chmod(0o755)
+
+    eks_module.load_valid_aws_credentials(eks_module.AccessMode.DEVELOPER)
+
+    assert eks_module.CACHE_DIR.stat().st_mode & 0o777 == 0o700
+
+
+@pytest.mark.unit
 def test_build_kubeconfig_sets_no_current_context_by_default(eks_module, two_clusters):
     """No cluster becomes the default kubectl target unless one is requested."""
     kubeconfig = eks_module.build_kubeconfig(
@@ -482,7 +539,7 @@ def test_setup_writes_kubeconfig_with_operator_contexts_by_default(
     """Setup in developer mode should write operator contexts by default."""
     output_path = tmp_path / "config"
     monkeypatch.setattr(
-        eks_module, "fetch_all_cluster_configs", lambda _mode: two_clusters
+        eks_module, "fetch_all_cluster_configs", lambda _mode, **_kwargs: two_clusters
     )
 
     eks_module.setup(
@@ -586,7 +643,7 @@ def test_setup_can_target_the_default_kubeconfig(
 ):
     """Setup aimed at the default kubeconfig overwrites it despite its EKS entries."""
     monkeypatch.setattr(
-        eks_module, "fetch_all_cluster_configs", lambda _mode: two_clusters
+        eks_module, "fetch_all_cluster_configs", lambda _mode, **_kwargs: two_clusters
     )
 
     eks_module.setup(output_path=legacy_default_kubeconfig)
@@ -697,3 +754,207 @@ def test_login_oidc_get_token_does_not_hang_on_idle_connection(
     assert "did not return an authorization code" in str(outcome["error"])
     for connection in connections:
         connection.close()
+
+
+# ---------------------------------------------------------------------------
+# logout
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_logout_revokes_tokens_and_deletes_credential_caches(eks_module, monkeypatch):
+    """Live tokens are revoked; already-dead ones are still deleted."""
+    eks_module.dump_json(
+        eks_module.cache_file("vault-token-developer"), {"token": "live"}
+    )
+    eks_module.dump_json(
+        eks_module.cache_file("vault-token-readonly"), {"token": "dead"}
+    )
+    eks_module.dump_json(eks_module.cache_file("aws-creds-developer"), {})
+    clients = {"live": MagicMock(), "dead": MagicMock()}
+    clients[
+        "dead"
+    ].auth.token.revoke_self.side_effect = eks_module.hvac.exceptions.Forbidden()
+    monkeypatch.setattr(eks_module, "vault_client", lambda token=None: clients[token])
+
+    eks_module.logout()
+
+    clients["live"].auth.token.revoke_self.assert_called_once_with()
+    assert not list(eks_module.CACHE_DIR.glob("vault-token-*.json"))
+    assert not list(eks_module.CACHE_DIR.glob("aws-creds-*.json"))
+
+
+@pytest.mark.unit
+def test_logout_keeps_tokens_it_could_not_revoke(eks_module, monkeypatch):
+    """An unreachable Vault fails the logout but not the other tokens or the AWS
+    credentials, and the unrevoked token stays cached so a rerun can revoke it.
+    """
+    unrevoked_path = eks_module.cache_file("vault-token-developer")
+    eks_module.dump_json(unrevoked_path, {"token": "unreachable"})
+    eks_module.dump_json(
+        eks_module.cache_file("vault-token-readonly"), {"token": "live"}
+    )
+    eks_module.dump_json(eks_module.cache_file("aws-creds-developer"), {})
+    clients = {"unreachable": MagicMock(), "live": MagicMock()}
+    clients[
+        "unreachable"
+    ].auth.token.revoke_self.side_effect = requests.exceptions.ConnectionError()
+    monkeypatch.setattr(eks_module, "vault_client", lambda token=None: clients[token])
+
+    with pytest.raises(RuntimeError, match="vault-token-developer"):
+        eks_module.logout()
+
+    clients["live"].auth.token.revoke_self.assert_called_once_with()
+    assert list(eks_module.CACHE_DIR.glob("vault-token-*.json")) == [unrevoked_path]
+    assert not list(eks_module.CACHE_DIR.glob("aws-creds-*.json"))
+
+
+@pytest.mark.unit
+def test_refresh_queued_behind_logout_does_not_log_in(eks_module):
+    """A refresh that queued on the lock before the marker existed still refuses."""
+    held = threading.Event()
+    release = threading.Event()
+
+    def logout_in_progress():
+        with eks_module.cache_lock("aws-creds-developer"):
+            held.set()
+            release.wait(5)
+            eks_module.dump_json(
+                eks_module.cache_file(eks_module.LOGGED_OUT_CACHE_KEY), {}
+            )
+
+    holder = run_in_background(logout_in_progress)
+    assert held.wait(5)
+    outcome = {}
+
+    def refresh():
+        try:
+            eks_module.load_valid_aws_credentials(
+                eks_module.AccessMode.DEVELOPER, block_noninteractive_login=True
+            )
+        except RuntimeError as exc:
+            outcome["error"] = exc
+
+    caller = run_in_background(refresh)
+    caller.join(0.2)
+    release.set()
+    holder.join(5)
+    caller.join(5)
+
+    assert "Logged out" in str(outcome["error"])
+
+
+@pytest.mark.unit
+def test_logged_out_cache_refuses_unexpired_credentials(eks_module):
+    """Credentials cached by a setup that failed after logging in mint no tokens."""
+    eks_module.dump_json(eks_module.cache_file(eks_module.LOGGED_OUT_CACHE_KEY), {})
+    expires_at = eks_module.json_datetime_now() + eks_module.timedelta(hours=1)
+    eks_module.dump_json(
+        eks_module.cache_file("aws-creds-developer"),
+        {
+            "access_key": "a",
+            "secret_key": "s",
+            "session_token": "t",
+            "expires_at": expires_at.isoformat(),
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Logged out"):
+        eks_module.load_valid_aws_credentials(eks_module.AccessMode.DEVELOPER)
+
+
+@pytest.mark.unit
+def test_logout_waits_for_a_refresh_holding_the_lock(eks_module):
+    """Logout does not delete credentials while a refresh may still write them."""
+    creds = eks_module.cache_file("aws-creds-readonly")
+    eks_module.dump_json(creds, {})
+    held = threading.Event()
+    release = threading.Event()
+
+    def refresh_in_progress():
+        with eks_module.cache_lock("aws-creds-readonly"):
+            held.set()
+            release.wait(5)
+
+    holder = run_in_background(refresh_in_progress)
+    assert held.wait(5)
+    logout = run_in_background(eks_module.logout)
+    logout.join(0.2)
+    assert creds.exists()
+
+    release.set()
+    holder.join(5)
+    logout.join(5)
+    assert not creds.exists()
+
+
+@pytest.mark.unit
+def test_setup_ends_a_logout_only_once_it_has_logged_in(
+    eks_module, monkeypatch, tmp_path
+):
+    """An abandoned setup leaves the logout in place; a completed one lifts it."""
+    eks_module.logout()
+    marker = eks_module.cache_file(eks_module.LOGGED_OUT_CACHE_KEY)
+    monkeypatch.setattr(
+        eks_module,
+        "load_valid_vault_token",
+        MagicMock(side_effect=[RuntimeError("No Vault OIDC callback"), "token"]),
+    )
+    vault = MagicMock()
+    vault.secrets.aws.generate_credentials.return_value = {
+        "lease_duration": 3600,
+        "data": {"access_key": "a", "secret_key": "s", "security_token": "t"},
+    }
+    monkeypatch.setattr(eks_module, "vault_client", lambda _token=None: vault)
+    eks_client = MagicMock()
+    eks_client.get_paginator.return_value.paginate.return_value = []
+    monkeypatch.setattr(eks_module, "make_eks_client", lambda _creds: eks_client)
+
+    with pytest.raises(RuntimeError, match="No Vault OIDC callback"):
+        eks_module.setup(output_path=tmp_path / "config")
+    assert marker.exists()
+
+    eks_module.setup(output_path=tmp_path / "config")
+    assert not marker.exists()
+
+
+@pytest.mark.unit
+def test_setup_queued_behind_a_logout_does_not_log_in(
+    eks_module, monkeypatch, tmp_path
+):
+    """A logout that finished while setup waited for its lock stops the login."""
+    login = MagicMock()
+    monkeypatch.setattr(eks_module, "load_valid_vault_token", login)
+
+    # The first cache read sits between setup reading the marker and taking its
+    # aws-creds lock, which is where a setup queued on that lock waits.
+    queued_logout = [eks_module.logout]
+
+    def logout_once_then_miss(_mode):
+        if queued_logout:
+            queued_logout.pop()()
+
+    monkeypatch.setattr(eks_module, "cached_aws_credentials", logout_once_then_miss)
+
+    with pytest.raises(RuntimeError, match="Logged out"):
+        eks_module.setup(output_path=tmp_path / "config")
+
+    login.assert_not_called()
+
+
+@pytest.mark.unit
+def test_setup_keeps_a_logout_that_ran_during_discovery(
+    eks_module, monkeypatch, tmp_path, two_clusters
+):
+    """Setup lifts the logout it started after, not one that ran while it worked."""
+    eks_module.logout()
+
+    def discover_during_logout(_mode, **_kwargs):
+        eks_module.logout()
+        return two_clusters
+
+    monkeypatch.setattr(eks_module, "fetch_all_cluster_configs", discover_during_logout)
+
+    eks_module.setup(output_path=tmp_path / "config")
+
+    assert eks_module.cache_file(eks_module.LOGGED_OUT_CACHE_KEY).exists()
