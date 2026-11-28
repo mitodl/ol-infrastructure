@@ -26,5 +26,6 @@ config:
   # 2026-11-23 (see tls_listeners_enabled in __main__.py). Apply opik only
   # after the operator has restarted every replica onto 8443.
   clickhouse:tls_listeners_enabled: "true"
+  clickhouse:vault_database_enabled: "false"
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagGUp1319rLamkN4eXvfsQY7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2fssuyKGmrRZnYJHAgEQgDuzjYP/SqDU3f6u+sc6BYB8R5jwXmcSylT7mNXA7saz6SbK++3EWAaeGNBn6rdv8MMj2SrcgOZP3Ol1hQ==
