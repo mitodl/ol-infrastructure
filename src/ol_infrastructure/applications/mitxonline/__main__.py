@@ -61,6 +61,7 @@ from ol_infrastructure.components.services.fastly import (
 from ol_infrastructure.components.services.k8s import (
     OLApplicationK8s,
     OLApplicationK8sCeleryRedisConfig,
+    celery_worker_deployment_name,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -1212,6 +1213,23 @@ mitxonline_fastly_tls = OLFastlyTLS(
 # Celery workers and beat are scaled via KEDA (Redis queue depth), so CPU+memory VPA is safe.
 _worker_vpa_min_allowed = {"cpu": "25m", "memory": "128Mi"}
 _worker_vpa_max_allowed = {"cpu": "1000m", "memory": "3Gi"}
+# The worker that consumes the `celery` queue runs
+# courses.tasks.upgrade_eligible_program_enrollments daily at 01:00 UTC. It
+# materialises every audit ProgramEnrollment with its prefetches in one pool child,
+# adding 0.7-1.4GiB of anonymous RSS for 8-70 minutes on most days (production,
+# 2026-10-25..11-24). The VPA's percentile recommendation discounts a once-a-day
+# spike and, with InPlaceOrRecreate, lowers the limit of the running pod between
+# spikes (down to 1181MiB on 2026-10-31). On 2026-10-28 the run climbed for two hours
+# to 2168MiB and was OOMKilled at a 2176MiB limit, so the task's real peak is
+# unmeasured; the floor is therefore the 3Gi ceiling rather than a margin over 2168MiB.
+# It stays until the task stops loading the whole table. Declared request:limit is
+# 1:1, so this floor is also the lowest limit.
+_upgrade_task_worker_name = celery_worker_deployment_name(
+    "mitxonline", "celery" if mitxonline_celery_topology == "per-queue" else "all"
+)
+_upgrade_task_worker_min_memory = mitxonline_config.get(
+    "celery_worker_vpa_min_allowed_memory"
+)
 for _celery_name in mitxonline_k8s_app.celery_deployment_names:
     make_vpa(
         name=f"{_celery_name}-vpa",
@@ -1220,7 +1238,12 @@ for _celery_name in mitxonline_k8s_app.celery_deployment_names:
         target_name=_celery_name,
         controlled_resources=["cpu", "memory"],
         container_name="celery-worker",
-        min_allowed=_worker_vpa_min_allowed,
+        min_allowed=(
+            _worker_vpa_min_allowed | {"memory": _upgrade_task_worker_min_memory}
+            if _celery_name == _upgrade_task_worker_name
+            and _upgrade_task_worker_min_memory
+            else _worker_vpa_min_allowed
+        ),
         max_allowed=_worker_vpa_max_allowed,
         opts=ResourceOptions(depends_on=[mitxonline_k8s_app]),
     )
